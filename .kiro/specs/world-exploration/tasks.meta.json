@@ -443,6 +443,149 @@
         "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
         "timestamp": 1795499539106
       }
+    ],
+    "9.1 Extend the layout to the full archive": [
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500287497
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500296368
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500448024
+      }
+    ],
+    "9.2 Render the full layout": [
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500287739
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500452536
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500582488
+      }
+    ],
+    "9.3 Implement feedback ownership text": [
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500287906
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500296592
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500448156
+      }
+    ],
+    "9.4 Extend the mode reducer for the supplied inputEnabled prop": [
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500288048
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500297488
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500449022
+      }
+    ],
+    "9.7 Implement the optional inputEnabled prop in the world module": [
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500288863
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500453355
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500583085
+      }
+    ],
+    "9.8 Write component tests for supplied and absent inputEnabled": [
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500289911
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500588153
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500665316
+      }
+    ],
+    "9.9 NON-IMPLEMENTATION: document the App.tsx change for team coordination": [
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500291008
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500588451
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500665783
+      }
+    ],
+    "10. Checkpoint - Milestone 3 complete": [
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500291878
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500668836
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500763627
+      }
+    ],
+    "9. Full layout, interaction feedback ownership and the inputEnabled prop": [
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500665850
+      }
     ]
   }
 }

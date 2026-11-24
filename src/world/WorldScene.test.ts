@@ -147,6 +147,41 @@ describe('WorldScene input (jsdom)', () => {
   });
 });
 
+describe('WorldScene feedback ownership text', () => {
+  it('aria-label states controls and that station messages appear in the status line', () => {
+    const { wrapper } = renderWorld();
+    const label = wrapper.getAttribute('aria-label') ?? '';
+    expect(label).toContain('W A S D');
+    expect(label).toContain('press E near a station');
+    expect(label).toContain(
+      'Station messages, including why a station cannot be used yet, appear in the status line below the scene.',
+    );
+  });
+
+  it('panel notice shows the exact neutral text after inspecting a station', () => {
+    h.target = 'vhs';
+    const { wrapper } = renderWorld();
+    fireEvent.keyDown(wrapper, { code: 'KeyE', key: 'e' });
+    expect(
+      screen.getByText(
+        'Station request sent. Click the view or press Enter to continue exploring. Messages appear below the scene.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('arcade prompt is identical across re-renders with different memoryShifted values', () => {
+    h.target = 'arcade';
+    const onInspect = vi.fn();
+    const { rerender } = render(createElement(WorldScene, { onInspect, memoryShifted: false }));
+    const text = () => document.querySelector('.world-prompt')?.textContent;
+    expect(text()).toBe('Press E to use the arcade cabinet');
+    rerender(createElement(WorldScene, { onInspect, memoryShifted: true }));
+    expect(text()).toBe('Press E to use the arcade cabinet');
+    rerender(createElement(WorldScene, { onInspect, memoryShifted: false }));
+    expect(text()).toBe('Press E to use the arcade cabinet');
+  });
+});
+
 describe('WorldScene fallback (no WebGL)', () => {
   it('fallback buttons call onInspect with vhs and arcade', () => {
     setWebgl(false);

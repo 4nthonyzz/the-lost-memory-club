@@ -1,7 +1,6 @@
-// Input mode state machine (prop-absent behavior only, M1).
+// Input mode state machine (prop absent and supplied inputEnabled).
 // Pure reducer: effects are returned as data and performed by the controller.
-// No timers, no React/three/DOM imports. The supplied `inputEnabled` prop rules
-// and the EXTERNAL_ENABLED event are added in task 9.4.
+// No timers, no React/three/DOM imports.
 import type { KeyRole } from './inputState';
 
 export type InputMode = 'capturePending' | 'active' | 'inspecting';
@@ -11,7 +10,7 @@ export interface ModeState {
   pointerLocked: boolean;
   /** True after a lock denial or an unsupported pointer lock API. */
   keyboardLookHint: boolean;
-  /** undefined = prop absent. Always undefined in M1. */
+  /** undefined = prop absent; otherwise the supplied value. */
   inputEnabled: boolean | undefined;
   /** True while E is physically held after a press that was consumed. */
   eRepeatGuard: boolean;
@@ -32,6 +31,7 @@ export type ModeEvent =
       hasTarget: boolean;
     }
   | { type: 'KEY_UP'; role: KeyRole | null }
+  | { type: 'EXTERNAL_ENABLED'; value: boolean }
   | { type: 'WINDOW_BLUR_OR_HIDDEN' };
 
 export type ModeEffect =
@@ -46,13 +46,13 @@ export interface ModeResult {
   effects: ModeEffect[];
 }
 
-/** Mount state: capturePending, no effects. */
-export function initialModeState(): ModeState {
+/** Mount state: capturePending (inspecting when the supplied prop is false), no effects. */
+export function initialModeState(inputEnabled?: boolean): ModeState {
   return {
-    mode: 'capturePending',
+    mode: inputEnabled === false ? 'inspecting' : 'capturePending',
     pointerLocked: false,
     keyboardLookHint: false,
-    inputEnabled: undefined,
+    inputEnabled,
     eRepeatGuard: false,
   };
 }
@@ -62,6 +62,7 @@ const none = (state: ModeState): ModeResult => ({ state, effects: [] });
 export function reduceMode(s: ModeState, e: ModeEvent): ModeResult {
   switch (e.type) {
     case 'CANVAS_CLICK':
+      if (s.mode === 'inspecting' && s.inputEnabled === false) return none(s);
       if (s.mode === 'inspecting') return resume(s, false);
       if (s.mode === 'capturePending') {
         return {
@@ -90,12 +91,29 @@ export function reduceMode(s: ModeState, e: ModeEvent): ModeResult {
       }
       return none(s);
 
+    case 'EXTERNAL_ENABLED':
+      return externalEnabled(s, e.value);
+
     case 'WINDOW_BLUR_OR_HIDDEN':
       return { state: s, effects: [{ type: 'CLEAR_INPUT' }] };
 
     case 'KEY_DOWN':
       return keyDown(s, e);
   }
+}
+
+function externalEnabled(s: ModeState, value: boolean): ModeResult {
+  if (s.inputEnabled === value) return none(s);
+  const first = s.inputEnabled === undefined;
+  if (!value) {
+    return {
+      state: { ...s, inputEnabled: false, mode: 'inspecting', pointerLocked: false },
+      effects: [{ type: 'RELEASE_POINTER_LOCK' }, { type: 'CLEAR_INPUT' }],
+    };
+  }
+  // value true: first supplied value changes nothing else; false -> true needs a later gesture.
+  if (first) return none({ ...s, inputEnabled: true });
+  return none({ ...s, inputEnabled: true, mode: 'capturePending', pointerLocked: false });
 }
 
 function resume(s: ModeState, byE: boolean): ModeResult {
@@ -112,6 +130,7 @@ function keyDown(s: ModeState, e: Extract<ModeEvent, { type: 'KEY_DOWN' }>): Mod
   const isE = e.code === 'KeyE' || e.role === 'interact';
 
   if (s.mode === 'inspecting') {
+    if (s.inputEnabled === false) return none(s);
     if (isEnter || isE) return resume(s, isE);
     return none(s);
   }
@@ -119,8 +138,10 @@ function keyDown(s: ModeState, e: Extract<ModeEvent, { type: 'KEY_DOWN' }>): Mod
   if (isE) {
     if (s.eRepeatGuard) return none(s);
     if (e.hasTarget) {
+      // Supplied prop: never suspend; the prop alone decides suspension.
+      const mode = s.inputEnabled === undefined ? 'inspecting' : 'capturePending';
       return {
-        state: { ...s, mode: 'inspecting', pointerLocked: false, eRepeatGuard: true },
+        state: { ...s, mode, pointerLocked: false, eRepeatGuard: true },
         effects: [
           { type: 'CALL_ON_INSPECT' },
           { type: 'RELEASE_POINTER_LOCK' },

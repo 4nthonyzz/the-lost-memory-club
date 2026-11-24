@@ -14,6 +14,8 @@ import { WorldCanvas } from './scene/WorldCanvas';
 export interface WorldSceneProps {
   onInspect: (station: StationId) => void;
   memoryShifted: boolean;
+  /** Optional. Absent behaves as before. When supplied, false suspends world input. */
+  inputEnabled?: boolean;
 }
 
 /** Delay before a lost WebGL context without restore switches to the fallback. */
@@ -22,7 +24,8 @@ const CONTEXT_RESTORE_TIMEOUT_MS = 3000;
 const WORLD_LABEL =
   'First-person 3D archive room. Click the scene to capture the mouse. ' +
   'Move with W A S D, look with the mouse, and press E near a station to inspect it. ' +
-  'Press Escape to release the mouse. Status messages appear in the status line below the scene.';
+  'Press Escape to release the mouse. Station messages, including why a station cannot be used yet, ' +
+  'appear in the status line below the scene.';
 
 function hasWebgl(): boolean {
   try {
@@ -75,6 +78,7 @@ function PlayerRigHost({
 function WorldInteractive({
   onInspect,
   memoryShifted,
+  inputEnabled,
   onFail,
 }: WorldSceneProps & { onFail: () => void }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -83,7 +87,7 @@ function WorldInteractive({
   const restoreTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const getTarget = useCallback(() => getTargetRef.current(), []);
-  const input = useWorldInput({ wrapperRef, onInspect, getTarget });
+  const input = useWorldInput({ wrapperRef, onInspect, getTarget, inputEnabled });
 
   const clearTimer = useCallback(() => {
     if (restoreTimer.current !== null) {
@@ -113,7 +117,7 @@ function WorldInteractive({
           onContextRestored={clearTimer}
         />
       </WorldCanvas>
-      <WorldOverlay mode={input.mode} target={target} canResume keyboardLookHint={input.keyboardLookHint} />
+      <WorldOverlay mode={input.mode} target={target} canResume={inputEnabled === undefined} keyboardLookHint={input.keyboardLookHint} />
     </div>
   );
 }
@@ -142,7 +146,7 @@ class WorldErrorBoundary extends Component<
   }
 }
 
-export function WorldScene({ onInspect, memoryShifted }: WorldSceneProps) {
+export function WorldScene({ onInspect, memoryShifted, inputEnabled }: WorldSceneProps) {
   const [webgl] = useState(hasWebgl);
   const [failed, setFailed] = useState(false);
   const fail = useCallback(() => setFailed(true), []);
@@ -151,7 +155,7 @@ export function WorldScene({ onInspect, memoryShifted }: WorldSceneProps) {
   if (!webgl || failed) return fallback;
   return (
     <WorldErrorBoundary fallback={fallback}>
-      <WorldInteractive onInspect={onInspect} memoryShifted={memoryShifted} onFail={fail} />
+      <WorldInteractive onInspect={onInspect} memoryShifted={memoryShifted} inputEnabled={inputEnabled} onFail={fail} />
     </WorldErrorBoundary>
   );
 }

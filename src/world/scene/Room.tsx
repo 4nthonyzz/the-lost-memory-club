@@ -26,6 +26,43 @@ export function Block({ box, y0 = 0, h, material }: BlockProps) {
   )
 }
 
+const DOOR_HEIGHT = 2.1
+
+/** Door frames (jambs match the frame Colliders), a lintel over the opening and a dark threshold strip. */
+function Doors() {
+  const { height, doors } = ROOM
+  return (
+    <group>
+      {doors.map((d) => {
+        const [a, b] = d.frames
+        const lintel: Aabb = {
+          minX: a.minX,
+          maxX: a.maxX,
+          minZ: a.minZ,
+          maxZ: b.maxZ,
+        }
+        const gap: Aabb = { minX: d.opening.minX, maxX: d.opening.maxX, minZ: a.maxZ, maxZ: b.minZ }
+        return (
+          <group key={d.id}>
+            {d.frames.map((f, i) => (
+              <Block key={i} box={f} h={DOOR_HEIGHT} material={materials.doorFrame} />
+            ))}
+            <Block box={lintel} y0={DOOR_HEIGHT} h={height - DOOR_HEIGHT} material={materials.doorFrame} />
+            {/* Doorway is open: a flat threshold strip, no leaf blocking the passage. */}
+            <mesh
+              geometry={geometries.plane}
+              material={materials.woodDark}
+              position={[(gap.minX + gap.maxX) / 2, 0.012, (gap.minZ + gap.maxZ) / 2]}
+              rotation={[-Math.PI / 2, 0, 0]}
+              scale={[gap.maxX - gap.minX, gap.maxZ - gap.minZ, 1]}
+            />
+          </group>
+        )
+      })}
+    </group>
+  )
+}
+
 export function Room() {
   const { bounds, height, walls } = ROOM
   const w = bounds.maxX - bounds.minX
@@ -51,6 +88,7 @@ export function Room() {
       {walls.map((box, i) => (
         <Block key={i} box={box} h={height} material={materials.wall} />
       ))}
+      <Doors />
     </group>
   )
 }

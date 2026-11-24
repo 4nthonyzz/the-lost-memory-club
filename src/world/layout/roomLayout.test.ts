@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { PLAYER_RADIUS, INTERACTION_RANGE } from '../logic/constants';
 import { overlapsAny } from '../logic/collision';
-import { selectInteractionTarget } from '../logic/targeting';
+import { segmentIntersectsAabb, selectInteractionTarget } from '../logic/targeting';
 import { COLLIDERS, ROOM, estimateTriangles, reachableCells } from './roomLayout';
-import type { Aabb } from '../worldTypes';
+import type { Aabb, StationDef } from '../worldTypes';
 
 const inside = (x: number, z: number, b: Aabb) =>
   x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ;
 
 describe('roomLayout', () => {
-  it('has the specified bounds, height and four walls', () => {
-    expect(ROOM.bounds).toEqual({ minX: -5, maxX: 5, minZ: -4, maxZ: 4 });
+  it('has the full-archive bounds, height and wall Colliders', () => {
+    expect(ROOM.bounds).toEqual({ minX: -5, maxX: 9.3, minZ: -4, maxZ: 4 });
     expect(ROOM.height).toBe(3);
-    expect(ROOM.walls).toHaveLength(4);
+    expect(ROOM.walls.length).toBeGreaterThanOrEqual(4);
     expect(Object.isFrozen(ROOM)).toBe(true);
     expect(Object.isFrozen(COLLIDERS)).toBe(true);
   });
@@ -64,5 +64,74 @@ describe('roomLayout', () => {
 
   it('estimates well under 20,000 triangles', () => {
     expect(estimateTriangles()).toBeLessThan(20000);
+  });
+
+  it('has the full archive content: 3 shelves, 2 furniture, 2 doors, 5 details', () => {
+    const count = (k: string) => ROOM.props.filter((p) => p.kind === k).length;
+    expect(count('shelf')).toBeGreaterThanOrEqual(3);
+    expect(count('furniture')).toBeGreaterThanOrEqual(2);
+    expect(count('detail')).toBeGreaterThanOrEqual(5);
+    expect(ROOM.doors.length).toBeGreaterThanOrEqual(2);
+    for (const p of ROOM.props) expect(typeof p.milestone).toBe('number');
+  });
+
+  it('adds solid props as Colliders and keeps non-solid details out', () => {
+    for (const p of ROOM.props) expect(COLLIDERS.includes(p.box)).toBe(p.solid);
+  });
+
+  it('door frames block, openings do not', () => {
+    for (const d of ROOM.doors) {
+      for (const f of d.frames) expect(COLLIDERS).toContain(f);
+      const mid = {
+        x: (d.opening.minX + d.opening.maxX) / 2,
+        z: (d.opening.minZ + d.opening.maxZ) / 2,
+      };
+      expect(overlapsAny(mid, PLAYER_RADIUS, COLLIDERS)).toBe(false);
+      for (const f of d.frames) {
+        const fc = { x: (f.minX + f.maxX) / 2, z: (f.minZ + f.maxZ) / 2 };
+        expect(overlapsAny(fc, PLAYER_RADIUS, COLLIDERS)).toBe(true);
+      }
+    }
+  });
+
+  it('reaches the Arcade_Area and every Station from the start through the doors', () => {
+    const cells = reachableCells(ROOM.start);
+    expect(cells.some((c) => c.x > 8 && Math.abs(c.z) < 1)).toBe(true);
+    for (const d of ROOM.doors) {
+      const mid = { x: 5.15, z: (d.opening.minZ + d.opening.maxZ) / 2 };
+      expect(cells.some((c) => Math.hypot(c.x - mid.x, c.z - mid.z) < 0.15)).toBe(true);
+    }
+    for (const s of ROOM.stations) {
+      expect(cells.some((c) => Math.hypot(c.x - s.anchor.x, c.z - s.anchor.z) <= 1.8)).toBe(true);
+    }
+  });
+
+  it('keeps door openings from blocking line of sight to the arcade Station', () => {
+    const arcade = ROOM.stations.find((s) => s.id === 'arcade')!;
+    const cells = reachableCells(ROOM.start);
+    for (const d of ROOM.doors) {
+      const zMid = (d.opening.minZ + d.opening.maxZ) / 2;
+      const spot = cells.find((c) => Math.abs(c.x - 4.4) < 0.05 && Math.abs(c.z - zMid) < 0.05)!;
+      expect(spot).toBeDefined();
+      for (const box of COLLIDERS) {
+        if (box === arcade.collider) continue;
+        expect(segmentIntersectsAabb(spot, arcade.anchor, box)).toBe(false);
+      }
+    }
+  });
+
+  it('selects a Station through a doorway and not past a door frame', () => {
+    // Synthetic Station inside the Arcade_Area, in line with the north door.
+    const inArea: StationDef = {
+      id: 'arcade',
+      anchor: { x: 6.2, z: -1.2 },
+      collider: { minX: 6.2, maxX: 7, minZ: -1.4, maxZ: -1.2 },
+    };
+    const yawEast = -Math.PI / 2;
+    const throughDoor = { x: 4.4, z: -1.2 };
+    expect(selectInteractionTarget(throughDoor, yawEast, [inArea], COLLIDERS)).toBe('arcade');
+    const behindWall = { x: 4.4, z: -2.5 };
+    const toward = Math.atan2(-(inArea.anchor.x - behindWall.x), -(inArea.anchor.z - behindWall.z));
+    expect(selectInteractionTarget(behindWall, toward, [inArea], COLLIDERS)).toBeNull();
   });
 });

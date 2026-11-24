@@ -330,8 +330,8 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 
 ### Milestone 3: Collision and interactions
 
-- [ ] 9. Full layout, interaction feedback ownership and the inputEnabled prop
-  - [ ] 9.1 Extend the layout to the full archive
+- [x] 9. Full layout, interaction feedback ownership and the inputEnabled prop
+  - [x] 9.1 Extend the layout to the full archive
     - Files: `src/world/layout/roomLayout.ts`, `src/world/layout/roomLayout.test.ts`.
     - Add the Arcade_Area (east opening to a 4 by 4 area), at least 2 doors (frame-side Colliders block, opening does not), shelf C (at least 3 shelves total), chair and couch (at least 2 furniture pieces), at least 5 additional detail objects (tapes, boxes, posters, cables) with Colliders where solid. Prop definitions carry `milestone` and optional `glbPath`.
     - Acceptance: all Stations reachable from the start through doors; at least 3 shelves, 2 furniture, 2 doors, 5 details; triangle estimate below 20,000; line of sight from a door-adjacent position to the arcade Station is not blocked by door openings.
@@ -340,7 +340,7 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: layout data only; M1 behavior and `WorldSceneProps` unchanged.
     - _Requirements: 1.1, 1.2, 1.5, 1.6, 1.7, 6.1, 7.3, 13.8, 19.10_
 
-  - [ ] 9.2 Render the full layout
+  - [x] 9.2 Render the full layout
     - Files: `src/world/scene/Props.tsx`, `src/world/scene/Stations.tsx`, `src/world/scene/Room.tsx`.
     - Render new props, doors and the Arcade_Area from primitives; repeated objects share geometry and use `InstancedMesh` above about 10 copies; arcade attract screen stays identical for every game state.
     - Acceptance: `npm run build` passes; visible objects match layout colliders; light count at or below 4.
@@ -349,7 +349,7 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: render-only.
     - _Requirements: 1.3, 1.4, 1.5, 1.6, 1.8, 14.4, 14.6, 20.6_
 
-  - [ ] 9.3 Implement feedback ownership text
+  - [x] 9.3 Implement feedback ownership text
     - Files: `src/world/overlay/InteractionPrompt.tsx`, `src/world/overlay/PanelOpenNotice.tsx`, `src/world/overlay/ControlsHint.tsx`, `src/world/WorldScene.tsx`.
     - Prompt text is a constant map independent of any prop. Canvas `aria-label` states the controls and that station messages, including why a station cannot be used yet, appear in the status line below the scene. Panel notice is neutral: "Station request sent. Click the view or press Enter to continue exploring. Messages appear below the scene." No overlay covers, replaces or duplicates the App status line.
     - Acceptance: the arcade prompt is identical regardless of props; no GameState or lock prop exists.
@@ -358,7 +358,7 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: the World_Module does not read or infer unlock status; the lock message stays in `App.tsx`.
     - _Requirements: 8.1, 8.6, 8.7, 11.2, 11.6, 16.6, 16.7, 16.13, 20.1, 20.2, 20.3, 20.4, 20.5, 20.7, 20.8, 20.9_
 
-  - [ ] 9.4 Extend the mode reducer for the supplied inputEnabled prop
+  - [x] 9.4 Extend the mode reducer for the supplied inputEnabled prop
     - Files: `src/world/logic/inputMode.ts`, `src/world/logic/inputMode.supplied.test.ts`.
     - Add `inputEnabled: boolean | undefined` handling and `EXTERNAL_ENABLED`. Supplied prop: `onInspect` never enters `inspecting` (emits `CALL_ON_INSPECT`, `RELEASE_POINTER_LOCK`, `CLEAR_INPUT`, stays or moves to `capturePending`); `true -> false` enters `inspecting` without `CALL_ON_INSPECT`; `false -> true` enters `capturePending` without `REQUEST_POINTER_LOCK`; click, Enter and E are ignored while the prop is false. Absent prop keeps the existing behavior unchanged.
     - Acceptance: all supplied-prop transitions of the state diagram covered; prop-absent tests from 3.7 still pass.
@@ -380,7 +380,7 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Depends on: 9.4, 2.2.
     - **Validates: Requirements 4.10, 4.11, 11.18, 11.23**
 
-  - [ ] 9.7 Implement the optional inputEnabled prop in the world module
+  - [x] 9.7 Implement the optional inputEnabled prop in the world module
     - Files: `src/world/WorldScene.tsx`, `src/world/controller/useWorldInput.ts`, `src/world/controller/usePlayerRig.ts`.
     - Add `inputEnabled?: boolean` to `WorldSceneProps` (additive, default true). Pass the value to `initialModeState` and send `EXTERNAL_ENABLED` only from an effect that fires when a supplied value changes. An absent prop is treated as true for rendering only, never as a supplied true. The panel notice shows only while the world is `inspecting`. Never request pointer lock on prop change. Do not declare `reducedDistortion` here.
     - Acceptance: existing call sites compile unchanged without the prop; with the prop false the world ignores input and shows the notice; with the prop true after false it shows the Capture_Overlay and waits for a user gesture; `src/App.tsx` is not modified.
@@ -389,13 +389,13 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: P1 implemented on the world side only. No prop carries lock, unlock or progress data.
     - _Requirements: 11.16, 11.17, 11.18, 11.19, 11.20, 11.21, 11.22, 11.23, 11.24, 11.25, 16.11, 16.12, 16.13, 17.5, 17.7_
 
-  - [ ] 9.8 Write component tests for supplied and absent inputEnabled
+  - [x] 9.8 Write component tests for supplied and absent inputEnabled
     - Files: `src/world/WorldScene.inputEnabled.test.tsx`.
     - jsdom docblock; the DOM test packages are already installed by required task 5.8. Cases: prop absent, E calls `onInspect` and the notice shows; prop true, E calls `onInspect` and the notice does not show (Capture_Overlay shows); prop toggled true to false to true ends in Capture_Overlay and does not call `requestPointerLock`; click while false does nothing; a keydown from a focused input outside the wrapper does not move the player or call `onInspect`.
     - Depends on: 9.7.
     - _Requirements: 11.12, 11.13, 11.16, 11.17, 11.20, 11.21, 11.22, 13.9, 13.13_
 
-  - [ ] 9.9 NON-IMPLEMENTATION: document the App.tsx change for team coordination
+  - [x] 9.9 NON-IMPLEMENTATION: document the App.tsx change for team coordination
     - Files: `.kiro/specs/world-exploration/integration-notes.md` (new, documentation only). **Do not edit `src/App.tsx`.**
     - Describe the proposed P1 change (`<WorldScene inputEnabled={station === null} ... />`), the expected sequences for an unlocked request and a locked arcade request, the prop-absent limitation (user resumes with click, Enter or E), and the question for the App.tsx owner. State that P1 is approved as a proposal only and that App.tsx stays unmodified until the team coordinates.
     - Acceptance: file exists and `git diff` shows no change to `src/App.tsx`.
@@ -404,7 +404,7 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: no code change outside the spec folder.
     - _Requirements: 11.10, 17.5, 17.7, 17.8, 17.9_
 
-- [ ] 10. Checkpoint - Milestone 3 complete
+- [x] 10. Checkpoint - Milestone 3 complete
   - Run `npm run typecheck`, `npm test`, `npm run build`.
   - Manual playtest: walk both areas through doors; all Stations reachable; arcade prompt text unchanged regardless of progress; after a locked-arcade request in the running App the status line message is visible and not covered; resume works with the prop absent.
   - Confirm `git diff` is limited to `src/world/`, `package.json`, lockfile and the spec folder.

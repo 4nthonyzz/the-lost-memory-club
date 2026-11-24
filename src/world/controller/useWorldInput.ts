@@ -35,6 +35,8 @@ export interface UseWorldInputOptions {
   onInspect: (id: StationId) => void;
   /** Returns the current interaction target, or null. Read at key time. */
   getTarget: () => StationId | null;
+  /** Optional external switch. Absent means unchanged default behavior. */
+  inputEnabled?: boolean;
 }
 
 export interface WorldInput {
@@ -53,7 +55,10 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
   const { wrapperRef, lockElementRef } = options;
   const { mouseDeltaRef, consumeMouseDelta, clearMouseDelta } = usePointerLock();
 
-  const stateRef = useRef<ModeState>(initialModeState());
+  const stateRef = useRef<ModeState>(initialModeState(options.inputEnabled));
+  // Set by the listener effect; lets the prop effect run the reducer and its effects.
+  const dispatchRef = useRef<((event: ModeEvent, gesture: boolean) => void) | null>(null);
+  const prevInputEnabledRef = useRef<boolean | undefined>(options.inputEnabled);
   const heldKeysRef = useRef<HeldKeys>(EMPTY_HELD_KEYS);
   const [mode, setMode] = useState<InputMode>(stateRef.current.mode);
   const [keyboardLookHint, setKeyboardLookHint] = useState<boolean>(false);
@@ -119,6 +124,8 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
         setKeyboardLookHint(result.state.keyboardLookHint);
       }
     };
+
+    dispatchRef.current = dispatch;
 
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as Element | null;
@@ -195,6 +202,7 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
     doc.addEventListener('visibilitychange', onVisibility);
 
     return () => {
+      dispatchRef.current = null;
       wrapper.removeEventListener('keydown', onKeyDown);
       wrapper.removeEventListener('keyup', onKeyUp);
       wrapper.removeEventListener('click', onClick);
@@ -205,6 +213,16 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
       clearInput();
     };
   }, [wrapperRef, lockElementRef, mouseDeltaRef, clearMouseDelta]);
+
+  // EXTERNAL_ENABLED only when a supplied value changes. Not on mount, not when
+  // absent, not on unrelated re-renders. Never requests pointer lock (gesture=false).
+  const { inputEnabled } = options;
+  useEffect(() => {
+    const prev = prevInputEnabledRef.current;
+    prevInputEnabledRef.current = inputEnabled;
+    if (inputEnabled === undefined || inputEnabled === prev) return;
+    dispatchRef.current?.({ type: 'EXTERNAL_ENABLED', value: inputEnabled }, false);
+  }, [inputEnabled]);
 
   return { mode, keyboardLookHint, getMode, heldKeysRef, mouseDeltaRef, consumeMouseDelta };
 }
