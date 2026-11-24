@@ -4,8 +4,10 @@
  * driver mutates wall, screen and overlay materials from the blend progress.
  */
 import {
+  AdditiveBlending,
   BoxGeometry,
   CanvasTexture,
+  DoubleSide,
   ClampToEdgeWrapping,
   CylinderGeometry,
   LinearFilter,
@@ -22,10 +24,16 @@ import { ROOM } from '../layout/roomLayout'
 import { BASE_ARCADE_SCREEN_COLOR, BASE_CRT_SCREEN_COLOR, BASE_WALL_COLOR } from './memoryShift'
 import {
   FLOOR_METRES_PER_REPEAT,
+  SPINE_CASE_SIDE_CELL,
+  SPINE_COVER_CELL,
+  SPINE_VARIANT_COUNT,
   TEXTURE_IDS,
   TEXTURE_SPECS,
+  WALL_METRES_U,
+  WALL_METRES_V,
   type Ctx2D,
   type TextureFilter,
+  spineCellUv,
   type TextureId,
 } from './proceduralTextures'
 
@@ -41,6 +49,27 @@ export const geometries = {
   /** Low-segment sphere (8 x 6) of diameter 1: joystick ball, bulb, bell. */
   sphere: new SphereGeometry(0.5, 8, 6),
 }
+
+/**
+ * Unit box per spine variant (task 18.2) with remapped UVs: the +Z face (the spine) shows the variant's atlas
+ * cell, every other face shows the cover cell (books) or the plastic side cell (slipcases). One InstancedMesh
+ * per variant keeps the shared geometry, so draw calls stay at one per variant per bookcase.
+ */
+function makeSpineGeometry(variant: number): BoxGeometry {
+  const g = new BoxGeometry(1, 1, 1)
+  const uv = g.getAttribute('uv')
+  const side = spineCellUv(variant < 3 ? SPINE_COVER_CELL : SPINE_CASE_SIDE_CELL)
+  const spine = spineCellUv(variant)
+  // BoxGeometry face order: +x, -x, +y, -y, +z, -z, four vertices each, local uv in 0..1.
+  for (let i = 0; i < uv.count; i++) {
+    const r = Math.floor(i / 4) === 4 ? spine : side
+    uv.setXY(i, r.u0 + uv.getX(i) * (r.u1 - r.u0), r.v0 + uv.getY(i) * (r.v1 - r.v0))
+  }
+  uv.needsUpdate = true
+  return g
+}
+
+export const spineGeometries: readonly BoxGeometry[] = Array.from({ length: SPINE_VARIANT_COUNT }, (_, v) => makeSpineGeometry(v))
 
 const lambert = (color: string) => new MeshLambertMaterial({ color })
 
@@ -93,8 +122,8 @@ export const materials = {
   spineA: lambert('#a02a2a'),
   spineB: lambert('#2a4aa0'),
   spineC: lambert('#c9a02a'),
-  /** White base so per-instance colours show true. Used by the shelf tape InstancedMeshes. */
-  tapeSpine: lambert('#ffffff'),
+  /** White base: the spine atlas (when available) is multiplied by each book's instance colour. Used by the bookcase InstancedMeshes. */
+  bookSpine: lambert('#ffffff'),
   /** 15.6 Arcade_Area dressing. Fixed colours. Sign face and lettering are emissive basic materials, not lights. */
   signBack: lambert('#1a1020'),
   signGlow: new MeshBasicMaterial({ color: '#2a0e2e' }),
@@ -110,6 +139,32 @@ export const materials = {
   screenOff: lambert('#050508'),
   marqueeOff: lambert('#2a2018'),
   runner: lambert('#4a2a6a'),
+  /** 18.1 north-wall focal zone placeholders: grey metal filing cabinets and a cork board. */
+  filingGrey: lambert('#6f7782'),
+  filingDark: lambert('#59606b'),
+  /** 18.3: the second cabinet is a slightly warmer, greener grey. Label slots are bright metal. */
+  filingGreyB: lambert('#7a7d70'),
+  filingDarkB: lambert('#656858'),
+  labelSlot: lambert('#d4d8de'),
+  /** Cork board: the cork texture (white multiplier) replaces the flat colour when a canvas exists. */
+  cork: lambert('#9a7448'),
+  /** Woven rug decal. A separate material from `rug`, which colours the couch. */
+  rugWoven: lambert('#7a2c3c'),
+  /** Overhead conduit pipes and clamps, junction box cover. */
+  conduit: lambert('#6b6e76'),
+  /** Archival cardboard boxes and their packing tape. */
+  cardboard: lambert('#a98457'),
+  cardboardDark: lambert('#7e603a'),
+  /** Warm desk-lamp shade: emissive basic material (not a light). The halo is an additive glow plane. */
+  lampEmissive: new MeshBasicMaterial({ color: '#ffb255' }),
+  lampHalo: new MeshBasicMaterial({
+    color: '#ffb060',
+    transparent: true,
+    opacity: 0.55,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    side: DoubleSide,
+  }),
   /** Screens: tinted only by the Memory_Shift blend. They never read lock state. */
   crtScreen: new MeshBasicMaterial({ color: BASE_CRT_SCREEN_COLOR }),
   arcadeScreen: new MeshBasicMaterial({ color: BASE_ARCADE_SCREEN_COLOR }),
@@ -125,9 +180,40 @@ export const overlayMaterials = [
   { material: materials.shiftPlaque, maxOpacity: 0.95 },
 ]
 
+/**
+ * Wall boxes with metric UVs (task 18.3): the wall texture repeats every WALL_METRES_U metres along the wall
+ * and once per WALL_METRES_V metres of height, so the wainscot panels keep their size on every wall length.
+ * UVs follow world coordinates, so neighbouring wall boxes line up. Cached by footprint, disposed once.
+ */
+const wallGeometryCache = new Map<string, BoxGeometry>()
+
+export function wallGeometry(box: { minX: number; maxX: number; minZ: number; maxZ: number }, height: number): BoxGeometry {
+  const key = `${box.minX},${box.maxX},${box.minZ},${box.maxZ},${height}`
+  const cached = wallGeometryCache.get(key)
+  if (cached) return cached
+  const cx = (box.minX + box.maxX) / 2
+  const cz = (box.minZ + box.maxZ) / 2
+  const g = new BoxGeometry(box.maxX - box.minX, height, box.maxZ - box.minZ)
+  const pos = g.getAttribute('position')
+  const uv = g.getAttribute('uv')
+  for (let i = 0; i < uv.count; i++) {
+    const wx = pos.getX(i) + cx
+    const wy = pos.getY(i) + height / 2
+    const wz = pos.getZ(i) + cz
+    // Face order: +x, -x, +y, -y, +z, -z.
+    const face = Math.floor(i / 4)
+    if (face < 2) uv.setXY(i, wz / WALL_METRES_U, wy / WALL_METRES_V)
+    else if (face < 4) uv.setXY(i, wx / WALL_METRES_U, wz / WALL_METRES_V)
+    else uv.setXY(i, wx / WALL_METRES_U, wy / WALL_METRES_V)
+  }
+  uv.needsUpdate = true
+  wallGeometryCache.set(key, g)
+  return g
+}
+
 // ---------------------------------------------------------------------------------------------
-// Procedural canvas textures (task 15.7). Deterministic, drawn once, never redrawn per frame.
-// Budget: 13 textures, about 4 MB estimated (see proceduralTextures.ts), limit 8 MB.
+// Procedural canvas textures (task 15.7, 18.3). Deterministic, drawn once, never redrawn per frame.
+// Budget: 18 textures, about 7.5 MB estimated (see proceduralTextures.ts), limit 8 MB.
 // ---------------------------------------------------------------------------------------------
 
 /** The part of a canvas element that createCanvasTexture needs. */
@@ -240,6 +326,12 @@ const TEXTURE_BINDINGS: readonly TextureBinding[] = [
   { material: 'crateSlat', texture: 'crate', color: '#b89c78' },
   { material: 'grille', texture: 'grille', color: '#ffffff' },
   { material: 'deck', texture: 'deck', color: '#ffffff' },
+  { material: 'bookSpine', texture: 'spineAtlas', color: '#ffffff' },
+  /** The wall colour stays a near-white multiplier owned by Memory_Shift, so no `color` here. */
+  { material: 'wall', texture: 'wallPanel' },
+  { material: 'rugWoven', texture: 'rugWoven', color: '#ffffff' },
+  { material: 'cork', texture: 'corkBoard', color: '#ffffff' },
+  { material: 'lampHalo', texture: 'lampGlow', color: '#ffffff' },
 ]
 
 /**
@@ -286,6 +378,9 @@ export const SHARED_TEXTURE_IDS: readonly TextureId[] = TEXTURE_IDS
 /** Disposes every shared geometry, material and texture. Call on scene unmount. Safe to call twice. */
 export function disposeSharedResources(): void {
   for (const g of Object.values(geometries)) g.dispose()
+  for (const g of spineGeometries) g.dispose()
+  for (const g of wallGeometryCache.values()) g.dispose()
+  wallGeometryCache.clear()
   for (const m of Object.values(materials)) m.dispose()
   disposeTextures()
 }

@@ -4,9 +4,9 @@
  * Matrices are written once in a layout effect; nothing is allocated per frame.
  */
 import { useLayoutEffect, useMemo, useRef } from 'react'
-import { Object3D, type InstancedMesh } from 'three'
-import type { Part } from './modelDetail'
-import { ensureSharedTextures, geometries, materials } from './sharedResources'
+import { Color, Object3D, type InstancedMesh } from 'three'
+import { instanceColour, type BookInstance, type Part } from './modelDetail'
+import { ensureSharedTextures, geometries, materials, spineGeometries } from './sharedResources'
 
 function InstancedGroup({ items }: { items: readonly Part[] }) {
   const ref = useRef<InstancedMesh>(null)
@@ -27,6 +27,54 @@ function InstancedGroup({ items }: { items: readonly Part[] }) {
     mesh.computeBoundingSphere()
   }, [items])
   return <instancedMesh ref={ref} args={[geometries[first.geo], materials[first.mat], items.length]} />
+}
+
+function BookVariantMesh({ variant, items }: { variant: number; items: readonly BookInstance[] }) {
+  const ref = useRef<InstancedMesh>(null)
+  useLayoutEffect(() => {
+    const mesh = ref.current
+    if (!mesh) return
+    const o = new Object3D()
+    const c = new Color()
+    items.forEach((b, i) => {
+      o.position.set(b.pos[0], b.pos[1], b.pos[2])
+      o.rotation.set(b.rot[0], b.rot[1], b.rot[2])
+      o.scale.set(b.size[0], b.size[1], b.size[2])
+      o.updateMatrix()
+      mesh.setMatrixAt(i, o.matrix)
+      // The instance colour multiplies the spine atlas (or the flat white fallback).
+      mesh.setColorAt(i, c.set(instanceColour(b)))
+    })
+    mesh.instanceMatrix.needsUpdate = true
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+    mesh.computeBoundingSphere()
+  }, [items])
+  return <instancedMesh ref={ref} args={[spineGeometries[variant], materials.bookSpine, items.length]} />
+}
+
+/**
+ * Books and slipcases of one bookcase: one InstancedMesh per spine variant in use. Every variant has its
+ * own unit-box geometry with remapped UVs into the shared spine atlas, so per-instance colour and matrix
+ * are the only per-book data (task 18.2).
+ */
+export function BookMeshes({ instances }: { instances: readonly BookInstance[] }) {
+  useMemo(ensureSharedTextures, [])
+  const groups = useMemo(() => {
+    const map = new Map<number, BookInstance[]>()
+    for (const b of instances) {
+      const list = map.get(b.variant)
+      if (list) list.push(b)
+      else map.set(b.variant, [b])
+    }
+    return [...map.entries()].sort((a, b) => a[0] - b[0])
+  }, [instances])
+  return (
+    <group>
+      {groups.map(([variant, items]) => (
+        <BookVariantMesh key={variant} variant={variant} items={items} />
+      ))}
+    </group>
+  )
 }
 
 export function PartMeshes({ parts }: { parts: readonly Part[] }) {

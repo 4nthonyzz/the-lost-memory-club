@@ -11,6 +11,7 @@ import { ROOM } from '../layout/roomLayout'
 import type { Aabb } from '../worldTypes'
 import { facingFrame } from './assetPlacement'
 import { TEXTURE_IDS, totalTextureMemoryBytes } from './proceduralTextures'
+import { SHELF_IDS, shelfContents, shelfFrameParts } from './shelfModel'
 import type { geometries, materials } from './sharedResources'
 
 export type GeometryKey = keyof typeof geometries
@@ -66,26 +67,41 @@ function tiltX(parts: readonly Part[], pivot: Vec3, angle: number): Part[] {
 const centre = (b: Aabb) => ({ cx: (b.minX + b.maxX) / 2, cz: (b.minZ + b.maxZ) / 2, w: b.maxX - b.minX, d: b.maxZ - b.minZ })
 
 // ---------------------------------------------------------------------------------------------
-// CRT television and VCR deck (station "crt-vhs"; front faces +z at box.maxZ)
+// Media console island: CRT, VCR, tapes and reference monitor (station "crt-vhs"; front faces +z at box.maxZ)
 // ---------------------------------------------------------------------------------------------
 
-/** Y where the television casing starts (stand + VCR below it). Effects.tsx uses the same 0.6. */
-export const CRT_Y0 = 0.6
+/** Top of the media console, and the Y where the television casing starts. */
+export const CONSOLE_TOP = 0.7
+export const CRT_Y0 = CONSOLE_TOP
 
-/** Fixed emissive CRT screen rectangle. Must equal Effects.tsx crtScreenPlacement() (minus its z nudge). */
+/** Television footprint on the console: width, x offset from the console centre, and recess from the front face. */
+const CRT_W = 0.9
+const CRT_DX = -0.3
+const CRT_RECESS = 0.05
+
+/** World (or local) placement of the television in the frame of `box`: centre x and the z of its front face. */
+function crtFrame(box: Aabb) {
+  const { cx } = centre(box)
+  return { cx: cx + CRT_DX, front: box.maxZ - CRT_RECESS, w: CRT_W }
+}
+
+/** Fixed emissive CRT screen rectangle. Effects.tsx crtScreenPlacement() adds only a small z nudge. */
 export function crtScreenRect(box: Aabb, height: number) {
-  const { cx, w } = centre(box)
+  const f = crtFrame(box)
   const h = height - CRT_Y0
   return {
-    position: [cx - 0.05, CRT_Y0 + h / 2, box.maxZ + 0.005] as const,
-    scale: [w * 0.6, h * 0.7, 1] as const,
+    position: [f.cx - 0.05, CRT_Y0 + h / 2, f.front + 0.005] as const,
+    scale: [f.w * 0.6, h * 0.7, 1] as const,
   }
 }
 
+/** `box` is the console footprint; the television sits on top of it, left of centre. */
 export function crtTelevisionParts(box: Aabb, height: number): Part[] {
-  const { cx, w } = centre(box)
+  const f = crtFrame(box)
+  const w = f.w
   const h = height - CRT_Y0
   const cy = CRT_Y0 + h / 2
+  const top = CRT_Y0 + h
   const sx = -0.05
   const sw = w * 0.6
   const sh = h * 0.7
@@ -103,41 +119,381 @@ export function crtTelevisionParts(box: Aabb, height: number): Part[] {
     // Fixed emissive screen on the shared crtScreen material (tinted only by Memory_Shift).
     part('plane', 'crtScreen', [sx, cy, 0.005], [sw, sh, 1]),
     // Two knobs, speaker slits, power LED and badge on the right strip.
-    part('cylinderLow', 'metal', [0.385, 1.05, 0.012], [0.06, 0.025, 0.06], [HALF_PI, 0, 0]),
-    part('cylinderLow', 'metal', [0.385, 0.95, 0.012], [0.06, 0.025, 0.06], [HALF_PI, 0, 0]),
-    bx('grille', [0.385, 0.75, 0.003], [0.1, 0.14, 0.006]),
-    part('cylinderLow', 'led', [0.4, 0.64, 0.006], [0.02, 0.012, 0.02], [HALF_PI, 0, 0]),
-    bx('metal', [sx, 0.62, 0.003], [0.1, 0.014, 0.006]),
+    part('cylinderLow', 'metal', [0.385, cy + 0.15, 0.012], [0.06, 0.025, 0.06], [HALF_PI, 0, 0]),
+    part('cylinderLow', 'metal', [0.385, cy + 0.05, 0.012], [0.06, 0.025, 0.06], [HALF_PI, 0, 0]),
+    bx('grille', [0.385, cy - 0.15, 0.003], [0.1, 0.14, 0.006]),
+    part('cylinderLow', 'led', [0.4, cy - 0.26, 0.006], [0.02, 0.012, 0.02], [HALF_PI, 0, 0]),
+    bx('metal', [sx, cy - 0.28, 0.003], [0.1, 0.014, 0.006]),
     // Antenna stubs.
-    part('cylinderLow', 'metal', [0, 1.215, -0.3], [0.08, 0.03, 0.08]),
-    part('cylinderLow', 'metal', [0.07, 1.373, -0.3], [0.012, 0.32, 0.012], [0, 0, -0.45]),
-    part('cylinderLow', 'metal', [-0.07, 1.373, -0.3], [0.012, 0.32, 0.012], [0, 0, 0.45]),
+    part('cylinderLow', 'metal', [0, top + 0.015, -0.3], [0.08, 0.03, 0.08]),
+    part('cylinderLow', 'metal', [0.07, top + 0.173, -0.3], [0.012, 0.32, 0.012], [0, 0, -0.45]),
+    part('cylinderLow', 'metal', [-0.07, top + 0.173, -0.3], [0.012, 0.32, 0.012], [0, 0, 0.45]),
   ]
-  return offset(local, [cx, 0, box.maxZ])
+  return offset(local, [f.cx, 0, f.front])
 }
 
-export function vcrDeckParts(box: Aabb): Part[] {
-  const { cx, d } = centre(box)
-  const zf = -0.01
-  const local: Part[] = [
-    // Wooden stand: body, top ledge, two door panels with handles.
-    bx('wood', [0, 0.24, -d / 2], [box.maxX - box.minX, 0.48, d]),
-    bx('wood', [0, 0.49, -d / 2], [box.maxX - box.minX + 0.04, 0.02, d + 0.04]),
-    bx('woodDark', [-0.24, 0.24, 0.004], [0.44, 0.38, 0.008]),
-    bx('woodDark', [0.24, 0.24, 0.004], [0.44, 0.38, 0.008]),
-    bx('metal', [-0.07, 0.3, 0.012], [0.015, 0.08, 0.015]),
-    bx('metal', [0.07, 0.3, 0.012], [0.015, 0.08, 0.015]),
-    // VCR body, front slot, partly inserted cassette with label.
-    bx('plastic', [0, 0.55, -0.29], [0.9, 0.1, 0.56]),
-    bx('bezel', [-0.12, 0.555, zf + 0.003], [0.4, 0.04, 0.006]),
-    bx('tapeBlack', [-0.12, 0.555, -0.002], [0.19, 0.026, 0.104]),
-    bx('tapeLabel', [-0.12, 0.5685, 0.025], [0.1, 0.002, 0.03]),
-    // Small buttons, display strip, power LED.
-    ...[0, 1, 2, 3].map((i) => bx('metal', [0.12 + i * 0.045, 0.535, zf + 0.002], [0.035, 0.02, 0.01])),
-    bx('displayGreen', [0.34, 0.57, zf + 0.002], [0.1, 0.02, 0.008]),
-    part('cylinderLow', 'led', [0.4, 0.535, zf + 0.002], [0.015, 0.01, 0.015], [HALF_PI, 0, 0]),
+/** Inner geometry of the console shared by the body, the VCR bay and the tape stacks. */
+const CONSOLE_PANEL = 0.04
+const SHELF_Y = 0.3
+const BAY_RIGHT_DX = 0.25 // x of the divider between the VCR bay and the cabinet, from the console centre
+
+/**
+ * Wide 1990s wooden media console: plinth, end panels, top slab, back, a divider that closes a VCR bay on
+ * the left (lower shelf at 0.3 m) and a two-door cabinet on the right. Front faces +Z at box.maxZ.
+ */
+export function mediaConsoleParts(box: Aabb): Part[] {
+  const { cx, cz, w, d } = centre(box)
+  const f = box.maxZ
+  const bodyH = CONSOLE_TOP - 0.02
+  const doorW = (w / 2 - BAY_RIGHT_DX - CONSOLE_PANEL) / 2 - 0.01
+  const doorX = cx + BAY_RIGHT_DX + CONSOLE_PANEL / 2 + 0.005 + doorW / 2
+  return [
+    bx('woodDark', [cx, 0.04, cz], [w - 0.04, 0.08, d - 0.04]),
+    bx('wood', [box.minX + CONSOLE_PANEL / 2, 0.38, cz], [CONSOLE_PANEL, 0.6, d]),
+    bx('wood', [box.maxX - CONSOLE_PANEL / 2, 0.38, cz], [CONSOLE_PANEL, 0.6, d]),
+    bx('woodDark', [cx, 0.38, box.minZ + 0.01], [w - 0.08, 0.6, 0.02]),
+    bx('wood', [cx, bodyH, cz], [w + 0.06, 0.04, d + 0.04]),
+    bx('wood', [cx + BAY_RIGHT_DX, 0.38, cz], [CONSOLE_PANEL, 0.6, d - 0.04]),
+    // Lower shelf of the VCR bay and the dark bay interior behind it.
+    bx('wood', [cx + (BAY_RIGHT_DX - w / 2) / 2, SHELF_Y, cz], [BAY_RIGHT_DX + w / 2 - 2 * CONSOLE_PANEL, 0.03, d - 0.04]),
+    // Two cabinet doors with handles.
+    bx('woodDark', [doorX, 0.36, f + 0.004], [doorW, 0.56, 0.012]),
+    bx('woodDark', [doorX + doorW + 0.02, 0.36, f + 0.004], [doorW, 0.56, 0.012]),
+    bx('metal', [doorX + doorW / 2 - 0.04, 0.4, f + 0.016], [0.015, 0.1, 0.015]),
+    bx('metal', [doorX + doorW / 2 + 0.06, 0.4, f + 0.016], [0.015, 0.1, 0.015]),
   ]
-  return offset(local, [cx, 0, box.maxZ])
+}
+
+/** VCR on the console's lower shelf: front slot, partly inserted cassette, buttons, display strip, LED. */
+export function vcrDeckParts(box: Aabb): Part[] {
+  const { cx, cz, w, d } = centre(box)
+  const vw = 0.62
+  const vcx = cx + (BAY_RIGHT_DX - w / 2) / 2 - 0.08
+  const front = cz + d / 2 - 0.06
+  const y = SHELF_Y + 0.015 + 0.05
+  const zf = front + 0.003
+  return [
+    bx('plastic', [vcx, y, front - 0.19], [vw, 0.1, 0.38]),
+    bx('bezel', [vcx - 0.12, y + 0.005, zf], [0.28, 0.04, 0.006]),
+    bx('tapeBlack', [vcx - 0.12, y + 0.005, front - 0.045], [0.19, 0.026, 0.104]),
+    bx('tapeLabel', [vcx - 0.12, y + 0.0185, front - 0.02], [0.1, 0.002, 0.03]),
+    ...[0, 1, 2, 3].map((i) => bx('metal', [vcx + 0.08 + i * 0.045, y - 0.015, zf + 0.002], [0.035, 0.02, 0.01])),
+    bx('displayGreen', [vcx + 0.22, y + 0.02, zf + 0.002], [0.08, 0.02, 0.008]),
+    part('cylinderLow', 'led', [vcx + 0.26, y - 0.015, zf + 0.002], [0.015, 0.01, 0.015], [HALF_PI, 0, 0]),
+  ]
+}
+
+/** Stacked VHS tapes: one stack on the console top, one on the VCR shelf next to the VCR. */
+export function consoleTapeParts(box: Aabb): Part[] {
+  const { cx, cz, d } = centre(box)
+  const parts: Part[] = []
+  const stack = (x: number, z: number, y0: number, n: number, rotY: number) => {
+    for (let i = 0; i < n; i++) {
+      parts.push(bx(i % 2 ? 'spineB' : 'tapeBlack', [x, y0 + 0.015 + i * 0.03, z], [0.19, 0.03, 0.1], [0, rotY * (i % 2 ? -1 : 1), 0]))
+    }
+    parts.push(bx('tapeLabel', [x, y0 + 0.03 * n + 0.001, z], [0.1, 0.002, 0.06]))
+  }
+  stack(cx + 0.3, cz + d / 2 - 0.2, CONSOLE_TOP, 4, 0.12)
+  stack(cx + BAY_RIGHT_DX - 0.17, cz + d / 2 - 0.2, SHELF_Y + 0.015, 3, 0.1)
+  return parts
+}
+
+/** Small secondary reference monitor on the right end of the console top. Own dim screen, not the shared crtScreen. */
+export function referenceMonitorParts(box: Aabb): Part[] {
+  const { cx, cz, w, d } = centre(box)
+  const mx = cx + w / 2 - 0.32
+  const mw = 0.34
+  const mh = 0.28
+  const y0 = CONSOLE_TOP
+  const front = cz + d / 2 - 0.12
+  return [
+    bx('casing', [mx, y0 + mh / 2, front - 0.1], [mw, mh, 0.2]),
+    bx('casingDark', [mx, y0 + mh / 2 + 0.01, front - 0.26], [mw * 0.6, mh * 0.7, 0.14]),
+    bx('bezel', [mx, y0 + mh / 2, front + 0.002], [mw * 0.86, mh * 0.82, 0.006]),
+    part('plane', 'screenOff', [mx, y0 + mh / 2, front + 0.006], [mw * 0.74, mh * 0.66, 1]),
+    part('cylinderLow', 'led', [mx + mw * 0.38, y0 + 0.03, front + 0.003], [0.015, 0.01, 0.015], [HALF_PI, 0, 0]),
+  ]
+}
+
+export const FILING_DRAWERS = 4
+
+/**
+ * Metal filing cabinet, front on +Z (task 18.3): plinth, body, an overhanging top lip, and four drawers.
+ * Each drawer face sits behind a raised four-strip frame (so it reads as recessed), with a dark gap
+ * outline, a round-bar pull on two posts, a bright label slot and a paper label with an ink line.
+ * `variant` 1 uses a warmer grey, so two cabinets side by side do not look identical.
+ */
+export function filingCabinetParts(box: Aabb, height: number, variant = 0): Part[] {
+  const { cx, cz, w, d } = centre(box)
+  const f = box.maxZ
+  const body: MaterialKey = variant === 0 ? 'filingGrey' : 'filingGreyB'
+  const face: MaterialKey = variant === 0 ? 'filingDark' : 'filingDarkB'
+  const base = 0.06
+  const lip = 0.03
+  const parts: Part[] = [
+    bx('bezel', [cx, base / 2, cz], [w - 0.04, base, d - 0.04]),
+    bx(body, [cx, (height - lip + base) / 2, cz], [w, height - lip - base, d]),
+    bx(body, [cx, height - lip / 2, cz + 0.005], [w + 0.02, lip, d + 0.03]),
+  ]
+  const pitch = (height - base - lip) / FILING_DRAWERS
+  const fw = w - 0.03
+  const fh = pitch - 0.012
+  const s = 0.012
+  for (let i = 0; i < FILING_DRAWERS; i++) {
+    const y = base + pitch * (i + 0.5)
+    parts.push(
+      // Dark gap outline, then the recessed drawer face, then the raised frame strips around it.
+      bx('bezel', [cx, y, f + 0.001], [fw, fh, 0.002]),
+      bx(face, [cx, y, f + 0.004], [fw - 2 * s, fh - 2 * s, 0.004]),
+      bx(body, [cx, y + fh / 2 - s / 2, f + 0.006], [fw, s, 0.012]),
+      bx(body, [cx, y - fh / 2 + s / 2, f + 0.006], [fw, s, 0.012]),
+      bx(body, [cx - fw / 2 + s / 2, y, f + 0.006], [s, fh - 2 * s, 0.012]),
+      bx(body, [cx + fw / 2 - s / 2, y, f + 0.006], [s, fh - 2 * s, 0.012]),
+      // Label slot with its paper label and an ink line, in the upper part of the drawer.
+      bx('labelSlot', [cx, y + fh * 0.27, f + 0.007], [0.17, 0.05, 0.004]),
+      bx('tapeLabel', [cx, y + fh * 0.27, f + 0.0095], [0.14, 0.036, 0.002]),
+      bx('bezel', [cx, y + fh * 0.27, f + 0.0108], [0.1, 0.005, 0.001]),
+      // Pull: horizontal bar on two posts.
+      part('cylinderLow', 'metal', [cx, y - fh * 0.14, f + 0.034], [0.02, 0.16, 0.02], [0, 0, HALF_PI]),
+      bx('metal', [cx - 0.07, y - fh * 0.14, f + 0.018], [0.012, 0.012, 0.028]),
+      bx('metal', [cx + 0.07, y - fh * 0.14, f + 0.018], [0.012, 0.012, 0.028]),
+    )
+  }
+  return parts
+}
+
+/**
+ * Wall-mounted cork bulletin board on the north wall facing +Z (task 18.3): a dark backing, the cork
+ * texture plane (pinned cards, Polaroids, notes, red string) and a four-piece wooden frame.
+ * Everything stays within 0.075 m of the wall.
+ */
+export function bulletinBoardParts(): Part[] {
+  const p = layoutProp('bulletin-board')
+  const el = p.elevation ?? 0
+  const { cx, w } = centre(p.box)
+  const h = p.height
+  const cy = el + h / 2
+  const z = p.box.maxZ
+  const t = 0.05
+  return [
+    bx('woodDark', [cx, cy, z - 0.02], [w, h, 0.04]),
+    part('plane', 'cork', [cx, cy, z + 0.004], [w - 2 * t, h - 2 * t, 1]),
+    bx('wood', [cx, el + h - t / 2, z + 0.01], [w, t, 0.03]),
+    bx('wood', [cx, el + t / 2, z + 0.01], [w, t, 0.03]),
+    bx('wood', [cx - w / 2 + t / 2, cy, z + 0.01], [t, h - 2 * t, 0.03]),
+    bx('wood', [cx + w / 2 - t / 2, cy, z + 0.01], [t, h - 2 * t, 0.03]),
+  ]
+}
+
+export const ARCHIVE_BOX_IDS = ['archive-boxes-nw', 'archive-boxes-ne', 'archive-boxes-sw'] as const
+
+/**
+ * Archival tape boxes in a corner (task 18.3): a large cardboard box, a smaller rotated box on top and a
+ * third box beside them, each with packing-tape strips and a paper label with an ink line, plus two small
+ * tape stacks (on the top box and on the floor). Everything stays inside the layout footprint and height.
+ */
+export function archiveBoxParts(box: Aabb, height: number): Part[] {
+  const { cx, cz, w, d } = centre(box)
+  const parts: Part[] = []
+  const cardboardBox = (x: number, z: number, y0: number, bw: number, bh: number, bd: number, yaw: number) => {
+    const rot: Vec3 | undefined = yaw ? [0, yaw, 0] : undefined
+    const cs = Math.cos(yaw)
+    const sn = Math.sin(yaw)
+    // Local offsets (lx, lz) rotated about Y by the box yaw.
+    const at = (lx: number, ly: number, lz: number): Vec3 => [x + lx * cs + lz * sn, y0 + ly, z - lx * sn + lz * cs]
+    parts.push(
+      bx('cardboard', [x, y0 + bh / 2, z], [bw, bh, bd], rot),
+      bx('cardboardDark', at(0, bh + 0.002, 0), [0.05, 0.004, bd], rot),
+      bx('cardboardDark', at(0, bh * 0.5, bd / 2 + 0.001), [0.05, bh, 0.003], rot),
+      bx('tapeLabel', at(bw * 0.2, bh * 0.55, bd / 2 + 0.002), [bw * 0.4, bh * 0.28, 0.004], rot),
+      bx('bezel', at(bw * 0.2, bh * 0.55, bd / 2 + 0.0045), [bw * 0.28, 0.006, 0.002], rot),
+    )
+  }
+  const bigH = height * 0.5
+  const midH = height * 0.3
+  const stackH = height - bigH - midH
+  cardboardBox(cx - w * 0.18, cz - d * 0.12, 0, w * 0.55, bigH, d * 0.7, 0)
+  cardboardBox(cx - w * 0.18, cz - d * 0.12, bigH, w * 0.4, midH, d * 0.5, 0.25)
+  cardboardBox(cx + w * 0.26, cz + d * 0.28, 0, w * 0.3, height * 0.34, d * 0.35, -0.3)
+  // Two small stacks of loose tapes: one on top of the stack, one on the floor.
+  const tapeStack = (x: number, z: number, y0: number, n: number, yaw: number) => {
+    for (let i = 0; i < n; i++) parts.push(bx(i % 2 ? 'spineB' : 'tapeBlack', [x, y0 + 0.012 + i * 0.024, z], [0.1, 0.024, 0.052], [0, yaw, 0]))
+  }
+  tapeStack(cx - w * 0.18, cz - d * 0.12, bigH + midH, Math.max(1, Math.floor(stackH / 0.024)), 0.25)
+  tapeStack(cx + w * 0.26, cz - d * 0.25, 0, 2, 0.4)
+  return parts
+}
+
+// ---------------------------------------------------------------------------------------------
+// Task 18.3 room dressing: conduit, vents, cable loops, corner posts, wall clock, lamp
+// ---------------------------------------------------------------------------------------------
+
+/** Main-room interior box (walls[2] west and walls[3] east segment bound it in x). */
+export function mainRoomBox(): Aabb {
+  return { minX: ROOM.walls[2].maxX, maxX: ROOM.walls[3].minX, minZ: ROOM.bounds.minZ, maxZ: ROOM.bounds.maxZ }
+}
+
+/** Wall-mounted dressing may protrude at most this far from the wall face. */
+export const WALL_PROTRUSION_LIMIT = 0.15
+const CONDUIT_D = 0.06
+const CONDUIT_Y = ROOM.height - 0.2
+/** x of the vertical conduit drop to the junction box on the north wall. */
+const CONDUIT_DROP_X = 3
+
+/**
+ * Overhead metal conduit: a run along the north wall and one along the west wall just under the crown
+ * trim, elbow spheres at the corner and at the drop, a vertical drop to a junction box with a status LED,
+ * and bracket clamps. Everything hugs the walls (at most 0.09 m out) and never touches a Collider.
+ */
+export function conduitParts(): Part[] {
+  const r = mainRoomBox()
+  const zN = r.minZ + 0.06
+  const xW = r.minX + 0.06
+  const parts: Part[] = []
+  // North run, axis along X.
+  const nLen = r.maxX - r.minX - 0.24
+  parts.push(part('cylinderLow', 'conduit', [(r.minX + r.maxX) / 2, CONDUIT_Y, zN], [CONDUIT_D, nLen, CONDUIT_D], [0, 0, HALF_PI]))
+  // West run, axis along Z.
+  const wLen = r.maxZ - r.minZ - 0.24
+  parts.push(part('cylinderLow', 'conduit', [xW, CONDUIT_Y, (r.minZ + r.maxZ) / 2], [CONDUIT_D, wLen, CONDUIT_D], [HALF_PI, 0, 0]))
+  // Elbows.
+  parts.push(
+    part('sphere', 'conduit', [xW, CONDUIT_Y, zN], [0.08, 0.08, 0.08]),
+    part('sphere', 'conduit', [CONDUIT_DROP_X, CONDUIT_Y, zN], [0.08, 0.08, 0.08]),
+  )
+  // Drop and junction box (cover plate and LED on its front).
+  const dropBottom = 1.95
+  parts.push(part('cylinderLow', 'conduit', [CONDUIT_DROP_X, (CONDUIT_Y + dropBottom) / 2, zN], [CONDUIT_D, CONDUIT_Y - dropBottom, CONDUIT_D]))
+  parts.push(
+    bx('metal', [CONDUIT_DROP_X, dropBottom - 0.1, r.minZ + 0.05], [0.2, 0.2, 0.1]),
+    bx('conduit', [CONDUIT_DROP_X, dropBottom - 0.1, r.minZ + 0.105], [0.16, 0.16, 0.012]),
+    part('cylinderLow', 'led', [CONDUIT_DROP_X + 0.05, dropBottom - 0.05, r.minZ + 0.114], [0.02, 0.01, 0.02], [HALF_PI, 0, 0]),
+  )
+  // Bracket clamps: straddling the pipe, a little thicker than it.
+  for (const x of [-4, -2, 0, 2, 4]) parts.push(bx('metal', [x, CONDUIT_Y, r.minZ + 0.045], [0.04, 0.09, 0.07]))
+  for (const z of [-3, -1, 1, 3]) parts.push(bx('metal', [r.minX + 0.045, CONDUIT_Y, z], [0.07, 0.09, 0.04]))
+  for (const y of [2.5, 2.15]) parts.push(bx('metal', [CONDUIT_DROP_X, y, r.minZ + 0.045], [0.09, 0.04, 0.07]))
+  return parts
+}
+
+/** Ceiling ventilation grille (louvred box using the grille texture) and a smaller high wall grille on the south wall. */
+export function ventilationParts(): Part[] {
+  const r = mainRoomBox()
+  const y = ROOM.height
+  const vx = 0
+  const vz = -2.5
+  const parts: Part[] = [
+    bx('metal', [vx, y - 0.04, vz], [0.9, 0.08, 0.6]),
+    bx('grille', [vx, y - 0.083, vz], [0.8, 0.006, 0.5]),
+  ]
+  // Five angled louvre slats under the grille face.
+  for (let i = 0; i < 5; i++) parts.push(bx('metal', [vx, y - 0.092, vz - 0.2 + i * 0.1], [0.78, 0.008, 0.05], [0.5, 0, 0]))
+  // High wall grille on the south wall: frame plus textured face, 0.06 m deep at most.
+  const wx = -3
+  const wy = 2.45
+  parts.push(
+    bx('metal', [wx, wy, r.maxZ - 0.02], [0.7, 0.4, 0.04]),
+    bx('grille', [wx, wy, r.maxZ - 0.05], [0.6, 0.3, 0.02]),
+  )
+  return parts
+}
+
+const CABLE_THICK = 0.025
+
+/**
+ * A hanging cable loop between two ceiling clamps: `segs` straight box segments along a parabola that
+ * sags by `sag` metres at the middle. Segment boxes are oriented with Euler XYZ (pitch about Z first, then yaw about Y).
+ */
+export function cableLoopParts(a: readonly [number, number], b: readonly [number, number], sag: number, segs = 8): Part[] {
+  const y0 = ROOM.height - 0.05
+  const pts = Array.from({ length: segs + 1 }, (_, i) => {
+    const s = i / segs
+    return [a[0] + (b[0] - a[0]) * s, y0 - sag * 4 * s * (1 - s), a[1] + (b[1] - a[1]) * s] as const
+  })
+  const parts: Part[] = []
+  for (let i = 0; i < segs; i++) {
+    const [x0, yy0, z0] = pts[i]
+    const [x1, yy1, z1] = pts[i + 1]
+    const dx = x1 - x0
+    const dy = yy1 - yy0
+    const dz = z1 - z0
+    const len = Math.hypot(dx, dy, dz)
+    parts.push(
+      bx('plastic', [(x0 + x1) / 2, (yy0 + yy1) / 2, (z0 + z1) / 2], [len, CABLE_THICK, CABLE_THICK], [0, Math.atan2(-dz, dx), Math.atan2(dy, Math.hypot(dx, dz))]),
+    )
+  }
+  for (const p of [a, b]) parts.push(bx('metal', [p[0], ROOM.height - 0.025, p[1]], [0.05, 0.05, 0.05]))
+  return parts
+}
+
+/** Hanging cable loops: three in the main room and one in the Arcade_Area. */
+export function cableLoopsParts(): Part[] {
+  return [
+    ...cableLoopParts([-4.2, -3], [-2.6, -3], 0.45),
+    ...cableLoopParts([4.2, 1], [4.2, 2.8], 0.5),
+    ...cableLoopParts([0.7, 0], [2.3, 0], 0.4),
+    ...cableLoopParts([6, -1.2], [8.2, -1.2], 0.4),
+  ]
+}
+
+/** Slim trim posts in the four inner corners of the main room (0.1 m square, from the skirting to the crown). */
+export function cornerPostParts(): Part[] {
+  const r = mainRoomBox()
+  const y0 = SKIRT_H
+  const y1 = ROOM.height - CROWN_H
+  const post = 0.1
+  return [
+    [r.minX + post / 2, r.minZ + post / 2],
+    [r.maxX - post / 2, r.minZ + post / 2],
+    [r.minX + post / 2, r.maxZ - post / 2],
+    [r.maxX - post / 2, r.maxZ - post / 2],
+  ].map(([x, z]) => bx('trim', [x, (y0 + y1) / 2, z], [post, y1 - y0, post]))
+}
+
+/** Round wall clock high on the south wall above shelf-c, facing -Z. 0.05 m deep. */
+export function wallClockParts(): Part[] {
+  const r = mainRoomBox()
+  const x = 3
+  const y = 2.45
+  const z = r.maxZ - 0.025
+  return [
+    part('cylinder', 'woodDark', [x, y, z], [0.46, 0.05, 0.46], [HALF_PI, 0, 0]),
+    part('cylinder', 'tapeLabel', [x, y, z - 0.0275], [0.4, 0.006, 0.4], [HALF_PI, 0, 0]),
+    bx('bezel', [x, y + 0.07, z - 0.034], [0.012, 0.15, 0.004]),
+    bx('bezel', [x + 0.035, y - 0.01, z - 0.034], [0.016, 0.1, 0.004], [0, 0, 1.2]),
+    part('cylinderLow', 'bezel', [x, y, z - 0.036], [0.03, 0.006, 0.03], [HALF_PI, 0, 0]),
+  ]
+}
+
+/**
+ * Warm desk lamp on the east end of the reception desk. The layout has no separate south-east desk, so the
+ * lamp stands on the desk's east end (the existing lamp is at the west end). The shade is an emissive basic
+ * material: there is no light source, the halo comes from `deskLampGlowParts`.
+ */
+export function deskLampPosition() {
+  const desk = layoutProp('reception-desk')
+  return { x: desk.box.maxX - 0.25, z: (desk.box.minZ + desk.box.maxZ) / 2, top: desk.height }
+}
+
+export function deskLampParts(): Part[] {
+  const { x, z, top } = deskLampPosition()
+  return [
+    part('cylinder', 'metal', [x, top + 0.015, z], [0.18, 0.03, 0.18]),
+    part('cylinderLow', 'metal', [x - 0.02, top + 0.16, z], [0.02, 0.26, 0.02], [0, 0, 0.15]),
+    part('cylinder', 'lampEmissive', [x - 0.07, top + 0.33, z], [0.2, 0.12, 0.2]),
+    part('cylinder', 'metal', [x - 0.07, top + 0.395, z], [0.08, 0.012, 0.08]),
+    part('sphere', 'bulb', [x - 0.07, top + 0.28, z], [0.07, 0.07, 0.07]),
+  ]
+}
+
+/** Faint additive glow: two crossed vertical planes at the shade and a pool on the desk top. No light. */
+export function deskLampGlowParts(): Part[] {
+  const { x, z, top } = deskLampPosition()
+  return [
+    part('plane', 'lampHalo', [x - 0.07, top + 0.3, z], [0.6, 0.6, 1]),
+    part('plane', 'lampHalo', [x - 0.07, top + 0.3, z], [0.6, 0.6, 1], [0, HALF_PI, 0]),
+    part('plane', 'lampHalo', [x - 0.07, top + 0.006, z], [0.55, 0.55, 1], [-HALF_PI, 0, 0]),
+  ]
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -438,140 +794,10 @@ export function arcadeFloorParts(): Part[] {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Shelves (wooden frame as parts, tapes as per-shelf instanced data)
+// Bookcases: carcass parts, books and slipcases live in shelfModel.ts (task 18.2)
 // ---------------------------------------------------------------------------------------------
 
-export const SHELF_BOARD_YS = [0.05, 0.55, 1.0, 1.45, 1.95] as const
-const TAPE_PITCH = 0.075
-const TAPE_W = 0.03
-const TAPE_D = 0.1
-const TAPE_MIN_H = 0.16
-const TAPE_MAX_H = 0.2
-
-/** Deterministic spine palette (muted 1990s rental-store colours). */
-export const TAPE_PALETTE = [
-  '#a32a2a',
-  '#2a4aa3',
-  '#c9a02a',
-  '#2a7a4a',
-  '#d8d2b8',
-  '#5a2a7a',
-  '#d06a2a',
-  '#1c1c22',
-  '#2a8aa3',
-  '#8a8a92',
-] as const
-
-export interface TapeInstance {
-  pos: Vec3
-  /** Spine box size in world axes. */
-  size: Vec3
-  paletteIndex: number
-  labelPos: Vec3
-  /** Y rotation that makes the label plane face the open side of the shelf. */
-  labelRotY: number
-}
-
-/** Small deterministic PRNG (mulberry32) seeded from a string. */
-export function seededRng(seed: string): () => number {
-  let h = 2166136261
-  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619)
-  let a = h >>> 0
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0
-    let t = a
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
-
-interface ShelfFrame {
-  alongX: boolean
-  len: number
-  start: number
-  /** Unit direction of the open side (away from the wall the shelf stands against). */
-  open: readonly [number, number]
-  backX: number
-  backZ: number
-}
-
-function shelfFrame(box: Aabb): ShelfFrame {
-  const b = ROOM.bounds
-  const { cx, cz, w, d } = centre(box)
-  const alongX = w > d
-  if (alongX) {
-    const backNorth = Math.abs(box.minZ - b.minZ) < Math.abs(box.maxZ - b.maxZ)
-    return {
-      alongX,
-      len: w,
-      start: box.minX,
-      open: [0, backNorth ? 1 : -1],
-      backX: cx,
-      backZ: backNorth ? box.minZ + 0.02 : box.maxZ - 0.02,
-    }
-  }
-  const backWest = Math.abs(box.minX - b.minX) < Math.abs(box.maxX - b.maxX)
-  return {
-    alongX,
-    len: d,
-    start: box.minZ,
-    open: [backWest ? 1 : -1, 0],
-    backX: backWest ? box.minX + 0.02 : box.maxX - 0.02,
-    backZ: cz,
-  }
-}
-
-export function shelfFrameParts(box: Aabb, height: number): Part[] {
-  const f = shelfFrame(box)
-  const { cx, cz, w, d } = centre(box)
-  const parts: Part[] = []
-  const boards = [...SHELF_BOARD_YS, height - 0.02]
-  for (const y of boards) parts.push(bx('wood', [cx, y, cz], [w, 0.04, d]))
-  parts.push(bx('woodDark', [f.backX, height / 2, f.backZ], f.alongX ? [f.len, height, 0.04] : [0.04, height, f.len]))
-  // Four corner posts, 5 mm proud of the footprint so they never share a face with the boards.
-  const post = 0.05
-  for (const px of [box.minX + post / 2 - 0.005, box.maxX - post / 2 + 0.005]) {
-    for (const pz of [box.minZ + post / 2 - 0.005, box.maxZ - post / 2 + 0.005]) {
-      parts.push(bx('woodDark', [px, (height - 0.04) / 2, pz], [post, height - 0.04, post]))
-    }
-  }
-  return parts
-}
-
-export function shelfTapes(id: string, box: Aabb): TapeInstance[] {
-  const f = shelfFrame(box)
-  const { cx, cz } = centre(box)
-  const rnd = seededRng(id)
-  const perBoard = Math.floor((f.len - 0.24) / TAPE_PITCH)
-  const out: TapeInstance[] = []
-  const rows = SHELF_BOARD_YS.length - 1
-  for (let row = 0; row < rows; row++) {
-    for (let i = 0; i < perBoard; i++) {
-      // Always draw the random numbers so a skipped slot never shifts later tapes.
-      const skip = rnd() < 0.12
-      const hh = TAPE_MIN_H + rnd() * (TAPE_MAX_H - TAPE_MIN_H)
-      const colour = Math.floor(rnd() * TAPE_PALETTE.length)
-      if (skip) continue
-      const tpos = f.start + 0.12 + i * TAPE_PITCH
-      const y = SHELF_BOARD_YS[row] + 0.02 + hh / 2
-      const px = f.alongX ? tpos : cx
-      const pz = f.alongX ? cz : tpos
-      const lift = TAPE_D / 2 + 0.001
-      out.push({
-        pos: [px, y, pz],
-        size: f.alongX ? [TAPE_W, hh, TAPE_D] : [TAPE_D, hh, TAPE_W],
-        paletteIndex: colour,
-        labelPos: [px + f.open[0] * lift, y, pz + f.open[1] * lift],
-        labelRotY: Math.atan2(f.open[0], f.open[1]),
-      })
-    }
-  }
-  return out
-}
-
-/** Label strip size (width, height) for a spine of height `h`. */
-export const labelSize = (h: number): readonly [number, number] => [TAPE_W * 0.75, h * 0.6]
+export * from './shelfModel'
 
 // ---------------------------------------------------------------------------------------------
 // Furniture
@@ -799,7 +1025,11 @@ export interface SceneDetailReport {
   baseDrawCalls: number
   totalTriangles: number
   totalDrawCalls: number
+  /** VHS slipcase instances on the bookcases. */
   tapeCount: number
+  /** Book instances on the bookcases (rows, leaning books and stacks). */
+  bookCount: number
+  leaningCount: number
   /** Procedural canvas textures (task 15.7) and their estimated GPU memory in bytes. */
   textureCount: number
   textureMemoryBytes: number
@@ -819,6 +1049,20 @@ export function declaredObjects(): Array<{ name: string; parts: Part[]; extraTri
   const objects: Array<{ name: string; parts: Part[]; extraTriangles?: number; extraDrawCalls?: number }> = [
     { name: 'crt-television', parts: crtTelevisionParts(crt.box, crt.height) },
     { name: 'vcr-deck', parts: vcrDeckParts(crt.box) },
+    { name: 'media-console', parts: mediaConsoleParts(crt.box) },
+    { name: 'console-tapes', parts: consoleTapeParts(crt.box) },
+    { name: 'reference-monitor', parts: referenceMonitorParts(crt.box) },
+    { name: 'filing-cabinet-a', parts: filingCabinetParts(prop('filing-cabinet-a').box, prop('filing-cabinet-a').height, 0) },
+    { name: 'filing-cabinet-b', parts: filingCabinetParts(prop('filing-cabinet-b').box, prop('filing-cabinet-b').height, 1) },
+    { name: 'conduit', parts: conduitParts() },
+    { name: 'ventilation', parts: ventilationParts() },
+    { name: 'cable-loops', parts: cableLoopsParts() },
+    { name: 'corner-posts', parts: cornerPostParts() },
+    { name: 'wall-clock', parts: wallClockParts() },
+    { name: 'desk-lamp', parts: deskLampParts() },
+    { name: 'desk-lamp-glow', parts: deskLampGlowParts() },
+    { name: 'bulletin-board', parts: bulletinBoardParts() },
+    ...ARCHIVE_BOX_IDS.map((id) => ({ name: id, parts: archiveBoxParts(prop(id).box, prop(id).height) })),
     { name: 'arcade-cabinet', parts: arcadeCabinetParts(facingFrame(arcade.box, arcade.facing).local, arcade.height) },
     { name: 'arcade-companion', parts: arcadeCabinetParts(facingFrame(companion.box, companion.facing).local, companion.height, false) },
     { name: 'crt-stack', parts: crtStackParts(facingFrame(stack.box, stack.facing).local, stack.height) },
@@ -833,15 +1077,15 @@ export function declaredObjects(): Array<{ name: string; parts: Part[]; extraTri
     { name: 'trim', parts: trimParts() },
     ...fixtureCentres().map(([x, z], i) => ({ name: `fixture-${i}`, parts: ceilingFixtureParts(x, z) })),
   ]
-  for (const id of ['shelf-a', 'shelf-b', 'shelf-c']) {
+  for (const id of SHELF_IDS) {
     const p = prop(id)
-    const tapes = shelfTapes(id, p.box).length
-    // One spine InstancedMesh (box, 12 tris) and one label InstancedMesh (plane, 2 tris) per shelf.
+    const contents = shelfContents(id, p.box, p.height)
+    // Books and slipcases: one InstancedMesh per spine variant in use, all on the shared 12-triangle unit box.
     objects.push({
       name: id,
-      parts: shelfFrameParts(p.box, p.height),
-      extraTriangles: tapes * (GEOMETRY_TRIANGLES.box + GEOMETRY_TRIANGLES.plane),
-      extraDrawCalls: 2,
+      parts: [...shelfFrameParts(p.box, p.height), ...contents.boxParts],
+      extraTriangles: contents.instances.length * GEOMETRY_TRIANGLES.box,
+      extraDrawCalls: new Set(contents.instances.map((b) => b.variant)).size,
     })
   }
   return objects
@@ -874,10 +1118,13 @@ export function sceneDetailReport(): SceneDetailReport {
   }))
   const detailTriangles = objects.reduce((n, o) => n + o.triangles, 0)
   const baseTriangles = baseRoomTriangles()
-  const tapeCount = ['shelf-a', 'shelf-b', 'shelf-c'].reduce((n, id) => {
+  const all = SHELF_IDS.flatMap((id) => {
     const p = ROOM.props.find((q) => q.id === id)
-    return n + (p ? shelfTapes(id, p.box).length : 0)
-  }, 0)
+    return p ? shelfContents(id, p.box, p.height).instances : []
+  })
+  const tapeCount = all.filter((b) => b.kind === 'slipcase').length
+  const bookCount = all.length - tapeCount
+  const leaningCount = all.filter((b) => b.group === 'lean').length
   return {
     objects,
     detailTriangles,
@@ -886,6 +1133,8 @@ export function sceneDetailReport(): SceneDetailReport {
     totalTriangles: detailTriangles + baseTriangles,
     totalDrawCalls: baseRoomDrawCalls() + objects.reduce((n, o) => n + o.drawCalls, 0),
     tapeCount,
+    bookCount,
+    leaningCount,
     textureCount: TEXTURE_IDS.length,
     textureMemoryBytes: totalTextureMemoryBytes(),
   }

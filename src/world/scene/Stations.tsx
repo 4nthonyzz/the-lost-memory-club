@@ -6,7 +6,16 @@
 import { useMemo, type ReactNode } from 'react'
 import { ROOM, type PropDef } from '../layout/roomLayout'
 import type { Aabb, Facing } from '../worldTypes'
-import { arcadeCabinetParts, crtTelevisionParts, vcrDeckParts } from './modelDetail'
+import {
+  arcadeCabinetParts,
+  bulletinBoardParts,
+  consoleTapeParts,
+  crtTelevisionParts,
+  filingCabinetParts,
+  mediaConsoleParts,
+  referenceMonitorParts,
+  vcrDeckParts,
+} from './modelDetail'
 import { AssetModel } from '../assets/AssetModel'
 import { assetPlacement, facingFrame } from './assetPlacement'
 import { PartMeshes } from './PartMeshes'
@@ -45,9 +54,27 @@ export function CrtScreen({ box, height }: BoxHeightProps) {
   return <PartMeshes parts={parts} />
 }
 
-/** Wooden stand with a VCR: front slot, inserted cassette, buttons and display strip. */
+/** VCR on the console's lower shelf: front slot, inserted cassette, buttons and display strip. */
 export function VcrDeck({ box }: { box: Aabb }) {
   const parts = useMemo(() => vcrDeckParts(box), [box])
+  return <PartMeshes parts={parts} />
+}
+
+/** Wide wooden media console with a VCR bay, a cabinet, stacked tapes and a small reference monitor (own dim screen). */
+export function MediaConsole({ box }: { box: Aabb }) {
+  const parts = useMemo(() => [...mediaConsoleParts(box), ...consoleTapeParts(box), ...referenceMonitorParts(box)], [box])
+  return <PartMeshes parts={parts} />
+}
+
+/** Metal filing cabinet with recessed drawers, pulls and label slots (task 18.3). `variant` picks the grey. */
+export function FilingCabinet({ box, height, variant = 0 }: BoxHeightProps & { variant?: number }) {
+  const parts = useMemo(() => filingCabinetParts(box, height, variant), [box, height, variant])
+  return <PartMeshes parts={parts} />
+}
+
+/** Framed cork bulletin board on the north wall with the pinned-notes texture (task 18.3). */
+export function BulletinBoard() {
+  const parts = useMemo(bulletinBoardParts, [])
   return <PartMeshes parts={parts} />
 }
 
@@ -81,21 +108,37 @@ export function Faced({ box, facing, children }: { box: Aabb; facing?: Facing; c
 
 export function Stations() {
   const crt = propById('crt-vhs')
+  const cabinetA = propById('filing-cabinet-a')
+  const cabinetB = propById('filing-cabinet-b')
   const arcade = propById('arcade-cabinet')
   return (
     <group>
-      {/* CRT + VCR are one asset; the screen plane is drawn separately below. */}
+      {/* Island: CRT, console, VCR, tapes and reference monitor are one asset facing +Z; the CRT screen plane is drawn separately below. */}
       <AssetModel
         id="crt-vhs"
-        {...assetPlacement(crt.box)}
+        {...assetPlacement(crt.box, crt.facing)}
         fallback={
-          <>
-            <CrtTelevision box={crt.box} height={crt.height} screen={false} />
-            <VcrDeck box={crt.box} />
-          </>
+          <Faced box={crt.box} facing={crt.facing}>
+            {(local) => (
+              <>
+                <CrtTelevision box={local} height={crt.height} screen={false} />
+                <MediaConsole box={local} />
+                <VcrDeck box={local} />
+              </>
+            )}
+          </Faced>
         }
       />
-      <CrtScreen box={crt.box} height={crt.height} />
+      <Faced box={crt.box} facing={crt.facing}>
+        {(local) => <CrtScreen box={local} height={crt.height} />}
+      </Faced>
+      {/* North wall focal zone placeholders (18.3 adds detail and the cork texture). */}
+      {[cabinetA, cabinetB].map((c, i) => (
+        <Faced key={c.id} box={c.box} facing={c.facing}>
+          {(local) => <FilingCabinet box={local} height={c.height} variant={i} />}
+        </Faced>
+      ))}
+      <BulletinBoard />
       <AssetModel
         id="arcade-cabinet"
         {...assetPlacement(arcade.box, arcade.facing)}

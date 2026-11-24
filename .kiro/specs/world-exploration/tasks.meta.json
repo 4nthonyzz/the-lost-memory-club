@@ -956,6 +956,61 @@
         "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
         "timestamp": 1795555377060
       }
+    ],
+    "18.1 Centralize the vhs Station and add the north-wall focal layout": [
+      {
+        "executionId": "259fd6d5-a488-4ce9-a1bf-8e9101b4e6e5",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795558024301
+      },
+      {
+        "executionId": "259fd6d5-a488-4ce9-a1bf-8e9101b4e6e5",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795559015415
+      }
+    ],
+    "18.2 Wood bookcases with dense varied books and VHS slipcases": [
+      {
+        "executionId": "259fd6d5-a488-4ce9-a1bf-8e9101b4e6e5",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795559016307
+      },
+      {
+        "executionId": "259fd6d5-a488-4ce9-a1bf-8e9101b4e6e5",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795559834633
+      }
+    ],
+    "18.3 Wall, rug, bulletin board, ceiling and corner dressing": [
+      {
+        "executionId": "259fd6d5-a488-4ce9-a1bf-8e9101b4e6e5",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795559835227
+      },
+      {
+        "executionId": "259fd6d5-a488-4ce9-a1bf-8e9101b4e6e5",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795560795592
+      }
+    ],
+    "18.4 Update computed metrics and run verification": [
+      {
+        "executionId": "259fd6d5-a488-4ce9-a1bf-8e9101b4e6e5",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795560796211
+      },
+      {
+        "executionId": "259fd6d5-a488-4ce9-a1bf-8e9101b4e6e5",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795561009223
+      }
+    ],
+    "18. Visual and spatial polish pass": [
+      {
+        "executionId": "259fd6d5-a488-4ce9-a1bf-8e9101b4e6e5",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795561009352
+      }
     ]
   }
 }

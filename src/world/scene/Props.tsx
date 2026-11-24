@@ -1,27 +1,28 @@
-/** Reception desk, shelves with instanced tapes, furniture and environmental details. Sizes come from ROOM props. */
-import { useLayoutEffect, useMemo, useRef } from 'react'
-import { Color, Object3D, type InstancedMesh } from 'three'
+/** Reception desk, bookcases with instanced books and tapes, furniture and environmental details. Sizes come from ROOM props. */
+import { useMemo } from 'react'
 import { AssetModel } from '../assets/AssetModel'
 import { ROOM, type PropDef } from '../layout/roomLayout'
 import type { Aabb } from '../worldTypes'
 import {
-  TAPE_PALETTE,
   arcadeCabinetParts,
+  ARCHIVE_BOX_IDS,
+  archiveBoxParts,
   arcadeFloorParts,
   armchairParts,
   couchParts,
   crateParts,
   crtStackParts,
+  deskLampGlowParts,
+  deskLampParts,
   deskParts,
-  labelSize,
   posterParts,
   shelfFrameParts,
-  shelfTapes,
+  shelfContents,
 } from './modelDetail'
 import { assetPlacement } from './assetPlacement'
-import { PartMeshes } from './PartMeshes'
+import { BookMeshes, PartMeshes } from './PartMeshes'
 import { Block } from './Room'
-import { geometries, materials } from './sharedResources'
+import { ensureSharedTextures, geometries, hasSharedTexture, materials } from './sharedResources'
 import { Faced } from './Stations'
 
 function propById(id: string): PropDef {
@@ -38,47 +39,37 @@ export function Desk({ box, height }: { box: Aabb; height: number }) {
 }
 
 /**
- * Wooden shelf (frame parts) plus two InstancedMeshes: tape spines with per-instance colours from a
- * seeded palette, and one label strip per tape. Tape layout is pure data from modelDetail.ts.
+ * Warm lamp on the east end of the reception desk (task 18.3): an emissive shade and bulb plus, when the
+ * glow texture exists, three faint additive planes. There is no light source; the glow is only meshes.
  */
-export function Shelf({ id, box, height }: { id: string; box: Aabb; height: number }) {
-  const spines = useRef<InstancedMesh>(null)
-  const labels = useRef<InstancedMesh>(null)
-  const frame = useMemo(() => shelfFrameParts(box, height), [box, height])
-  const tapes = useMemo(() => shelfTapes(id, box), [id, box])
-
-  useLayoutEffect(() => {
-    const s = spines.current
-    const l = labels.current
-    if (!s || !l) return
-    const o = new Object3D()
-    const c = new Color()
-    tapes.forEach((t, i) => {
-      o.rotation.set(0, 0, 0)
-      o.position.set(t.pos[0], t.pos[1], t.pos[2])
-      o.scale.set(t.size[0], t.size[1], t.size[2])
-      o.updateMatrix()
-      s.setMatrixAt(i, o.matrix)
-      s.setColorAt(i, c.set(TAPE_PALETTE[t.paletteIndex]))
-      const [lw, lh] = labelSize(t.size[1])
-      o.position.set(t.labelPos[0], t.labelPos[1], t.labelPos[2])
-      o.rotation.set(0, t.labelRotY, 0)
-      o.scale.set(lw, lh, 1)
-      o.updateMatrix()
-      l.setMatrixAt(i, o.matrix)
-    })
-    s.instanceMatrix.needsUpdate = true
-    if (s.instanceColor) s.instanceColor.needsUpdate = true
-    l.instanceMatrix.needsUpdate = true
-    s.computeBoundingSphere()
-    l.computeBoundingSphere()
-  }, [tapes])
-
+export function DeskLamp() {
+  const parts = useMemo(deskLampParts, [])
+  const glow = useMemo(deskLampGlowParts, [])
+  const textured = useMemo(() => {
+    ensureSharedTextures()
+    return hasSharedTexture('lampGlow')
+  }, [])
   return (
     <group>
-      <PartMeshes parts={frame} />
-      <instancedMesh ref={spines} args={[geometries.box, materials.tapeSpine, tapes.length]} />
-      <instancedMesh ref={labels} args={[geometries.plane, materials.tapeLabel, tapes.length]} />
+      <PartMeshes parts={parts} />
+      {textured ? <PartMeshes parts={glow} /> : null}
+    </group>
+  )
+}
+
+/**
+ * Solid wood bookcase (carcass parts and the cardboard tape boxes) plus the books and VHS slipcases as
+ * instanced meshes with per-instance colour (task 18.2). Contents are pure seeded data from shelfModel.ts.
+ */
+export function Shelf({ id, box, height }: { id: string; box: Aabb; height: number }) {
+  const { parts, instances } = useMemo(() => {
+    const contents = shelfContents(id, box, height)
+    return { parts: [...shelfFrameParts(box, height), ...contents.boxParts], instances: contents.instances }
+  }, [id, box, height])
+  return (
+    <group>
+      <PartMeshes parts={parts} />
+      <BookMeshes instances={instances} />
     </group>
   )
 }
@@ -102,13 +93,28 @@ function Details() {
   const crateB = propById('crate-b')
   const stack = propById('tape-stack')
   const cable = propById('cable-run')
+  const rug = propById('rug')
+  const archiveBoxes = useMemo(
+    () => ARCHIVE_BOX_IDS.map((id) => ({ id, parts: archiveBoxParts(propById(id).box, propById(id).height) })),
+    [],
+  )
   const sx = (stack.box.minX + stack.box.maxX) / 2
   const sz = (stack.box.minZ + stack.box.maxZ) / 2
   const posters = useMemo(posterParts, [])
   return (
     <group>
-      {/* Rug (decal only, no layout entry) */}
-      <mesh geometry={geometries.plane} material={materials.rug} position={[0, 0.01, -0.8]} rotation={[-Math.PI / 2, 0, 0]} scale={[3, 2, 1]} />
+      {/* Rug decal under the island, from the layout */}
+      <mesh
+        geometry={geometries.plane}
+        material={materials.rugWoven}
+        position={[(rug.box.minX + rug.box.maxX) / 2, rug.elevation ?? 0.01, (rug.box.minZ + rug.box.maxZ) / 2]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        scale={[rug.box.maxX - rug.box.minX, rug.box.maxZ - rug.box.minZ, 1]}
+      />
+      {/* Archival tape boxes in the corners (visual only) */}
+      {archiveBoxes.map((b) => (
+        <PartMeshes key={b.id} parts={b.parts} />
+      ))}
       {[crateA, crateB].map((c) => (
         <AssetModel key={c.id} id={c.id} {...assetPlacement(c.box)} fallback={<Crate box={c.box} height={c.height} />} />
       ))}
@@ -138,7 +144,7 @@ function Details() {
 function ShiftDressing() {
   return (
     <group>
-      <mesh geometry={geometries.plane} material={materials.shiftPoster} position={[-1.2, 1.7, -3.94]} scale={[0.6, 1.2, 1]} />
+      <mesh geometry={geometries.plane} material={materials.shiftPoster} position={[-0.3, 1.7, -3.94]} scale={[0.6, 1.2, 1]} />
       <mesh geometry={geometries.plane} material={materials.shiftPlaque} position={[0.8, 1.7, 3.99]} rotation={[0, Math.PI, 0]} scale={[0.6, 0.3, 1]} />
     </group>
   )
@@ -184,6 +190,7 @@ export function Props() {
     <group>
       <ShiftDressing />
       <Desk box={desk.box} height={desk.height} />
+      <DeskLamp />
       {(['shelf-a', 'shelf-b', 'shelf-c'] as const).map((id) => {
         const s = propById(id)
         // The shelf GLB is authored along X; assetPlacement rotates it 90 degrees for the Z-long west shelves.

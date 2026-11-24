@@ -60,10 +60,18 @@ describe('roomLayout', () => {
     expect(overlapsAny(ROOM.start, PLAYER_RADIUS, COLLIDERS)).toBe(false);
   });
 
-  it('keeps the vhs Station on the north wall and moves the arcade Station into the Arcade_Area', () => {
+  it('puts the vhs Station on the central island facing +z and moves the arcade Station into the Arcade_Area', () => {
     const vhs = ROOM.stations.find((s) => s.id === 'vhs')!;
-    expect(vhs.collider.minZ).toBe(-4);
-    expect(vhs.anchor).toEqual({ x: -2.5, z: -3.4 });
+    expect(vhs.collider).toEqual({ minX: -1.3, maxX: 0.5, minZ: -0.6, maxZ: 0 });
+    expect(vhs.collider).toBe(prop('crt-vhs').box);
+    expect(vhs.facing).toBe('+z');
+    expect(prop('crt-vhs').facing).toBe('+z');
+    // Anchor on the south (player-facing) face, centred on the console.
+    expect(vhs.anchor).toEqual({ x: -0.4, z: 0 });
+    expect(vhs.collider.maxX - vhs.collider.minX).toBeCloseTo(1.8);
+    expect(vhs.collider.maxZ - vhs.collider.minZ).toBeCloseTo(0.6);
+    // The old north-wall CRT collider is gone.
+    expect(COLLIDERS.some((c) => c.minZ === -4 && c.minX === -3 && c.maxX === -2)).toBe(false);
     const a = arcadeStation();
     const area: Aabb = { minX: 5.3, maxX: 9.3, minZ: -2, maxZ: 2 };
     expect(a.collider).toEqual({ minX: 8.4, maxX: 9.2, minZ: -0.5, maxZ: 0.5 });
@@ -120,11 +128,86 @@ describe('roomLayout', () => {
     for (const p of ROOM.props) expect(COLLIDERS.includes(p.box)).toBe(p.solid);
   });
 
-  it('counts Colliders: 9 walls, 4 door frames and 12 solid props', () => {
+  it('counts Colliders: 9 walls, 4 door frames and 14 solid props', () => {
     expect(ROOM.walls).toHaveLength(9);
-    expect(ROOM.props.filter((p) => p.solid)).toHaveLength(12);
-    expect(COLLIDERS).toHaveLength(9 + 4 + 12);
-    for (const id of ['arcade-companion', 'crt-stack']) expect(COLLIDERS).toContain(prop(id).box);
+    expect(ROOM.props.filter((p) => p.solid)).toHaveLength(14);
+    expect(COLLIDERS).toHaveLength(9 + 4 + 14);
+    for (const id of ['arcade-companion', 'crt-stack', 'crt-vhs', 'filing-cabinet-a', 'filing-cabinet-b']) {
+      expect(COLLIDERS).toContain(prop(id).box);
+    }
+  });
+
+  it('flanks a non-solid wall-mounted bulletin board with two tall filing cabinets on the north wall', () => {
+    const a = prop('filing-cabinet-a');
+    const b = prop('filing-cabinet-b');
+    const board = prop('bulletin-board');
+    for (const c of [a, b]) {
+      expect(c.solid).toBe(true);
+      expect(c.box.minZ).toBe(-4);
+      expect(c.height).toBeCloseTo(1.4);
+      expect(c.box.maxX - c.box.minX).toBeCloseTo(0.5);
+      expect(c.box.maxZ - c.box.minZ).toBeCloseTo(0.6);
+    }
+    expect(board.solid).toBe(false);
+    expect(COLLIDERS).not.toContain(board.box);
+    expect(board.elevation).toBeCloseTo(1.1);
+    expect(board.box.minX).toBeGreaterThanOrEqual(a.box.maxX);
+    expect(board.box.maxX).toBeLessThanOrEqual(b.box.minX);
+    expect((board.box.minX + board.box.maxX) / 2).toBeCloseTo(-2.25);
+  });
+
+  it('keeps every prop footprint inside the room bounds and the rug and tape boxes non-solid', () => {
+    for (const p of ROOM.props) {
+      expect(p.box.minX).toBeGreaterThanOrEqual(ROOM.bounds.minX);
+      expect(p.box.maxX).toBeLessThanOrEqual(ROOM.bounds.maxX);
+      expect(p.box.minZ).toBeGreaterThanOrEqual(ROOM.bounds.minZ);
+      expect(p.box.maxZ).toBeLessThanOrEqual(ROOM.bounds.maxZ);
+    }
+    const rug = prop('rug');
+    expect(rug.solid).toBe(false);
+    expect(rug.elevation).toBeCloseTo(0.01);
+    expect(rug.box.maxX - rug.box.minX).toBeCloseTo(3.0);
+    expect(rug.box.maxZ - rug.box.minZ).toBeCloseTo(2.2);
+    const island = prop('crt-vhs').box;
+    expect((rug.box.minX + rug.box.maxX) / 2).toBeCloseTo((island.minX + island.maxX) / 2);
+    expect((rug.box.minZ + rug.box.maxZ) / 2).toBeCloseTo(-0.3);
+    for (const p of ROOM.props.filter((q) => q.id.startsWith('archive-boxes'))) expect(p.solid).toBe(false);
+  });
+
+  it('keeps at least 1.2 m of walkway on all four sides of the island (computed from the layout)', () => {
+    const island = prop('crt-vhs').box;
+    const gap = (a: Aabb, b: Aabb) =>
+      Math.hypot(
+        Math.max(a.minX - b.maxX, b.minX - a.maxX, 0),
+        Math.max(a.minZ - b.maxZ, b.minZ - a.maxZ, 0),
+      );
+    const others = COLLIDERS.filter((c) => c !== island);
+    expect(others.length).toBe(COLLIDERS.length - 1);
+    // Pairwise: every other solid collider (walls, frames, props) is at least 1.2 m away.
+    const nearest = Math.min(...others.map((c) => gap(island, c)));
+    expect(nearest).toBeGreaterThanOrEqual(1.2 - 1e-9);
+    // Grid: no point within 1.2 m of the island lies inside any other collider.
+    const R = 1.2;
+    for (let x = island.minX - R; x <= island.maxX + R; x += 0.05) {
+      for (let z = island.minZ - R; z <= island.maxZ + R; z += 0.05) {
+        const p = { x, z };
+        if (distToBox(p, island) >= R || distToBox(p, island) === 0) continue;
+        for (const c of others) expect(distToBox(p, c)).toBeGreaterThan(0);
+      }
+    }
+    // The nearest solid is the reception desk, south of the island.
+    expect(gap(island, prop('reception-desk').box)).toBeGreaterThanOrEqual(1.2 - 1e-9);
+  });
+
+  it('selects vhs from a reachable cell in front of the console, within range and cone', () => {
+    const vhs = ROOM.stations.find((s) => s.id === 'vhs')!;
+    const cells = reachableCells(ROOM.start);
+    const c = cells.find((p) => Math.abs(p.x - vhs.anchor.x) < 0.05 && Math.abs(p.z - (vhs.anchor.z + 0.8)) < 0.05)!;
+    expect(c).toBeDefined();
+    expect(Math.hypot(c.x - vhs.anchor.x, c.z - vhs.anchor.z)).toBeLessThanOrEqual(INTERACTION_RANGE);
+    expect(selectInteractionTarget(c, yawToward(c, vhs.anchor), ROOM.stations, COLLIDERS)).toBe('vhs');
+    // A few degrees off to the side is still inside the cone.
+    expect(selectInteractionTarget(c, yawToward(c, vhs.anchor) + 0.2, ROOM.stations, COLLIDERS)).toBe('vhs');
   });
 
   it('keeps the sign, runner and cable runs visual only', () => {

@@ -22,6 +22,7 @@ import {
 import { ROOM } from '../layout/roomLayout'
 import { useReducedMotion } from '../controller/useReducedMotion'
 import { MAX_DT_SEC } from '../logic/palette'
+import { crtScreenRect } from './modelDetail'
 import {
   DUST_COUNT,
   NOISE_MAX_HZ,
@@ -51,17 +52,17 @@ const DUST_BOUNDS: DustBounds = {
   maxZ: ROOM.bounds.maxZ - DUST_MARGIN,
 }
 
-/** Same placement math as the CRT screen in Stations.tsx, nudged slightly in front of it. */
-function crtScreenPlacement() {
+/**
+ * The CRT screen rectangle from modelDetail.ts (derived from the island console footprint, in world
+ * coordinates because the island faces +Z), nudged 5 mm in front of the screen plane.
+ */
+export function crtScreenPlacement() {
   const prop = ROOM.props.find((p) => p.id === 'crt-vhs')
   if (!prop) return null
-  const { box, height } = prop
-  const w = box.maxX - box.minX
-  const crtY0 = 0.6
-  const crtH = height - crtY0
+  const rect = crtScreenRect(prop.box, prop.height)
   return {
-    position: [(box.minX + box.maxX) / 2 - 0.05, crtY0 + crtH / 2, box.maxZ + 0.01] as [number, number, number],
-    scale: [w * 0.6, crtH * 0.7, 1] as [number, number, number],
+    position: [rect.position[0], rect.position[1], rect.position[2] + 0.005] as [number, number, number],
+    scale: [rect.scale[0], rect.scale[1], rect.scale[2]] as [number, number, number],
   }
 }
 

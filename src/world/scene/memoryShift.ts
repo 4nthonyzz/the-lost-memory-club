@@ -9,9 +9,26 @@ import {
   PALETTE_SHIFTED,
   blendPalette,
 } from '../logic/palette'
+import { WALL_TEXTURE_ALBEDO } from './proceduralTextures'
 
-/** Authored colors of the materials that the shift tints. */
-export const BASE_WALL_COLOR = '#5a5470'
+/**
+ * Authored colors of the materials that the shift tints.
+ * The wall carries a baked panelling texture (task 18.3), so its colour is a near-white multiplier:
+ * at t = 0 the wall shows the authored plaster tone, and the blend tints it toward the shifted wall colour.
+ */
+export const BASE_WALL_COLOR = '#f4f0ff'
+
+/** Multiplier colour that makes the baked wall texture read as `tint` at t = 1 (channels clamped to 255). */
+export function wallShiftColor(tint: string = PALETTE_SHIFTED.wallTint): string {
+  const c = parse(tint)
+  return `#${[0, 1, 2]
+    .map((i) =>
+      Math.min(255, Math.round(c[i] / WALL_TEXTURE_ALBEDO[i]))
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')}`
+}
 export const BASE_CRT_SCREEN_COLOR = '#4fe0d0'
 /**
  * The arcade screen carries a texture, so its colour is a multiplier: white shows the authored
@@ -94,7 +111,7 @@ export function applyShift(t: number, targets: ShiftTargets): void {
     pt.light.color.set(mixHex(pt.baseColor, PALETTE_SHIFTED.lightColor, k * POINT_LIGHT_TINT))
     pt.light.intensity = pt.baseIntensity * (1 + (POINT_LIGHT_SHIFTED_SCALE - 1) * k)
   }
-  targets.wall.color.set(mixHex(BASE_WALL_COLOR, PALETTE_SHIFTED.wallTint, k))
+  targets.wall.color.set(mixHex(BASE_WALL_COLOR, wallShiftColor(), k))
   for (const s of targets.screens) {
     s.material.color.set(mixHex(s.baseColor, PALETTE_SHIFTED.screenEmissive, k))
   }

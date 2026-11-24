@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  SPINE_ATLAS_HEIGHT,
+  SPINE_ATLAS_WIDTH,
+  SPINE_CELL_WIDTH,
+  SPINE_VARIANT_COUNT,
+  spineCellUv,
   TEXTURE_IDS,
   TEXTURE_MEMORY_BUDGET_BYTES,
   TEXTURE_SPECS,
@@ -7,6 +12,7 @@ import {
   isPowerOfTwo,
   textureMemoryBytes,
   totalTextureMemoryBytes,
+  WALL_TEXTURE_ALBEDO,
   type TextureId,
 } from './proceduralTextures'
 import { RecordingContext } from './recordingContext'
@@ -96,6 +102,117 @@ describe('lettering', () => {
   it('uses no real film, brand or franchise names', () => {
     const banned = /BLOCKBUSTER|VHS CLUB|NINTENDO|ATARI|SEGA|PAC-?MAN|KIND REWIND/i
     for (const id of TEXTURE_IDS) for (const s of run(id).texts()) expect(s).not.toMatch(banned)
+  })
+})
+
+describe('spine atlas (task 18.2)', () => {
+  const { width: W, height: H } = TEXTURE_SPECS.spineAtlas
+
+  it('is 512 x 256, power of two, mipmapped, clamped, with 8 equal cells', () => {
+    expect([W, H]).toEqual([SPINE_ATLAS_WIDTH, SPINE_ATLAS_HEIGHT])
+    expect(isPowerOfTwo(W) && isPowerOfTwo(H)).toBe(true)
+    expect(TEXTURE_SPECS.spineAtlas.filter).toBe('mipmap')
+    expect(W / SPINE_CELL_WIDTH).toBe(8)
+    expect(SPINE_VARIANT_COUNT).toBeLessThanOrEqual(6)
+  })
+
+  it('cell UV rectangles lie inside the atlas, do not overlap and keep a gutter', () => {
+    let lastU1 = 0
+    for (let cell = 0; cell < W / SPINE_CELL_WIDTH; cell++) {
+      const r = spineCellUv(cell)
+      expect(r.u0).toBeGreaterThan(cell / 8)
+      expect(r.u1).toBeLessThan((cell + 1) / 8)
+      expect(r.u0).toBeGreaterThanOrEqual(lastU1)
+      expect(r.v0).toBeGreaterThan(0)
+      expect(r.v1).toBeLessThan(1)
+      lastU1 = r.u1
+    }
+  })
+
+  it('draws only generic words, one letter at a time, with no brand names', () => {
+    const texts = run('spineAtlas').texts()
+    expect(texts.every((s) => s.length === 1)).toBe(true)
+    const joined = texts.join('')
+    for (const word of ['ARCHIVE', 'VOL.3', 'REWIND']) expect(joined).toContain(word)
+    expect(joined).not.toMatch(/BLOCKBUSTER|VHS CLUB|NINTENDO|ATARI|SEGA|KIND REWIND/i)
+  })
+
+  it('has title bands, label rectangles and glyph strokes in every spine cell', () => {
+    const calls = run('spineAtlas').calls
+    for (let cell = 0; cell < SPINE_VARIANT_COUNT; cell++) {
+      const x0 = cell * SPINE_CELL_WIDTH
+      const rects = calls.filter((c) => c.op === 'fillRect' && (c.args[0] as number) >= x0 && (c.args[0] as number) < x0 + SPINE_CELL_WIDTH)
+      expect(rects.length, `cell ${cell}`).toBeGreaterThanOrEqual(6)
+    }
+  })
+
+  it('stays light enough for the instance colour to tint it (no dark fills or strokes)', () => {
+    const styles = run('spineAtlas')
+      .calls.filter((c) => c.op === 'set fillStyle' || c.op === 'set strokeStyle')
+      .map((c) => String(c.args[0]))
+    expect(styles.length).toBeGreaterThan(30)
+    for (const s of styles) {
+      expect(s).toMatch(/^#[0-9a-f]{6}$/)
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16))
+      expect(Math.min(r, g, b), s).toBeGreaterThanOrEqual(0x2c)
+    }
+    // Each cell starts with a light base fill.
+    const rects = run('spineAtlas').calls.filter((c) => c.op === 'fillRect')
+    for (let cell = 0; cell < 8; cell++) {
+      const first = rects.find((c) => c.args[0] === cell * SPINE_CELL_WIDTH)!
+      expect(first.args.slice(1, 3)).toEqual([0, SPINE_CELL_WIDTH])
+      expect(first.args[3] as number).toBeLessThanOrEqual(H)
+    }
+  })
+})
+
+describe('wall, rug, cork board and lamp glow (task 18.3)', () => {
+  const NEW_IDS = ['wallPanel', 'rugWoven', 'corkBoard', 'lampGlow'] as const
+
+  it('are registered as power-of-two textures with the intended wrap modes', () => {
+    for (const id of NEW_IDS) {
+      expect(TEXTURE_IDS).toContain(id)
+      expect(isPowerOfTwo(TEXTURE_SPECS[id].width) && isPowerOfTwo(TEXTURE_SPECS[id].height)).toBe(true)
+    }
+    expect(TEXTURE_SPECS.wallPanel.wrap).toBe('repeat')
+    expect(TEXTURE_SPECS.rugWoven.wrap).toBe('clamp')
+    expect(TEXTURE_SPECS.corkBoard.wrap).toBe('clamp')
+  })
+
+  it('the cork board carries its generic archive lettering and no brand names', () => {
+    const texts = run('corkBoard').texts()
+    for (const s of ['TAPE 001', 'ARCHIVE 09', 'WHO TAPED OVER?']) expect(texts).toContain(s)
+    for (const s of texts) expect(s).not.toMatch(/BLOCKBUSTER|VHS CLUB|NINTENDO|ATARI|SEGA|PAC-?MAN|KIND REWIND/i)
+  })
+
+  it('the cork board has pinned cards, Polaroid-like frames, sticky notes in four colours and red string', () => {
+    const calls = run('corkBoard').calls
+    const fills = calls.filter((c) => c.op === 'set fillStyle').map((c) => String(c.args[0]))
+    for (const col of ['#f2e060', '#f09ab0', '#9ad88a', '#8ac8e8', '#ece8dc', '#efe8cf']) expect(fills).toContain(col)
+    const strokes = calls.filter((c) => c.op === 'set strokeStyle').map((c) => String(c.args[0]))
+    expect(strokes.filter((s) => s === '#c42222').length).toBeGreaterThanOrEqual(10)
+    expect(calls.filter((c) => c.op === 'arc').length).toBeGreaterThanOrEqual(24)
+  })
+
+  it('wall, rug and glow textures contain no text', () => {
+    for (const id of ['wallPanel', 'rugWoven', 'lampGlow'] as const) expect(run(id).texts()).toEqual([])
+  })
+
+  it('the wall texture paints a chair rail, panels and a plaster area, with a baked mid-tone', () => {
+    const { width: W, height: H } = TEXTURE_SPECS.wallPanel
+    const rects = run('wallPanel').calls.filter((c) => c.op === 'fillRect')
+    // A full-width rail band exists in the lower third of the canvas.
+    expect(rects.some((r) => r.args[0] === 0 && r.args[2] === W && (r.args[1] as number) > H * 0.5 && (r.args[3] as number) <= 14)).toBe(true)
+    expect(rects.length).toBeGreaterThan(300)
+    expect(WALL_TEXTURE_ALBEDO.every((v) => v > 0.2 && v < 0.6)).toBe(true)
+  })
+
+  it('the rug texture draws a bordered diamond pattern and the lamp glow starts on a cleared canvas', () => {
+    const rug = run('rugWoven').calls
+    expect(rug.filter((c) => c.op === 'fill').length).toBeGreaterThan(40)
+    const glow = run('lampGlow')
+    expect(glow.calls[0].op).toBe('clearRect')
+    expect(glow.calls.filter((c) => c.op === 'arc').length).toBeGreaterThan(10)
   })
 })
 

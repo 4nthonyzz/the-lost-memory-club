@@ -25,6 +25,7 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 - All visible text, labels, comments and docs are in English.
 - Approved scope change (M6), 2026-11-24: the `arcade` Station may be relocated from the main room north wall into the east Arcade_Area (against the east wall around x 8.4, z 0, facing west toward both doorways). The station id `'arcade'` and the `StationId` contract are unchanged. `roomLayout.ts` remains the single source of truth for colliders and anchors. Procedural `CanvasTexture` textures are allowed (deterministic, created in `sharedResources.ts`, all disposed). Budgets stay: fewer than 20,000 triangles in total and at most 4 lights. `ASSET_MANIFEST` stays `Object.freeze({})` unless real `.glb` files exist. `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `vite.config.ts` and `package.json` are unchanged. Earlier wording in `requirements.md` and `design.md` about the arcade Station position is superseded by this bullet.
 - Approved scope change (M5), 2026-11-24: `src/App.tsx` and `src/styles.css` may now be modified. P1 (App-side `inputEnabled={station === null}`), P3 (overlay and layout styles) and P4 (status text) are approved and implemented in task 13.5. `src/core/`, `src/arcade/`, `src/memories/` and `vite.config.ts` remain unchanged. `package.json` changes only if unavoidable and flagged. `tools/blender/` and `.glb` files are allowed from M5 on. The earlier statements that `App.tsx` is not modified apply to M1-M4 only. `requirements.md` and `design.md` still contain M1-M4 wording stating that `App.tsx` is unmodified and that P1/P3/P4 are pending; that wording is superseded by this bullet.
+- Approved scope change (polish pass), 2026-11-25: the `vhs` Station may be relocated from the north wall to a central archive media island in the main room (around x -0.4, z -0.3, facing +Z toward the spawn at (0, 3)). `StationId` and the station ids are unchanged. `roomLayout.ts` stays the single source of truth for colliders and anchors. New solid colliders are allowed (media console, two filing cabinets), with walkways of at least 1.2 m around the island. New procedural textures are allowed (spine atlas, wall paneling, woven rug, cork bulletin board); each must be registered in `sharedResources.ts` and disposed. Budgets: fewer than 20,000 triangles, at most 4 lights (`M3_LIGHT_COUNT` stays 4 and `crt-light` moves to the new CRT spot), texture memory at most 8 MB. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json` and `tools/blender/` stay unchanged. `ASSET_MANIFEST` stays empty. Earlier wording that places the `vhs` Station on the north wall (in this file, `requirements.md` and `design.md`) is superseded by this bullet.
 
 ## Tasks
 
@@ -663,6 +664,54 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
   - Ensure all tests pass, ask the user if questions arise.
   - _Requirements: 14.11, 14.12, 15.6, 17.3, 17.7, 17.9_
 
+### Polish pass: visual and spatial
+
+- [x] 18. Visual and spatial polish pass
+  - [x] 18.1 Centralize the vhs Station and add the north-wall focal layout
+    - Files: `src/world/layout/roomLayout.ts`, `src/world/layout/roomLayout.test.ts`, `src/world/scene/Lighting.tsx`, `src/world/scene/Stations.tsx`, `src/world/scene/modelDetail.ts` and `src/world/scene/modelDetail.test.ts` (only where they hardcode the old vhs position), `src/world/WorldScene.test.ts` (only if needed), `src/world/scene/Effects.tsx` and its test (only for `crtScreenPlacement()`).
+    - Move the `vhs` Station and a wider wooden media console (with a lower VCR shelf) to the central island around x -0.4, z -0.3, facing +Z. The console is a solid collider and the anchor sits on its south (player-facing) face. Remove the old north-wall CRT collider.
+    - Keep at least 1.2 m of walkway on all sides of the island.
+    - Add two tall metal filing cabinets (solid colliders) flanking a bulletin-board zone on the north wall. Add non-solid details: rug footprint and tape boxes in corners.
+    - Move `crt-light` to illuminate the new CRT spot. The light count stays 4. If the CRT screen moves, update `crtScreenPlacement()` in `Effects.tsx` and its test consistently.
+    - Acceptance: both Stations are reachable from the start; `vhs` is targetable from in front of the console (range and cone); clearance tests pass; the filing cabinets and the console are in `COLLIDERS`; triangle estimate is below 20,000; light count is at most 4; all existing tests pass.
+    - Tests: update `roomLayout.test.ts` (BFS reachability, 1.2 m clearance around the island, collider membership, `selectInteractionTarget` example in front of the console) and `modelDetail.test.ts`. Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 17, 15.7.
+    - Boundary: `src/world/` only; `StationId`, `WorldSceneProps` and `onInspect` unchanged; layout stays the single source of truth for collision; no new dependency.
+    - _Requirements: 1.2, 1.3, 1.4, 1.7, 6.1, 7.1, 7.2, 7.3, 12.5, 13.8, 14.4, 14.5, 19.1, 20.1_
+
+  - [x] 18.2 Wood bookcases with dense varied books and VHS slipcases
+    - Files: `src/world/scene/modelDetail.ts`, `src/world/scene/PartMeshes.tsx`, `src/world/scene/Props.tsx`, `src/world/scene/proceduralTextures.ts`, `src/world/scene/sharedResources.ts`, `src/world/scene/modelDetail.test.ts`, `src/world/scene/proceduralTextures.test.ts`.
+    - Build solid wood bookcases for `shelf-a`, `shelf-b` and `shelf-c`: thick side panels, top cornice, solid back panel and 4 wooden shelves using the wood texture.
+    - Fill them with dense, deterministic rows of varied books and VHS slipcases using `InstancedMesh` with per-instance colour, varied heights, thicknesses and depths, occasional leaning books (10 to 18 degrees) and horizontal stacks.
+    - Add a deterministic spine atlas `CanvasTexture` (title bands and labels), registered in `sharedResources.ts` and disposed.
+    - Use a seeded generator only; no `Math.random`. Compute triangle and draw-call numbers with the pure helpers.
+    - Acceptance: layout colliders for the shelves are unchanged; output is identical across runs; triangle estimate is below 20,000; light count is at most 4; texture memory estimate is at most 8 MB; the atlas is disposed exactly once.
+    - Tests: `modelDetail.test.ts` (triangle and draw-call estimates, budgets, colliders unchanged), `proceduralTextures.test.ts` (atlas determinism with a fake context, power-of-two size, no randomness). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 18.1.
+    - Boundary: render-only; no collider changes; no GLB; no new dependency.
+    - _Requirements: 1.3, 1.4, 1.8, 12.5, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 18.3 Wall, rug, bulletin board, ceiling and corner dressing
+    - Files: `src/world/scene/proceduralTextures.ts`, `src/world/scene/sharedResources.ts`, `src/world/scene/Room.tsx`, `src/world/scene/Props.tsx`, `src/world/scene/modelDetail.ts`, `src/world/scene/Lighting.tsx` (only if the warm lamp glow needs an emissive-only mesh; no new light), `src/world/scene/modelDetail.test.ts`, `src/world/scene/proceduralTextures.test.ts`.
+    - Add textures: wall panelling or wainscoting, woven rug under the island, and a cork bulletin board on the north wall (pinned index cards, Polaroids, red string, sticky notes).
+    - Add filing-cabinet detail (drawer handles, label slots), overhead conduit pipes, a ventilation grille, hanging cable loops, a warm desk-lamp shade with emissive glow (no light) on the south-east desk, and scattered archival tape boxes in corners.
+    - Every new texture is registered in `sharedResources.ts` and disposed exactly once; `disposeSharedResources()` is safe to call twice.
+    - Acceptance: colliders unchanged by this task; triangle estimate below 20,000; light count at most 4; texture memory estimate at most 8 MB; Memory_Shift tinting still works.
+    - Tests: `proceduralTextures.test.ts` (determinism, power-of-two sizes), `modelDetail.test.ts` (disposal once and twice-safe, budgets). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 18.1, 18.2 (shares scene files, so it runs after 18.2).
+    - Boundary: render-only; no collider changes; no new dependency; no GLB.
+    - _Requirements: 1.3, 1.4, 1.8, 9.1, 9.2, 9.8, 12.5, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 18.4 Update computed metrics and run verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles (below 20,000), lights (at most 4) and texture memory (at most 8 MB).
+    - Label every number "computed, not runtime-measured". Make no browser or frame-rate claims.
+    - Acceptance: documents match the final layout and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 18.2, 18.3.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional. The 17 property-based test sub-tasks can be skipped for a faster MVP. Tasks 16.2 and 16.3 are marked `*` because they must not be implemented without approval.
@@ -705,7 +754,11 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     { "id": 25, "tasks": ["15.1", "15.4"] },
     { "id": 26, "tasks": ["15.5"] },
     { "id": 27, "tasks": ["16.2", "16.3"] },
-    { "id": 28, "tasks": ["17"] }
+    { "id": 28, "tasks": ["17"] },
+    { "id": 29, "tasks": ["18.1"] },
+    { "id": 30, "tasks": ["18.2"] },
+    { "id": 31, "tasks": ["18.3"] },
+    { "id": 32, "tasks": ["18.4"] }
   ]
 }
 ```

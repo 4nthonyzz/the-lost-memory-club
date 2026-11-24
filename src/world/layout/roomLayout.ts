@@ -4,8 +4,8 @@
  * Nothing here depends on `memoryShifted`.
  *
  * Axes: y up, yaw 0 looks toward -z. The player starts at the south side
- * (z = +3) and looks north. The VHS Station stands against the north wall
- * and faces +z. The arcade Station stands against the east wall of the
+ * (z = +3) and looks north. The VHS Station is the media console on the central archive island
+ * (polish pass, task 18.1) and faces +z. The arcade Station stands against the east wall of the
  * Arcade_Area and faces -x, toward both doorways.
  */
 import { PLAYER_RADIUS } from '../logic/constants';
@@ -99,13 +99,29 @@ const WALLS: readonly Aabb[] = Object.freeze([
   box(9.3, 9.6, -2, 2), // Arcade_Area east
 ]);
 
-const DESK = prop('reception-desk', 'desk', box(-1.5, 1.5, 0.5, 1.3), 1.0);
+/**
+ * Reception desk. Moved 0.7 m south in the polish pass (task 18.1, was z 0.5..1.3) so the island media
+ * console keeps a 1.2 m walkway between its south face (z 0) and the desk back (z 1.2).
+ */
+const DESK = prop('reception-desk', 'desk', box(-1.5, 1.5, 1.2, 2.0), 1.0);
 const SHELF_A = prop('shelf-a', 'shelf', box(-5, -4.6, -2.6, -0.4), 2.2);
 const SHELF_B = prop('shelf-b', 'shelf', box(-5, -4.6, 0.4, 2.6), 2.2);
 const SHELF_C = prop('shelf-c', 'shelf', box(2, 4, 3.4, 4), 2.2, 3);
 
-/** CRT television on a stand against the north wall; front face at z = -3.4. */
-const VHS_PROP = prop('crt-vhs', 'station', box(-3, -2, -4, -3.4), 1.2);
+/**
+ * Central archive island (task 18.1): a wide 1990s wooden media console, 1.8 m x 0.6 m, front on the
+ * south face (z = 0) looking toward the spawn. The CRT, VCR, tape stacks and a small reference monitor
+ * are parts on top of / inside this footprint. The prop id stays 'crt-vhs' (asset manifest mapping).
+ * The prop height is the top of the CRT casing: console top 0.7 m + 0.6 m television.
+ */
+const VHS_PROP = prop('crt-vhs', 'station', box(-1.3, 0.5, -0.6, 0), 1.3, 1, true, undefined, { facing: '+z' });
+
+/** North wall focal zone: two tall metal filing cabinets flanking a wall-mounted bulletin board. */
+const FILING_A = prop('filing-cabinet-a', 'furniture', box(-3.5, -3.0, -4, -3.4), 1.4, 1, true, undefined, { facing: '+z' });
+const FILING_B = prop('filing-cabinet-b', 'furniture', box(-1.5, -1.0, -4, -3.4), 1.4, 1, true, undefined, { facing: '+z' });
+const BULLETIN = prop('bulletin-board', 'detail', box(-2.95, -1.55, -4, -3.95), 1.0, 1, false, undefined, { elevation: 1.1, facing: '+z' });
+/** Floor decal under the island, 3.0 m x 2.2 m centred on the console footprint. */
+const RUG = prop('rug', 'detail', box(-1.9, 1.1, -1.4, 0.8), 0.01, 1, false, undefined, { elevation: 0.01 });
 /**
  * Arcade cabinet against the east wall of the Arcade_Area, 0.1 m clear of the wall (x = 9.3).
  * Its front (west) face is at x = 8.4 and looks toward both doorways.
@@ -124,10 +140,14 @@ const DETAILS: readonly PropDef[] = Object.freeze([
   // Crates sit against the Arcade_Area side walls, outside the 1.2 m lanes from the doors to the arcade anchor.
   prop('crate-a', 'detail', box(7.2, 7.8, -1.95, -1.35), 0.6, 3),
   prop('crate-b', 'detail', box(7.2, 7.8, 1.35, 1.95), 0.5, 3),
-  prop('tape-stack', 'detail', box(-0.6, -0.2, 0.7, 1.1), 0.15, 3, false),
+  prop('tape-stack', 'detail', box(-0.6, -0.2, 1.4, 1.8), 0.15, 3, false),
   prop('poster-north', 'detail', box(0.5, 1.5, -4, -3.95), 1.0, 3, false),
   prop('poster-arcade-area', 'detail', box(7, 8, -2, -1.95), 1.0, 3, false),
   prop('cable-run', 'detail', box(-1, 1, -2.5, -2.45), 0.02, 3, false),
+  // Archival tape boxes in three corners (visual only).
+  prop('archive-boxes-nw', 'detail', box(-4.9, -4.3, -3.9, -3.4), 0.4, 3, false),
+  prop('archive-boxes-ne', 'detail', box(4.1, 4.8, -3.9, -3.4), 0.4, 3, false),
+  prop('archive-boxes-sw', 'detail', box(-4.9, -4.3, 3.3, 3.9), 0.4, 3, false),
   // Arcade_Area dressing, all visual only. The ARCADE sign hangs on the main-room face of the east wall
   // above both doorways (x 4.78 is 0.07 m in front of the lintel faces at x 4.85).
   prop('arcade-sign', 'detail', box(4.78, 5, -1.4, 1.4), 0.5, 3, false, undefined, { elevation: 2.3, facing: '-x' }),
@@ -139,8 +159,10 @@ const DETAILS: readonly PropDef[] = Object.freeze([
 const STATIONS: readonly StationDef[] = Object.freeze([
   Object.freeze({
     id: 'vhs' as const,
-    anchor: Object.freeze({ x: -2.5, z: VHS_PROP.box.maxZ }),
+    // Anchor on the south (player-facing) face, centred on the console.
+    anchor: Object.freeze({ x: (VHS_PROP.box.minX + VHS_PROP.box.maxX) / 2, z: VHS_PROP.box.maxZ }),
     collider: VHS_PROP.box,
+    facing: '+z' as const,
   }),
   Object.freeze({
     id: 'arcade' as const,
@@ -157,6 +179,10 @@ const PROPS: readonly PropDef[] = Object.freeze([
   SHELF_B,
   SHELF_C,
   VHS_PROP,
+  FILING_A,
+  FILING_B,
+  BULLETIN,
+  RUG,
   ARCADE_PROP,
   ARCADE_COMPANION,
   CRT_STACK,

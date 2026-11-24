@@ -1,16 +1,19 @@
-# World Exploration: Test Report
+﻿# World Exploration: Test Report
 
-Task 15.1. Requirements 13.2, 13.10, 13.11, 13.14, 15.6. Related: `design.md` (Correctness Properties), `manual-test-log.md`, `tasks.md`.
+Task 15.1, counts refreshed by task 18.4. Requirements 13.2, 13.10, 13.11, 13.14, 15.6. Related: `design.md` (Correctness Properties), `manual-test-log.md`, `tasks.md`.
 
 ## Result of the audit run
 
-Command: `npm test` (Vitest, `vite.config.ts`: `environment: 'node'`, `include: ['src/**/*.test.ts']`). The audit used `npx vitest run --reporter=verbose` for per-test output, which runs the same suite.
+Command: `npm test` (Vitest, `vite.config.ts`: `environment: 'node'`, `include: ['src/**/*.test.ts']`). The earlier audit used `npx vitest run --reporter=verbose` for per-test output, which runs the same suite.
 
 ```
 Test Files  27 passed (27)
-     Tests  361 passed (361)
-  Start at  16:39:17
-  Duration  7.24s (transform 2.88s, setup 0ms, collect 9.85s, tests 4.04s, environment 16.04s, prepare 7.27s)
+     Tests  428 passed (428)
+```
+
+Task 18.4 ran `npm test` twice. Both runs passed 27 files and 428 tests (exit 0), so no flakiness was seen. The first run reported `Duration  8.94s`. `npm run typecheck` and `npm run build` exited 0. The suite has the same 27 files as before; 67 tests were added to existing files (roomLayout +4, memoryShift +1, modelDetail +41, proceduralTextures +21).
+
+```
 ```
 
 These numbers describe the repository at the time of the audit. They change when tests are added or removed.
@@ -36,7 +39,7 @@ These numbers describe the repository at the time of the audit. They change when
 | `src/world/assets/assetManifest.test.ts` | 20 |
 | `src/world/assets/assets.test.ts` | 9 |
 | `src/world/controller/useReducedMotion.test.ts` | 8 |
-| `src/world/layout/roomLayout.test.ts` | 20 |
+| `src/world/layout/roomLayout.test.ts` | 24 |
 | `src/world/logic/collision.test.ts` | 18 |
 | `src/world/logic/frameStats.test.ts` | 5 |
 | `src/world/logic/inputMode.test.ts` | 29 |
@@ -52,10 +55,12 @@ These numbers describe the repository at the time of the audit. They change when
 | `src/world/logic/targeting.bench.test.ts` | 1 (informational timing, asserts no speed) |
 | `src/world/scene/assetIntegration.test.ts` | 6 |
 | `src/world/scene/effectsTiming.test.ts` | 8 |
-| `src/world/scene/memoryShift.test.ts` | 8 |
-| `src/world/scene/modelDetail.test.ts` | 31 |
-| `src/world/scene/proceduralTextures.test.ts` | 44 |
-| **Total** | **361 in 27 files** |
+| `src/world/scene/memoryShift.test.ts` | 9 |
+| `src/world/scene/modelDetail.test.ts` | 72 |
+| `src/world/scene/proceduralTextures.test.ts` | 65 |
+| **Total** | **428 in 27 files** |
+
+New test areas since the audit (polish pass, tasks 18.1 to 18.3), all computed from declared data, none visual: island media console and 1.2 m walkway clearance (`roomLayout.test.ts`), north-wall filing cabinets and bulletin board, book and shelf counts, triangle budget below 20,000, texture memory within 8 MB, at most 4 lights, disposal of all 18 textures and wall geometries (`modelDetail.test.ts`), new procedural textures (`proceduralTextures.test.ts`), and memory-shift tint of the new materials (`memoryShift.test.ts`). Which exact tests were added by which task is not itemized here.
 
 ## Correctness properties 1 to 17
 
@@ -98,7 +103,7 @@ These tests combine several modules or render components; none uses a real brows
 | World component (jsdom) | `src/world/WorldScene.test.ts`, `src/world/WorldScene.inputEnabled.test.ts` | Prompts, listeners, pointer-lock request after click, key filtering, no-WebGL fallback, supplied `inputEnabled` prop. |
 | Boundary between modules | `src/world/boundary.test.ts` | 10 tests. |
 | Assets | `src/world/assets/assetManifest.test.ts`, `src/world/assets/assets.test.ts`, `src/world/scene/assetIntegration.test.ts` | Manifest and loading logic; no real GLB parse in a browser. |
-| Procedural textures | `src/world/scene/proceduralTextures.test.ts` | 44 tests on generated data. |
+| Procedural textures | `src/world/scene/proceduralTextures.test.ts` | 65 tests on generated data (18 textures, 7.50 MB computed estimate). |
 | Effects | `src/world/scene/effectsTiming.test.ts`, `src/world/scene/memoryShift.test.ts` | Timing and state logic. |
 | Layout reachability | `src/world/layout/roomLayout.test.ts` | Grid search from the start position. |
 | Reduced motion | `src/world/controller/useReducedMotion.test.ts` | 8 tests. |
@@ -117,7 +122,7 @@ These tests combine several modules or render components; none uses a real brows
 - Pointer lock in real browsers (jsdom tests only check that the code requests it after a click).
 - Real GLB loading and parsing in a browser.
 - Blender scripts (not run by any test).
-- How procedural textures look (tests check generated data, not appearance).
+- How procedural textures and the polish-pass layout look (tests check generated data and layout numbers, not appearance). Not verified visually.
 - Performance on target hardware (`targeting.bench.test.ts` is informational and asserts nothing about speed).
 
 ## Test gaps recorded for Requirement 13.14

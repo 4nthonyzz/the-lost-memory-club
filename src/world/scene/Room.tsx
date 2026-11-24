@@ -3,9 +3,20 @@ import { useMemo } from 'react'
 import type { Material } from 'three'
 import { ROOM } from '../layout/roomLayout'
 import type { Aabb } from '../worldTypes'
-import { arcadeSignBodyParts, arcadeSignLetterParts, ceilingFixtureParts, fixtureCentres, trimParts } from './modelDetail'
+import {
+  arcadeSignBodyParts,
+  arcadeSignLetterParts,
+  cableLoopsParts,
+  ceilingFixtureParts,
+  conduitParts,
+  cornerPostParts,
+  fixtureCentres,
+  trimParts,
+  ventilationParts,
+  wallClockParts,
+} from './modelDetail'
 import { PartMeshes } from './PartMeshes'
-import { ensureSharedTextures, geometries, hasSharedTexture, materials } from './sharedResources'
+import { ensureSharedTextures, geometries, hasSharedTexture, materials, wallGeometry } from './sharedResources'
 
 interface BlockProps {
   /** Footprint on the floor plane. */
@@ -27,6 +38,24 @@ export function Block({ box, y0 = 0, h, material }: BlockProps) {
       scale={[box.maxX - box.minX, h, box.maxZ - box.minZ]}
     />
   )
+}
+
+/** A wall box with metric UVs, so the panelling texture keeps its size on every wall length. The wall material colour is owned by Memory_Shift. */
+function WallBlock({ box, h }: { box: Aabb; h: number }) {
+  const geometry = useMemo(() => wallGeometry(box, h), [box, h])
+  return <mesh geometry={geometry} material={materials.wall} position={[(box.minX + box.maxX) / 2, h / 2, (box.minZ + box.maxZ) / 2]} />
+}
+
+/**
+ * Task 18.3 dressing that is not tied to a prop: overhead conduit, ceiling and wall vents, hanging cable
+ * loops, corner posts and a wall clock. Visual only, no Colliders, no lights.
+ */
+export function RoomDressing() {
+  const parts = useMemo(
+    () => [...conduitParts(), ...ventilationParts(), ...cableLoopsParts(), ...cornerPostParts(), ...wallClockParts()],
+    [],
+  )
+  return <PartMeshes parts={parts} />
 }
 
 const DOOR_HEIGHT = 2.1
@@ -122,10 +151,11 @@ export function Room() {
         scale={[w, d, 1]}
       />
       {walls.map((box, i) => (
-        <Block key={i} box={box} h={height} material={materials.wall} />
+        <WallBlock key={i} box={box} h={height} />
       ))}
       <Doors />
       <WallTrim />
+      <RoomDressing />
       <ArcadeSign />
       {fixtureCentres().map(([x, z]) => (
         <CeilingFixture key={`:`} x={x} z={z} />

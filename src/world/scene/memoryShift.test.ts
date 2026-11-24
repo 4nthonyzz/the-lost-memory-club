@@ -8,8 +8,10 @@ import {
   mixHex,
   overlayOpacity,
   overlayVisible,
+  wallShiftColor,
   type ShiftTargets,
 } from './memoryShift'
+import { WALL_TEXTURE_ALBEDO } from './proceduralTextures'
 
 class FakeColor {
   hex = ''
@@ -102,6 +104,24 @@ describe('applyShift', () => {
     expect(t.screens[1].material.color.hex).toBe(PALETTE_SHIFTED.screenEmissive)
     applyShift(0.5, t)
     expect(t.screens[1].material.color.hex).not.toBe('#ffffff')
+  })
+
+  it('textured wall: near-white multiplier at t = 0, the shifted wall tint is reached at t = 1 through the baked albedo', () => {
+    const channels = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+    for (const ch of channels(BASE_WALL_COLOR)) expect(ch).toBeGreaterThanOrEqual(0xe0)
+    const t = makeTargets()
+    applyShift(0, t)
+    expect(t.wall.color.hex).toBe(BASE_WALL_COLOR)
+    applyShift(1, t)
+    expect(t.wall.color.hex).toBe(wallShiftColor())
+    // multiplier x albedo ~ PALETTE_SHIFTED.wallTint wherever the multiplier is not clamped
+    const mult = channels(wallShiftColor())
+    const tint = channels(PALETTE_SHIFTED.wallTint)
+    mult.forEach((m, i) => {
+      if (m < 255) expect(Math.abs(m * WALL_TEXTURE_ALBEDO[i] - tint[i])).toBeLessThanOrEqual(1)
+    })
+    applyShift(0.5, t)
+    expect(t.wall.color.hex).not.toBe(BASE_WALL_COLOR)
   })
 
   it('clamps invalid t', () => {
