@@ -1,16 +1,16 @@
 // Player rig: per-frame movement, mouse look, camera and target evaluation.
 // Must be called from a component inside the R3F <Canvas>. All per-frame state
 // lives in refs; React is notified only when the interaction target changes.
-// Keyboard look (I/J/K/L) is intentionally not handled here (task 7.1/7.3).
+// Mouse and keyboard look (I/J/K/L) both apply in any lock state; frozen while inspecting.
 import { useCallback, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import type { StationId } from '../../core/contracts';
-import { moveWithCollision, relocateToValid } from '../logic/collision';
+import { relocateToValid } from '../logic/collision';
 import { EYE_HEIGHT, PLAYER_RADIUS } from '../logic/constants';
-import { toMovementInput, type HeldKeys } from '../logic/inputState';
+import type { HeldKeys } from '../logic/inputState';
 import type { InputMode } from '../logic/inputMode';
-import { applyMouseLook, type Look } from '../logic/look';
-import { clampDt, stepMovement } from '../logic/movement';
+import type { Look } from '../logic/look';
+import { stepPlayer } from '../logic/playerStep';
 import { selectInteractionTarget } from '../logic/targeting';
 import { COLLIDERS, ROOM, STATION_DEFS } from '../layout/roomLayout';
 import type { Vec2 } from '../worldTypes';
@@ -47,21 +47,21 @@ export function usePlayerRig(options: UsePlayerRigOptions): PlayerRig {
     const camera = state.camera;
     let pos = posRef.current as Vec2;
 
-    if (getMode() !== 'inspecting') {
-      const dt = clampDt(delta);
-
-      const md = consumeMouseDelta();
-      if (md.x !== 0 || md.y !== 0) {
-        lookRef.current = applyMouseLook(lookRef.current, md.x, md.y);
-      }
-
-      const input = toMovementInput(heldKeysRef.current);
-      if (dt > 0 && (input.forward || input.backward || input.left || input.right)) {
-        const next = stepMovement(pos, lookRef.current.yaw, input, dt);
-        const displacement = { x: next.x - pos.x, z: next.z - pos.z };
-        pos = moveWithCollision(pos, displacement, PLAYER_RADIUS, COLLIDERS, ROOM.bounds);
-        posRef.current = pos;
-      }
+    const mode = getMode();
+    if (mode !== 'inspecting') {
+      const step = stepPlayer({
+        pos,
+        look: lookRef.current,
+        keys: heldKeysRef.current,
+        mouseDelta: consumeMouseDelta(),
+        dt: delta,
+        mode,
+        colliders: COLLIDERS,
+        bounds: ROOM.bounds,
+      });
+      pos = step.pos;
+      posRef.current = pos;
+      lookRef.current = step.look;
 
       const target = selectInteractionTarget(pos, lookRef.current.yaw, STATION_DEFS, COLLIDERS);
       if (target !== targetRef.current) {

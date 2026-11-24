@@ -126,3 +126,12 @@
   justify-content: center;
   gap: 10px;
 }
+.world-keyboard-look {
+  position: absolute;
+  left: 50%;
+  top: 72px;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  text-align: center;
+  pointer-events: none;
+}

@@ -113,7 +113,7 @@ function WorldInteractive({
           onContextRestored={clearTimer}
         />
       </WorldCanvas>
-      <WorldOverlay mode={input.mode} target={target} canResume />
+      <WorldOverlay mode={input.mode} target={target} canResume keyboardLookHint={input.keyboardLookHint} />
     </div>
   );
 }

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 
 export const CONTROLS_LINES: readonly string[] = [
-  'WASD or arrow keys: move',
+  'W A S D: move',
+  'Arrow keys: move',
   'Mouse: look (after clicking the view)',
   'I J K L: look with the keyboard',
   'E: interact with a station',

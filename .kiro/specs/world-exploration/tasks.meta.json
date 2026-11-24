@@ -334,6 +334,115 @@
         "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
         "timestamp": 1795498518804
       }
+    ],
+    "7.1 Add keyboard look to the look module": [
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499366144
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499374876
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499461556
+      }
+    ],
+    "7.3 Wire keyboard look into the controllers": [
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499366358
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499468907
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499538972
+      }
+    ],
+    "7.4 Implement pointer-lock denial and unsupported fallback display": [
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499367259
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499375004
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499462118
+      }
+    ],
+    "7.5 Complete the controls hint": [
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499368142
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499375443
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499462654
+      }
+    ],
+    "7.6 Write unit tests for fallback transitions": [
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499369388
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499543785
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499597880
+      }
+    ],
+    "8. Checkpoint - Milestone 2 complete": [
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499369908
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499598070
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499700840
+      }
+    ],
+    "7. Keyboard look, pointer-lock fallback and full controls hint": [
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499539106
+      }
     ]
   }
 }

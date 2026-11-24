@@ -1,4 +1,7 @@
 import type { MovementInput } from '../worldTypes';
+import type { LookKeys } from './look';
+
+export type { LookKeys };
 
 export type KeyRole =
   | 'forward'
@@ -10,14 +13,6 @@ export type KeyRole =
   | 'pitchUp'
   | 'pitchDown'
   | 'interact';
-
-/** Structurally identical to LookKeys in look.ts (added by task 7.1). */
-export interface LookKeys {
-  yawLeft: boolean;
-  yawRight: boolean;
-  pitchUp: boolean;
-  pitchDown: boolean;
-}
 
 const ROLE_BY_CODE: Readonly<Record<string, KeyRole>> = {
   KeyW: 'forward',

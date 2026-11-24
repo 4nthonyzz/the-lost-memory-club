@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyMouseLook, clampPitch, wrapYaw } from './look';
+import { applyKeyboardLook, applyMouseLook, clampPitch, wrapYaw, type LookKeys } from './look';
 import { MOUSE_SENSITIVITY } from './constants';
 
 const LIMIT = (80 * Math.PI) / 180;
@@ -68,5 +68,57 @@ describe('applyMouseLook', () => {
       expect(look.yaw).toBeGreaterThan(-Math.PI);
       expect(look.yaw).toBeLessThanOrEqual(Math.PI);
     }
+  });
+});
+
+describe('applyKeyboardLook', () => {
+  const NONE: LookKeys = { yawLeft: false, yawRight: false, pitchUp: false, pitchDown: false };
+  const STEP = (90 * Math.PI) / 180 * 0.1; // 90 deg/s over the 0.1 s dt clamp
+  const start = { yaw: 0, pitch: 0 };
+
+  it('J turns left, L turns right, I pitches up, K pitches down', () => {
+    expect(applyKeyboardLook(start, { ...NONE, yawLeft: true }, 0.1).yaw).toBeCloseTo(STEP, 12);
+    expect(applyKeyboardLook(start, { ...NONE, yawRight: true }, 0.1).yaw).toBeCloseTo(-STEP, 12);
+    expect(applyKeyboardLook(start, { ...NONE, pitchUp: true }, 0.1).pitch).toBeCloseTo(STEP, 12);
+    expect(applyKeyboardLook(start, { ...NONE, pitchDown: true }, 0.1).pitch).toBeCloseTo(-STEP, 12);
+  });
+  it('rotates 90 degrees per second (4.5 degrees at dt = 0.05)', () => {
+    const r = applyKeyboardLook(start, { ...NONE, yawLeft: true }, 0.05);
+    expect(r.yaw).toBeCloseTo(Math.PI / 40, 12);
+  });
+  it('opposing keys cancel', () => {
+    expect(applyKeyboardLook(start, { ...NONE, yawLeft: true, yawRight: true }, 0.1)).toEqual(start);
+    expect(applyKeyboardLook(start, { ...NONE, pitchUp: true, pitchDown: true }, 0.1)).toEqual(start);
+  });
+  it('clamps pitch at +/-80 degrees', () => {
+    expect(applyKeyboardLook({ yaw: 0, pitch: LIMIT - 0.01 }, { ...NONE, pitchUp: true }, 0.1).pitch).toBe(LIMIT);
+    expect(applyKeyboardLook({ yaw: 0, pitch: -LIMIT + 0.01 }, { ...NONE, pitchDown: true }, 0.1).pitch).toBe(-LIMIT);
+  });
+  it('wraps yaw across PI in both directions', () => {
+    const a = applyKeyboardLook({ yaw: Math.PI - 0.01, pitch: 0 }, { ...NONE, yawLeft: true }, 0.1).yaw;
+    expect(a).toBeCloseTo(-Math.PI + STEP - 0.01, 12);
+    const b = applyKeyboardLook({ yaw: -Math.PI + 0.01, pitch: 0 }, { ...NONE, yawRight: true }, 0.1).yaw;
+    expect(b).toBeCloseTo(Math.PI - STEP + 0.01, 12);
+  });
+  it('does not rotate for dt = 0, negative, NaN or Infinity', () => {
+    const look = { yaw: 0.5, pitch: 0.2 };
+    const all: LookKeys = { yawLeft: true, yawRight: false, pitchUp: true, pitchDown: false };
+    for (const dt of [0, -1, NaN, Infinity, -Infinity]) {
+      expect(applyKeyboardLook(look, all, dt)).toEqual(look);
+    }
+  });
+  it('clamps dt larger than 0.1', () => {
+    const keys = { ...NONE, yawLeft: true };
+    expect(applyKeyboardLook(start, keys, 5).yaw).toBeCloseTo(STEP, 12);
+  });
+  it('combines yaw and pitch on diagonals', () => {
+    const r = applyKeyboardLook(start, { yawLeft: true, yawRight: false, pitchUp: false, pitchDown: true }, 0.1);
+    expect(r.yaw).toBeCloseTo(STEP, 12);
+    expect(r.pitch).toBeCloseTo(-STEP, 12);
+  });
+  it('sanitizes a non-finite input look', () => {
+    const r = applyKeyboardLook({ yaw: NaN, pitch: NaN }, { ...NONE, yawLeft: true, pitchUp: true }, 0.1);
+    expect(Number.isFinite(r.yaw)).toBe(true);
+    expect(Number.isFinite(r.pitch)).toBe(true);
   });
 });

@@ -272,8 +272,8 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 
 ### Milestone 2: Movement and camera
 
-- [ ] 7. Keyboard look, pointer-lock fallback and full controls hint
-  - [ ] 7.1 Add keyboard look to the look module
+- [x] 7. Keyboard look, pointer-lock fallback and full controls hint
+  - [x] 7.1 Add keyboard look to the look module
     - Files: `src/world/logic/look.ts`, `src/world/logic/look.keyboard.test.ts`.
     - `LookKeys`, `applyKeyboardLook` at 90 degrees per second times `clampDt(dt)`, then wrap and clamp.
     - Acceptance: pitch cannot exceed plus or minus 80 degrees; result independent of frame rate within tolerance.
@@ -289,7 +289,7 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Depends on: 7.1, 2.2.
     - **Validates: Requirements 4.2, 4.3, 4.4, 4.5, 5.3, 5.5, 13.4**
 
-  - [ ] 7.3 Wire keyboard look into the controllers
+  - [x] 7.3 Wire keyboard look into the controllers
     - Files: `src/world/controller/usePlayerRig.ts`, `src/world/controller/useWorldInput.ts`.
     - I, J, K, L are active whenever the canvas has focus and mode is not `inspecting`, regardless of pointer-lock state.
     - Acceptance: a player who never locks the pointer can look and walk.
@@ -298,7 +298,7 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: `preventDefault` only for used keys.
     - _Requirements: 5.3, 5.4, 11.15_
 
-  - [ ] 7.4 Implement pointer-lock denial and unsupported fallback display
+  - [x] 7.4 Implement pointer-lock denial and unsupported fallback display
     - Files: `src/world/controller/usePointerLock.ts`, `src/world/overlay/WorldOverlay.tsx`.
     - Missing `requestPointerLock` dispatches `LOCK_UNSUPPORTED`; `pointerlockerror` or a rejected request dispatches `LOCK_DENIED`; the overlay shows a keyboard-controls hint; no retry without a new gesture.
     - Acceptance: after denial the mode stays `capturePending`, WASD and IJKL still work.
@@ -307,7 +307,7 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: browser API only in the controller.
     - _Requirements: 4.11, 5.1, 5.2, 5.4_
 
-  - [ ] 7.5 Complete the controls hint
+  - [x] 7.5 Complete the controls hint
     - Files: `src/world/overlay/ControlsHint.tsx`.
     - Collapsible hint listing W A S D, arrows, I J K L, E, Esc, and a sentence that station messages appear in the status line below the scene. Readable without pointer lock.
     - Acceptance: every movement, look and interaction key is listed; hint toggle is keyboard operable with visible focus.
@@ -316,13 +316,13 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: text only; no lock-state knowledge.
     - _Requirements: 5.6, 15.1, 15.2, 15.4, 20.7_
 
-  - [ ]* 7.6 Write unit tests for fallback transitions
+  - [x]* 7.6 Write unit tests for fallback transitions
     - Files: `src/world/logic/inputMode.fallback.test.ts`.
     - Cases: `LOCK_DENIED` sets `keyboardLookHint` and emits no request; `LOCK_UNSUPPORTED` same; a later `CANVAS_CLICK` emits a request; lock loss returns to `capturePending`.
     - Depends on: 3.7.
     - _Requirements: 4.8, 4.11, 5.1, 5.2_
 
-- [ ] 8. Checkpoint - Milestone 2 complete
+- [x] 8. Checkpoint - Milestone 2 complete
   - Run `npm run typecheck`, `npm test`, `npm run build`.
   - Manual check: keyboard-only play (Tab to canvas, WASD, arrows, IJKL, E, Esc); simulate pointer lock denial; confirm the hint lists all keys.
   - Ensure all tests pass, ask the user if questions arise.

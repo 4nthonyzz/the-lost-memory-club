@@ -73,7 +73,7 @@ export function reduceMode(s: ModeState, e: ModeEvent): ModeResult {
 
     case 'LOCK_ACQUIRED':
       if (s.mode !== 'capturePending') return none(s);
-      return none({ ...s, mode: 'active', pointerLocked: true });
+      return none({ ...s, mode: 'active', pointerLocked: true, keyboardLookHint: false });
 
     case 'LOCK_LOST':
       if (s.mode === 'inspecting') return none(s);
