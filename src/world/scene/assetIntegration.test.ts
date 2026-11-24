@@ -4,7 +4,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { cleanup, render, waitFor } from '@testing-library/react'
 import { ROOM } from '../layout/roomLayout'
-import { assetPlacement } from './assetPlacement'
+import { assetPlacement, facingYaw } from './assetPlacement'
 
 const mocks = vi.hoisted(() => ({ fake: false }))
 
@@ -87,6 +87,18 @@ describe('assetPlacement', () => {
     expect(assetPlacement(prop('shelf-b').box).rotation[1]).toBeCloseTo(Math.PI / 2)
     expect(assetPlacement(prop('shelf-c').box).rotation[1]).toBe(0)
     expect(assetPlacement(prop('couch').box).rotation[1]).toBe(0)
+  })
+
+  it('rotates the +Z-facing model toward the layout facing (arcade cabinet faces -X)', () => {
+    const a = prop('arcade-cabinet')
+    expect(a.facing).toBe('-x')
+    // The footprint is longer in Z, but an explicit facing wins over the shelf rule.
+    expect(assetPlacement(a.box, a.facing).rotation[1]).toBeCloseTo(-Math.PI / 2)
+    expect([facingYaw('+z'), facingYaw('-z'), facingYaw('+x'), facingYaw('-x')]).toEqual([0, Math.PI, Math.PI / 2, -Math.PI / 2])
+    // Model front (+Z) rotated by that yaw points along -X.
+    const yaw = assetPlacement(a.box, a.facing).rotation[1]
+    expect(Math.sin(yaw)).toBeCloseTo(-1)
+    expect(Math.cos(yaw)).toBeCloseTo(0)
   })
 })
 

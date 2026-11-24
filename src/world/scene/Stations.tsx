@@ -3,12 +3,12 @@
  * Screens use shared materials that only the Memory_Shift blend tints; lock state is not an input.
  * Each object takes only layout-derived props. Task 13.2 wraps them in AssetModel: the primitive is the\n * fallback, and a GLB (when the manifest has one) replaces only the body.\n *\n * The screens stay outside the swapped asset: CrtScreen and ArcadeScreen always render the shared\n * crtScreen / arcadeScreen materials (Memory_Shift tint, Effects overlay placement). A GLB must\n * therefore leave the screen face open and not model its own screen. The 'crt-light' point light\n * lives in Lighting.tsx and is unaffected.
  */
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { ROOM, type PropDef } from '../layout/roomLayout'
-import type { Aabb } from '../worldTypes'
+import type { Aabb, Facing } from '../worldTypes'
 import { arcadeCabinetParts, crtTelevisionParts, vcrDeckParts } from './modelDetail'
 import { AssetModel } from '../assets/AssetModel'
-import { assetPlacement } from './assetPlacement'
+import { assetPlacement, facingFrame } from './assetPlacement'
 import { PartMeshes } from './PartMeshes'
 
 function propById(id: string): PropDef {
@@ -66,6 +66,19 @@ export function ArcadeScreen({ box, height }: BoxHeightProps) {
   return <PartMeshes parts={parts} />
 }
 
+/**
+ * Places local parts (front toward +Z, footprint centred on the origin) over a world footprint so the
+ * front points toward `facing`. The arcade cabinet in the Arcade_Area faces -X, toward the doorways.
+ */
+export function Faced({ box, facing, children }: { box: Aabb; facing?: Facing; children: (local: Aabb) => ReactNode }) {
+  const frame = useMemo(() => facingFrame(box, facing), [box, facing])
+  return (
+    <group position={frame.position} rotation={[0, frame.rotationY, 0]}>
+      {children(frame.local)}
+    </group>
+  )
+}
+
 export function Stations() {
   const crt = propById('crt-vhs')
   const arcade = propById('arcade-cabinet')
@@ -85,10 +98,17 @@ export function Stations() {
       <CrtScreen box={crt.box} height={crt.height} />
       <AssetModel
         id="arcade-cabinet"
-        {...assetPlacement(arcade.box)}
-        fallback={<ArcadeCabinet box={arcade.box} height={arcade.height} screen={false} />}
+        {...assetPlacement(arcade.box, arcade.facing)}
+        fallback={
+          <Faced box={arcade.box} facing={arcade.facing}>
+            {(local) => <ArcadeCabinet box={local} height={arcade.height} screen={false} />}
+          </Faced>
+        }
       />
-      <ArcadeScreen box={arcade.box} height={arcade.height} />
+      {/* The attract screen is the fixed arcadeScreen material, drawn the same way whatever the lock state. */}
+      <Faced box={arcade.box} facing={arcade.facing}>
+        {(local) => <ArcadeScreen box={local} height={arcade.height} />}
+      </Faced>
     </group>
   )
 }

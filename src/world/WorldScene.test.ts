@@ -10,6 +10,7 @@ vi.mock('./scene/WorldCanvas', () => ({
   WorldCanvas: ({ children }: { children?: ReactNode }) =>
     createElement('div', { 'data-testid': 'canvas' }, children),
 }));
+vi.mock('./controller/useFrameSampler', () => ({ FrameSamplerHost: () => null }));
 vi.mock('./scene/Lighting', () => ({ Lighting: () => null }));
 vi.mock('./scene/Effects', () => ({ Effects: () => null }));
 vi.mock('./scene/Props', () => ({ Props: () => null }));
@@ -186,7 +187,8 @@ describe('WorldScene feedback ownership text', () => {
 describe('WorldScene fallback (no WebGL)', () => {
   it('fallback buttons call onInspect with vhs and arcade', () => {
     setWebgl(false);
-    const { onInspect } = renderWorld();
+    const { onInspect, wrapper } = renderWorld();
+    expect(wrapper.getAttribute('tabindex')).toBe('-1');
     expect(document.querySelector('canvas[data-testid]')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Inspect the CRT television' }));
     fireEvent.click(screen.getByRole('button', { name: 'Use the arcade cabinet' }));

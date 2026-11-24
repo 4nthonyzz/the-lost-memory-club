@@ -4,12 +4,13 @@
  * Nothing here depends on `memoryShifted`.
  *
  * Axes: y up, yaw 0 looks toward -z. The player starts at the south side
- * (z = +3) and looks north, so Stations stand against the north wall and
- * face +z.
+ * (z = +3) and looks north. The VHS Station stands against the north wall
+ * and faces +z. The arcade Station stands against the east wall of the
+ * Arcade_Area and faces -x, toward both doorways.
  */
 import { PLAYER_RADIUS } from '../logic/constants';
 import { overlapsAny } from '../logic/collision';
-import type { Aabb, StationDef, Vec2 } from '../worldTypes';
+import type { Aabb, Facing, StationDef, Vec2 } from '../worldTypes';
 
 export interface PropDef {
   id: string;
@@ -24,6 +25,10 @@ export interface PropDef {
   solid: boolean;
   /** Optional GLB asset path, used by the M5 asset integration. */
   glbPath?: string;
+  /** Direction the front face points toward. Omitted means '+z'. */
+  facing?: Facing;
+  /** Height of the bottom of the prop above the floor, for wall-mounted items. Omitted means 0. */
+  elevation?: number;
 }
 
 export interface DoorDef {
@@ -48,8 +53,19 @@ function prop(
   milestone = 1,
   solid = true,
   glbPath?: string,
+  extra: { facing?: Facing; elevation?: number } = {},
 ): PropDef {
-  return Object.freeze({ id, kind, box: b, height, milestone, solid, ...(glbPath ? { glbPath } : {}) });
+  return Object.freeze({
+    id,
+    kind,
+    box: b,
+    height,
+    milestone,
+    solid,
+    ...(glbPath ? { glbPath } : {}),
+    ...(extra.facing ? { facing: extra.facing } : {}),
+    ...(extra.elevation !== undefined ? { elevation: extra.elevation } : {}),
+  });
 }
 
 /** Main room x -5..5, z -4..4. Arcade_Area x 5.3..9.3, z -2..2, entered from the east wall. */
@@ -90,19 +106,34 @@ const SHELF_C = prop('shelf-c', 'shelf', box(2, 4, 3.4, 4), 2.2, 3);
 
 /** CRT television on a stand against the north wall; front face at z = -3.4. */
 const VHS_PROP = prop('crt-vhs', 'station', box(-3, -2, -4, -3.4), 1.2);
-/** Arcade cabinet against the north wall; front face at z = -3.2. */
-const ARCADE_PROP = prop('arcade-cabinet', 'station', box(2, 3, -4, -3.2), 1.8);
+/**
+ * Arcade cabinet against the east wall of the Arcade_Area, 0.1 m clear of the wall (x = 9.3).
+ * Its front (west) face is at x = 8.4 and looks toward both doorways.
+ */
+const ARCADE_PROP = prop('arcade-cabinet', 'station', box(8.4, 9.2, -0.5, 0.5), 1.8, 1, true, undefined, { facing: '-x' });
+
+/** Powered-down companion cabinet next to the active one, same facing, no interaction. */
+const ARCADE_COMPANION = prop('arcade-companion', 'furniture', box(8.4, 9.2, 0.7, 1.6), 1.8, 3, true, undefined, { facing: '-x' });
+/** Stacked CRT monitors in the north-east corner of the Arcade_Area. */
+const CRT_STACK = prop('crt-stack', 'furniture', box(8.6, 9.2, -1.9, -1.3), 1.0, 3, true, undefined, { facing: '-x' });
 
 const CHAIR = prop('abandoned-chair', 'furniture', box(2.9, 3.5, 1.9, 2.5), 0.9, 3);
 const COUCH = prop('couch', 'furniture', box(-3.9, -2.1, 2.6, 3.4), 0.9, 3);
 
 const DETAILS: readonly PropDef[] = Object.freeze([
-  prop('crate-a', 'detail', box(8.3, 8.9, -1.8, -1.2), 0.6, 3),
-  prop('crate-b', 'detail', box(8.3, 8.9, 1.2, 1.8), 0.5, 3),
+  // Crates sit against the Arcade_Area side walls, outside the 1.2 m lanes from the doors to the arcade anchor.
+  prop('crate-a', 'detail', box(7.2, 7.8, -1.95, -1.35), 0.6, 3),
+  prop('crate-b', 'detail', box(7.2, 7.8, 1.35, 1.95), 0.5, 3),
   prop('tape-stack', 'detail', box(-0.6, -0.2, 0.7, 1.1), 0.15, 3, false),
   prop('poster-north', 'detail', box(0.5, 1.5, -4, -3.95), 1.0, 3, false),
   prop('poster-arcade-area', 'detail', box(7, 8, -2, -1.95), 1.0, 3, false),
   prop('cable-run', 'detail', box(-1, 1, -2.5, -2.45), 0.02, 3, false),
+  // Arcade_Area dressing, all visual only. The ARCADE sign hangs on the main-room face of the east wall
+  // above both doorways (x 4.78 is 0.07 m in front of the lintel faces at x 4.85).
+  prop('arcade-sign', 'detail', box(4.78, 5, -1.4, 1.4), 0.5, 3, false, undefined, { elevation: 2.3, facing: '-x' }),
+  prop('arcade-runner', 'detail', box(5.5, 8.1, -0.45, 0.45), 0.01, 3, false),
+  prop('arcade-cable-a', 'detail', box(8.98, 9.04, -1.3, -0.5), 0.02, 3, false),
+  prop('arcade-cable-b', 'detail', box(7.9, 8.4, 1.1, 1.16), 0.02, 3, false),
 ]);
 
 const STATIONS: readonly StationDef[] = Object.freeze([
@@ -113,8 +144,10 @@ const STATIONS: readonly StationDef[] = Object.freeze([
   }),
   Object.freeze({
     id: 'arcade' as const,
-    anchor: Object.freeze({ x: 2.5, z: ARCADE_PROP.box.maxZ }),
+    // Anchor on the west face, centred on the cabinet.
+    anchor: Object.freeze({ x: ARCADE_PROP.box.minX, z: (ARCADE_PROP.box.minZ + ARCADE_PROP.box.maxZ) / 2 }),
     collider: ARCADE_PROP.box,
+    facing: '-x' as const,
   }),
 ]);
 
@@ -125,6 +158,8 @@ const PROPS: readonly PropDef[] = Object.freeze([
   SHELF_C,
   VHS_PROP,
   ARCADE_PROP,
+  ARCADE_COMPANION,
+  CRT_STACK,
   CHAIR,
   COUCH,
   ...DETAILS,

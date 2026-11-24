@@ -9,6 +9,8 @@
  */
 import { ROOM } from '../layout/roomLayout'
 import type { Aabb } from '../worldTypes'
+import { facingFrame } from './assetPlacement'
+import { TEXTURE_IDS, totalTextureMemoryBytes } from './proceduralTextures'
 import type { geometries, materials } from './sharedResources'
 
 export type GeometryKey = keyof typeof geometries
@@ -103,7 +105,7 @@ export function crtTelevisionParts(box: Aabb, height: number): Part[] {
     // Two knobs, speaker slits, power LED and badge on the right strip.
     part('cylinderLow', 'metal', [0.385, 1.05, 0.012], [0.06, 0.025, 0.06], [HALF_PI, 0, 0]),
     part('cylinderLow', 'metal', [0.385, 0.95, 0.012], [0.06, 0.025, 0.06], [HALF_PI, 0, 0]),
-    ...[0, 1, 2, 3].map((i) => bx('bezel', [0.385, 0.7 + i * 0.035, 0.003], [0.1, 0.01, 0.006])),
+    bx('grille', [0.385, 0.75, 0.003], [0.1, 0.14, 0.006]),
     part('cylinderLow', 'led', [0.4, 0.64, 0.006], [0.02, 0.012, 0.02], [HALF_PI, 0, 0]),
     bx('metal', [sx, 0.62, 0.003], [0.1, 0.014, 0.006]),
     // Antenna stubs.
@@ -144,7 +146,26 @@ export function vcrDeckParts(box: Aabb): Part[] {
 
 export const ARCADE_BUTTON_MATERIALS = ['btnRed', 'btnYellow', 'btnGreen', 'btnBlue', 'btnWhite', 'btnOrange'] as const
 
-export function arcadeCabinetParts(box: Aabb, height: number): Part[] {
+/**
+ * Cabinet parts in a local frame: `box` is the footprint with its front at `box.maxZ` (+Z).
+ * The arcade Station faces -X in the world, so callers pass `facingFrame(...).local` and rotate the
+ * group. `powered = false` gives the dark companion cabinet: no arcadeScreen plane, no lit marquee.
+ */
+export function arcadeCabinetParts(box: Aabb, height: number, powered = true): Part[] {
+  const parts = poweredCabinetParts(box, height)
+  if (powered) return parts
+  return parts.map((p) =>
+    p.mat === 'arcadeScreen'
+      ? { ...p, mat: 'screenOff' as const }
+      : p.mat === 'marquee'
+        ? { ...p, mat: 'marqueeOff' as const }
+        : p.mat === 'coinGlow'
+          ? { ...p, mat: 'plastic' as const }
+          : p,
+  )
+}
+
+function poweredCabinetParts(box: Aabb, height: number): Part[] {
   const { cx, w, d } = centre(box)
   const lowerH = 0.95
   const upperH = height - lowerH
@@ -156,7 +177,8 @@ export function arcadeCabinetParts(box: Aabb, height: number): Part[] {
   const zc = -0.25 // front face of the upper column
 
   const deck: Part[] = [
-    bx('plastic', [0, 0, 0], [w, 0.07, 0.44]),
+    // Textured control deck: joystick and button rings are drawn on the top face (see drawDeck).
+    bx('deck', [0, 0, 0], [w, 0.07, 0.44]),
     // Ball-top joystick.
     part('cylinderLow', 'metal', [-0.2, 0.04, 0.02], [0.07, 0.012, 0.07]),
     part('cylinderLow', 'metal', [-0.2, 0.1, 0.02], [0.015, 0.12, 0.015]),
@@ -166,22 +188,43 @@ export function arcadeCabinetParts(box: Aabb, height: number): Part[] {
       part('cylinder', m, [0.02 + (i % 3) * 0.085, 0.04, i < 3 ? -0.04 : 0.06], [0.06, 0.02, 0.06]),
     ),
   ]
+  // The marquee texture is 4:1, so the lit plane keeps that ratio.
+  const mw = Math.min(w * 0.9, 0.8)
   const marquee: Part[] = [
     bx('cabinet', [0, 0, 0], [w, 0.22, 0.1]),
     // Fixed lit marquee, never changed by state.
-    part('plane', 'marquee', [0, 0, 0.051], [w * 0.88, 0.17, 1]),
+    part('plane', 'marquee', [0, 0, 0.051], [mw, mw / 4, 1]),
   ]
+  /**
+   * Sculpted side panel: a full-depth lower wing and an upper wing in three steps that taper toward the
+   * back, with the art planes on the outer faces. `th` is the wing thickness.
+   */
   const side = (sign: 1 | -1): Part[] => {
-    const x = sign * (w / 2 + 0.003)
-    const xs = sign * (w / 2 + 0.005)
+    const th = 0.03
+    const xw = sign * (w / 2 + th / 2)
+    const xo = sign * (w / 2 + th + 0.003)
+    const xs = sign * (w / 2 + th + 0.005)
     const rot: Vec3 = [0, sign * HALF_PI, 0]
-    return [
-      part('plane', 'sideArtA', [x, 0.5, -d / 2], [d - 0.04, 0.9, 1], rot),
-      part('plane', 'sideArtB', [xs, 0.5, -d / 2], [d - 0.04, 0.12, 1], rot),
-      part('plane', 'sideArtA', [x, 1.375, -(0.25 + colD / 2)], [colD - 0.04, 0.8, 1], rot),
-      part('plane', 'sideArtB', [xs, 1.375, -(0.25 + colD / 2)], [colD - 0.04, 0.12, 1], rot),
+    const stepH = upperH / 3
+    const out: Part[] = [
+      bx('cabinet', [xw, 0.5, -d / 2], [th, 0.9, d - 0.02]),
+      part('plane', 'sideArtA', [xo, 0.5, -d / 2], [d - 0.08, 0.8, 1], rot),
+      part('plane', 'sideArtB', [xs, 0.5, -d / 2], [d - 0.08, 0.1, 1], rot),
     ]
+    for (let i = 0; i < 3; i++) {
+      const depth = colD - 0.05 * (i + 1)
+      const zc2 = -0.25 - depth / 2
+      out.push(bx('cabinet', [xw, lowerH + stepH * (i + 0.5), zc2], [th, stepH - 0.012, depth]))
+      if (i === 1) out.push(part('plane', 'sideArtB', [xo, lowerH + stepH * 1.5, zc2], [depth - 0.08, 0.1, 1], rot))
+    }
+    return out
   }
+  // Screen hood: a visor and two cheeks that stand proud of the bezel, so the screen sits in a recess.
+  const hood: Part[] = [
+    bx('cabinet', [0, screenY + sh / 2 + t + 0.015, zc + 0.05], [sw + 2 * t + 0.14, 0.03, 0.1]),
+    bx('cabinet', [-(sw / 2 + t + 0.035), screenY, zc + 0.04], [0.03, sh + 2 * t, 0.08]),
+    bx('cabinet', [sw / 2 + t + 0.035, screenY, zc + 0.04], [0.03, sh + 2 * t, 0.08]),
+  ]
   const local: Part[] = [
     bx('cabinet', [0, lowerH / 2, -d / 2], [w, lowerH, d]),
     bx('cabinet', [0, lowerH + upperH / 2, -(0.25 + colD / 2)], [w, upperH, colD]),
@@ -191,6 +234,7 @@ export function arcadeCabinetParts(box: Aabb, height: number): Part[] {
     bx('bezel', [0, screenY - sh / 2 - t / 2, zc + 0.015], [sw + 2 * t, t, 0.03]),
     bx('bezel', [-sw / 2 - t / 2, screenY, zc + 0.015], [t, sh, 0.03]),
     bx('bezel', [sw / 2 + t / 2, screenY, zc + 0.015], [t, sh, 0.03]),
+    ...hood,
     ...tiltX(deck, [0, 1.0, -0.22], 0.2),
     ...tiltX(marquee, [0, 1.68, -0.2], 0.25),
     ...side(1),
@@ -201,9 +245,196 @@ export function arcadeCabinetParts(box: Aabb, height: number): Part[] {
     bx('bezel', [0.05, 0.56, 0.01], [0.03, 0.06, 0.012]),
     bx('btnYellow', [-0.07, 0.41, 0.01], [0.04, 0.04, 0.012]),
     bx('btnYellow', [0.07, 0.41, 0.01], [0.04, 0.04, 0.012]),
+    // Coin return: a small lit slot under the coin door.
+    bx('coinGlow', [0, 0.34, 0.012], [0.09, 0.025, 0.008]),
+    // Louvered speaker grilles flanking the coin door.
+    bx('grille', [-0.3, 0.5, 0.004], [0.2, 0.3, 0.008]),
+    bx('grille', [0.3, 0.5, 0.004], [0.2, 0.3, 0.008]),
     bx('metal', [0, 0.075, 0.004], [w * 0.98, 0.13, 0.012]),
   ]
   return offset(local, [cx, 0, box.maxZ])
+}
+
+// ---------------------------------------------------------------------------------------------
+// Arcade_Area dressing (task 15.6): CRT stack, ARCADE sign, floor runner and cable runs.
+// All visual only. Colliders for the solid pieces come from the layout props.
+// ---------------------------------------------------------------------------------------------
+
+const layoutProp = (id: string) => {
+  const p = ROOM.props.find((q) => q.id === id)
+  if (!p) throw new Error(`Missing prop ${id}`)
+  return p
+}
+
+/** Three stacked, powered-down CRT monitors on a low wooden base. `box` is a local footprint (front at +Z). */
+export function crtStackParts(box: Aabb, height: number): Part[] {
+  const { cx, cz, w, d } = centre(box)
+  const baseH = 0.2
+  const h = (height - baseH) / 3
+  const mw = w * 0.9
+  const md = d * 0.9
+  const front = cz + md / 2
+  // Slightly crooked stacking, fixed offsets (no randomness).
+  const shifts = [0.02, -0.03, 0.01] as const
+  const parts: Part[] = [bx('woodDark', [cx, baseH / 2, cz], [w, baseH, d])]
+  shifts.forEach((s, i) => {
+    const y = baseH + h * (i + 0.5)
+    parts.push(
+      bx('casing', [cx + s, y, cz], [mw, h, md]),
+      bx('bezel', [cx + s, y, front + 0.003], [mw * 0.8, h * 0.82, 0.006]),
+      part('plane', 'screenOff', [cx + s, y, front + 0.0065], [mw * 0.68, h * 0.66, 1]),
+    )
+  })
+  return parts
+}
+
+/** Stroke lettering for the sign. Since task 15.7 the sign shows a textured face; these boxes are the fallback when no canvas exists. */
+export const ARCADE_SIGN_TEXT = 'ARCADE'
+const GLYPH_W = 0.26
+const GLYPH_H = 0.34
+const GLYPH_GAP = 0.1
+const STROKE = 0.05
+const LETTER_DEPTH = 0.03
+
+interface Stroke {
+  /** Centre across the letter (0 = left edge) and up from its bottom, plus size. */
+  z: number
+  y: number
+  dz: number
+  dy: number
+  /** Rotation about X for diagonals; the box length then runs along dy. */
+  rot?: number
+}
+
+function glyphStrokes(ch: string): Stroke[] {
+  const W = GLYPH_W
+  const H = GLYPH_H
+  const t = STROKE
+  const left: Stroke = { z: t / 2, y: H / 2, dz: t, dy: H }
+  const right: Stroke = { z: W - t / 2, y: H / 2, dz: t, dy: H }
+  const top: Stroke = { z: W / 2, y: H - t / 2, dz: W, dy: t }
+  const mid: Stroke = { z: W / 2, y: H / 2, dz: W, dy: t }
+  const bottom: Stroke = { z: W / 2, y: t / 2, dz: W, dy: t }
+  switch (ch) {
+    case 'A':
+      return [left, right, top, mid]
+    case 'C':
+      return [left, top, bottom]
+    case 'D':
+      return [left, top, bottom, { ...right, y: H / 2, dy: H - 2 * t }]
+    case 'E':
+      return [left, top, mid, bottom]
+    case 'R': {
+      // Leg from the middle bar down to the bottom right corner.
+      const sz = W * 0.35
+      const sy = H / 2
+      const ez = W - t / 2
+      const ey = 0.02
+      const len = Math.hypot(ez - sz, ey - sy)
+      return [
+        left,
+        top,
+        mid,
+        { z: W - t / 2, y: (H * 3) / 4 - t / 4, dz: t, dy: H / 2 - t / 2 },
+        { z: (sz + ez) / 2, y: (sy + ey) / 2, dz: t, dy: len, rot: Math.atan2(ez - sz, ey - sy) },
+      ]
+    }
+    default:
+      throw new Error(`No glyph for ${ch}`)
+  }
+}
+
+/** Sign lettering as emissive box strokes, reading left to right for a viewer facing east (increasing z). */
+export function arcadeSignLetterParts(): Part[] {
+  const sign = layoutProp('arcade-sign')
+  const el = sign.elevation ?? 0
+  const x = sign.box.minX - 0.02
+  const total = ARCADE_SIGN_TEXT.length * GLYPH_W + (ARCADE_SIGN_TEXT.length - 1) * GLYPH_GAP
+  const zStart = (sign.box.minZ + sign.box.maxZ) / 2 - total / 2
+  const yBottom = el + sign.height / 2 - GLYPH_H / 2
+  const parts: Part[] = []
+  ;[...ARCADE_SIGN_TEXT].forEach((ch, i) => {
+    const z0 = zStart + i * (GLYPH_W + GLYPH_GAP)
+    for (const s of glyphStrokes(ch)) {
+      const size: Vec3 = [LETTER_DEPTH, s.dy, s.dz]
+      parts.push(bx('signText', [x, yBottom + s.y, z0 + s.z], size, s.rot === undefined ? undefined : [s.rot, 0, 0]))
+    }
+  })
+  return parts
+}
+
+/**
+ * Sign body: dark backing box on the lintel and pillar faces, a glowing face plane and two trim strips.
+ * Only the lettering is meant to be swapped for a texture later. No light source.
+ */
+export function arcadeSignBodyParts(): Part[] {
+  const sign = layoutProp('arcade-sign')
+  const el = sign.elevation ?? 0
+  const len = sign.box.maxZ - sign.box.minZ
+  const zc = (sign.box.minZ + sign.box.maxZ) / 2
+  const faceX = sign.box.minX - 0.003
+  return [
+    bx('signBack', [(sign.box.minX + sign.box.maxX) / 2, el + sign.height / 2, zc], [sign.box.maxX - sign.box.minX, sign.height, len]),
+    part('plane', 'signGlow', [faceX, el + sign.height / 2, zc], [len - 0.1, sign.height - 0.08, 1], [0, -HALF_PI, 0]),
+    // Textured lettering face (4:1, matches drawSignFace). Emissive basic material, no light.
+    part('plane', 'signFace', [faceX - 0.004, el + sign.height / 2, zc], [(sign.height - 0.08) * 4, sign.height - 0.08, 1], [0, -HALF_PI, 0]),
+    bx('signText', [faceX - 0.012, el + sign.height - 0.05, zc], [0.02, 0.02, len - 0.16]),
+    bx('signText', [faceX - 0.012, el + 0.05, zc], [0.02, 0.02, len - 0.16]),
+  ]
+}
+
+export function arcadeSignParts(): Part[] {
+  return [...arcadeSignBodyParts(), ...arcadeSignLetterParts()]
+}
+
+/** Poster plane aspect (width / height), matching the 256 x 512 poster textures. */
+export const POSTER_ASPECT = 0.5
+const POSTER_CENTRE_Y = 1.7
+const POSTER_FRAME = 0.05
+
+/**
+ * The two framed posters (task 15.7): textured plane plus a four-piece wooden frame whose front stands
+ * 3 mm proud of the poster. Positions come from the poster props; the north wall posters face +z.
+ */
+export function posterParts(): Part[] {
+  const specs = [
+    ['poster-north', 'posterSunset'],
+    ['poster-arcade-area', 'posterReel'],
+  ] as const
+  const t = POSTER_FRAME
+  const parts: Part[] = []
+  for (const [id, mat] of specs) {
+    const p = layoutProp(id)
+    const cx = (p.box.minX + p.box.maxX) / 2
+    const z = p.box.maxZ + 0.005
+    const h = p.height
+    const w = h * POSTER_ASPECT
+    const zf = z - 0.012
+    parts.push(
+      part('plane', mat, [cx, POSTER_CENTRE_Y, z], [w, h, 1]),
+      bx('woodDark', [cx, POSTER_CENTRE_Y + h / 2 + t / 2, zf], [w + 2 * t, t, 0.03]),
+      bx('woodDark', [cx, POSTER_CENTRE_Y - h / 2 - t / 2, zf], [w + 2 * t, t, 0.03]),
+      bx('woodDark', [cx - w / 2 - t / 2, POSTER_CENTRE_Y, zf], [t, h, 0.03]),
+      bx('woodDark', [cx + w / 2 + t / 2, POSTER_CENTRE_Y, zf], [t, h, 0.03]),
+    )
+  }
+  return parts
+}
+
+/** Floor runner decal (plane, no collider) and flat cable runs (boxes, no collider). */
+export function arcadeFloorParts(): Part[] {
+  const mid = (b: Aabb) => [(b.minX + b.maxX) / 2, (b.minZ + b.maxZ) / 2] as const
+  const runner = layoutProp('arcade-runner').box
+  const [rx, rz] = mid(runner)
+  const parts: Part[] = [
+    part('plane', 'runner', [rx, 0.011, rz], [runner.maxX - runner.minX, runner.maxZ - runner.minZ, 1], [-HALF_PI, 0, 0]),
+  ]
+  for (const id of ['arcade-cable-a', 'arcade-cable-b']) {
+    const p = layoutProp(id)
+    const [cx, cz] = mid(p.box)
+    parts.push(bx('plastic', [cx, p.height / 2, cz], [p.box.maxX - p.box.minX, p.height, p.box.maxZ - p.box.minZ]))
+  }
+  return parts
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -351,7 +582,7 @@ export function armchairParts(box: Aabb): Part[] {
   const parts: Part[] = []
   const leg = 0.05
   for (const lx of [box.minX + leg / 2, box.maxX - leg / 2]) {
-    for (const lz of [box.minZ + leg / 2, box.maxZ - leg / 2]) parts.push(bx('woodDark', [lx, 0.06, lz], [leg, 0.12, leg]))
+    for (const lz of [box.minZ + leg / 2, box.maxZ - leg / 2]) parts.push(part('cylinderLow', 'woodDark', [lx, 0.06, lz], [leg, 0.12, leg]))
   }
   parts.push(
     bx('fabric', [cx, 0.21, cz], [w, 0.18, d]),
@@ -361,6 +592,11 @@ export function armchairParts(box: Aabb): Part[] {
     bx('fabricLight', [cx, 0.6, box.maxZ - 0.17], [w - 0.24, 0.36, 0.1], [0.15, 0, 0]),
     bx('fabric', [box.minX + 0.05, 0.41, cz], [0.1, 0.22, d - 0.04]),
     bx('fabric', [box.maxX - 0.05, 0.41, cz], [0.1, 0.22, d - 0.04]),
+    // Rolled arm tops (axis along z), rolled back top (axis along x) and a throw pillow on the seat.
+    part('cylinderLow', 'fabric', [box.minX + 0.05, 0.53, cz], [0.11, d - 0.04, 0.11], [HALF_PI, 0, 0]),
+    part('cylinderLow', 'fabric', [box.maxX - 0.05, 0.53, cz], [0.11, d - 0.04, 0.11], [HALF_PI, 0, 0]),
+    part('cylinderLow', 'fabric', [cx, 0.88, box.maxZ - 0.07], [0.1, w - 0.04, 0.1], [0, 0, HALF_PI]),
+    bx('rugLight', [cx + 0.14, 0.5, cz + 0.02], [0.2, 0.16, 0.06], [-0.5, 0.2, 0.1]),
   )
   return parts
 }
@@ -369,7 +605,7 @@ export function couchParts(box: Aabb): Part[] {
   const { cx, cz, w, d } = centre(box)
   const parts: Part[] = []
   for (const lx of [box.minX + 0.08, box.maxX - 0.08]) {
-    for (const lz of [box.minZ + 0.08, box.maxZ - 0.08]) parts.push(bx('woodDark', [lx, 0.04, lz], [0.06, 0.08, 0.06]))
+    for (const lz of [box.minZ + 0.08, box.maxZ - 0.08]) parts.push(part('cylinderLow', 'woodDark', [lx, 0.04, lz], [0.07, 0.08, 0.07]))
   }
   parts.push(
     bx('rug', [cx, 0.18, cz], [w, 0.2, d]),
@@ -380,6 +616,9 @@ export function couchParts(box: Aabb): Part[] {
     bx('rug', [box.maxX - 0.1, 0.45, cz], [0.2, 0.34, d]),
     part('cylinder', 'rug', [box.minX + 0.1, 0.62, cz], [0.2, d, 0.2], [HALF_PI, 0, 0]),
     part('cylinder', 'rug', [box.maxX - 0.1, 0.62, cz], [0.2, d, 0.2], [HALF_PI, 0, 0]),
+    // Rolled top along the backrest and a tilted throw pillow in the left corner.
+    part('cylinderLow', 'rug', [cx, 0.84, box.maxZ - 0.1], [0.16, w - 0.4, 0.16], [0, 0, HALF_PI]),
+    bx('sideArtB', [box.minX + 0.42, 0.52, cz + 0.12], [0.3, 0.3, 0.08], [-0.4, 0.5, 0.3]),
   )
   const inner = w - 0.4
   const sw = inner / 3 - 0.01
@@ -413,6 +652,13 @@ export function crateParts(box: Aabb, height: number): Part[] {
     parts.push(bx('crate', [cx, y, cz], [w + 0.02, sh, d - 0.02]), bx('crate', [cx, y, cz], [w - 0.02, sh, d + 0.02]))
   }
   parts.push(bx('crateSlat', [cx, height - 0.012, cz], [w, 0.024, d]))
+  // Diagonal brace on the front face and hand-hold slots on both end faces.
+  const brace = Math.hypot(w, height) * 0.8
+  parts.push(
+    bx('crateSlat', [cx, height / 2, box.maxZ + 0.016], [0.045, brace, 0.012], [0, 0, -Math.atan2(w, height)]),
+    bx('bezel', [box.minX - 0.012, height * 0.62, cz], [0.012, 0.05, d * 0.4]),
+    bx('bezel', [box.maxX + 0.012, height * 0.62, cz], [0.012, 0.05, d * 0.4]),
+  )
   const post = 0.05
   for (const px of [box.minX + post / 2 - 0.006, box.maxX - post / 2 + 0.006]) {
     for (const pz of [box.minZ + post / 2 - 0.006, box.maxZ - post / 2 + 0.006]) {
@@ -456,6 +702,13 @@ export function deskParts(box: Aabb, height: number): Part[] {
     bx('spineB', [cx + 0.45, top + 0.22, cz], [0.03, 0.19, 0.1]),
     bx('spineC', [cx + 0.5, top + 0.22, cz], [0.03, 0.19, 0.1]),
     bx('spineA', [cx + 0.55, top + 0.22, cz], [0.03, 0.19, 0.1]),
+    // Coffee mug (low-segment cylinder with a handle), a notepad with a pencil and a loose tape.
+    part('cylinderLow', 'mug', [cx + 0.95, top + 0.0475, cz - 0.1], [0.08, 0.095, 0.08]),
+    bx('mug', [cx + 0.95 + 0.048, top + 0.05, cz - 0.1], [0.014, 0.05, 0.016]),
+    bx('paper', [cx - 0.95, top + 0.008, cz + 0.1], [0.15, 0.016, 0.21], [0, 0.25, 0]),
+    bx('metal', [cx - 0.95, top + 0.018, cz + 0.1 - 0.1], [0.15, 0.006, 0.008], [0, 0.25, 0]),
+    part('cylinderLow', 'spineC', [cx - 0.78, top + 0.006, cz + 0.2], [0.01, 0.16, 0.01], [0, 0.5, HALF_PI]),
+    bx('tapeBlack', [cx + 0.75, top + 0.015, cz + 0.2], [0.19, 0.03, 0.1], [0, -0.5, 0]),
     // Two loose tapes with labels.
     bx('tapeBlack', [cx - 0.2, top + 0.015, cz + 0.05], [0.19, 0.03, 0.1]),
     bx('tapeBlack', [cx - 0.2, top + 0.045, cz + 0.05], [0.19, 0.03, 0.1]),
@@ -547,6 +800,9 @@ export interface SceneDetailReport {
   totalTriangles: number
   totalDrawCalls: number
   tapeCount: number
+  /** Procedural canvas textures (task 15.7) and their estimated GPU memory in bytes. */
+  textureCount: number
+  textureMemoryBytes: number
 }
 
 /** Every declared object, built from the layout. Order matches the component tree. */
@@ -558,10 +814,17 @@ export function declaredObjects(): Array<{ name: string; parts: Part[]; extraTri
   }
   const crt = prop('crt-vhs')
   const arcade = prop('arcade-cabinet')
+  const companion = prop('arcade-companion')
+  const stack = prop('crt-stack')
   const objects: Array<{ name: string; parts: Part[]; extraTriangles?: number; extraDrawCalls?: number }> = [
     { name: 'crt-television', parts: crtTelevisionParts(crt.box, crt.height) },
     { name: 'vcr-deck', parts: vcrDeckParts(crt.box) },
-    { name: 'arcade-cabinet', parts: arcadeCabinetParts(arcade.box, arcade.height) },
+    { name: 'arcade-cabinet', parts: arcadeCabinetParts(facingFrame(arcade.box, arcade.facing).local, arcade.height) },
+    { name: 'arcade-companion', parts: arcadeCabinetParts(facingFrame(companion.box, companion.facing).local, companion.height, false) },
+    { name: 'crt-stack', parts: crtStackParts(facingFrame(stack.box, stack.facing).local, stack.height) },
+    { name: 'arcade-sign', parts: arcadeSignParts() },
+    { name: 'arcade-floor', parts: arcadeFloorParts() },
+    { name: 'posters', parts: posterParts() },
     { name: 'desk', parts: deskParts(prop('reception-desk').box, prop('reception-desk').height) },
     { name: 'armchair', parts: armchairParts(prop('abandoned-chair').box) },
     { name: 'couch', parts: couchParts(prop('couch').box) },
@@ -589,8 +852,8 @@ function baseRoomCounts() {
   const frames = ROOM.doors.reduce((n, d) => n + d.frames.length, 0)
   const doorBlocks = frames + ROOM.doors.length // jambs + lintel
   const boxes = ROOM.walls.length + doorBlocks + 3 /* tape stack */ + 1 /* cable */
-  // planes: floor, ceiling, thresholds, rug, 2 posters x 2 layers, 4 shift overlays
-  const planes = 2 + ROOM.doors.length + 1 + 4 + 4
+  // planes: floor, ceiling, thresholds, rug, 2 shift overlays (framed posters are declared parts)
+  const planes = 2 + ROOM.doors.length + 1 + 2
   return { boxes, planes }
 }
 
@@ -623,5 +886,7 @@ export function sceneDetailReport(): SceneDetailReport {
     totalTriangles: detailTriangles + baseTriangles,
     totalDrawCalls: baseRoomDrawCalls() + objects.reduce((n, o) => n + o.drawCalls, 0),
     tapeCount,
+    textureCount: TEXTURE_IDS.length,
+    textureMemoryBytes: totalTextureMemoryBytes(),
   }
 }

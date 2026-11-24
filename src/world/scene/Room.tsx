@@ -3,9 +3,9 @@ import { useMemo } from 'react'
 import type { Material } from 'three'
 import { ROOM } from '../layout/roomLayout'
 import type { Aabb } from '../worldTypes'
-import { ceilingFixtureParts, fixtureCentres, trimParts } from './modelDetail'
+import { arcadeSignBodyParts, arcadeSignLetterParts, ceilingFixtureParts, fixtureCentres, trimParts } from './modelDetail'
 import { PartMeshes } from './PartMeshes'
-import { geometries, materials } from './sharedResources'
+import { ensureSharedTextures, geometries, hasSharedTexture, materials } from './sharedResources'
 
 interface BlockProps {
   /** Footprint on the floor plane. */
@@ -78,7 +78,28 @@ export function CeilingFixture({ x, z }: { x: number; z: number }) {
   return <PartMeshes parts={parts} />
 }
 
+/**
+ * Overhead ARCADE sign above both east doorways (task 15.6). Visual only: emissive basic materials,
+ * no light, no Collider. Task 15.7: the face is a textured plane; the box lettering is drawn only when
+ * no canvas texture could be created.
+ */
+export function ArcadeSign() {
+  const body = useMemo(arcadeSignBodyParts, [])
+  const letters = useMemo(arcadeSignLetterParts, [])
+  const textured = useMemo(() => {
+    ensureSharedTextures()
+    return hasSharedTexture('signFace')
+  }, [])
+  return (
+    <group>
+      <PartMeshes parts={body} />
+      {textured ? null : <PartMeshes parts={letters} />}
+    </group>
+  )
+}
+
 export function Room() {
+  useMemo(ensureSharedTextures, [])
   const { bounds, height, walls } = ROOM
   const w = bounds.maxX - bounds.minX
   const d = bounds.maxZ - bounds.minZ
@@ -105,6 +126,7 @@ export function Room() {
       ))}
       <Doors />
       <WallTrim />
+      <ArcadeSign />
       {fixtureCentres().map(([x, z]) => (
         <CeilingFixture key={`:`} x={x} z={z} />
       ))}

@@ -804,6 +804,158 @@
         "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
         "timestamp": 1795553737972
       }
+    ],
+    "15.7 Procedural canvas textures and model craftsmanship upgrade": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795554688521
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795555385315
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795556287622
+      }
+    ],
+    "15.1 Audit test coverage against design properties": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795554689389
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795556296353
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795556445661
+      }
+    ],
+    "15.4 MANUAL MEASUREMENT: record performance results": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795554690425
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795556296559
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795556446875
+      }
+    ],
+    "15.5 Update src/world/README.md": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795554691319
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795556456604
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795556660014
+      }
+    ],
+    "17. Final checkpoint - Verify and report": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795554692305
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795556660797
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795556854926
+      }
+    ],
+    "15.2 Add a dev-only frame sampler and targeting benchmark": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795554693124
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795555375020
+      }
+    ],
+    "15.3 Create the manual test log": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795554694204
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795555375214
+      }
+    ],
+    "15.6 Relocate the arcade Station into the Arcade_Area and dress it": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795554695314
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795555375337
+      }
+    ],
+    "15.8 Apply M5 polish fixes": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795554696319
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795555376230
+      }
+    ],
+    "16.1 NON-IMPLEMENTATION: record pending proposals P2 to P8": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795554697016
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795555376974
+      }
+    ],
+    "16. Approval-gated proposals (do not implement unless approved)": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795555377060
+      }
     ]
   }
 }

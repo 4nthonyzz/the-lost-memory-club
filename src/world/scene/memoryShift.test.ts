@@ -93,6 +93,17 @@ describe('applyShift', () => {
     expect(a.screens[1].material.color.hex).toBe(b.screens[1].material.color.hex)
   })
 
+  it('textured arcade screen: white base shows the map unmodified at t = 0 and tints at t = 1', () => {
+    expect(BASE_ARCADE_SCREEN_COLOR).toBe('#ffffff')
+    const t = makeTargets()
+    applyShift(0, t)
+    expect(t.screens[1].material.color.hex).toBe('#ffffff')
+    applyShift(1, t)
+    expect(t.screens[1].material.color.hex).toBe(PALETTE_SHIFTED.screenEmissive)
+    applyShift(0.5, t)
+    expect(t.screens[1].material.color.hex).not.toBe('#ffffff')
+  })
+
   it('clamps invalid t', () => {
     const t = makeTargets()
     applyShift(Number.NaN, t)

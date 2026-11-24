@@ -6,7 +6,7 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { Object3D, type InstancedMesh } from 'three'
 import type { Part } from './modelDetail'
-import { geometries, materials } from './sharedResources'
+import { ensureSharedTextures, geometries, materials } from './sharedResources'
 
 function InstancedGroup({ items }: { items: readonly Part[] }) {
   const ref = useRef<InstancedMesh>(null)
@@ -30,6 +30,8 @@ function InstancedGroup({ items }: { items: readonly Part[] }) {
 }
 
 export function PartMeshes({ parts }: { parts: readonly Part[] }) {
+  // Idempotent: attaches the procedural textures to the shared materials before the first draw.
+  useMemo(ensureSharedTextures, [])
   const groups = useMemo(() => {
     const map = new Map<string, Part[]>()
     for (const p of parts) {

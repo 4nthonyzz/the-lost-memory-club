@@ -23,6 +23,7 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 - `jsdom`, `@testing-library/react` (and `@testing-library/dom` if required as a peer) are installed in required task 5.8. `fast-check` remains installed in optional task 2.2 or by the first property-test task that is run. jsdom is selected per test file with `// @vitest-environment jsdom`.
 - Numeric values are initial and validated in testing. No performance figure is reported as achieved before it is recorded (Requirement 14.11, 14.12).
 - All visible text, labels, comments and docs are in English.
+- Approved scope change (M6), 2026-11-24: the `arcade` Station may be relocated from the main room north wall into the east Arcade_Area (against the east wall around x 8.4, z 0, facing west toward both doorways). The station id `'arcade'` and the `StationId` contract are unchanged. `roomLayout.ts` remains the single source of truth for colliders and anchors. Procedural `CanvasTexture` textures are allowed (deterministic, created in `sharedResources.ts`, all disposed). Budgets stay: fewer than 20,000 triangles in total and at most 4 lights. `ASSET_MANIFEST` stays `Object.freeze({})` unless real `.glb` files exist. `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `vite.config.ts` and `package.json` are unchanged. Earlier wording in `requirements.md` and `design.md` about the arcade Station position is superseded by this bullet.
 - Approved scope change (M5), 2026-11-24: `src/App.tsx` and `src/styles.css` may now be modified. P1 (App-side `inputEnabled={station === null}`), P3 (overlay and layout styles) and P4 (status text) are approved and implemented in task 13.5. `src/core/`, `src/arcade/`, `src/memories/` and `vite.config.ts` remain unchanged. `package.json` changes only if unavoidable and flagged. `tools/blender/` and `.glb` files are allowed from M5 on. The earlier statements that `App.tsx` is not modified apply to M1-M4 only. `requirements.md` and `design.md` still contain M1-M4 wording stating that `App.tsx` is unmodified and that P1/P3/P4 are pending; that wording is superseded by this bullet.
 
 ## Tasks
@@ -545,53 +546,90 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 ### Milestone 6: Testing and optimization
 
 - [ ] 15. Verification, measurement and documentation
-  - [ ] 15.1 Audit test coverage against design properties
+  - [x] 15.1 Audit test coverage against design properties
     - Files: `.kiro/specs/world-exploration/test-report.md`.
     - Table of Properties 1 to 17 with the test file and status (present, skipped, fallback), seeds used, and any gap such as a failed `fast-check` or jsdom install. Add any missing property tests that were skipped only if the user asks for them.
-    - Acceptance: each property row names a file or states "not implemented"; `npm test` result recorded.
+    - Also record the tests added in 15.6, 15.7 and 15.8 (layout relocation, procedural textures, disposal, tabIndex) in the report.
+    - Acceptance: each property row names a file or states "not implemented"; the new M6 tests are listed; `npm test` result recorded.
     - Tests: `npm test`.
-    - Depends on: 14.
+    - Depends on: 15.7.
     - Boundary: documentation of results only.
     - _Requirements: 13.2, 13.10, 13.11, 13.14, 15.6_
 
-  - [ ] 15.2 Add a dev-only frame sampler and targeting benchmark
+  - [x] 15.2 Add a dev-only frame sampler and targeting benchmark
     - Files: `src/world/controller/useFrameSampler.ts`, `src/world/logic/targeting.bench.test.ts`.
     - Sampler records `useFrame` deltas and `renderer.info` (triangles, draw calls), enabled only with `import.meta.env.DEV` and an explicit flag, and exports median and 95th percentile. Targeting benchmark times `selectInteractionTarget` over the full layout and prints the result without asserting a pass threshold (no hardware-dependent assertion).
-    - Acceptance: sampler is inert in production build; benchmark does not fail on slow machines.
+    - Acceptance: sampler is inert in production build; benchmark does not fail on slow machines. The benchmark runs against the layout as it stands when the test executes (it needs no relocation to be written).
     - Tests: `npm test`, `npm run build`.
     - Depends on: 14, 5.5.
     - Boundary: no runtime effect in production.
     - _Requirements: 7.9, 14.8, 14.9, 14.11_
 
-  - [ ] 15.3 Create the manual test log
+  - [x] 15.3 Create the manual test log
     - Files: `.kiro/specs/world-exploration/manual-test-log.md`.
     - Template for the matrix: keyboard only, pointer lock (lock, Esc, alt-tab, denial, unsupported), panels (VHS typing, Snake keys do not move the player, locked arcade message visible and uncovered), reduced motion, Memory_Shift, WebGL failure, latest Chrome, Firefox, Edge. Each row starts as "not run".
+    - Add rows for the M6 changes: arcade reachable through both doors, arcade prompt from each doorway, ARCADE sign visible, textured posters and screen, Memory_Shift tint on the arcade screen and posters.
     - Acceptance: every row has a status field; no row is marked passed without a date and tester.
     - Tests: none (documentation). Manual review.
     - Depends on: 14.
     - Boundary: spec folder only.
     - _Requirements: 15.6, 15.7_
 
-  - [ ] 15.4 MANUAL MEASUREMENT: record performance results
+  - [~] 15.4 MANUAL MEASUREMENT: record performance results
     - Files: `.kiro/specs/world-exploration/performance-log.md`.
     - Run `npm run build` and `npm run preview`, then record a 60-second scripted walk on the Reference_Hardware at 1280 by 720 with the dev sampler or the browser Performance panel. Record method, hardware, browser, median and 95th-percentile frame time, first-render time, triangle count, draw calls and the targeting benchmark output. Fill each target as "measured: value" or "not measured". Do not claim a target as achieved without a recorded value.
-    - Acceptance: the log contains raw numbers and the method, or states that a target is not measured.
+    - Agents prepare `performance-log.md` with computed static metrics (triangle count from `modelDetail` helpers, draw-call grouping estimate), clearly labelled "computed, not runtime-measured". The runtime frame-time fields stay "not measured" until the user records them. This sub-task is intentionally left unchecked until a human records values.
+    - Acceptance: the log contains raw numbers and the method, or states that a target is not measured; computed values are labelled as computed.
     - Tests: manual measurement by a team member.
-    - Depends on: 15.2.
+    - Depends on: 15.2, 15.7.
     - Boundary: results only; no code change.
     - _Requirements: 14.1, 14.8, 14.9, 14.10, 14.11, 14.12_
 
-  - [ ] 15.5 Update src/world/README.md
+  - [x] 15.5 Update src/world/README.md
     - Files: `src/world/README.md`.
     - Describe module layout, controls, public props (including optional `inputEnabled`), the lock-agnostic design, the known limitation while `inputEnabled` is not supplied, pending proposals, and test commands. Mark each feature as verified only if backed by a test or a recorded manual check, otherwise "planned" or "prototype". Reference performance numbers only from `performance-log.md`.
-    - Acceptance: README contains no claim without a linked test or log entry; all text in English.
+    - Also add to `src/world/README.md` and `.kiro/specs/world-exploration/integration-notes.md` the measured or computed triangle and draw-call numbers (each labelled computed or measured) and the list of disposal and edge-case checks (texture disposal exactly once, reachability through both doors, doorway line of sight, Memory_Shift tint, reduced motion).
+    - Acceptance: README contains no claim without a linked test or log entry; all text in English; numbers carry their label.
     - Tests: none (documentation). Manual review.
     - Depends on: 15.1, 15.3, 15.4, 9.9.
-    - Boundary: only `src/world/README.md`.
+    - Boundary: `src/world/README.md` and the spec folder only.
     - _Requirements: 11.10, 14.11, 14.12, 15.3, 15.6_
 
-- [ ] 16. Approval-gated proposals (do not implement unless approved)
-  - [ ] 16.1 NON-IMPLEMENTATION: record pending proposals P2 to P8
+  - [x] 15.6 Relocate the arcade Station into the Arcade_Area and dress it
+    - Files: `src/world/layout/roomLayout.ts`, `src/world/layout/roomLayout.test.ts`, `src/world/scene/Stations.tsx`, `src/world/scene/Props.tsx`, `src/world/scene/Room.tsx`, `src/world/scene/modelDetail.ts`, `src/world/scene/modelDetail.test.ts`, `src/world/assets/assetPlacement.ts` (only if needed), `src/world/WorldScene.test.ts` (only if it hardcodes the old position).
+    - Move the `arcade` Station (cabinet collider, anchor in front of its west face, orientation facing -X toward the doorways) to the east Arcade_Area against the east wall (around x 8.4, z 0). Keep the `vhs` Station where it is.
+    - Add an overhead retro "ARCADE" sign above the east doorways (visual only, emissive material, no light).
+    - Add non-interactive vintage dressing in the Arcade_Area: a powered-down companion cabinet with a collider, stacked CRT monitors with a collider, a floor runner decal and cable runs. Colliders only where solid.
+    - `Stations.tsx` renders the cabinet rotated to face west. Placement helpers from `assetPlacement.ts` handle orientation consistently.
+    - Acceptance: the arcade anchor is reachable from the start through BOTH doors; line of sight to the arcade Station is clear from each door-adjacent position; anchors are inside bounds and not blocked; triangle estimate below 20,000; light count unchanged (at most 4); arcade prompt text unchanged; all existing tests pass.
+    - Tests: `roomLayout.test.ts` (reachability through both doors, doorway line of sight, collider counts, triangle estimate); `modelDetail.test.ts` (colliders match layout, anchors match `STATION_DEFS`). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: none.
+    - Boundary: `src/world/` only; `StationId`, `WorldSceneProps` and `onInspect` unchanged; layout stays the single source of truth for collision.
+    - _Requirements: 1.2, 1.3, 1.5, 1.6, 1.7, 6.1, 7.3, 12.5, 13.8, 14.4, 14.5, 19.10, 20.1_
+
+  - [x] 15.7 Procedural canvas textures and model craftsmanship upgrade
+    - Files: `src/world/scene/sharedResources.ts`, `src/world/scene/proceduralTextures.ts`, `src/world/scene/modelDetail.ts`, `src/world/scene/Stations.tsx`, `src/world/scene/Props.tsx`, `src/world/scene/Room.tsx`, `src/world/scene/proceduralTextures.test.ts`, `src/world/scene/modelDetail.test.ts`, existing Memory_Shift tests (updated, not weakened).
+    - `proceduralTextures.ts` holds pure drawing helpers over a minimal 2D-context interface so they are unit-testable with a fake context. `sharedResources.ts` creates the `CanvasTexture` objects.
+    - Textures are deterministic and crisp: power-of-two sizes, `NearestFilter` where pixel-art, sRGB colour space, no per-frame redraw. Textures for: arcade attract screen ("LOST MEMORY // PRESS E" pixel art, scanlines, phosphor grid, tintable by `memoryShifted` without breaking the fixed-material rule); arcade marquee (backlit title lettering and border trim); framed 1990s posters (poster-north, poster-arcade-area and the Memory_Shift overlay posters) inside beveled 3D frames; floor carpet or tile pattern; woodgrain (desk, shelves, crates); louvered speaker grilles and control-deck markings.
+    - Refine silhouettes: sculpted arcade side panels, recessed screen hood, coin-return glow, desk props (loose tapes, mug, notepad), cushioned armchair and couch with armrests and legs, slatted crates.
+    - Document the texture count and size budget (total texture memory estimate at most 8 MB) in `modelDetail.ts` or a comment in `sharedResources.ts`.
+    - Acceptance: every texture is disposed in `disposeSharedResources()`; Memory_Shift tinting of the arcade screen and overlays still works; triangle estimate below 20,000 and light count at most 4 asserted; layout colliders unchanged by this task.
+    - Tests: `proceduralTextures.test.ts` (determinism with a fake context, power-of-two sizes, no randomness); `modelDetail.test.ts` (each texture disposed exactly once, texture memory estimate at most 8 MB, triangles and lights budgets); updated Memory_Shift tests. Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 15.6.
+    - Boundary: render-only; no layout collider changes; no new dependency; no GLB.
+    - _Requirements: 1.3, 1.4, 1.8, 9.1, 9.2, 9.8, 12.5, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 15.8 Apply M5 polish fixes
+    - Files: `src/world/overlay/WebglFallback.tsx`, `src/App.tsx`, one existing test file (add a test line for the `tabIndex`).
+    - `.world-wrapper` gets `tabIndex={-1}` in `WebglFallback.tsx`. `src/App.tsx` gets a trailing newline only.
+    - Acceptance: the wrapper has `tabIndex=-1` in the fallback; `git diff` for `src/App.tsx` shows only the trailing newline.
+    - Tests: add one assertion in an existing test file for the `tabIndex`. Run `npm test`.
+    - Depends on: none.
+    - Boundary: no behavior change in `App.tsx`.
+    - _Requirements: 2.5, 15.1, 16.7_
+
+- [x] 16. Approval-gated proposals (do not implement unless approved)
+  - [x] 16.1 NON-IMPLEMENTATION: record pending proposals P2 to P8
     - Files: `.kiro/specs/world-exploration/proposals.md`.
     - List P2 (`reducedDistortion` prop), P3 (styles in `src/styles.css`), P4 (App status text), P5 (`@react-three/drei`), P6 (`docs/THIRD_PARTY_ASSETS.md`), P7 (mark game-foundation tasks), P8 (App locked-arcade message styling) with status "pending", affected files, owner, and the fallback already used. No file outside the spec folder is changed.
     - Acceptance: every proposal has status and fallback; `git diff` shows no change outside the spec folder.
@@ -618,7 +656,7 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: touches a file outside `src/world/` only with approval.
     - _Requirements: 17.5, 17.6_
 
-- [ ] 17. Final checkpoint - Verify and report
+- [x] 17. Final checkpoint - Verify and report
   - Run `npm run typecheck`, `npm test`, `npm run build`.
   - Confirm `git diff` is limited to `src/world/`, `tools/blender/`, `package.json` and the lockfile (test dev dependencies only), and the spec folder; `src/core/`, `src/arcade/`, `src/memories/` and `src/App.tsx` are unchanged.
   - Confirm README and logs describe unmeasured items as planned.
@@ -662,11 +700,12 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     { "id": 20, "tasks": ["13.1", "13.3", "13.5", "13.6"] },
     { "id": 21, "tasks": ["13.2", "13.4"] },
     { "id": 22, "tasks": ["14"] },
-    { "id": 23, "tasks": ["15.1", "15.2", "15.3", "16.1"] },
-    { "id": 24, "tasks": ["15.4"] },
-    { "id": 25, "tasks": ["15.5"] },
-    { "id": 26, "tasks": ["16.2", "16.3"] },
-    { "id": 27, "tasks": ["17"] }
+    { "id": 23, "tasks": ["15.2", "15.3", "15.6", "15.8", "16.1"] },
+    { "id": 24, "tasks": ["15.7"] },
+    { "id": 25, "tasks": ["15.1", "15.4"] },
+    { "id": 26, "tasks": ["15.5"] },
+    { "id": 27, "tasks": ["16.2", "16.3"] },
+    { "id": 28, "tasks": ["17"] }
   ]
 }
 ```

@@ -6,11 +6,15 @@ import { ROOM, type PropDef } from '../layout/roomLayout'
 import type { Aabb } from '../worldTypes'
 import {
   TAPE_PALETTE,
+  arcadeCabinetParts,
+  arcadeFloorParts,
   armchairParts,
   couchParts,
   crateParts,
+  crtStackParts,
   deskParts,
   labelSize,
+  posterParts,
   shelfFrameParts,
   shelfTapes,
 } from './modelDetail'
@@ -18,6 +22,7 @@ import { assetPlacement } from './assetPlacement'
 import { PartMeshes } from './PartMeshes'
 import { Block } from './Room'
 import { geometries, materials } from './sharedResources'
+import { Faced } from './Stations'
 
 function propById(id: string): PropDef {
   const p = ROOM.props.find((q) => q.id === id)
@@ -96,18 +101,10 @@ function Details() {
   const crateA = propById('crate-a')
   const crateB = propById('crate-b')
   const stack = propById('tape-stack')
-  const posterN = propById('poster-north')
-  const posterA = propById('poster-arcade-area')
   const cable = propById('cable-run')
   const sx = (stack.box.minX + stack.box.maxX) / 2
   const sz = (stack.box.minZ + stack.box.maxZ) / 2
-  const poster = (p: PropDef) => ({
-    x: (p.box.minX + p.box.maxX) / 2,
-    z: p.box.maxZ + 0.005,
-    w: p.box.maxX - p.box.minX,
-  })
-  const pn = poster(posterN)
-  const pa = poster(posterA)
+  const posters = useMemo(posterParts, [])
   return (
     <group>
       {/* Rug (decal only, no layout entry) */}
@@ -125,10 +122,8 @@ function Details() {
           scale={[stack.box.maxX - stack.box.minX, 0.04, stack.box.maxZ - stack.box.minZ]}
         />
       ))}
-      <mesh geometry={geometries.plane} material={materials.poster} position={[pn.x, 1.7, pn.z]} scale={[pn.w, posterN.height, 1]} />
-      <mesh geometry={geometries.plane} material={materials.posterAccent} position={[pn.x, 1.5, pn.z + 0.005]} scale={[pn.w * 0.7, posterN.height * 0.4, 1]} />
-      <mesh geometry={geometries.plane} material={materials.posterAccent} position={[pa.x, 1.7, pa.z]} scale={[pa.w, posterA.height, 1]} />
-      <mesh geometry={geometries.plane} material={materials.poster} position={[pa.x, 1.5, pa.z + 0.005]} scale={[pa.w * 0.7, posterA.height * 0.4, 1]} />
+      {/* Framed posters: textured planes inside four-piece wooden frames */}
+      <PartMeshes parts={posters} />
       {/* Cable run on the floor */}
       <Block box={cable.box} y0={0.005} h={cable.height} material={materials.plastic} />
     </group>
@@ -143,10 +138,40 @@ function Details() {
 function ShiftDressing() {
   return (
     <group>
-      <mesh geometry={geometries.plane} material={materials.shiftPoster} position={[-1.2, 1.7, -3.94]} scale={[0.9, 1.2, 1]} />
-      <mesh geometry={geometries.plane} material={materials.shiftPosterAccent} position={[-1.2, 1.7, -3.935]} scale={[0.6, 0.8, 1]} />
-      <mesh geometry={geometries.plane} material={materials.shiftPlaque} position={[0.8, 1.7, 3.99]} rotation={[0, Math.PI, 0]} scale={[0.7, 0.3, 1]} />
-      <mesh geometry={geometries.plane} material={materials.shiftPlaqueText} position={[0.8, 1.7, 3.985]} rotation={[0, Math.PI, 0]} scale={[0.5, 0.05, 1]} />
+      <mesh geometry={geometries.plane} material={materials.shiftPoster} position={[-1.2, 1.7, -3.94]} scale={[0.6, 1.2, 1]} />
+      <mesh geometry={geometries.plane} material={materials.shiftPlaque} position={[0.8, 1.7, 3.99]} rotation={[0, Math.PI, 0]} scale={[0.6, 0.3, 1]} />
+    </group>
+  )
+}
+
+/**
+ * Arcade_Area dressing (task 15.6): a powered-down companion cabinet, stacked CRT monitors, a floor
+ * runner decal and cable runs. Solid pieces get their Colliders from the layout; nothing here is
+ * interactive and nothing animates.
+ */
+function PoweredDownCabinet({ box, height }: { box: Aabb; height: number }) {
+  const parts = useMemo(() => arcadeCabinetParts(box, height, false), [box, height])
+  return <PartMeshes parts={parts} />
+}
+
+function CrtStack({ box, height }: { box: Aabb; height: number }) {
+  const parts = useMemo(() => crtStackParts(box, height), [box, height])
+  return <PartMeshes parts={parts} />
+}
+
+function ArcadeAreaDressing() {
+  const companion = propById('arcade-companion')
+  const stack = propById('crt-stack')
+  const floor = useMemo(arcadeFloorParts, [])
+  return (
+    <group>
+      <Faced box={companion.box} facing={companion.facing}>
+        {(local) => <PoweredDownCabinet box={local} height={companion.height} />}
+      </Faced>
+      <Faced box={stack.box} facing={stack.facing}>
+        {(local) => <CrtStack box={local} height={stack.height} />}
+      </Faced>
+      <PartMeshes parts={floor} />
     </group>
   )
 }
@@ -169,6 +194,7 @@ export function Props() {
       <AssetModel id="armchair" {...assetPlacement(chair.box)} fallback={<Armchair box={chair.box} />} />
       <AssetModel id="couch" {...assetPlacement(couch.box)} fallback={<Couch box={couch.box} />} />
       <Details />
+      <ArcadeAreaDressing />
     </group>
   )
 }

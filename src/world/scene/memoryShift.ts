@@ -13,7 +13,11 @@ import {
 /** Authored colors of the materials that the shift tints. */
 export const BASE_WALL_COLOR = '#5a5470'
 export const BASE_CRT_SCREEN_COLOR = '#4fe0d0'
-export const BASE_ARCADE_SCREEN_COLOR = '#d84fd0'
+/**
+ * The arcade screen carries a texture, so its colour is a multiplier: white shows the authored
+ * attract screen unmodified at t = 0, and the blend tints it toward the shifted screen colour.
+ */
+export const BASE_ARCADE_SCREEN_COLOR = '#ffffff'
 
 /** Share of the shifted light color mixed into each point light at t = 1. */
 export const POINT_LIGHT_TINT = 0.6

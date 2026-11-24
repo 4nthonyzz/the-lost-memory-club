@@ -1,6 +1,7 @@
 import { Component, useCallback, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from 'react';
 import { useThree } from '@react-three/fiber';
 import type { StationId } from '../core/contracts';
+import { FrameSamplerHost } from './controller/useFrameSampler';
 import { usePlayerRig } from './controller/usePlayerRig';
 import { useWorldInput, type WorldInput } from './controller/useWorldInput';
 import { WebglFallback } from './overlay/WebglFallback';
@@ -111,6 +112,7 @@ function WorldInteractive({
         <Props />
         <Stations />
         <Effects active={input.mode !== 'inspecting'} />
+        <FrameSamplerHost />
         <PlayerRigHost
           input={input}
           getTargetRef={getTargetRef}
@@ -126,7 +128,7 @@ function WorldInteractive({
 
 function FallbackView({ onInspect }: { onInspect: (station: StationId) => void }) {
   return (
-    <div className="world-wrapper">
+    <div className="world-wrapper" tabIndex={-1}>
       <WebglFallback onInspect={onInspect} />
     </div>
   );

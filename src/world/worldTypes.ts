@@ -21,10 +21,15 @@ export interface MovementInput {
   right: boolean;
 }
 
+/** Direction a prop or Station front face points toward. Omitted means '+z'. */
+export type Facing = '+z' | '-z' | '+x' | '-x';
+
 export interface StationDef {
   id: StationId;
   /** Point on the Station front face used for distance and cone tests. */
   anchor: Vec2;
   /** The Station's own Collider. */
   collider: Aabb;
+  /** Direction the front face (and the anchor) points toward. Omitted means '+z'. */
+  facing?: Facing;
 }

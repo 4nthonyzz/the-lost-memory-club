@@ -12,6 +12,7 @@ vi.mock('./scene/WorldCanvas', () => ({
   WorldCanvas: ({ children }: { children?: ReactNode }) =>
     createElement('div', { 'data-testid': 'canvas' }, children),
 }));
+vi.mock('./controller/useFrameSampler', () => ({ FrameSamplerHost: () => null }));
 vi.mock('./scene/Lighting', () => ({ Lighting: () => null }));
 vi.mock('./scene/Effects', () => ({ Effects: () => null }));
 vi.mock('./scene/Props', () => ({ Props: () => null }));
