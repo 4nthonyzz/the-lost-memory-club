@@ -13,6 +13,7 @@ vi.mock('./scene/WorldCanvas', () => ({
     createElement('div', { 'data-testid': 'canvas' }, children),
 }));
 vi.mock('./scene/Lighting', () => ({ Lighting: () => null }));
+vi.mock('./scene/Effects', () => ({ Effects: () => null }));
 vi.mock('./scene/Props', () => ({ Props: () => null }));
 vi.mock('./scene/Room', () => ({ Room: () => null }));
 vi.mock('./scene/Stations', () => ({ Stations: () => null }));

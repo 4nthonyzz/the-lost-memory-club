@@ -175,9 +175,26 @@ function Details() {
   )
 }
 
+/**
+ * Memory_Shift set dressing: an extra poster on the north wall and an altered plaque on the
+ * south wall. Visual only (no Collider, no layout entry). Materials are transparent and
+ * hidden until the shift blend starts.
+ */
+function ShiftDressing() {
+  return (
+    <group>
+      <mesh geometry={geometries.plane} material={materials.shiftPoster} position={[-1.2, 1.7, -3.94]} scale={[0.9, 1.2, 1]} />
+      <mesh geometry={geometries.plane} material={materials.shiftPosterAccent} position={[-1.2, 1.7, -3.935]} scale={[0.6, 0.8, 1]} />
+      <mesh geometry={geometries.plane} material={materials.shiftPlaque} position={[0.8, 1.7, 3.99]} rotation={[0, Math.PI, 0]} scale={[0.7, 0.3, 1]} />
+      <mesh geometry={geometries.plane} material={materials.shiftPlaqueText} position={[0.8, 1.7, 3.985]} rotation={[0, Math.PI, 0]} scale={[0.5, 0.05, 1]} />
+    </group>
+  )
+}
+
 export function Props() {
   return (
     <group>
+      <ShiftDressing />
       <Desk />
       <Shelf id="shelf-a" />
       <Shelf id="shelf-b" />

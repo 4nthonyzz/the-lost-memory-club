@@ -5,6 +5,7 @@ import { usePlayerRig } from './controller/usePlayerRig';
 import { useWorldInput, type WorldInput } from './controller/useWorldInput';
 import { WebglFallback } from './overlay/WebglFallback';
 import { WorldOverlay } from './overlay/WorldOverlay';
+import { Effects } from './scene/Effects';
 import { Lighting } from './scene/Lighting';
 import { Props } from './scene/Props';
 import { Room } from './scene/Room';
@@ -104,11 +105,12 @@ function WorldInteractive({
 
   return (
     <div className="world-wrapper" ref={wrapperRef} tabIndex={0} role="group" aria-label={WORLD_LABEL}>
-      <WorldCanvas>
+      <WorldCanvas frameloop={input.mode === 'inspecting' ? 'demand' : 'always'}>
         <Lighting memoryShifted={memoryShifted} />
         <Room />
         <Props />
         <Stations />
+        <Effects active={input.mode !== 'inspecting'} />
         <PlayerRigHost
           input={input}
           getTargetRef={getTargetRef}

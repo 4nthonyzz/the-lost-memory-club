@@ -1,4 +1,4 @@
-/** CRT + VHS player and arcade cabinet. Screens use fixed materials with no state input. */
+/** CRT + VHS player and arcade cabinet. Screens use shared materials that only the Memory_Shift blend tints; lock state is not an input. */
 import { ROOM, type PropDef } from '../layout/roomLayout'
 import { Block } from './Room'
 import { geometries, materials } from './sharedResources'

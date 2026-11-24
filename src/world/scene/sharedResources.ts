@@ -1,6 +1,7 @@
 /**
  * Shared geometries and materials, created once and reused by every scene
- * component. Materials are fixed: none reads lock state or memoryShifted.
+ * component. No material reads lock state or memoryShifted; the Memory_Shift
+ * driver mutates wall, screen and overlay materials from the blend progress.
  */
 import {
   BoxGeometry,
@@ -9,6 +10,7 @@ import {
   MeshLambertMaterial,
   PlaneGeometry,
 } from 'three'
+import { BASE_ARCADE_SCREEN_COLOR, BASE_CRT_SCREEN_COLOR, BASE_WALL_COLOR } from './memoryShift'
 
 export const geometries = {
   /** Unit box; size it with mesh `scale`. */
@@ -21,9 +23,13 @@ export const geometries = {
 
 const lambert = (color: string) => new MeshLambertMaterial({ color })
 
+/** Hidden by default (opacity 0, invisible); the Memory_Shift driver fades them in. Visual only. */
+const overlay = (color: string) =>
+  new MeshBasicMaterial({ color, transparent: true, opacity: 0, visible: false, depthWrite: false })
+
 export const materials = {
   floor: lambert('#3a3340'),
-  wall: lambert('#5a5470'),
+  wall: lambert(BASE_WALL_COLOR),
   ceiling: lambert('#2c2838'),
   wood: lambert('#6b4a30'),
   woodDark: lambert('#4a3220'),
@@ -38,11 +44,24 @@ export const materials = {
   tapeLabel: lambert('#d8d2b8'),
   cabinet: lambert('#5a1f7a'),
   lampShade: lambert('#e8c27a'),
-  /** Fixed emissive screens; independent of any state. */
-  crtScreen: new MeshBasicMaterial({ color: '#4fe0d0' }),
-  arcadeScreen: new MeshBasicMaterial({ color: '#d84fd0' }),
+  /** Screens: tinted only by the Memory_Shift blend. They never read lock state. */
+  crtScreen: new MeshBasicMaterial({ color: BASE_CRT_SCREEN_COLOR }),
+  arcadeScreen: new MeshBasicMaterial({ color: BASE_ARCADE_SCREEN_COLOR }),
   led: new MeshBasicMaterial({ color: '#ff4040' }),
+  /** Memory_Shift set dressing, faded by opacity. */
+  shiftPoster: overlay('#8a1c2e'),
+  shiftPosterAccent: overlay('#f0c0c8'),
+  shiftPlaque: overlay('#2a0a14'),
+  shiftPlaqueText: overlay('#ff7f9a'),
 }
+
+/** Overlay materials with their full opacity, in the order the driver fades them. */
+export const overlayMaterials = [
+  { material: materials.shiftPoster, maxOpacity: 0.95 },
+  { material: materials.shiftPosterAccent, maxOpacity: 0.9 },
+  { material: materials.shiftPlaque, maxOpacity: 0.95 },
+  { material: materials.shiftPlaqueText, maxOpacity: 0.9 },
+]
 
 /** Disposes every shared geometry and material. Call on scene unmount. */
 export function disposeSharedResources(): void {

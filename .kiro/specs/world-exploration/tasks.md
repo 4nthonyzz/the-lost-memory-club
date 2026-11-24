@@ -413,8 +413,8 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 
 ### Milestone 4: Environmental effects
 
-- [ ] 11. Memory_Shift and effects
-  - [ ] 11.1 Complete the palette module
+- [x] 11. Memory_Shift and effects
+  - [x] 11.1 Complete the palette module
     - Files: `src/world/logic/palette.ts`, `src/world/logic/palette.full.test.ts`.
     - Full `Palette` (light, fog, wall, screen emissive, accent), `transitionProgress` (2 s, immediate under reduced motion), `blendPalette`, `flickerFactor` (amplitude at most 15 percent, at most 3 direction changes per second, constant under reduced motion).
     - Acceptance: progress is 1 after 3 s; reduced motion gives 1 immediately and a constant flicker factor; ambient floor kept.
@@ -429,7 +429,7 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Depends on: 11.1, 2.2.
     - **Validates: Requirements 9.4, 9.5, 10.2, 10.3**
 
-  - [ ] 11.3 Implement the reduced-motion hook
+  - [x] 11.3 Implement the reduced-motion hook
     - Files: `src/world/controller/useReducedMotion.ts`.
     - `matchMedia('(prefers-reduced-motion: reduce)')` with `change` subscription; treat missing `matchMedia` as no preference; accept an optional boolean argument (default false) that is ORed in. The `reducedDistortion` prop on `WorldSceneProps` is not declared until P2 is approved (task 16.2).
     - Acceptance: setting changes apply without remount; listener removed on unmount.
@@ -438,7 +438,7 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: controller only; no prop change.
     - _Requirements: 10.4, 10.6_
 
-  - [ ] 11.4 Wire Memory_Shift into the scene
+  - [x] 11.4 Wire Memory_Shift into the scene
     - Files: `src/world/scene/WorldCanvas.tsx`, `src/world/scene/Lighting.tsx`, `src/world/scene/Room.tsx`, `src/world/scene/Props.tsx`, `src/world/scene/Stations.tsx`.
     - Blend progress `t` kept in a ref, advanced by `dt / 2`, mounted at 1 when `memoryShifted` starts true, immediate under reduced motion. Changes lighting color, background and fog, screen emissive colors and an added poster plus altered plaque (visual only, no Collider, fade by opacity). `frameloop="demand"` while inspecting with `invalidate()` during transitions. Canvas is never remounted.
     - Acceptance: at least 4 properties differ between states; colliders and Station positions unchanged; true to false restores the original look.
@@ -447,7 +447,7 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: appearance derives only from `memoryShifted`.
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 10.7, 14.3_
 
-  - [ ] 11.5 Implement environmental effects
+  - [x] 11.5 Implement environmental effects
     - Files: `src/world/scene/Effects.tsx`, `src/world/scene/WorldCanvas.tsx`.
     - CRT point-light flicker, screen glow variation (0.5 Hz), one `Points` object with about 150 dust points, 64 by 64 `CanvasTexture` static updated at most 12 times per second on the CRT screen only. Under reduced motion all are static equivalents. No shake, roll or forced camera motion. Textures and geometries disposed on unmount. No post-processing, no custom shaders.
     - Acceptance: luminance changes at most 3 per second; reduced motion disables animation; camera is untouched by effects.
@@ -456,7 +456,7 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: render-only; at most 4 lights.
     - _Requirements: 10.1, 10.2, 10.3, 10.5, 14.2, 14.5, 14.7_
 
-- [ ] 12. Checkpoint - Milestone 4 complete
+- [x] 12. Checkpoint - Milestone 4 complete
   - Run `npm run typecheck`, `npm test`, `npm run build`.
   - Manual check: toggle `memoryShifted` during play, transition under 3 s, mount with shifted state, toggle the OS reduced-motion setting while mounted, room stays readable in both states.
   - Ensure all tests pass, ask the user if questions arise.

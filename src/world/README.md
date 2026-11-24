@@ -1,14 +1,22 @@
 # World and exploration — Developer 1
 
-## Status (M1 to M3 implemented)
+## Status (M1 to M4 implemented)
 
 `WorldScene` renders a first-person archive: the main room (x -5..5, z -4..4) plus an Arcade_Area (4 by 4) entered through 2 doors in the east wall, 3 shelves, a desk, a chair, a couch and 6 detail objects, all built from primitives. WASD/arrow movement, mouse look after pointer lock (click the scene), keyboard look (I/J/K/L, M2, works without pointer lock), wall/prop/door-frame collision, and an E-key prompt near the CRT (`vhs`) and arcade stations. E calls `onInspect(stationId)`. Prompt texts are fixed and do not depend on any prop. If WebGL is unavailable, rendering throws, or a lost context is not restored within 3 s, a fallback with two buttons calls `onInspect('vhs')` / `onInspect('arcade')`. Lighting is one ambient light plus 3 point lights.
 
-- Tested by Vitest (`npm test`: 15 files, 193 tests at the last run): pure logic in `logic/` and `layout/` (movement, collision, look, targeting, input state/mode, palette, layout reachability), the import boundary, and component-level tests of `WorldScene`, including the optional `inputEnabled` prop (M3).
+M4 environmental effects (implemented, covered by unit tests, not verified in a browser by this agent):
+
+- Memory_Shift: when `memoryShifted` changes, background, fog, ambient and point-light colors, wall and screen tints, and a visual-only poster and plaque blend over 2 s, in both directions. Under reduced motion the change is immediate. If the prop is already true at mount, the world starts shifted with no transition. Colliders, Station anchors and prompt text do not depend on `memoryShifted`.
+- Palette: normal and shifted palettes, with the ambient intensity never below `AMBIENT_INTENSITY_FLOOR` (0.35).
+- CRT effects: light flicker, screen glow, drifting dust particles and CRT static noise, all driven from `useFrame` with no timers. They stop animating while the world is inspecting.
+- Reduced motion: `useReducedMotion` follows the OS `prefers-reduced-motion` setting only. The `reducedDistortion` prop is NOT declared (P2 is pending).
+- While inspecting, the canvas `frameloop` is `demand`, so no frames are rendered until something invalidates.
+
+- Tested by Vitest (`npm test`: 19 files, 229 tests at the last run): pure logic in `logic/` and `layout/` (movement, collision, look, targeting, input state/mode, palette and blending), effect timing and shift helpers in `scene/`, the reduced-motion hook, the import boundary, and component-level tests of `WorldScene`, including the optional `inputEnabled` prop (M3).
 - `inputEnabled`: implemented on the world side and covered by reducer and component tests. `App.tsx` is unchanged and does not pass it, so the prop is NOT verified end-to-end in the running App.
-- Not manually verified by the developer in a browser: rendering, pointer lock, the E interaction, context-loss fallback.
-- Not recorded yet: performance measurements (frame rate, draw calls). No performance figure is claimed.
-- Not implemented: M4 environmental effects, Blender/GLB assets (M5), optional property-based tests.
+- Manual verification: the user verified M1 to M3 in a browser. Nothing in M4 (transition, effects, reduced motion, demand frameloop) has been verified in a browser by this agent.
+- Not recorded yet: performance measurements (frame rate, draw calls), planned for M6. No performance figure is claimed.
+- Not implemented: Blender/GLB assets (M5), optional property-based tests.
 - Known limitation: while `App.tsx` does not pass `inputEnabled`, the player must resume after a station request by clicking the scene (or pressing Enter/E). Resume is always user-initiated.
 ## Proposed App integration: `inputEnabled` (P1)
 

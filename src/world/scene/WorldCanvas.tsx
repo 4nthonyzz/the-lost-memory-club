@@ -7,12 +7,15 @@ export interface WorldCanvasProps {
   children?: ReactNode
   className?: string
   style?: CSSProperties
+  /** 'demand' renders only on invalidate(); used while a panel is open. Default 'always'. */
+  frameloop?: 'always' | 'demand'
 }
 
-export function WorldCanvas({ children, className, style }: WorldCanvasProps) {
+export function WorldCanvas({ children, className, style, frameloop = 'always' }: WorldCanvasProps) {
   useEffect(() => disposeSharedResources, [])
   return (
     <Canvas
+      frameloop={frameloop}
       className={className}
       style={style}
       dpr={[1, 1.5]}

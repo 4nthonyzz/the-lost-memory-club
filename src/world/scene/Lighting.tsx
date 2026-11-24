@@ -1,22 +1,44 @@
-/** M1 lights: ambient plus two point lights (3 total, cap is 4). Only background and ambient depend on memoryShifted. */
+/**
+ * M1 lights: ambient plus three point lights (4 total, the cap). The initial look comes from
+ * memoryShifted at mount; later changes are applied imperatively by MemoryShiftDriver
+ * (colors, intensities, background and fog), so these props never change after mount.
+ */
+import { useRef, useState } from 'react'
+import type { AmbientLight, PointLight } from 'three'
 import { paletteFor } from '../logic/palette'
+import { MemoryShiftDriver } from './MemoryShiftDriver'
 
 export const M1_LIGHT_COUNT = 3
 /** M3 adds one point light for the Arcade_Area (ambient + 3 point lights). */
 export const M3_LIGHT_COUNT = 4
 
+const POINT_BASES = [
+  { color: '#4fe0d0', intensity: 6 }, // over the CRT, cool teal
+  { color: '#d84fd0', intensity: 6 }, // near the arcade, magenta
+  { color: '#9a6ae0', intensity: 5 }, // Arcade_Area, warm violet
+] as const
+
 export function Lighting({ memoryShifted }: { memoryShifted: boolean }) {
-  const palette = paletteFor(memoryShifted)
+  const [initial] = useState(() => paletteFor(memoryShifted))
+  const ambientRef = useRef<AmbientLight>(null)
+  const p0 = useRef<PointLight>(null)
+  const p1 = useRef<PointLight>(null)
+  const p2 = useRef<PointLight>(null)
+  const [pointRefs] = useState(() => [p0, p1, p2])
   return (
     <>
-      <color attach="background" args={[palette.background]} />
-      <ambientLight color={palette.ambient} intensity={palette.ambientIntensity} />
-      {/* Over the CRT, cool teal. */}
-      <pointLight position={[-2.5, 2.2, -2.6]} color="#4fe0d0" intensity={6} distance={7} decay={2} />
-      {/* Near the arcade, magenta. */}
-      <pointLight position={[2.5, 2.2, -2.6]} color="#d84fd0" intensity={6} distance={7} decay={2} />
-      {/* Arcade_Area (x 5.3..9.3), warm violet. Ambient + 3 point lights = 4, the cap. */}
-      <pointLight position={[7.3, 2.4, 0]} color="#9a6ae0" intensity={5} distance={6} decay={2} />
+      <color attach="background" args={[initial.background]} />
+      <fog attach="fog" args={[initial.fogColor, initial.fogNear, initial.fogFar]} />
+      <ambientLight ref={ambientRef} color={initial.ambient} intensity={initial.ambientIntensity} />
+      <pointLight ref={p0} name="crt-light" position={[-2.5, 2.2, -2.6]} color={POINT_BASES[0].color} intensity={POINT_BASES[0].intensity} distance={7} decay={2} />
+      <pointLight ref={p1} position={[2.5, 2.2, -2.6]} color={POINT_BASES[1].color} intensity={POINT_BASES[1].intensity} distance={7} decay={2} />
+      <pointLight ref={p2} position={[7.3, 2.4, 0]} color={POINT_BASES[2].color} intensity={POINT_BASES[2].intensity} distance={6} decay={2} />
+      <MemoryShiftDriver
+        memoryShifted={memoryShifted}
+        ambientRef={ambientRef}
+        pointRefs={pointRefs}
+        pointBases={POINT_BASES}
+      />
     </>
   )
 }
