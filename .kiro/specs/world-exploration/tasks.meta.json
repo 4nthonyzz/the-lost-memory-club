@@ -1,0 +1,339 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Create world types and constants": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497483660
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497501839
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497578730
+      }
+    ],
+    "1.2 Implement the Milestone 1 room layout with reachability test": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497483851
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497808133
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497908217
+      }
+    ],
+    "2.1 Implement movement module with unit tests": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497484678
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497583100
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497700161
+      }
+    ],
+    "2.4 Implement collision module with unit tests": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497485440
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497583300
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497700605
+      }
+    ],
+    "3.1 Implement mouse look module with unit tests": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497486456
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497583732
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497701343
+      }
+    ],
+    "3.2 Implement interaction targeting with unit tests": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497487347
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497584853
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497702158
+      }
+    ],
+    "3.4 Implement input state and key filtering with unit tests": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497488448
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497585482
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497702891
+      }
+    ],
+    "3.7 Implement the mode state machine (prop absent) with unit tests": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497489154
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497808949
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497908971
+      }
+    ],
+    "4. Checkpoint - Pure logic complete": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497490200
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498022979
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498076881
+      }
+    ],
+    "5.1 Implement the minimal palette": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497491104
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497712970
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497804706
+      }
+    ],
+    "5.2 Implement the M1 scene components": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497491932
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498080930
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498206116
+      }
+    ],
+    "5.3 Implement the M1 overlay components": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497492741
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497713244
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497805371
+      }
+    ],
+    "5.4 Implement pointer-lock and input controller hooks": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497493749
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497916574
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498016400
+      }
+    ],
+    "5.5 Implement the player rig": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497494474
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498081144
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498206340
+      }
+    ],
+    "5.6 Wire WorldScene.tsx": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497495640
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498209145
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498318576
+      }
+    ],
+    "5.7 Write import-boundary test": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497496460
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498321560
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498518526
+      }
+    ],
+    "5.8 Write component-level tests": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497497170
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498322456
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498518730
+      }
+    ],
+    "6. Checkpoint - Milestone 1 playable": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497497807
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498521504
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498611617
+      }
+    ],
+    "2. Movement and collision pure logic (test-first)": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497700695
+      }
+    ],
+    "1. Foundation: types, constants and room layout": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497908403
+      }
+    ],
+    "3. Look, targeting, input and mode pure logic (test-first)": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497909045
+      }
+    ],
+    "5. M1 scene, controllers, overlays and WorldScene wiring": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498518804
+      }
+    ]
+  }
+}
