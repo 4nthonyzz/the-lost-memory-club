@@ -9,7 +9,7 @@ export const CONTROLS_LINES: readonly string[] = [
   'Esc: release the mouse',
 ];
 
-export const STATUS_NOTE = 'Station messages, including why a station cannot be used yet, appear in the status line below the scene.';
+export const STATUS_NOTE = 'Station messages, including why a station cannot be used yet, appear in the status line at the bottom of the screen.';
 
 export function ControlsHint() {
   const [open, setOpen] = useState(true);

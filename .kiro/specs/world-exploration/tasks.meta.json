@@ -678,6 +678,132 @@
         "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
         "timestamp": 1795538691195
       }
+    ],
+    "13.1 Implement the asset loader, manifest and AssetModel": [
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552888764
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552914687
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553556675
+      }
+    ],
+    "13.2 Integrate AssetModel into scene components": [
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552904592
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553562446
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553737626
+      }
+    ],
+    "13.3 Add original Blender scripts": [
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552904729
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552915325
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553556856
+      }
+    ],
+    "13.4 Add asset budget check and asset log": [
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552905094
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553563325
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553737833
+      }
+    ],
+    "13.5 Full-screen game shell and in-game overlays (approved App.tsx/styles.css change)": [
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552906237
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552916238
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553556975
+      }
+    ],
+    "13.6 Upgrade procedural model detail (primitives only)": [
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552907278
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552916971
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553557127
+      }
+    ],
+    "14. Checkpoint - Milestone 5 complete": [
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552909246
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553743610
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553928543
+      }
+    ],
+    "13. Optional GLB assets with primitive fallback": [
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553737972
+      }
     ]
   }
 }

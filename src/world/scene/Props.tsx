@@ -1,7 +1,21 @@
-﻿/** Reception desk, shelves with instanced tapes, and environmental details. Sizes come from ROOM props. */
-import { useLayoutEffect, useRef } from 'react'
-import { Object3D, type InstancedMesh } from 'three'
+/** Reception desk, shelves with instanced tapes, furniture and environmental details. Sizes come from ROOM props. */
+import { useLayoutEffect, useMemo, useRef } from 'react'
+import { Color, Object3D, type InstancedMesh } from 'three'
+import { AssetModel } from '../assets/AssetModel'
 import { ROOM, type PropDef } from '../layout/roomLayout'
+import type { Aabb } from '../worldTypes'
+import {
+  TAPE_PALETTE,
+  armchairParts,
+  couchParts,
+  crateParts,
+  deskParts,
+  labelSize,
+  shelfFrameParts,
+  shelfTapes,
+} from './modelDetail'
+import { assetPlacement } from './assetPlacement'
+import { PartMeshes } from './PartMeshes'
 import { Block } from './Room'
 import { geometries, materials } from './sharedResources'
 
@@ -12,127 +26,72 @@ function propById(id: string): PropDef {
 }
 
 const DESK_TOP = propById('reception-desk').height
-const BOARD_YS = [0.05, 0.55, 1.0, 1.45, 1.95]
-const TAPE_PITCH = 0.17
-const TAPE_W = 0.03
-const TAPE_H = 0.19
-const TAPE_D = 0.1
 
-function Desk() {
-  const { box, height } = propById('reception-desk')
-  const cx = (box.minX + box.maxX) / 2
-  const cz = (box.minZ + box.maxZ) / 2
-  const topY = height
-  return (
-    <group>
-      <Block box={box} h={height - 0.06} material={materials.woodDark} />
-      <mesh
-        geometry={geometries.box}
-        material={materials.wood}
-        position={[cx, topY - 0.03, cz]}
-        scale={[box.maxX - box.minX + 0.1, 0.06, box.maxZ - box.minZ + 0.1]}
-      />
-      {/* Desk lamp */}
-      <mesh geometry={geometries.cylinder} material={materials.metal} position={[box.minX + 0.3, topY + 0.02, cz]} scale={[0.16, 0.04, 0.16]} />
-      <mesh geometry={geometries.cylinder} material={materials.metal} position={[box.minX + 0.3, topY + 0.2, cz]} scale={[0.03, 0.32, 0.03]} />
-      <mesh geometry={geometries.cylinder} material={materials.lampShade} position={[box.minX + 0.3, topY + 0.4, cz]} scale={[0.22, 0.12, 0.22]} />
-      {/* VHS archive box and loose tapes */}
-      <mesh geometry={geometries.box} material={materials.crate} position={[cx + 0.5, topY + 0.1, cz]} scale={[0.4, 0.2, 0.3]} />
-      <mesh geometry={geometries.box} material={materials.tapeBlack} position={[cx - 0.2, topY + 0.015, cz + 0.05]} scale={[0.19, 0.03, 0.1]} />
-      <mesh geometry={geometries.box} material={materials.tapeBlack} position={[cx - 0.2, topY + 0.045, cz + 0.05]} scale={[0.19, 0.03, 0.1]} />
-    </group>
-  )
+export function Desk({ box, height }: { box: Aabb; height: number }) {
+  const parts = useMemo(() => deskParts(box, height), [box, height])
+  return <PartMeshes parts={parts} />
 }
 
 /**
- * Shelf with instanced tapes. Runs along the longer footprint side; the back
- * panel sits on the side nearest the room bounds (the wall it stands against).
+ * Wooden shelf (frame parts) plus two InstancedMeshes: tape spines with per-instance colours from a
+ * seeded palette, and one label strip per tape. Tape layout is pure data from modelDetail.ts.
  */
-function Shelf({ id }: { id: string }) {
-  const { box, height } = propById(id)
-  const ref = useRef<InstancedMesh>(null)
-  const alongX = box.maxX - box.minX > box.maxZ - box.minZ
-  const len = alongX ? box.maxX - box.minX : box.maxZ - box.minZ
-  const start = alongX ? box.minX : box.minZ
-  const perBoard = Math.floor((len - 0.2) / TAPE_PITCH)
-  const count = perBoard * (BOARD_YS.length - 1)
-  const cx = (box.minX + box.maxX) / 2
-  const cz = (box.minZ + box.maxZ) / 2
-  const b = ROOM.bounds
-  const backX = alongX ? cx : Math.abs(box.minX - b.minX) < Math.abs(box.maxX - b.maxX) ? box.minX + 0.02 : box.maxX - 0.02
-  const backZ = alongX ? (Math.abs(box.minZ - b.minZ) < Math.abs(box.maxZ - b.maxZ) ? box.minZ + 0.02 : box.maxZ - 0.02) : cz
+export function Shelf({ id, box, height }: { id: string; box: Aabb; height: number }) {
+  const spines = useRef<InstancedMesh>(null)
+  const labels = useRef<InstancedMesh>(null)
+  const frame = useMemo(() => shelfFrameParts(box, height), [box, height])
+  const tapes = useMemo(() => shelfTapes(id, box), [id, box])
 
   useLayoutEffect(() => {
-    const mesh = ref.current
-    if (!mesh) return
+    const s = spines.current
+    const l = labels.current
+    if (!s || !l) return
     const o = new Object3D()
-    let n = 0
-    for (let row = 0; row < BOARD_YS.length - 1; row++) {
-      for (let i = 0; i < perBoard; i++) {
-        const t = start + 0.2 + i * TAPE_PITCH
-        const y = BOARD_YS[row] + 0.02 + TAPE_H / 2
-        if (alongX) {
-          o.position.set(t, y, cz)
-          o.scale.set(TAPE_W, TAPE_H, TAPE_D)
-        } else {
-          o.position.set(cx, y, t)
-          o.scale.set(TAPE_D, TAPE_H, TAPE_W)
-        }
-        o.updateMatrix()
-        mesh.setMatrixAt(n++, o.matrix)
-      }
-    }
-    mesh.instanceMatrix.needsUpdate = true
-  }, [alongX, cx, cz, perBoard, start])
+    const c = new Color()
+    tapes.forEach((t, i) => {
+      o.rotation.set(0, 0, 0)
+      o.position.set(t.pos[0], t.pos[1], t.pos[2])
+      o.scale.set(t.size[0], t.size[1], t.size[2])
+      o.updateMatrix()
+      s.setMatrixAt(i, o.matrix)
+      s.setColorAt(i, c.set(TAPE_PALETTE[t.paletteIndex]))
+      const [lw, lh] = labelSize(t.size[1])
+      o.position.set(t.labelPos[0], t.labelPos[1], t.labelPos[2])
+      o.rotation.set(0, t.labelRotY, 0)
+      o.scale.set(lw, lh, 1)
+      o.updateMatrix()
+      l.setMatrixAt(i, o.matrix)
+    })
+    s.instanceMatrix.needsUpdate = true
+    if (s.instanceColor) s.instanceColor.needsUpdate = true
+    l.instanceMatrix.needsUpdate = true
+    s.computeBoundingSphere()
+    l.computeBoundingSphere()
+  }, [tapes])
 
   return (
     <group>
-      <mesh
-        geometry={geometries.box}
-        material={materials.woodDark}
-        position={[backX, height / 2, backZ]}
-        scale={alongX ? [len, height, 0.04] : [0.04, height, len]}
-      />
-      {BOARD_YS.map((y) => (
-        <Block key={y} box={box} y0={y - 0.02} h={0.04} material={materials.wood} />
-      ))}
-      <instancedMesh ref={ref} args={[geometries.box, materials.tapeBlack, count]} frustumCulled={false} />
+      <PartMeshes parts={frame} />
+      <instancedMesh ref={spines} args={[geometries.box, materials.tapeSpine, tapes.length]} />
+      <instancedMesh ref={labels} args={[geometries.plane, materials.tapeLabel, tapes.length]} />
     </group>
   )
 }
 
-function Chair() {
-  const { box } = propById('abandoned-chair')
-  const { minX, maxX, minZ, maxZ } = box
-  const leg = 0.05
-  const seatY = 0.45
-  const legBox = (x: number, z: number) => ({ minX: x, maxX: x + leg, minZ: z, maxZ: z + leg })
-  return (
-    <group>
-      <Block box={box} y0={seatY} h={0.06} material={materials.wood} />
-      <Block box={{ minX, maxX, minZ: maxZ - 0.05, maxZ }} y0={seatY + 0.06} h={0.4} material={materials.wood} />
-      <Block box={legBox(minX, minZ)} h={seatY} material={materials.woodDark} />
-      <Block box={legBox(maxX - leg, minZ)} h={seatY} material={materials.woodDark} />
-      <Block box={legBox(minX, maxZ - leg)} h={seatY} material={materials.woodDark} />
-      <Block box={legBox(maxX - leg, maxZ - leg)} h={seatY} material={materials.woodDark} />
-    </group>
-  )
+export function Armchair({ box }: { box: Aabb }) {
+  const parts = useMemo(() => armchairParts(box), [box])
+  return <PartMeshes parts={parts} />
 }
 
-function Couch() {
-  const { box } = propById('couch')
-  const { minX, maxX, minZ, maxZ } = box
-  return (
-    <group>
-      <Block box={box} h={0.4} material={materials.rug} />
-      {/* Backrest on the south side, arms on both ends */}
-      <Block box={{ minX, maxX, minZ: maxZ - 0.22, maxZ }} y0={0.4} h={0.5} material={materials.rug} />
-      <Block box={{ minX, maxX: minX + 0.2, minZ, maxZ: maxZ - 0.22 }} y0={0.4} h={0.2} material={materials.rug} />
-      <Block box={{ minX: maxX - 0.2, maxX, minZ, maxZ: maxZ - 0.22 }} y0={0.4} h={0.2} material={materials.rug} />
-    </group>
-  )
+export function Couch({ box }: { box: Aabb }) {
+  const parts = useMemo(() => couchParts(box), [box])
+  return <PartMeshes parts={parts} />
 }
 
+export function Crate({ box, height }: { box: Aabb; height: number }) {
+  const parts = useMemo(() => crateParts(box, height), [box, height])
+  return <PartMeshes parts={parts} />
+}
 function Details() {
   const crateA = propById('crate-a')
   const crateB = propById('crate-b')
@@ -153,8 +112,9 @@ function Details() {
     <group>
       {/* Rug (decal only, no layout entry) */}
       <mesh geometry={geometries.plane} material={materials.rug} position={[0, 0.01, -0.8]} rotation={[-Math.PI / 2, 0, 0]} scale={[3, 2, 1]} />
-      <Block box={crateA.box} h={crateA.height} material={materials.crate} />
-      <Block box={crateB.box} h={crateB.height} material={materials.crate} />
+      {[crateA, crateB].map((c) => (
+        <AssetModel key={c.id} id={c.id} {...assetPlacement(c.box)} fallback={<Crate box={c.box} height={c.height} />} />
+      ))}
       {/* Tape stack on the reception desk top */}
       {[0, 1, 2].map((i) => (
         <mesh
@@ -192,15 +152,22 @@ function ShiftDressing() {
 }
 
 export function Props() {
+  const desk = propById('reception-desk')
+  const chair = propById('abandoned-chair')
+  const couch = propById('couch')
   return (
     <group>
       <ShiftDressing />
-      <Desk />
-      <Shelf id="shelf-a" />
-      <Shelf id="shelf-b" />
-      <Shelf id="shelf-c" />
-      <Chair />
-      <Couch />
+      <Desk box={desk.box} height={desk.height} />
+      {(['shelf-a', 'shelf-b', 'shelf-c'] as const).map((id) => {
+        const s = propById(id)
+        // The shelf GLB is authored along X; assetPlacement rotates it 90 degrees for the Z-long west shelves.
+        return (
+          <AssetModel key={id} id={id} {...assetPlacement(s.box)} fallback={<Shelf id={id} box={s.box} height={s.height} />} />
+        )
+      })}
+      <AssetModel id="armchair" {...assetPlacement(chair.box)} fallback={<Armchair box={chair.box} />} />
+      <AssetModel id="couch" {...assetPlacement(couch.box)} fallback={<Couch box={couch.box} />} />
       <Details />
     </group>
   )

@@ -1,7 +1,10 @@
 /** Floor, ceiling and four walls, all sized from ROOM. Meshes follow the layout; colliders never read from meshes. */
+import { useMemo } from 'react'
 import type { Material } from 'three'
 import { ROOM } from '../layout/roomLayout'
 import type { Aabb } from '../worldTypes'
+import { ceilingFixtureParts, fixtureCentres, trimParts } from './modelDetail'
+import { PartMeshes } from './PartMeshes'
 import { geometries, materials } from './sharedResources'
 
 interface BlockProps {
@@ -63,6 +66,18 @@ function Doors() {
   )
 }
 
+/** Skirting boards and crown trim that follow the layout wall and door-frame boxes. */
+export function WallTrim() {
+  const parts = useMemo(trimParts, [])
+  return <PartMeshes parts={parts} />
+}
+
+/** Fluorescent ceiling fixture: metal housing plus an emissive tube box. Not a light source. */
+export function CeilingFixture({ x, z }: { x: number; z: number }) {
+  const parts = useMemo(() => ceilingFixtureParts(x, z), [x, z])
+  return <PartMeshes parts={parts} />
+}
+
 export function Room() {
   const { bounds, height, walls } = ROOM
   const w = bounds.maxX - bounds.minX
@@ -89,6 +104,10 @@ export function Room() {
         <Block key={i} box={box} h={height} material={materials.wall} />
       ))}
       <Doors />
+      <WallTrim />
+      {fixtureCentres().map(([x, z]) => (
+        <CeilingFixture key={`:`} x={x} z={z} />
+      ))}
     </group>
   )
 }

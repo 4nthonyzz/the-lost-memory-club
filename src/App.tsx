@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import { ArcadePanel } from './arcade/ArcadePanel';
 import { FIRST_CLUE_ID, FIRST_TAPE_ID, SAVE_KEY, SNAKE_GAME_ID, type GameEvent, type StationId } from './core/contracts';
 import { gameReducer, loadGameState, saveGameState } from './core/gameReducer';
@@ -12,7 +12,37 @@ export function App() {
   const hasClue = state.discoveredClues.includes(FIRST_CLUE_ID);
   const memoryShifted = state.completedArcades.includes(SNAKE_GAME_ID);
 
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const shellRef = useRef<HTMLElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const wasOpen = useRef(false);
+  const stationOpen = station !== null;
+
   useEffect(() => saveGameState(state), [state]);
+
+  // Escape closes the open station overlay. The listener exists only while a station is open.
+  useEffect(() => {
+    if (!stationOpen) return undefined;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setStation(null);
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [stationOpen]);
+
+  // Move focus into the dialog on open; return it to the world wrapper on close.
+  // Pointer lock is never requested here.
+  useEffect(() => {
+    if (stationOpen) {
+      const first = dialogRef.current?.querySelector<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      (first ?? dialogRef.current)?.focus();
+    } else if (wasOpen.current) {
+      shellRef.current?.querySelector<HTMLElement>('.world-wrapper')?.focus();
+    }
+    wasOpen.current = stationOpen;
+  }, [stationOpen, station]);
 
   function interact(nextStation: StationId) {
     if (nextStation === 'arcade' && !hasClue) {
@@ -36,38 +66,43 @@ export function App() {
     setMessage('Development save reset.');
   }
 
+  const dialogTitle = station === 'vhs' ? 'VHS station' : 'Arcade station';
+  const progress: Array<[string, boolean]> = [
+    ['TAPE', state.collectedTapes.includes(FIRST_TAPE_ID)],
+    ['CLUE', hasClue],
+    ['ARCADE', memoryShifted],
+    ['ENDING', state.endingUnlocked],
+  ];
+
   return (
-    <main className="app-shell">
-      <header className="site-header">
-        <div>
-          <p className="eyebrow">ARCHIVE 09 / EST. 1996</p>
-          <h1>THE LOST MEMORY CLUB</h1>
-          <p className="subheading">Some memories should stay forgotten.</p>
-        </div>
-        <span className="build-pill">DEVELOPMENT SCAFFOLD · NOT THE FINAL GAME</span>
-      </header>
-      <div className="content-grid">
-        <section className="scene-card">
-          <div className="section-heading"><span>ARCHIVE FLOOR · PROTOTYPE</span><span className="online-dot">● RENDER ONLINE</span></div>
-          <WorldScene onInspect={interact} memoryShifted={memoryShifted} />
-          <div className="scene-status" role="status">{message}</div>
-        </section>
-        <aside className="side-column">
-          <div className="info-card">
-            <p className="eyebrow">FIELD NOTES</p>
-            <h2>Prototype Progress</h2>
-            <div className="metric"><span>VHS collected</span><strong>{state.collectedTapes.includes(FIRST_TAPE_ID) ? 'YES' : 'NO'}</strong></div>
-            <div className="metric"><span>Clue discovered</span><strong>{hasClue ? 'YES' : 'NO'}</strong></div>
-            <div className="metric"><span>Arcade completed</span><strong>{memoryShifted ? 'YES' : 'NO'}</strong></div>
-            <div className="metric"><span>Ending unlocked</span><strong>{state.endingUnlocked ? 'YES' : 'NO'}</strong></div>
-            <button type="button" className="secondary reset" onClick={reset}>Reset local prototype state</button>
-          </div>
-          {station === 'vhs' && <MemoryPanel hasTape={state.collectedTapes.includes(FIRST_TAPE_ID)} hasClue={hasClue} onCollect={(tapeId) => send({ type: 'TAPE_COLLECTED', tapeId })} onDiscoverClue={(tapeId, clueId) => send({ type: 'VHS_CLUE_FOUND', tapeId, clueId })} onClose={() => setStation(null)} />}
-          {station === 'arcade' && <ArcadePanel onStart={(gameId) => send({ type: 'ARCADE_STARTED', gameId })} onClose={() => setStation(null)} />}
-          {!station && <div className="info-card instructions"><p className="eyebrow">WHAT COMES NEXT?</p><p>This starter proves the 3D scene and three-module integration. Developers must implement movement, real VHS media and the Snake game before submission.</p></div>}
-        </aside>
+    <main className="game-shell" ref={shellRef}>
+      <WorldScene inputEnabled={station === null} onInspect={interact} memoryShifted={memoryShifted} />
+      <div className="hud-progress" aria-label="Prototype progress">
+        <span className="hud-tag">PROTOTYPE</span>
+        <ul>
+          {progress.map(([label, done]) => (
+            <li key={label} className={done ? 'done' : undefined}>{label} {done ? '✓' : '·'}<span className="sr-only">{done ? ' done' : ' pending'}</span></li>
+          ))}
+        </ul>
       </div>
-      <footer>KIROWEEN 2026 · ORIGINAL PROTOTYPE · NO THIRD-PARTY ASSETS INCLUDED</footer>
+      <div className="hud-status" role="status">{message}</div>
+      <div className="hud-drawer">
+        <button type="button" className="secondary" aria-expanded={drawerOpen} aria-controls="hud-drawer-body" onClick={() => setDrawerOpen((open) => !open)}>
+          {drawerOpen ? 'Close menu' : 'Menu'}
+        </button>
+        <div id="hud-drawer-body" className="hud-drawer-body" hidden={!drawerOpen}>
+          <p>Move: W A S D or arrows. Look: mouse or I J K L. Interact: E. Esc releases the mouse or closes a station.</p>
+          <button type="button" className="secondary" onClick={reset}>Reset local prototype state</button>
+        </div>
+      </div>
+      {station && (
+        <div className="modal-backdrop">
+          <div className="modal-dialog" role="dialog" aria-modal="true" aria-label={dialogTitle} ref={dialogRef} tabIndex={-1}>
+            {station === 'vhs' && <MemoryPanel hasTape={state.collectedTapes.includes(FIRST_TAPE_ID)} hasClue={hasClue} onCollect={(tapeId) => send({ type: 'TAPE_COLLECTED', tapeId })} onDiscoverClue={(tapeId, clueId) => send({ type: 'VHS_CLUE_FOUND', tapeId, clueId })} onClose={() => setStation(null)} />}
+            {station === 'arcade' && <ArcadePanel onStart={(gameId) => send({ type: 'ARCADE_STARTED', gameId })} onClose={() => setStation(null)} />}
+          </div>
+        </div>
+      )}
     </main>
   );
 }

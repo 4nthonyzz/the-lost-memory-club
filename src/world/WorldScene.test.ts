@@ -155,7 +155,7 @@ describe('WorldScene feedback ownership text', () => {
     expect(label).toContain('W A S D');
     expect(label).toContain('press E near a station');
     expect(label).toContain(
-      'Station messages, including why a station cannot be used yet, appear in the status line below the scene.',
+      'Station messages, including why a station cannot be used yet, appear in the status line at the bottom of the screen.',
     );
   });
 
@@ -165,7 +165,7 @@ describe('WorldScene feedback ownership text', () => {
     fireEvent.keyDown(wrapper, { code: 'KeyE', key: 'e' });
     expect(
       screen.getByText(
-        'Station request sent. Click the view or press Enter to continue exploring. Messages appear below the scene.',
+        'Station request sent. Click the view or press Enter to continue exploring. Messages appear at the bottom of the screen.',
       ),
     ).toBeTruthy();
   });

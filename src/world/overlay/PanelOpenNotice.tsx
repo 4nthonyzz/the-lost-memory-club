@@ -1,7 +1,7 @@
 export const PANEL_NOTICE_TEXT =
-  'Station request sent. Click the view or press Enter to continue exploring. Messages appear below the scene.';
+  'Station request sent. Click the view or press Enter to continue exploring. Messages appear at the bottom of the screen.';
 export const PANEL_NOTICE_PASSIVE_TEXT =
-  'Station request sent. The view resumes when the panel closes. Messages appear below the scene.';
+  'Station request sent. The view resumes when the panel closes. Messages appear at the bottom of the screen.';
 
 export interface PanelOpenNoticeProps {
   /** True when the user can resume by click/Enter (inputEnabled prop absent). */

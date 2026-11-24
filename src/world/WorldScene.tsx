@@ -26,7 +26,7 @@ const WORLD_LABEL =
   'First-person 3D archive room. Click the scene to capture the mouse. ' +
   'Move with W A S D, look with the mouse, and press E near a station to inspect it. ' +
   'Press Escape to release the mouse. Station messages, including why a station cannot be used yet, ' +
-  'appear in the status line below the scene.';
+  'appear in the status line at the bottom of the screen.';
 
 function hasWebgl(): boolean {
   try {

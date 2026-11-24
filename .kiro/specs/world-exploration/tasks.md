@@ -23,6 +23,7 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 - `jsdom`, `@testing-library/react` (and `@testing-library/dom` if required as a peer) are installed in required task 5.8. `fast-check` remains installed in optional task 2.2 or by the first property-test task that is run. jsdom is selected per test file with `// @vitest-environment jsdom`.
 - Numeric values are initial and validated in testing. No performance figure is reported as achieved before it is recorded (Requirement 14.11, 14.12).
 - All visible text, labels, comments and docs are in English.
+- Approved scope change (M5), 2026-11-24: `src/App.tsx` and `src/styles.css` may now be modified. P1 (App-side `inputEnabled={station === null}`), P3 (overlay and layout styles) and P4 (status text) are approved and implemented in task 13.5. `src/core/`, `src/arcade/`, `src/memories/` and `vite.config.ts` remain unchanged. `package.json` changes only if unavoidable and flagged. `tools/blender/` and `.glb` files are allowed from M5 on. The earlier statements that `App.tsx` is not modified apply to M1-M4 only. `requirements.md` and `design.md` still contain M1-M4 wording stating that `App.tsx` is unmodified and that P1/P3/P4 are pending; that wording is superseded by this bullet.
 
 ## Tasks
 
@@ -464,8 +465,8 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 
 ### Milestone 5: Blender/GLB integration
 
-- [ ] 13. Optional GLB assets with primitive fallback
-  - [ ] 13.1 Implement the asset loader, manifest and AssetModel
+- [x] 13. Optional GLB assets with primitive fallback
+  - [x] 13.1 Implement the asset loader, manifest and AssetModel
     - Files: `src/world/assets/assetManifest.ts`, `src/world/assets/loadGlb.ts`, `src/world/assets/AssetModel.tsx`, `src/world/assets/assets.test.ts`.
     - Manifest maps layout object ids to optional `/models/<name>.glb` paths with triangle budgets (initially empty). Loader uses `three/examples/jsm/loaders/GLTFLoader` (no new dependency). `AssetModel` wraps `Suspense` plus an error boundary whose fallback is the primitive; one English warning per failing path: `[world] GLB asset failed to load, using primitive fallback: <path>`. Loaded resources are disposed on unmount.
     - Acceptance: empty manifest renders exactly the M3 scene; a failing path logs once; movement is not blocked while loading.
@@ -474,18 +475,20 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: colliders and anchors never read from GLB geometry.
     - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 14.7_
 
-  - [ ] 13.2 Integrate AssetModel into scene components
+  - [x] 13.2 Integrate AssetModel into scene components
     - Files: `src/world/scene/Props.tsx`, `src/world/scene/Stations.tsx`.
     - Replace direct primitives with `AssetModel` using the primitive as fallback.
     - Acceptance: with an empty manifest the rendered result is unchanged; `npm run build` passes.
     - Tests: typecheck, build; manual check with a missing path to see the warning once.
-    - Depends on: 13.1.
+    - Generated `.glb` files are optional: the manifest stays empty until they exist and are measured.
+    - Depends on: 13.1, 13.6.
     - Boundary: layout data still the only source of collision.
     - _Requirements: 12.1, 12.2, 12.3, 12.5_
 
-  - [ ] 13.3 Add original Blender scripts
-    - Files: `tools/blender/export_glb.py`, `tools/blender/count_triangles.py`, `tools/blender/README.md`.
+  - [x] 13.3 Add original Blender scripts
+    - Files: `tools/blender/export_glb.py`, `tools/blender/count_triangles.py`, `tools/blender/generate_assets.py`, `tools/blender/README.md`.
     - Original `bpy` scripts with English comments: batch GLB export into `public/models/` and a triangle counter. README gives usage instructions. No Blender or GLB is needed by M1 to M4.
+    - Add `tools/blender/generate_assets.py`: a generator that procedurally builds the same detailed objects as task 13.6 (CRT TV plus VCR, arcade cabinet, shelf with tapes, armchair, couch, crate) from `bpy` primitives, applies the triangle budgets, and exports `.glb` files into `public/models/`. It is deterministic and reproducible (fixed seed) and runs with `blender -b --python tools/blender/generate_assets.py`. Original work only. No `.glb` is claimed to exist unless it was generated and measured.
     - Acceptance: scripts have usage docs; no copied third-party code; folder is outside `src/`.
     - Tests: manual run in Blender by a team member; `python -m py_compile` on each script if Python is available.
     - Deferred note: no Blender scripts or `.glb` assets are created during M1 (tasks 1-6). This task must not start before the M4 checkpoint (task 12) completes.
@@ -493,7 +496,7 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: `tools/blender/` only (approved P10).
     - _Requirements: 12.6, 12.8, 12.9_
 
-  - [ ] 13.4 Add asset budget check and asset log
+  - [x] 13.4 Add asset budget check and asset log
     - Files: `src/world/assets/assetManifest.test.ts`, `.kiro/specs/world-exploration/asset-log.md`.
     - Test that each manifest entry has a path under `/models/`, at most 5,000 triangles for props, and the sum of budgets is at most 20,000. Asset log template (source, author, license, modifications, file size) kept in the spec folder until P6 is approved. Real file size checks (5 MB total) stay a manual checklist item.
     - Acceptance: test passes with the empty manifest and fails on an over-budget fixture entry.
@@ -502,7 +505,38 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: `docs/THIRD_PARTY_ASSETS.md` is not edited (P6 pending).
     - _Requirements: 12.6, 12.7, 12.10, 14.4_
 
-- [ ] 14. Checkpoint - Milestone 5 complete
+  - [x] 13.5 Full-screen game shell and in-game overlays (approved App.tsx/styles.css change)
+    - Files: `src/App.tsx`, `src/styles.css`, `src/App.test.ts`, `src/world/WorldScene.tsx` (string wording only), `src/world/overlay/*` and existing world tests (only where the "status line below the scene" wording must change to match the new HUD), `src/world/README.md`, `.kiro/specs/world-exploration/integration-notes.md`.
+    - Replace the split-column prototype (header, FIELD NOTES, WHAT COMES NEXT?, footer) with a 100vw by 100vh container with `overflow: hidden`. `<WorldScene>` fills it and receives `inputEnabled={station === null}`.
+    - Unlock rules, messages and event wiring in `interact()`, `send()` and `reset()` stay unchanged. `App.tsx` stays the source of truth.
+    - Render the existing `MemoryPanel` (VHS station) and `ArcadePanel` as `role="dialog"` `aria-modal="true"` overlays centered over the canvas. Each closes with its Close button and with Escape. Focus moves into the dialog on open and returns to the world wrapper on close.
+    - Add a compact HUD (progress badge plus a `role="status"` message line, placed so it does not collide with world overlays) and a minimal controls/reset drawer. The world must not cover the HUD status line and the HUD must not cover world overlays.
+    - No restored-memory viewer exists in `src/memories`, so none is invented. Record this gap in `integration-notes.md`.
+    - Update `integration-notes.md` and `src/world/README.md` to state that P1, P3 and P4 are now implemented, and change any "status line below the scene" wording to describe the HUD.
+    - Acceptance: `npm run typecheck` and `npm run build` pass. In the unlocked state, E at a station opens the overlay and the world suspends; closing returns control, and one click re-captures the pointer (no automatic pointer lock). A locked arcade request shows the App lock message and the world stays usable.
+    - Tests: `src/App.test.ts` (jsdom docblock; `.test.ts` naming because `vite.config.ts` only includes `.test.ts`; mock `./world/WorldScene`) covering overlay open, close and Escape, `inputEnabled` passed to the world, the lock message, and reset. Run `npm test`.
+    - Depends on: 9.7.
+    - Boundary: `src/core/`, `src/arcade/` and `src/memories/` unchanged; `vite.config.ts` unchanged.
+    - _Requirements: 8.6, 11.2, 11.16, 11.17, 11.20, 11.21, 16.6, 16.7, 16.11, 17.5, 20.2, 20.8_
+
+  - [x] 13.6 Upgrade procedural model detail (primitives only)
+    - Files: `src/world/scene/Stations.tsx`, `src/world/scene/Props.tsx`, `src/world/scene/Room.tsx`, `src/world/scene/sharedResources.ts`, `src/world/scene/modelDetail.test.ts`.
+    - Build multi-part 1990s detail from primitives:
+      - CRT TV with beveled casing, recessed screen bezel, power LED and knobs.
+      - VCR deck with a slot and a cassette.
+      - Arcade cabinet with angled marquee, side art panels, recessed CRT screen, and a control deck with a ball-top joystick and 6 coloured buttons.
+      - Wooden shelves with varied VHS spines and labels (`InstancedMesh` with per-instance colour).
+      - Armchair with cushions and armrests, worn couch, ribbed crates.
+      - Ceiling fluorescent fixtures, trim and skirting.
+    - Layout stays the single source of truth: meshes only decorate layout anchors and footprints. No collider changes.
+    - Light count stays at or below 4 (fluorescent fixtures are emissive meshes, not lights). The triangle estimate stays under 20,000 in total and is checked by a pure helper test. Shared geometries and materials are disposed.
+    - Acceptance: `npm run typecheck` and `npm run build` pass; colliders and Station anchors are unchanged; triangle estimate below 20,000; light count at or below 4.
+    - Tests: `modelDetail.test.ts` (pure triangle-estimate helper, light-count constant, layout colliders unchanged). Run `npm test`.
+    - Depends on: 9.2, 11.4.
+    - Boundary: render-only; no GLB required.
+    - _Requirements: 1.3, 1.4, 1.8, 12.5, 14.4, 14.5, 14.6, 19.1_
+
+- [x] 14. Checkpoint - Milestone 5 complete
   - Run `npm run typecheck`, `npm test`, `npm run build`.
   - Manual check: scene identical with an empty manifest; a deliberately missing GLB path logs one warning and shows the primitive.
   - Ensure all tests pass, ask the user if questions arise.
@@ -625,7 +659,7 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     { "id": 17, "tasks": ["11.2", "11.4"] },
     { "id": 18, "tasks": ["11.5"] },
     { "id": 19, "tasks": ["12"] },
-    { "id": 20, "tasks": ["13.1", "13.3"] },
+    { "id": 20, "tasks": ["13.1", "13.3", "13.5", "13.6"] },
     { "id": 21, "tasks": ["13.2", "13.4"] },
     { "id": 22, "tasks": ["14"] },
     { "id": 23, "tasks": ["15.1", "15.2", "15.3", "16.1"] },

@@ -41,9 +41,9 @@ vi.mock('./controller/usePlayerRig', async () => {
 import { WorldScene } from './WorldScene';
 
 const DEFAULT_NOTICE =
-  'Station request sent. Click the view or press Enter to continue exploring. Messages appear below the scene.';
+  'Station request sent. Click the view or press Enter to continue exploring. Messages appear at the bottom of the screen.';
 const PASSIVE_NOTICE =
-  'Station request sent. The view resumes when the panel closes. Messages appear below the scene.';
+  'Station request sent. The view resumes when the panel closes. Messages appear at the bottom of the screen.';
 
 const originalGetContext = HTMLCanvasElement.prototype.getContext;
 const lockSpy = vi.fn();

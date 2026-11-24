@@ -1,30 +1,28 @@
 # World Exploration: App.tsx Integration Notes (P1 `inputEnabled`)
 
-Documentation only (task 9.9). No code is changed by this document.
+Originally documentation only (task 9.9). Updated by task 13.5.
 
-## Status
+## Status (updated by task 13.5, approved scope change M5)
 
-- P1 is approved as an **integration proposal only**.
-- `src/App.tsx` is **NOT modified** and must not be modified until the team coordinates (see the checklist below).
-- Implemented in the world module: the optional `inputEnabled?: boolean` prop on `WorldScene` (`src/world/WorldScene.tsx`) and the mode reducer support for it (`src/world/logic/inputMode.ts`). It is covered by unit and component-level tests.
-- Pending in App: passing the prop. The world-side prop has **not been verified end-to-end in the running App**, because App does not pass it today.
+- P1 (`inputEnabled={station === null}`), P3 (overlay and layout styles) and P4 (status text) are **IMPLEMENTED in App** in this commit (`src/App.tsx`, `src/styles.css`).
+- App is now a full-screen 3D shell (100vw x 100vh). `MemoryPanel` and `ArcadePanel` render inside a modal layer (`role="dialog"`, `aria-modal="true"`). Escape (window keydown, registered only while a station is open) and the panel Close button close it. Focus moves into the dialog on open and returns to `.world-wrapper` on close. App never requests pointer lock.
+- The HUD shows a PROTOTYPE tag, progress booleans (TAPE, CLUE, ARCADE, ENDING), the `role="status"` message line at the bottom center, and a collapsed menu drawer (controls summary and the reset button) at the top right.
+- World wording now says station messages appear "in the status line at the bottom of the screen".
+- Unlock rule and message strings are unchanged.
 
-## Proposed change in `src/App.tsx` (not applied)
+### Known gaps
 
-Current line:
+- No restored-memory viewer component exists in the repo. No story content was invented; the HUD shows progress booleans only.
+- App-level end-to-end behavior is verified only by tests (`src/App.test.ts`, with a stubbed `WorldScene`) until the user plays it in a browser.
+- HUD layout on small or short viewports (expanded controls hint vs. bottom status line) is unverified in a browser.
 
-```tsx
-<WorldScene onInspect={interact} memoryShifted={memoryShifted} />
-```
-
-Proposed line:
+## Applied change in `src/App.tsx`
 
 ```tsx
 <WorldScene inputEnabled={station === null} onInspect={interact} memoryShifted={memoryShifted} />
 ```
 
-No other App change is needed. `interact`, `station`, `message` and the panels stay as they are.
-
+The sections below are the original proposal text, kept for history. Where they say App is unmodified, that is superseded by the status above.
 ## Backward compatibility
 
 - The prop is optional and additive. `onInspect` and `memoryShifted` keep their names and types. `StationId` is unchanged.
