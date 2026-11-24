@@ -1,0 +1,27 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Verify versioned Kiro specifications
+        run: |
+          test -f .kiro/specs/game-foundation/requirements.md
+          test -f .kiro/specs/game-foundation/design.md
+          test -f .kiro/specs/game-foundation/tasks.md
+          test -f LICENSE
