@@ -7,6 +7,7 @@ import {
   type ActNumber,
   type EndingId,
 } from './memoryCatalog';
+import { describeObjective, type NarrativeObjective } from './narrativeText';
 
 export interface ExtraProgress {
   collectedTapes?: readonly string[];
@@ -46,6 +47,7 @@ export interface NarrativeState {
   archiveRestored: boolean;
   unlockedEndings: readonly EndingId[];
   secrets: SecretProgress;
+  objective: NarrativeObjective;
   nextObjective: string;
 }
 
@@ -56,6 +58,7 @@ export interface ClubAtmosphere {
   distortion: number;
   headline: string;
   whispers: readonly string[];
+  objective: NarrativeObjective;
   nextObjective: string;
 }
 
@@ -100,20 +103,20 @@ function actStatus(
   return 'available';
 }
 
-function objectiveFor(acts: readonly ActProgress[], archiveRestored: boolean, secretEligible: boolean): string {
-  if (secretEligible) return 'The last frame is ready. Watch it, or choose another ending.';
-  if (archiveRestored) return 'Choose how the club ends: release the memories or stay in the tape.';
+function objectiveFor(acts: readonly ActProgress[], archiveRestored: boolean, secretEligible: boolean): NarrativeObjective {
+  if (secretEligible) return { kind: 'secret-ending-ready' };
+  if (archiveRestored) return { kind: 'choose-ending' };
   const current = acts.find((entry) => entry.status !== 'completed');
-  if (!current) return 'Restore Archive 09 at the CRT.';
+  if (!current) return { kind: 'restore-archive' };
   switch (current.status) {
     case 'available':
-      return `Find the tape "${current.title}".`;
+      return { kind: 'find-tape', tapeId: current.tapeId };
     case 'tape-collected':
-      return `Play "${current.title}" and pause when the picture betrays itself.`;
+      return { kind: 'play-tape', tapeId: current.tapeId };
     case 'clue-found':
-      return `Play ${current.gameName} at the arcade.`;
+      return { kind: 'play-game', tapeId: current.tapeId, gameName: current.gameName };
     default:
-      return 'Finish the previous memory first.';
+      return { kind: 'locked' };
   }
 }
 
@@ -152,6 +155,7 @@ export function evaluateNarrativeState(gameState: GameState, extraProgress: Extr
   const unlockedEndings: EndingId[] = archiveRestored ? ['bittersweet-dawn', 'forever-1998'] : [];
   if (eligible) unlockedEndings.push('archivists-truth');
 
+  const objective = objectiveFor(acts, archiveRestored, eligible);
   return {
     acts,
     fragments,
@@ -159,7 +163,8 @@ export function evaluateNarrativeState(gameState: GameState, extraProgress: Extr
     archiveRestored,
     unlockedEndings,
     secrets: { found: secretsFound, total: ACTS.length, perfectTracking, eligible },
-    nextObjective: objectiveFor(acts, archiveRestored, eligible),
+    objective,
+    nextObjective: describeObjective(objective, 'en'),
   };
 }
 
@@ -190,6 +195,7 @@ export function narrativeFor(gameState: GameState): ClubAtmosphere {
     distortion: Math.round((points / maxPoints) * 100) / 100,
     headline: STAGE_COPY[stage].headline,
     whispers: STAGE_COPY[stage].whispers,
+    objective: narrative.objective,
     nextObjective: narrative.nextObjective,
   };
 }
