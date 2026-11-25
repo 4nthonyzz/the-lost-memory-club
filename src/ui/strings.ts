@@ -19,6 +19,7 @@ export interface ShellStrings {
     arcadeLogged: string;
     demoArcadeWon: string;
     tapeCollected: string;
+    clueConfirmed: string;
     archiveLoaded: string;
     endingLocked: string;
     reset: string;
@@ -39,6 +40,7 @@ export interface ShellStrings {
     eyebrow: string;
     title: string;
     collect: string;
+    inspect: string;
     load: string;
     loaded: string;
     archiveLocked: string;
@@ -141,9 +143,10 @@ const EN: UiStrings = {
       crtConnected: 'CRT STATION CONNECTED',
       arcadeConnected: 'ARCADE STATION CONNECTED',
       arcadeLocked: 'ARCADE LOCKED \u00b7 Recover the VHS clue first.',
-      arcadeLogged: 'Arcade start logged. Gameplay is still in development.',
+      arcadeLogged: 'Arcade initialization event logged. Gameplay is pending.',
       demoArcadeWon: 'Demo: arcade victory recorded.',
       tapeCollected: 'Tape collected. Load it in the deck and play it.',
+      clueConfirmed: 'CLUE CONFIRMED \u00b7 The arcade is now unlocked.',
       archiveLoaded: 'Archive 09 restored. Its tape is now in the deck.',
       endingLocked: 'Restore Archive 09 before opening the ending.',
       reset: 'Development save reset.',
@@ -163,13 +166,14 @@ const EN: UiStrings = {
     deck: {
       eyebrow: 'ARCHIVE / MODULE 03',
       title: 'VHS deck',
-      collect: 'Collect tape',
+      collect: 'Collect prototype tape',
+      inspect: 'Inspect label clue',
       load: 'Load tape',
       loaded: 'Loaded',
       archiveLocked: 'Locked: win the arcade to restore Archive 09.',
       archiveOpen: 'Load Archive 09',
       emptyDeck: 'Load a tape to start playback.',
-      close: 'Close deck',
+      close: 'Close',
     },
     next: {
       eyebrow: 'WHAT COMES NEXT?',
@@ -232,6 +236,7 @@ const ES: UiStrings = {
       arcadeLogged: 'Inicio de la recreativa registrado. El juego a\u00fan est\u00e1 en desarrollo.',
       demoArcadeWon: 'Demo: victoria en la recreativa registrada.',
       tapeCollected: 'Cinta recogida. C\u00e1rgala en la platina y rep\u00f3drala.',
+      clueConfirmed: 'PISTA CONFIRMADA \u00b7 La recreativa est\u00e1 desbloqueada.',
       archiveLoaded: 'Archivo 09 restaurado. Su cinta ya est\u00e1 en la platina.',
       endingLocked: 'Restaura el Archivo 09 antes de abrir el final.',
       reset: 'Guardado de desarrollo reiniciado.',
@@ -252,12 +257,13 @@ const ES: UiStrings = {
       eyebrow: 'ARCHIVO / M\u00d3DULO 03',
       title: 'Platina VHS',
       collect: 'Recoger cinta',
+      inspect: 'Inspeccionar pista de la etiqueta',
       load: 'Cargar cinta',
       loaded: 'Cargada',
       archiveLocked: 'Bloqueado: gana la recreativa para restaurar el Archivo 09.',
       archiveOpen: 'Cargar Archivo 09',
       emptyDeck: 'Carga una cinta para empezar la reproducci\u00f3n.',
-      close: 'Cerrar platina',
+      close: 'Cerrar',
     },
     next: {
       eyebrow: '\u00bfQU\u00c9 SIGUE?',
