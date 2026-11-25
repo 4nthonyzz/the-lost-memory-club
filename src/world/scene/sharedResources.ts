@@ -178,23 +178,65 @@ export const materials = {
    * swapped per mesh, so one lamp's state never touches the other (`bulb` above is the lit bulb core).
    */
   brass: lambert('#a8802f'),
-  lampGreenShade: lambert('#1f7a4e'),
+  /** 24.1 banker shade: OFF is dark green glass with no emission; ON adds emissive #22c55e at 0.75. Separate per lamp, swapped per mesh. */
+  lampGreenShade: new MeshLambertMaterial({ color: '#16503a', emissive: '#22c55e', emissiveIntensity: 0 }),
+  lampGreenShadeOn: new MeshLambertMaterial({ color: '#1f7a4e', emissive: '#22c55e', emissiveIntensity: 0.75 }),
   /** 23.2: lighter cream spine band on the three arcade manuals (flat colour, no texture). */
   manualBand: lambert('#eadfb8'),
-  lampCreamShade: new MeshLambertMaterial({ color: '#efe3c4', side: DoubleSide }),
+  /** 24.1 table-lamp shade: OFF is a dull grey-cream with no emission; ON adds emissive #ffd27d at 0.85. */
+  lampCreamShade: new MeshLambertMaterial({ color: '#a89f8a', emissive: '#ffd27d', emissiveIntensity: 0, side: DoubleSide }),
+  lampCreamShadeOn: new MeshLambertMaterial({ color: '#efe3c4', emissive: '#ffd27d', emissiveIntensity: 0.85, side: DoubleSide }),
   lampBulbOff: lambert('#46443f'),
   lampInnerOn: new MeshBasicMaterial({ color: '#ffc272', side: DoubleSide }),
   lampInnerOff: new MeshLambertMaterial({ color: '#2a2824', side: DoubleSide }),
-  /** Light pool decal on the desk top: faint additive lampGlow, pulled toward the camera by a polygon offset. */
+  /** Light pool decal on the desk top (table lamp, warm tungsten amber): additive lampGlow, pulled toward the camera by a polygon offset. */
   lampPool: new MeshBasicMaterial({
-    color: '#ffb060',
+    color: '#ffa63c',
     transparent: true,
     opacity: 0.32,
     blending: AdditiveBlending,
     depthWrite: false,
     polygonOffset: true,
-    polygonOffsetFactor: -1,
-    polygonOffsetUnits: -1,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  }),
+  /** Same decal for the banker's lamp, emerald-gold. A separate material so the two lamps never share state. */
+  lampPoolBanker: new MeshBasicMaterial({
+    color: '#a6d65a',
+    transparent: true,
+    opacity: 0.32,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  }),
+  /** Translucent volumetric light cones from each shade rim to the desk top (24.1): additive, no depth write, both faces. */
+  lampConeBanker: new MeshBasicMaterial({
+    color: '#8fd65a',
+    transparent: true,
+    opacity: 0.14,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    side: DoubleSide,
+  }),
+  lampConeTable: new MeshBasicMaterial({
+    color: '#ffa63c',
+    transparent: true,
+    opacity: 0.14,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    side: DoubleSide,
+  }),
+  /** Faint cool-white additive bloom strip under each ceiling fluorescent tube (24.1), lampGlow map when a canvas exists. */
+  ceilingBloom: new MeshBasicMaterial({
+    color: '#cfe4ff',
+    transparent: true,
+    opacity: 0.16,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    side: DoubleSide,
+    fog: false,
   }),
   /** Swapped in for the glow sprite and the pool when a lamp is off: never drawn. */
   lampGlowOff: new MeshBasicMaterial({ transparent: true, opacity: 0, visible: false, depthWrite: false }),
@@ -496,7 +538,9 @@ const TEXTURE_BINDINGS: readonly TextureBinding[] = [
   { material: 'paper', texture: 'deskDetail', color: '#ffffff', fallbackColor: '#e6dfc6' },
   { material: 'notebookCover', texture: 'deskDetail', color: '#6a7888', fallbackColor: '#4a5866' },
   { material: 'lampHalo', texture: 'lampGlow', color: '#ffffff' },
-  { material: 'lampPool', texture: 'lampGlow', color: '#ffb060' },
+  { material: 'lampPool', texture: 'lampGlow', color: '#ffa63c' },
+  { material: 'lampPoolBanker', texture: 'lampGlow', color: '#a6d65a' },
+  { material: 'ceilingBloom', texture: 'lampGlow', color: '#cfe4ff' },
   /** Slightly dimmed multiplier: the reference card stays below the main CRT's brightness. */
   { material: 'smpteScreen', texture: 'smpteBars', color: '#b8b8b8' },
   { material: 'timecode', texture: 'timecode', color: '#ffffff' },

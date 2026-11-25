@@ -13,9 +13,15 @@ import {
   cableLoopsParts,
   conduitParts,
   cornerPostParts,
+  CEILING_BLOOM_DROP,
   DESK_LAMPS,
+  FIXTURE_LENGTH,
   LAMP_POOL_LIFT,
+  LAMP_POOL_RADIUS_WANTED,
+  ceilingFixtureParts,
   deskLampParts,
+  fixtureCentres,
+  lampPoolPlacement,
   mainRoomBox,
   ventilationParts,
   wallClockParts,
@@ -680,6 +686,18 @@ describe('arcade manuals on the west bookcase (task 23.2)', () => {
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(8 * 1048576)
     console.info(`[23.2] triangles ${report.totalTriangles} (delta from 23.1 ${report.totalTriangles - AFTER_23_1}), texture memory ${(report.textureMemoryBytes / 1048576).toFixed(3)} MiB`)
   })
+
+  it('keeps the Task 24 budgets after 24.2: triangles < 20,000 and delta <= +100 from 19,042, 4 lights, texture memory <= 8 MB', () => {
+    const report = sceneDetailReport()
+    const TASK_24_BASELINE = 19042 // before task 24.1
+    expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
+    expect(report.totalTriangles - TASK_24_BASELINE).toBeLessThanOrEqual(100)
+    expect(M3_LIGHT_COUNT).toBe(4)
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(8 * 1048576)
+    // Eight interactables, none of them solid or adding geometry (the notes reuse existing parts).
+    expect(INTERACTABLE_DEFS).toHaveLength(8)
+    console.info(`[24.2] triangles ${report.totalTriangles} (delta from 19042 ${report.totalTriangles - TASK_24_BASELINE}), texture memory ${(report.textureMemoryBytes / 1048576).toFixed(3)} MiB`)
+  })
 })
 
 describe('disposeSharedResources', () => {
@@ -973,7 +991,7 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
       const def = DESK_LAMPS.find((l) => l.id === id)!
       return deskLampParts(prop(id).box, def.kind, on, top)
     }
-    const body = (parts: Part[]) => parts.filter((p) => p.lampRole !== 'sprite' && p.lampRole !== 'pool')
+    const body = (parts: Part[]) => parts.filter((p) => p.lampRole !== 'sprite' && p.lampRole !== 'pool' && p.lampRole !== 'cone')
     const overlaps = (a: ReturnType<typeof extent>, b: ReturnType<typeof extent>) =>
       a.minX < b.maxX && a.maxX > b.minX && a.minY < b.maxY && a.maxY > b.minY && a.minZ < b.maxZ && a.maxZ > b.minZ
 
@@ -981,14 +999,14 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
       expect(DESK_LAMPS.map((l) => l.id)).toEqual(['desk-lamp-left', 'desk-lamp-right'])
       const left = lampParts('desk-lamp-left', true)
       const right = lampParts('desk-lamp-right', true)
-      expect(left.some((p) => p.mat === 'lampGreenShade')).toBe(true)
-      expect(right.some((p) => p.mat === 'lampCreamShade' && p.geo === 'cone')).toBe(true)
-      expect(left.some((p) => p.mat === 'lampCreamShade')).toBe(false)
-      expect(right.some((p) => p.mat === 'lampGreenShade')).toBe(false)
+      expect(left.some((p) => p.mat === 'lampGreenShadeOn')).toBe(true)
+      expect(right.some((p) => p.mat === 'lampCreamShadeOn' && p.geo === 'cone')).toBe(true)
+      expect(left.some((p) => p.mat === 'lampCreamShadeOn' || p.mat === 'lampCreamShade')).toBe(false)
+      expect(right.some((p) => p.mat === 'lampGreenShadeOn' || p.mat === 'lampGreenShade')).toBe(false)
       expect(materials.lampGreenShade.color.getHexString()).not.toBe(materials.lampCreamShade.color.getHexString())
       expect(prop('desk-lamp-left').box.maxX).toBeLessThan(prop('desk-lamp-right').box.minX)
       for (const parts of [left, right]) {
-        for (const role of ['bulb', 'inner', 'sprite', 'pool'] as const) expect(parts.filter((p) => p.lampRole === role), role).toHaveLength(1)
+        for (const role of ['bulb', 'inner', 'sprite', 'pool', 'cone'] as const) expect(parts.filter((p) => p.lampRole === role), role).toHaveLength(1)
         expect(parts.some((p) => p.mat === 'brass')).toBe(true)
       }
     })
@@ -998,8 +1016,9 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
         const on = lampParts(id, true)
         const off = lampParts(id, false)
         const mat = (parts: Part[], role: string) => parts.find((p) => p.lampRole === role)!.mat
-        expect([mat(on, 'bulb'), mat(on, 'inner'), mat(on, 'sprite'), mat(on, 'pool')]).toEqual(['bulb', 'lampInnerOn', 'lampHalo', 'lampPool'])
-        expect([mat(off, 'bulb'), mat(off, 'inner'), mat(off, 'sprite'), mat(off, 'pool')]).toEqual(['lampBulbOff', 'lampInnerOff', 'lampGlowOff', 'lampGlowOff'])
+        expect([mat(on, 'bulb'), mat(on, 'inner'), mat(on, 'sprite')]).toEqual(['bulb', 'lampInnerOn', 'lampHalo'])
+        expect([mat(on, 'pool'), mat(on, 'cone')]).toEqual(id === 'desk-lamp-left' ? ['lampPoolBanker', 'lampConeBanker'] : ['lampPool', 'lampConeTable'])
+        expect([mat(off, 'bulb'), mat(off, 'inner'), mat(off, 'sprite'), mat(off, 'pool'), mat(off, 'cone')]).toEqual(['lampBulbOff', 'lampInnerOff', 'lampGlowOff', 'lampGlowOff', 'lampGlowOff'])
         // Same geometry and placement in both states: only the materials differ.
         expect(off.map((p) => [p.geo, p.pos, p.scale])).toEqual(on.map((p) => [p.geo, p.pos, p.scale]))
       }
@@ -1009,7 +1028,7 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
       expect(materials.lampInnerOff.type).toBe('MeshLambertMaterial')
       expect(materials.lampGlowOff.visible).toBe(false)
       // Lit sprite and pool are additive, transparent and do not write depth.
-      for (const m of [materials.lampHalo, materials.lampPool]) {
+      for (const m of [materials.lampHalo, materials.lampPool, materials.lampPoolBanker, materials.lampConeBanker, materials.lampConeTable]) {
         expect(m.type).toBe('MeshBasicMaterial')
         expect(m.transparent).toBe(true)
         expect(m.depthWrite).toBe(false)
@@ -1094,6 +1113,130 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
       expect(M3_LIGHT_COUNT).toBe(4)
       expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.55 * 1048576)
       expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
+    })
+
+    it('task 24.1: each lamp has an additive open light cone from the shade rim to the desk top', () => {
+      for (const { id } of DESK_LAMPS) {
+        const cone = lampParts(id, true).find((p) => p.lampRole === 'cone')!
+        expect(cone.geo).toBe('cone')
+        expect(GEOMETRY_TRIANGLES[cone.geo]).toBe(24)
+        const e = extent(cone)
+        expect(e.minY).toBeGreaterThan(top)
+        expect(e.minY).toBeLessThan(top + 0.01)
+        expect(e.maxY).toBeGreaterThan(top + 0.2)
+        expect(e.maxY).toBeLessThan(top + 0.26)
+        // The cone stays inside the desk top.
+        expect(e.minX).toBeGreaterThanOrEqual(desk.box.minX)
+        expect(e.maxX).toBeLessThanOrEqual(desk.box.maxX)
+        expect(e.minZ).toBeGreaterThanOrEqual(desk.box.minZ)
+        expect(e.maxZ).toBeLessThanOrEqual(desk.box.maxZ)
+      }
+      for (const m of [materials.lampConeBanker, materials.lampConeTable]) {
+        expect(m.type).toBe('MeshBasicMaterial')
+        expect(m.blending).toBe(2) // AdditiveBlending
+        expect(m.depthWrite).toBe(false)
+        expect(m.transparent).toBe(true)
+        expect(m.side).toBe(2) // DoubleSide
+        expect(m.opacity).toBeCloseTo(0.14, 5)
+      }
+      expect(materials.lampConeBanker.color.getHexString()).not.toBe(materials.lampConeTable.color.getHexString())
+    })
+
+    it('task 24.1: the pool is additive with a negative polygon offset, 2 mm above the desk and fully inside the desk top', () => {
+      for (const m of [materials.lampPool, materials.lampPoolBanker]) {
+        expect(m.blending).toBe(2)
+        expect(m.depthWrite).toBe(false)
+        expect(m.polygonOffset).toBe(true)
+        expect(m.polygonOffsetFactor).toBeLessThan(0)
+        expect(m.polygonOffsetUnits).toBeLessThan(0)
+      }
+      expect(materials.lampPool.color.getHexString()).not.toBe(materials.lampPoolBanker.color.getHexString())
+      for (const { id } of DESK_LAMPS) {
+        const pool = lampParts(id, true).find((p) => p.lampRole === 'pool')!
+        expect(pool.pos[1] - top).toBeCloseTo(0.002, 9)
+        const half = pool.scale[0] / 2
+        expect(pool.pos[0] - half).toBeGreaterThanOrEqual(desk.box.minX - 1e-9)
+        expect(pool.pos[0] + half).toBeLessThanOrEqual(desk.box.maxX + 1e-9)
+        expect(pool.pos[2] - half).toBeGreaterThanOrEqual(desk.box.minZ - 1e-9)
+        expect(pool.pos[2] + half).toBeLessThanOrEqual(desk.box.maxZ + 1e-9)
+        // The wanted 0.85 m radius is capped by the 0.8 m desk depth to 0.4 m, bigger than the old 0.18 m pool.
+        expect(half).toBeGreaterThan(0.36)
+        expect(half).toBeLessThanOrEqual(LAMP_POOL_RADIUS_WANTED)
+      }
+      const fit = lampPoolPlacement(desk.box, -1.31, 1.45)
+      expect(fit.radius).toBeCloseTo((desk.box.maxZ - desk.box.minZ) / 2, 9)
+    })
+
+    it('task 24.1: ON shades are emissive with the exact colours and intensities, OFF shades are dark with emissiveIntensity 0', () => {
+      expect(materials.lampGreenShadeOn.emissive.getHexString()).toBe('22c55e')
+      expect(materials.lampGreenShadeOn.emissiveIntensity).toBe(0.75)
+      expect(materials.lampCreamShadeOn.emissive.getHexString()).toBe('ffd27d')
+      expect(materials.lampCreamShadeOn.emissiveIntensity).toBe(0.85)
+      expect(materials.lampGreenShade.emissiveIntensity).toBe(0)
+      expect(materials.lampCreamShade.emissiveIntensity).toBe(0)
+      for (const m of [materials.lampGreenShadeOn, materials.lampCreamShadeOn, materials.lampGreenShade, materials.lampCreamShade]) expect(m.type).toBe('MeshLambertMaterial')
+      // Lit and unlit pairs are distinct objects per lamp.
+      expect(materials.lampGreenShadeOn).not.toBe(materials.lampGreenShade)
+      expect(materials.lampCreamShadeOn).not.toBe(materials.lampCreamShade)
+      const lum = (m: { color: { r: number; g: number; b: number } }) => m.color.r + m.color.g + m.color.b
+      expect(lum(materials.lampGreenShade)).toBeLessThan(lum(materials.lampGreenShadeOn))
+      expect(lum(materials.lampCreamShade)).toBeLessThan(lum(materials.lampCreamShadeOn))
+      const shadeMats = (id: string, on: boolean) => new Set(lampParts(id, on).filter((p) => p.lampRole === 'shade').map((p) => p.mat))
+      expect([...shadeMats('desk-lamp-left', true)]).toEqual(['lampGreenShadeOn'])
+      expect([...shadeMats('desk-lamp-right', true)]).toEqual(['lampCreamShadeOn'])
+      expect([...shadeMats('desk-lamp-left', false)]).toEqual(['lampGreenShade'])
+      expect([...shadeMats('desk-lamp-right', false)]).toEqual(['lampCreamShade'])
+      // OFF: cone, pool and sprite use the never-drawn material.
+      for (const id of DESK_LAMPS.map((l) => l.id)) {
+        for (const role of ['cone', 'pool', 'sprite'] as const) {
+          const mat = lampParts(id, false).find((p) => p.lampRole === role)!.mat
+          expect(materials[mat].visible, `${id} ${role}`).toBe(false)
+        }
+      }
+    })
+
+    it('task 24.1: every ceiling fixture has a 2-triangle additive bloom strip just below its tube', () => {
+      const centres = fixtureCentres()
+      expect(centres.length).toBeGreaterThanOrEqual(2)
+      for (const [x, z] of centres) {
+        const parts = ceilingFixtureParts(x, z)
+        const bloom = parts.filter((p) => p.mat === 'ceilingBloom')
+        expect(bloom).toHaveLength(1)
+        expect(GEOMETRY_TRIANGLES[bloom[0].geo]).toBe(2)
+        const tube = parts.find((p) => p.mat === 'fluorescent')!
+        expect(bloom[0].pos[1]).toBeLessThan(tube.pos[1] - tube.scale[1] / 2)
+        expect(bloom[0].pos[1]).toBeCloseTo(ROOM.height - CEILING_BLOOM_DROP, 9)
+        expect(bloom[0].rot).toEqual([Math.PI / 2, 0, 0])
+        expect(bloom[0].scale[0]).toBeGreaterThan(FIXTURE_LENGTH)
+      }
+      const m = materials.ceilingBloom
+      expect(m.blending).toBe(2)
+      expect(m.depthWrite).toBe(false)
+      expect(m.transparent).toBe(true)
+      expect(m.opacity).toBeLessThanOrEqual(0.25)
+    })
+
+    it('task 24.1: budgets hold (triangles delta from 19,042 at most +70, 4 lights, same texture count and memory) and textures dispose once', () => {
+      const report = sceneDetailReport()
+      expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
+      expect(report.totalTriangles - 19042).toBeLessThanOrEqual(70)
+      expect(report.totalTriangles - 19042).toBe(58)
+      expect(report.textureCount).toBe(30)
+      expect(report.textureMemoryBytes / 1048576).toBeCloseTo(7.521, 2)
+      expect(report.textureMemoryBytes).toBeLessThanOrEqual(8 * 1048576)
+      expect(M3_LIGHT_COUNT).toBe(4)
+      console.info(
+        `[24.1] triangles ${report.totalTriangles} (delta ${report.totalTriangles - 19042}), draw-call estimate ${report.totalDrawCalls}, ` +
+          `texture memory ${(report.textureMemoryBytes / 1048576).toFixed(3)} MiB`,
+      )
+      setCanvasFactory(() => fakeCanvas())
+      ensureSharedTextures()
+      const spies = TEXTURE_IDS.map((id) => vi.spyOn(getSharedTexture(id)!, 'dispose'))
+      expect(materials.lampPoolBanker.map).toBe(getSharedTexture('lampGlow'))
+      expect(materials.ceilingBloom.map).toBe(getSharedTexture('lampGlow'))
+      disposeSharedResources()
+      disposeSharedResources()
+      for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
     })
 
     it('disposes lampGlow exactly once and keeps the pool and sprite bound to it', () => {
@@ -1890,7 +2033,8 @@ describe('task 22.1: media island, armchair and VHS shells', () => {
     // 19,128 before task 22.2; part A changes it by -72 net (crate label panels +24, cabinet ink lines -96), part B by +116 (notebook page block +12, mug rim +32, door detail +72).
     // Task 23.1 replaced the two old desk lamps (470 triangles) with two new ones (352): -118.
     // Task 23.2 replaced 7 ordinary books on shelf-b (-84) with 3 manuals and 3 spine bands (+72): -12.
-    expect(report.totalTriangles).toBe(19128 - 72 + 116 - 118 - 12)
+    // Task 24.1: two lamp cones (+48) and five ceiling bloom strips (+10) = +58.
+    expect(report.totalTriangles).toBe(19128 - 72 + 116 - 118 - 12 + 58)
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
   })
 

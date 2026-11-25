@@ -13,13 +13,13 @@ Every feature below carries one of these labels.
 | **not verified** | Implemented, but no test or recorded check covers the behavior. |
 | **planned/prototype** | Not implemented, or implemented only as a stand-in. |
 
-Milestone M6, the polish pass and the spatial and visual refinement pass (media island, north-wall filing cabinets and bulletin board, wood bookcases with dense books, textured walls and rug, three arcade cabinets, ARCADE sign, dressing, re-centred console, SMPTE monitor, cables) have **no recorded browser run**. Their layout and data are verified by automated tests only; how they look and play is **not verified visually**. The same holds for tasks 21 and 22 (couch fix and fabric, CRT casing and glass, VCR deck face, armchair, VHS shell textures, metal filing cabinets, cardboard crates, desk detail, doorway trim): **not verified visually**. Task 23 (two desk lamps with ON/OFF visuals, the 128x128 `lampGlow`, the interactable lamps and manuals, the world message overlay, the three manual books on `shelf-b`) is also **not verified visually**; its logic is **verified by automated test** only.
+Milestone M6, the polish pass and the spatial and visual refinement pass (media island, north-wall filing cabinets and bulletin board, wood bookcases with dense books, textured walls and rug, three arcade cabinets, ARCADE sign, dressing, re-centred console, SMPTE monitor, cables) have **no recorded browser run**. Their layout and data are verified by automated tests only; how they look and play is **not verified visually**. The same holds for tasks 21 and 22 (couch fix and fabric, CRT casing and glass, VCR deck face, armchair, VHS shell textures, metal filing cabinets, cardboard crates, desk detail, doorway trim): **not verified visually**. Task 23 (two desk lamps with ON/OFF visuals, the 128x128 `lampGlow`, the interactable lamps and manuals, the lamp status pill, the three manual books on `shelf-b`) and Task 24 (lamp cones and desk pools, emissive shades, room light coupling by lamps ON, ceiling bloom strips, the Archive Document Card, the three new readable props and the notes counter) are also **not verified visually**; their logic and computed data are **verified by automated test** only.
 
 ## Purpose and boundaries
 
-- The world renders the room, moves the player, finds the targeted station or world-local prop, and calls `onInspect(stationId)` for stations only. Props (desk lamps, arcade manuals) are handled inside the world and never reach `onInspect`.
+- The world renders the room, moves the player, finds the targeted station or world-local prop, and calls `onInspect(stationId)` for stations only. Props (desk lamps, arcade manuals, notebook, cork board, poster) are handled inside the world and never reach `onInspect`.
 - It never reads `GameState` or lock state. It does not know whether the arcade is locked.
-- It has no storage: no LocalStorage, no cookies, no backend. Lamp state is session-only React state in `WorldScene` (see "Interactable props").
+- It has no storage: no LocalStorage, no cookies, no backend. Lamp state, the open card and the notes counter are session-only React state in `WorldScene` (see "Interactable props").
 - It imports nothing from `src/arcade/` or `src/memories/`. From `src/core/` it imports only the `StationId` type.
 - It never requests pointer lock by itself. Lock is requested only from a user gesture.
 - Status: **verified by automated test** (`src/world/boundary.test.ts`, 10 tests, checks the import boundary).
@@ -29,13 +29,13 @@ Milestone M6, the polish pass and the spatial and visual refinement pass (media 
 ```
 src/world/
   WorldScene.tsx            public component, WebGL fallback, error boundary, context-loss watch
-  worldTypes.ts             Aabb, Vec2, StationDef, Facing, PropInteractableId, InteractableDef, InteractionTarget
+  worldTypes.ts             Aabb, Vec2, StationDef, Facing, PropInteractableId, ReadableId, InteractableDef, InteractionTarget
   assets/                   GLB pipeline: assetManifest.ts (empty), AssetModel.tsx, loadGlb.ts
   controller/               usePlayerRig, useWorldInput, usePointerLock, useReducedMotion, useFrameSampler (dev only)
   layout/roomLayout.ts      single source of truth: bounds, walls, doors, props, colliders, station anchors
-  logic/                    pure rules: movement, collision, look, targeting, inputMode, inputState, propState, palette, frameStats, playerStep, constants
-  overlay/                  DOM overlays and world.css: prompt, WorldMessage, crosshair, capture overlay, hints, panel notice, WebGL fallback
-  scene/                    Room, Props, Stations, Lighting, Effects, MemoryShiftDriver, PartMeshes, WorldCanvas,
+  logic/                    pure rules: movement, collision, look, targeting, inputMode, inputState, propState, archiveDocuments, palette, frameStats, playerStep, constants
+  overlay/                  DOM overlays and world.css: prompt, WorldMessage (lamp pill), WorldInspectorCard, NotesCounter, crosshair, capture overlay, hints, panel notice, WebGL fallback
+  scene/                    Room, Props, Stations, Lighting, Effects, MemoryShiftDriver, lampCoupling, PartMeshes, WorldCanvas,
                             modelDetail.ts, proceduralTextures.ts, sharedResources.ts, memoryShift.ts, effectsTiming.ts, assetPlacement.ts
   *.test.ts (and tests beside each module)
 tools/blender/              generate_assets.py, count_triangles.py, README.md (never run)
@@ -48,8 +48,8 @@ tools/blender/              generate_assets.py, count_triangles.py, README.md (n
 | W A S D or arrow keys | Move |
 | Mouse (after pointer lock) | Look |
 | I J K L | Keyboard look (works without pointer lock) |
-| E | Interact with the targeted station, desk lamp or arcade manual |
-| Esc | Releases the mouse (browser pointer-lock exit) |
+| E | Interact with the targeted station, desk lamp or readable prop; closes an open Archive Document Card |
+| Esc | Releases the mouse (browser pointer-lock exit) and closes an open Archive Document Card |
 | Click the view, or Enter / E on the capture overlay | Capture the mouse (a user gesture requests pointer lock) |
 
 Status: input state machine, key filtering and click-only lock requests are **verified by automated test** (`logic/inputMode*.test.ts`, `logic/inputState.test.ts`, `logic/movement.test.ts`, `logic/look.test.ts`, `WorldScene.test.ts`). Real pointer-lock behavior in browsers: **verified manually by the project owner (M1-M5 per the owner's report; no recorded log)**. Alt-tab, tab-switch and Esc-while-locked rows P1 to P6 in `manual-test-log.md` are `not run`.
@@ -81,32 +81,61 @@ interface WorldSceneProps {
 - `App.tsx` owns the HUD status line (`role="status"`, bottom center). For a locked arcade it shows `ARCADE LOCKED · Recover the VHS clue first.` The world only says, in its `aria-label`, that station messages appear in the status line at the bottom of the screen (**verified by automated test**).
 - While a station panel is open, the world shows a neutral panel notice.
 
-## Interactable props (task 23.2, not verified visually)
+## Interactable props, lamp lighting and the Archive Document Card (tasks 23 and 24, not verified visually)
 
-Five world-local props can be targeted and used with E: `desk-lamp-left`, `desk-lamp-right`, `manual-snake`, `manual-maze` and `manual-frequency`. Their ids form the world-only type `PropInteractableId` (`worldTypes.ts`). They are not `StationId` values, so `src/core/contracts.ts` is unchanged.
+Eight world-local props can be targeted and used with E: the two desk lamps (`desk-lamp-left`, `desk-lamp-right`), the three arcade manuals (`manual-snake`, `manual-maze`, `manual-frequency`) and three readable notes (`desk-notebook`, `cork-board`, `poster-shift`). Their ids form the world-only type `PropInteractableId` (`worldTypes.ts`; `ReadableId` is the six non-lamp ids). They are not `StationId` values, so `src/core/contracts.ts` is unchanged (`StationId` is still `'vhs' | 'arcade'`).
 
-- **Targeting**: `selectInteractionTargetAll` (`logic/targeting.ts`) combines both kinds. Stations use the existing 2.0 m range, props use 2.2 m (`PROP_INTERACTION_RANGE`). Both use the same view cone and the same line-of-sight rule (a target's own collider is ignored for its own test). The nearest eligible target wins; on equal distance stations come first.
-- **Effect**: E on a prop produces a `PROP_INTERACT` effect (`logic/inputMode.ts`). It never calls `onInspect`, never releases pointer lock, never clears input and never suspends the world. E on a station is unchanged (`CALL_ON_INSPECT`, release lock, clear input).
-- **Lamp state is session-only.** Both lamps start ON. State lives in React state in `WorldScene` (`logic/propState.ts`). It is not stored (no LocalStorage, no cookie), is not part of `GameState` and resets on reload. Each lamp toggles only itself.
+- **Targeting**: `selectInteractionTargetAll` (`logic/targeting.ts`) combines both kinds. Stations use the existing 2.0 m range, props use 2.2 m (`PROP_INTERACTION_RANGE`). Both use the same view cone and the same line-of-sight rule (a target's own collider is ignored for its own test). The nearest eligible target wins; on equal distance stations come first. The poster is the Memory_Shift overlay poster and has `requiresShift: true`, so it is targetable only while `memoryShifted` is true.
+- **Effect**: E on a prop produces a `PROP_INTERACT` effect (`logic/inputMode.ts`). It never calls `onInspect`, never releases pointer lock, never clears input and never suspends the world. `onInspect` is called only from the `CALL_ON_INSPECT` branch of `controller/useWorldInput.ts`, which checks `target.type === 'station'`. E on a station is unchanged (`CALL_ON_INSPECT`, release lock, clear input); if a card is open, `WorldScene.tsx` closes it first and then calls `onInspect` once.
+- **Session-only state.** Both lamps start ON. Lamp state, the open card and the set of read notes live in React state in `WorldScene` (`logic/propState.ts`). Nothing is stored (no LocalStorage, no cookie), none of it is part of `GameState`, and it resets on reload. Each lamp toggles only itself.
 - **Prompts** (fixed text; the lamp prompt follows the lamp state):
   - `Press E to turn off desk lamp` (lamp is ON) / `Press E to turn on desk lamp` (lamp is OFF)
   - `Press E to read: SNAKE.EXE Manual`
   - `Press E to read: LAST EXIT Manual`
   - `Press E to read: DEAD FREQUENCY Manual`
-- **Messages** (exact text):
-  - Lamp: `Desk lamp turned off.` / `Desk lamp turned on.`
-  - `SNAKE.EXE — Guide a serpent of magnetic VHS tape, collect tape fragments, and evade the dark shadow serpent to uncover a secret code.`
-  - `LAST EXIT — Navigate a shifting dark labyrinth, recover three lost photograph fragments, and escape before the stalker catches you.`
-  - `DEAD FREQUENCY — Listen closely to haunted radio frequencies and repeat each audio sequence to decode hidden transmissions.`
-- **Where messages appear**: in the world-owned `WorldMessage` overlay (`overlay/WorldMessage.tsx`, `role="status"`, `aria-live="polite"`) inside the world wrapper, just above the interaction prompt. They do **not** appear in the App HUD status line: `WorldSceneProps` has no status callback and `src/App.tsx` is unchanged.
-- **Clearing**: a message clears when the current target is no longer the prop that produced it. There is no timer (`WorldMessage` has none).
-- **LAST EXIT and DEAD FREQUENCY manual texts describe gameplay that does not exist in `src/arcade/`.** They are in-world lore only. Only Snake exists in `src/arcade/`. This task did not check the SNAKE.EXE text against the Snake rules, so treat it as lore too.
-- Tests: `logic/targeting.test.ts` (`selectInteractionTargetAll`, 26 tests in the file), `logic/propState.test.ts` (5), `logic/inputMode.prop.test.ts` (12), `WorldScene.test.ts` (`WorldScene interactable props (task 23.2)`).
+  - `Press E to read: Shift Log Notebook`
+  - `Press E to examine: Investigation Pinboard`
+  - `Press E to inspect: 'The Signal Remembers' Poster`
+- **Lamp status pills.** A lamp press shows a short pill in the world-owned `WorldMessage` overlay (`overlay/WorldMessage.tsx`, `role="status"`, `aria-live="polite"`), just above the interaction prompt: `Banker's lamp switched ON` / `Banker's lamp switched OFF` and `Table lamp switched ON` / `Table lamp switched OFF`. The pill clears when the current target is no longer that lamp. There is no timer. It does not appear in the App HUD status line (`WorldSceneProps` has no status callback and `src/App.tsx` is unchanged). Manuals and notes no longer produce a message; they open a card.
+- **Archive Document Card (`overlay/WorldInspectorCard.tsx`, text in `logic/archiveDocuments.ts`).** E on a readable prop opens a non-modal paper card inside the world wrapper (`role="region"`, `aria-label` equal to the title, `aria-live="polite"`). It has no focus trap, no focus move and no pointer events, and it does not call `onInspect`, change the input mode or touch pointer lock. It closes on E (also with no target, even after the target was lost), on Esc (the key is not prevented, so the browser still releases pointer lock), when pointer lock is lost, when the player walks more than 2.6 m from the prop's anchor (`CARD_CLOSE_DISTANCE`), when a station opens, and when the world enters `inspecting`. E on a lamp while a card is open closes the card and does not toggle the lamp. Each card ends with the footer `Press E or move away to close`.
 
-Desk lamps (task 23.1): the left lamp is a green banker's lamp (`desk-lamp-left`), the right one a cream table lamp (`desk-lamp-right`). Each has a bulb, an inner shade glow, a camera-facing glow sprite and a light pool on the desk top. ON uses emissive materials. OFF swaps to dark materials and a never-drawn material for the sprite and pool. **No light was added**: both lamps are visual only, and the scene keeps 4 lights.
+  | Prop | Card tag | Card title |
+  | --- | --- | --- |
+  | `manual-snake` | ARCADE MANUAL // CABINET 01 | SNAKE.EXE Manual |
+  | `manual-maze` | ARCADE MANUAL // CABINET 02 | LAST EXIT Manual |
+  | `manual-frequency` | ARCADE MANUAL // CABINET 03 | DEAD FREQUENCY Manual |
+  | `desk-notebook` | TECHNICIAN LOG // NOV 1996 | Shift Log Notebook |
+  | `cork-board` | EVIDENCE BOARD // INCIDENT REPORT | Investigation Pinboard |
+  | `poster-shift` | ARCHIVE NOTICE // SIGNAL | The Signal Remembers |
+
+- **All card text is placeholder lore for review by the story owner (Developer 3).** It is original, English and ASCII, and names no real brand. The LAST EXIT and DEAD FREQUENCY cards carry the status line `Cabinet status: awaiting service`, because those games do not exist in `src/arcade/`. Only Snake exists there. The SNAKE.EXE text has not been checked against the Snake rules, so treat it as lore too.
+- **Notes counter (`overlay/NotesCounter.tsx`).** `NOTES READ: X / 6` in the bottom-right corner counts the unique readable props opened this session (`role="group"`, label `Notes read: X of 6`, not a live region). Re-reading a prop does not change it. It is hidden while a station panel is open (inspecting). Session-only, no storage.
+- **Poster decision.** No texture in the repository says "THE SIGNAL REMEMBERS". The Memory_Shift overlay poster (north wall, x -0.3, z -3.94) reads PLEASE REWIND / THE TAPE / REMEMBERS YOU, and it was used with the requested title "The Signal Remembers". It is invisible until the shift, so 6 / 6 needs `memoryShifted` to become true at least once.
+- **Known limitations.**
+  - On short windows (about 400 to 500 px tall) the card region is small and its overflow cannot be scrolled with the mouse (`pointer-events: none`).
+  - The poster becomes targetable when the flag flips, slightly before its fade completes (the 2 s Memory_Shift blend).
+  - Closing on pointer-lock loss is wired in `controller/useWorldInput.ts` (line 226) but is not testable in jsdom, which has no pointer lock. The 2.6 m auto-close runs in the per-frame player rig (`controller/usePlayerRig.ts:88-89`), which jsdom does not run; the pure function `shouldCloseCard` is unit-tested.
+- Tests: `logic/targeting.test.ts` (32 tests in the file; `selectInteractionTargetAll`, eight interactables, notes in the layout, the poster only while shifted), `logic/propState.test.ts` (11), `logic/archiveDocuments.test.ts` (5), `logic/inputMode.prop.test.ts` (17), `WorldScene.test.ts` (21; `WorldScene interactable props (task 23.2, 24.2)`).
+
+### Lamp lighting (task 24.1, computed from source and tests, not verified visually)
+
+- **Desk lamps.** The left lamp is a green banker's lamp (`desk-lamp-left`), the right one a cream table lamp (`desk-lamp-right`). Each has a bulb, an inner shade glow, a camera-facing glow sprite, an additive cone and an additive light pool. ON uses emissive materials; OFF swaps to dark materials and the never-drawn `lampGlowOff` for the sprite, cone and pool. **No light was added** (4 lights).
+- **Texture.** `lampGlow` was redrawn in place (still 128x128, same id): a warm-white core, a golden-amber falloff and a soft feather to alpha 0.
+- **Cones.** Additive volumetric cones from each shade rim to the desk top: 12-segment open cone (24 triangles each), opacity 0.14, `DoubleSide`, `depthWrite` false.
+- **Pools.** Additive desk pools (opacity 0.32, polygon offset), 2 mm above the desk top. **The requested 0.85 m radius was not possible on a 0.8 m deep desk.** The radius is capped to half the desk depth, so each pool is a 0.8 m decal (the 0.8 m desk depth) whose visible disc, 90 percent of it, is about 0.36 m. `lampPoolPlacement` keeps it inside the desk top.
+- **Emissive shades.** ON: banker shade `#22c55e` at 0.75, table shade `#ffd27d` at 0.85. OFF shades have emissive intensity 0.
+- **Room light coupling** (`scene/lampCoupling.ts`). The number of lamps ON scales the ambient and `west-light` intensities:
+
+  | Lamps ON | Ambient | `west-light` |
+  | --- | --- | --- |
+  | 2 | 1.00 | 1.00 |
+  | 1 | 0.95 | 0.88 |
+  | 0 | 0.90 | 0.75 |
+
+  The factors are applied in `applyShift` (`scene/memoryShift.ts`) after the Memory_Shift blend, from the authored base values every frame, so they do not accumulate. The ambient floor (0.35) is kept. `crt-light` (owned by the flicker) and `arcade-light` are untouched.
+- **Ceiling bloom.** Additive bloom strips (2 triangles each, opacity 0.16, cool white, `lampGlow` map) hang 8 cm below the ceiling under the five ceiling fixtures (there are five, not two).
 
 Arcade manuals (task 23.2): three colour-coded volumes stand on level 2 of the west bookcase `shelf-b` (y 1.117..1.397, spines at x -4.635, at z 1.4 / 1.8 / 2.2): emerald SNAKE.EXE, crimson LAST EXIT and amber DEAD FREQUENCY, each with a cream band. Seven ordinary books were removed from that row. Interaction anchors are at x -4.6 (the bookcase front face). They are not colliders.
-
 ## World layout
 
 Source of truth: `layout/roomLayout.ts` (**verified by automated test**: `layout/roomLayout.test.ts`, 32 tests, including grid-search reachability of every station and a cell in front of each cabinet through each door separately).
@@ -116,8 +145,8 @@ Source of truth: `layout/roomLayout.ts` (**verified by automated test**: `layout
 - VHS station (CRT television on a media console): the console covers x -0.9..0.9, z -2.1..-1.5 (north-centre zone), facing +z, with the `vhs` anchor at (0, -1.5) on the south face. The CRT is centred on the console. It is no longer on the north wall. The island keeps a 2.7 m front walkway to the reception desk, 1.9 m to the north wall and 1.3 m to the filing cabinets (computed from the layout, tested). Walkway tests: `keeps at least 1.2 m of walkway on all four sides of the island` and `leaves a 2.7 m unobstructed walkway between the console front and the reception desk`.
 - Reception desk: unchanged at x -1.5..1.5, z 1.2..2.0.
 - Woven floor rug under the island: x -1.6..1.6, z -2.5..-0.1 (visual only).
-- Reception desk lamps (task 23.1): `desk-lamp-left` (green banker's lamp) and `desk-lamp-right` (cream table lamp), non-solid props on the desk top. No light is attached to them.
-- Lights (4): ambient, `crt-light` at (0, 1.6, -0.6), a warm tungsten `west-light` at (-2.6, 2.3, 0.2) over the west bookcase and lounge zone (it replaces the former magenta light), and `arcade-light` at (7.4, 2.4, 0) with distance 6.
+- Reception desk lamps (task 23.1): `desk-lamp-left` (green banker's lamp) and `desk-lamp-right` (cream table lamp), non-solid props on the desk top. No light is attached to them. The desk notebook, the cork board (bulletin board) and the Memory_Shift overlay poster are readable props (anchors on the notebook, the bulletin board and the poster; see "Interactable props").
+- Lights (4): ambient, `crt-light` at (0, 1.6, -0.6), a warm tungsten `west-light` at (-2.6, 2.3, 0.2) over the west bookcase and lounge zone (it replaces the former magenta light), and `arcade-light` at (7.4, 2.4, 0) with distance 6. Since task 24.1 the ambient and `west-light` intensities are multiplied by a factor that depends on how many desk lamps are ON (see "Lamp lighting").
 - Console detail (render-only, no collider change): SMPTE colour-bar reference monitor, green 00:19:96 timecode window and metallic tape slot on the VCR, routed coaxial and power cables behind the console, and metric wood UVs.
 - North wall: two filing cabinets flanking a wall-mounted bulletin board.
 - **Three arcade cabinets** inside the Arcade_Area against its east wall (x 8.4..9.2, front faces at x = 8.4, facing -x toward both doorways). Each is a solid collider and a Station that calls `onInspect('arcade')`:
@@ -141,9 +170,11 @@ Visual appearance of the M6, polish-pass, refinement-pass and three-cabinet layo
 
 ## Procedural textures
 
-30 deterministic canvas textures (`scene/proceduralTextures.ts`, `scene/sharedResources.ts`): three cabinet attract screens (`attractSnake`, `attractMaze`, `attractFrequency`, 256x256), three cabinet marquees (`marqueeSnake`, `marqueeMaze`, `marqueeFrequency`, 256x64), sign face, three posters (two ordinary, one shifted), shifted plaque, floor, wood, dark wood, crate, grille, book spine atlas, wall panel (256x256), woven rug, cork board, lamp glow (`lampGlow`, 128x128 since task 23.1, see below), SMPTE colour bars and the timecode window, plus seven added in tasks 21 and 22. Task 21: `couchFabric` (256x256 woven upholstery, metric fabric UVs), `crtCasing` (256x256 charcoal casing with a generic "KV-1996" badge, metric UV, one tile across the front shell) and `crtGlass` (256x256, on the shared `crtScreen` material, which uses a white base when textured and a teal flat fallback). Task 22: `vcrDeck` (256x128 VCR face with PLAY, STOP, REW and EJECT buttons and a "HI-FI STEREO" label), `vhsShell` (128x128 tape shell), `metalCabinet` (256x256 filing-cabinet front) and `deskDetail` (128x64 notebook cover grain and ruled page block). Earlier, 6 textures were added and 4 removed: `arcadeScreen`, `marquee`, `deck` and `outOfOrder`.
+30 deterministic canvas textures (`scene/proceduralTextures.ts`, `scene/sharedResources.ts`): three cabinet attract screens (`attractSnake`, `attractMaze`, `attractFrequency`, 256x256), three cabinet marquees (`marqueeSnake`, `marqueeMaze`, `marqueeFrequency`, 256x64), sign face, three posters (two ordinary, one shifted), shifted plaque, floor, wood, dark wood, crate, grille, book spine atlas, wall panel (256x256), woven rug, cork board, lamp glow (`lampGlow`, 128x128 since task 23.1, redrawn in place in task 24.1, see below), SMPTE colour bars and the timecode window, plus seven added in tasks 21 and 22. Task 21: `couchFabric` (256x256 woven upholstery, metric fabric UVs), `crtCasing` (256x256 charcoal casing with a generic "KV-1996" badge, metric UV, one tile across the front shell) and `crtGlass` (256x256, on the shared `crtScreen` material, which uses a white base when textured and a teal flat fallback). Task 22: `vcrDeck` (256x128 VCR face with PLAY, STOP, REW and EJECT buttons and a "HI-FI STEREO" label), `vhsShell` (128x128 tape shell), `metalCabinet` (256x256 filing-cabinet front) and `deskDetail` (128x64 notebook cover grain and ruled page block). Earlier, 6 textures were added and 4 removed: `arcadeScreen`, `marquee`, `deck` and `outOfOrder`.
 
-Task 23.1 change (computed from source and tests, **not verified visually**): `lampGlow` grew from 64x64 to 128x128 (0.021 MB to 0.083 MB, +0.062 MB). It is a deterministic multi-stop radial gradient with 7 stops, alpha 0 at 90 percent of the half-width, and a filament core. It is shared by the glow sprite (`lampHalo` material) and the desk light pool (`lampPool` material) of both lamps.
+Task 23.1 change (computed from source and tests, **not verified visually**): `lampGlow` grew from 64x64 to 128x128 (0.021 MB to 0.083 MB, +0.062 MB). It is a deterministic multi-stop radial gradient with 7 stops, alpha 0 at 90 percent of the half-width, and a filament core. It is shared by the glow sprite (`lampHalo` material), the desk light pools (`lampPool`, `lampPoolBanker`) and the ceiling bloom strips (`ceilingBloom`).
+
+Task 24.1 change (computed from source and tests, **not verified visually**): `lampGlow` was redrawn in place at the same size and id (128x128, 0.083 MB, no memory change): a warm-white core, a golden-amber falloff and a soft feather to alpha 0 (8 gradient stops plus a filament dot). `scene/proceduralTextures.ts`, `LAMP_GLOW_STOPS`.
 
 Task 22 changes (all computed from source and tests, **not verified visually**):
 
@@ -158,7 +189,7 @@ Task 22 changes (all computed from source and tests, **not verified visually**):
 - Doorway panel insets and kickplates on the pillar and jambs sit outside the openings, protrude at most 2 cm, and have no colliders.
 - The `fabric`, `fabricLight` and `casing` materials are removed.
 
-The couch uses the `couchBody`, `couchCushion` and `couchPillow` materials, which take the `memoryShift` tint. The CRT casing fallback colour (no canvas) is charcoal. Without a canvas or 2D context, materials keep flat colors. Textures are disposed on unmount, each exactly once. **verified by automated test** (`scene/proceduralTextures.test.ts`, 147 tests; `scene/modelDetail.test.ts`, 131 tests). Whether they look readable in a browser: **not verified visually** (S7 to S11 `not run`).
+The couch uses the `couchBody`, `couchCushion` and `couchPillow` materials, which take the `memoryShift` tint. The CRT casing fallback colour (no canvas) is charcoal. Without a canvas or 2D context, materials keep flat colors. Textures are disposed on unmount, each exactly once. **verified by automated test** (`scene/proceduralTextures.test.ts`, 148 tests; `scene/modelDetail.test.ts`, 137 tests). Whether they look readable in a browser: **not verified visually** (S7 to S11 `not run`).
 
 Couch fix (task 21.1): the dark patch on the couch came from a dark "worn patch" box placed 4 mm above the middle cushion. It is removed, together with a second hidden patch. The roll caps are shortened by 4 mm to avoid coplanar faces. The pillow sits in the left seat corner; a test checks with an oriented-box (OBB) no-intersection test that it does not overlap the other couch parts. The couch has 388 triangles (was 412) and no new collider. Task 21 is **not verified visually**.
 
@@ -174,23 +205,23 @@ Dev builds only (`import.meta.env.DEV`). Run `npm run dev` and open the page wit
 
 ## Metrics
 
-Computed from declared geometry and source, **computed, not runtime-measured**. Source: `.kiro/specs/world-exploration/performance-log.md`. Figures re-checked in task 23.3 with `npx vitest run src/world/scene/modelDetail.test.ts` (131 tests passed); the console line was:
-`[18.2] computed triangles: 19042 (detail 18800 + base 242), draw-call estimate (grouped by geometry+material): 325, books 366, slipcases 136, leaning 16, per shelf shelf-a=16 draws/178 books, shelf-b=17 draws/168 books, shelf-c=16 draws/156 books, textures 30, texture memory estimate 7.52 MB`
+Computed from declared geometry and source, **computed, not runtime-measured**. Source: `.kiro/specs/world-exploration/performance-log.md`. Figures re-checked in task 24.3 with `npx vitest run src/world/scene/modelDetail.test.ts` (137 tests passed); the console line was:
+`[18.2] computed triangles: 19100 (detail 18858 + base 242), draw-call estimate (grouped by geometry+material): 332, books 366, slipcases 136, leaning 16, per shelf shelf-a=16 draws/178 books, shelf-b=17 draws/168 books, shelf-c=16 draws/156 books, textures 30, texture memory estimate 7.52 MB`
 
 | Metric | Value | Label |
 | --- | --- | --- |
-| Triangles | 19,042 (detail 18,800 + base 242), limit 20,000; task 23 changed it by -130 from 19,172 | computed, not runtime-measured |
-| Draw-call grouping estimate | about 325 (was 319) | computed estimate, not `renderer.info` |
+| Triangles | 19,100 (detail 18,858 + base 242), limit 20,000; task 23 changed it by -130 from 19,172, task 24 by +58 from 19,042 | computed, not runtime-measured |
+| Draw-call grouping estimate | about 332 (was 325 before task 24, 319 before task 23) | computed estimate, not `renderer.info` |
 | Books | 366 (shelf-a 178, shelf-b 168, shelf-c 156); includes the 3 manuals | computed |
-| Lights | 4 (1 ambient + 3 point), limit 4; task 23 added none | computed from source |
-| Procedural textures | 30, 7.521 MB estimated, limit 8 MB; `lampGlow` +0.062 MB | computed, not runtime-measured |
-| Colliders | 28 (task 23 added none) | computed |
-| Targeting benchmark | informational timing only, no threshold; varies per run and machine (task 23.3 standalone run 1.025 us/call, full-suite run 1.790 us/call; this benchmark times station targeting only, not `selectInteractionTargetAll`) | informational |
+| Lights | 4 (1 ambient + 3 point), limit 4; tasks 23 and 24 added none | computed from source |
+| Procedural textures | 30, 7.521 MB estimated, limit 8 MB; every texture registered for disposal; unchanged by task 24 | computed, not runtime-measured |
+| Colliders | 28 (tasks 23 and 24 added none) | computed |
+| Targeting benchmark | informational timing only, no threshold; varies per run and machine (task 24.3 standalone run 1.228 us/call, full-suite run 2.043 us/call; this benchmark times station targeting only, not `selectInteractionTargetAll`) | informational |
 
-**The triangle margin is thin:** 19,042 leaves 958 triangles (about 5 percent) below the 20,000 limit. The biggest consumers (computed by summing declared objects in task 21.3, not recomputed after task 23): the three bookshelves (2,352, 2,280 and 2,088 before the manuals replaced 7 books on `shelf-b`), the three cabinets (1,316 each), `console-cables` (1,088), the two filing cabinets (692 each) and the desk (672). Task 23.1 replaced the two old desk lamps (470 triangles) with two new ones (352): -118. Task 23.2 replaced 7 books on `shelf-b` (-84) with 3 manuals and 3 spine bands (+72): -12.
+**The triangle margin is thin:** 19,100 leaves 900 triangles (about 4.5 percent) below the 20,000 limit. The biggest consumers (computed by summing declared objects in task 21.3, not recomputed after task 23; task 24.1 then added 58 triangles): the three bookshelves (2,352, 2,280 and 2,088 before the manuals replaced 7 books on `shelf-b`), the three cabinets (1,316 each), `console-cables` (1,088), the two filing cabinets (692 each) and the desk (672). Task 23.1 replaced the two old desk lamps (470 triangles) with two new ones (352): -118. Task 23.2 replaced 7 books on `shelf-b` (-84) with 3 manuals and 3 spine bands (+72): -12. Task 24.1 added 58 (two lamp cones at 24 triangles each plus five ceiling bloom strips at 2 each, by arithmetic); task 24.2 added no triangles.
 
 **The texture margin is also thin:** 7.521 MB computed against the 8 MB limit leaves about 0.48 MB. First candidates to cut if more room is needed: `console-cables` (1,088 triangles), the book count (366 books), the three 0.66 MB posters (`posterSunset`, `posterReel`, `shiftPoster`, 256x512) or `spineAtlas` (512x256, 0.66 MB), which could shrink. The per-texture list (MB, computed, not runtime-measured, rounded to two decimals): attractSnake 0.25, attractMaze 0.25, attractFrequency 0.25, marqueeSnake 0.06, marqueeMaze 0.06, marqueeFrequency 0.06, signFace 0.33, posterSunset 0.66, posterReel 0.66, shiftPoster 0.66, shiftPlaque 0.17, floor 0.08, wood 0.08, woodDark 0.08, crate 0.33, grille 0.08, spineAtlas 0.66, wallPanel 0.33, rugWoven 0.33, corkBoard 0.33, lampGlow 0.08, smpteBars 0.13, timecode 0.02, couchFabric 0.33, crtCasing 0.33, crtGlass 0.25, vcrDeck 0.17, vhsShell 0.08, metalCabinet 0.33, deskDetail 0.04. The largest are the three posters and `spineAtlas` (0.66 each).
-**Measured runtime values** (measured by the project owner **before Task 23; not repeated since**, so they do not describe the lamps, manuals or message overlay; dev build, `?worldPerf=1` sampler, 60 s walkthrough across both rooms and all three arcade cabinets; raw output in `.kiro/specs/world-exploration/performance-log.md` section 4):
+**Measured runtime values** (measured by the project owner **before Tasks 23 and 24; not repeated since**, so they do not describe the lamps, manuals, lamp cones, desk pools, ceiling bloom strips, Archive Document Card or notes counter. **Re-measuring is recommended**, because Task 24 adds additive transparent layers; dev build, `?worldPerf=1` sampler, 60 s walkthrough across both rooms and all three arcade cabinets; raw output in `.kiro/specs/world-exploration/performance-log.md` section 4):
 
 | Metric | Measured value |
 | --- | --- |
@@ -203,7 +234,7 @@ Computed from declared geometry and source, **computed, not runtime-measured**. 
 
 Caveats:
 - Hardware/GPU, browser and version, OS, window resolution and date were **not provided**. The Reference_Hardware (integrated graphics at 1280x720) cannot be confirmed, so the median <= 20 ms and p95 <= 33 ms targets are met on the owner's machine only.
-- Triangles and draw calls describe the last rendered frame from one camera position, after frustum culling, with each instanced mesh counted as one call. They are not comparable one-to-one with the computed whole-scene figures above (19,042 triangles, 325 draw-call estimate, 30 declared textures); the lower measured numbers are expected.
+- Triangles and draw calls describe the last rendered frame from one camera position, after frustum culling, with each instanced mesh counted as one call. They are not comparable one-to-one with the computed whole-scene figures above (19,100 triangles, 332 draw-call estimate, 30 declared textures); the lower measured numbers are expected.
 - Textures 29 vs 30 declared: `renderer.info.memory.textures` counts textures uploaded to the GPU so far. One declared texture may not have been uploaded yet or may be absent (likely explanation, not verified).
 - A median near 16.7 ms is consistent with a 60 Hz vsync cap, so frame time is likely limited by display refresh. The real headroom is unknown.
 - Dev build, which is slower than production.
@@ -233,16 +264,16 @@ npm test
 npm run build
 ```
 
-Fresh `npm test` run for this README (task 23.3, run twice, same result; `npm run typecheck` and `npm run build` exit 0): **29 test files, 619 tests, all passed**. Files under `src/world/` and their counts:
+Fresh run for this README (task 24.3): `npm run typecheck` exit 0, `npm run build` exit 0, `npm test` **31 test files, 663 tests, all passed** (exit 0). Earlier full runs of the same session had 1, 2 and 4 CPU-heavy tests time out at the 5 s default while many files ran in parallel (they passed when run alone); those four tests now carry an explicit 30,000 ms per-test timeout, and three full runs after that passed. Details in `test-report.md`. Files under `src/world/` and their counts:
 
 | Area | Files (tests) |
 | --- | --- |
-| Component | `WorldScene.test.ts` (14), `WorldScene.inputEnabled.test.ts` (8), `boundary.test.ts` (10) |
+| Component | `WorldScene.test.ts` (21), `WorldScene.inputEnabled.test.ts` (8), `boundary.test.ts` (10) |
 | Assets | `assets/assetManifest.test.ts` (22), `assets/assets.test.ts` (9), `scene/assetIntegration.test.ts` (6) |
 | Controller | `controller/useReducedMotion.test.ts` (8) |
 | Layout | `layout/roomLayout.test.ts` (32) |
-| Logic | `collision` (18), `frameStats` (5), `inputMode` (29), `inputMode.supplied` (17), `inputMode.fallback` (7), `inputMode.prop` (12), `inputState` (15), `look` (20), `movement` (15), `palette` (4), `palette.full` (13), `playerStep` (9), `propState` (5), `targeting` (26), `targeting.bench` (1, informational) |
-| Scene | `effectsTiming` (8), `memoryShift` (16), `modelDetail` (131), `proceduralTextures` (147) |
+| Logic | `collision` (18), `frameStats` (5), `inputMode` (29), `inputMode.supplied` (17), `inputMode.fallback` (7), `inputMode.prop` (17), `inputState` (15), `look` (20), `movement` (15), `palette` (4), `palette.full` (13), `playerStep` (9), `propState` (11), `archiveDocuments` (5), `targeting` (32), `targeting.bench` (1, informational) |
+| Scene | `effectsTiming` (8), `memoryShift` (16), `lampCoupling` (8), `modelDetail` (137), `proceduralTextures` (148) |
 
 Outside `src/world/`: `src/App.test.ts` (8, stubbed `WorldScene`) and `src/core/gameReducer.test.ts` (4). Counts change when tests are added. Details, the 17 correctness properties and gaps: `.kiro/specs/world-exploration/test-report.md`.
 
@@ -255,13 +286,15 @@ See `.kiro/specs/world-exploration/proposals.md`. In short: P1 implemented; P3 a
 ## Known limitations and gaps
 
 - No browser run is recorded for M6, the polish pass, the refinement pass or the three-cabinet pass; the new layout and textures are not verified visually.
-- All three cabinets open the same App arcade panel (Snake). LAST EXIT and DEAD FREQUENCY have no game behind them. Their manual texts on `shelf-b` are in-world lore for gameplay that does not exist in `src/arcade/`.
-- Task 23 (lamps, manuals, world message) is not verified visually or in a browser. Lamp state is session-only and resets on reload. Prop messages appear in the world-owned overlay, not in the App HUD status line.
+- All three cabinets open the same App arcade panel (Snake). LAST EXIT and DEAD FREQUENCY have no game behind them. Their manuals on `shelf-b` and their Archive Document Cards are in-world lore for gameplay that does not exist in `src/arcade/`.
+- Tasks 23 and 24 (lamps, manuals, lamp cones and pools, room light coupling, ceiling bloom, Archive Document Card, notes counter) are not verified visually or in a browser. Lamp state, the open card and the notes counter are session-only and reset on reload. Lamp pills appear in the world-owned overlay, not in the App HUD status line. All card texts are placeholder lore pending review by the story owner (Developer 3).
+- Archive Document Card: on short windows (about 400 to 500 px tall) the card region is small and its overflow cannot be scrolled with the mouse (`pointer-events: none`); the poster becomes targetable when the flag flips, slightly before its fade completes; closing on pointer-lock loss is wired but not testable in jsdom.
+- The requested 0.85 m lamp pool radius was not possible on the 0.8 m deep desk; the pool is a 0.8 m decal with a visible disc of about 0.36 m.
 - Spawn gap (open item): the spawn (0, 3) is exactly 1.0 m from the desk edge and the south wall, so a 1.2 m disc around the spawn is not clear. The test asserts 0.99 m. This was not requested in the final instructions and is not fixed. The manual test log has no recorded result.
-- Frame time and renderer counts were measured once by the project owner (dev build, hardware not provided; see the Metrics section). First-render time is not measured, and the Reference_Hardware cannot be confirmed. The triangle margin below the 20,000 limit is only 958 (computed), and the texture margin below 8 MB is only about 0.48 MB (computed).
+- Frame time and renderer counts were measured once by the project owner before Tasks 23 and 24 (dev build, hardware not provided; see the Metrics section) and have not been repeated; re-measuring is recommended. First-render time is not measured, and the Reference_Hardware cannot be confirmed. The triangle margin below the 20,000 limit is only 900 (computed), and the texture margin below 8 MB is only about 0.48 MB (computed).
 - No GLB assets and no Blender run. The scene uses primitives only.
 - No restored-memory viewer component exists in the repo. The HUD shows progress booleans only.
 - `reducedDistortion` (P2) is not wired, so there is no in-game reduced-distortion link.
 - When `inputEnabled` is absent, the world cannot tell when a panel closed.
-- The production bundle is a single 1,262.70 kB JS chunk (360.43 kB gzip, task 21.3 build) per `performance-log.md`; no code splitting.
+- The production bundle is a single 1,286.49 kB JS chunk (368.91 kB gzip, task 24.3 build) per `performance-log.md`; no code splitting.
 - Optional property-based tests are not implemented.

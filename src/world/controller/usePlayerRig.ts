@@ -9,6 +9,7 @@ import { EYE_HEIGHT, PLAYER_RADIUS } from '../logic/constants';
 import type { HeldKeys } from '../logic/inputState';
 import type { InputMode } from '../logic/inputMode';
 import type { Look } from '../logic/look';
+import { CARD_CLOSE_DISTANCE, shouldCloseCard } from '../logic/propState';
 import { stepPlayer } from '../logic/playerStep';
 import { selectInteractionTargetAll } from '../logic/targeting';
 import { COLLIDERS, INTERACTABLE_DEFS, ROOM, STATION_DEFS } from '../layout/roomLayout';
@@ -21,6 +22,12 @@ export interface UsePlayerRigOptions {
   getMode: () => InputMode;
   /** Called only when the interaction target changes. */
   onTargetChange?: (target: InteractionTarget | null) => void;
+  /** True while the Memory_Shift look is on. Props with `requiresShift` (the poster) are targetable only then. */
+  memoryShifted?: boolean;
+  /** Anchor of the prop whose Archive Document Card is open, or null. Read from a ref each frame, no React state. */
+  getCardAnchor?: () => Vec2 | null;
+  /** Called when the player walks beyond CARD_CLOSE_DISTANCE from the open card's anchor. Must be idempotent. */
+  onCardAutoClose?: () => void;
 }
 
 export interface PlayerRig {
@@ -51,7 +58,7 @@ export function usePlayerRig(options: UsePlayerRigOptions): PlayerRig {
   const getTarget = useCallback((): InteractionTarget | null => targetRef.current, []);
 
   useFrame((state, delta) => {
-    const { heldKeysRef, consumeMouseDelta, getMode, onTargetChange } = optionsRef.current;
+    const { heldKeysRef, consumeMouseDelta, getMode, onTargetChange, memoryShifted, getCardAnchor, onCardAutoClose } = optionsRef.current;
     const camera = state.camera;
     let pos = posRef.current as Vec2;
 
@@ -71,11 +78,15 @@ export function usePlayerRig(options: UsePlayerRigOptions): PlayerRig {
       posRef.current = pos;
       lookRef.current = step.look;
 
-      const target = selectInteractionTargetAll(pos, lookRef.current.yaw, STATION_DEFS, INTERACTABLE_DEFS, COLLIDERS);
+      const target = selectInteractionTargetAll(pos, lookRef.current.yaw, STATION_DEFS, INTERACTABLE_DEFS, COLLIDERS, undefined, memoryShifted === true);
       if (!sameTarget(target, targetRef.current)) {
         targetRef.current = target;
         onTargetChange?.(target);
       }
+
+      // Walking away closes an open card. Only reads a ref; the callback clears the anchor so it fires once.
+      const cardAnchor = getCardAnchor?.() ?? null;
+      if (cardAnchor !== null && shouldCloseCard(pos, cardAnchor, CARD_CLOSE_DISTANCE)) onCardAutoClose?.();
     }
 
     // No roll (Requirement 10.5): order YXZ, rotation.z is always 0.

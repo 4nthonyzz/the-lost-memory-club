@@ -118,6 +118,7 @@ export function selectInteractionStation(
  * share the same view cone and line-of-sight rules. A target's own Collider is ignored for its own test; props
  * without a Collider are never occluded by themselves. The nearest eligible target wins. On equal distance the
  * earlier entry wins, and Stations come before props. Returns null when nothing qualifies.
+ * A prop with requiresShift (the Memory_Shift poster, invisible at t = 0) is excluded unless memoryShifted is true.
  */
 export function selectInteractionTargetAll(
   pos: Vec2,
@@ -126,6 +127,7 @@ export function selectInteractionTargetAll(
   props: readonly InteractableDef[],
   colliders: readonly Aabb[],
   coneDeg: number = INTERACTION_CONE_DEG,
+  memoryShifted = false,
 ): InteractionTarget | null {
   const fx = -Math.sin(yaw);
   const fz = -Math.cos(yaw);
@@ -157,6 +159,7 @@ export function selectInteractionTargetAll(
     }
   }
   for (const prop of props) {
+    if (prop.requiresShift && !memoryShifted) continue;
     const d = distanceIfEligible(prop.anchor, prop.range, prop.collider);
     if (d !== null && d < bestDist) {
       bestDist = d;

@@ -38,6 +38,13 @@ export interface UseWorldInputOptions {
   getTarget: () => InteractionTarget | null;
   /** Called when E is pressed on a world-local prop (lamp or manual). Read through a ref. Never calls onInspect. */
   onPropInteract?: (id: PropInteractableId) => void;
+  /**
+   * Closes the open Archive Document Card (E on nothing, Escape, pointer lock lost). Read through a ref. Must be
+   * idempotent: it can be called when no card is open.
+   */
+  onCloseCard?: () => void;
+  /** Returns true while a card is open. Read at key time. */
+  isCardOpen?: () => boolean;
   /** Optional external switch. Absent means unchanged default behavior. */
   inputEnabled?: boolean;
 }
@@ -70,9 +77,13 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
   const onInspectRef = useRef(options.onInspect);
   const getTargetRef = useRef(options.getTarget);
   const onPropInteractRef = useRef(options.onPropInteract);
+  const onCloseCardRef = useRef(options.onCloseCard);
+  const isCardOpenRef = useRef(options.isCardOpen);
   onInspectRef.current = options.onInspect;
   getTargetRef.current = options.getTarget;
   onPropInteractRef.current = options.onPropInteract;
+  onCloseCardRef.current = options.onCloseCard;
+  isCardOpenRef.current = options.isCardOpen;
 
   const getMode = useCallback((): InputMode => stateRef.current.mode, []);
 
@@ -107,6 +118,9 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
           }
           case 'PROP_INTERACT':
             onPropInteractRef.current?.(effect.id);
+            break;
+          case 'CLOSE_CARD':
+            onCloseCardRef.current?.();
             break;
           case 'RELEASE_POINTER_LOCK':
             exitLock(doc);
@@ -144,6 +158,8 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
         insideWorldWrapper: target instanceof Node && wrapper.contains(target),
       });
       const modeBefore = stateRef.current.mode;
+      // Escape closes an open card. It is never prevented: the browser also uses it to release pointer lock.
+      if (accepted && e.code === 'Escape') onCloseCardRef.current?.();
 
       if (accepted && role !== null && role !== 'interact' && modeBefore !== 'inspecting') {
         heldKeysRef.current = reduceHeldKeys(heldKeysRef.current, { type: 'down', role });
@@ -159,7 +175,17 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
       const targetPropId = current !== null && current.type === 'prop' ? current.prop.id : null;
       // keydown is a valid activation gesture (Enter or E on the capture overlay).
       dispatch(
-        { type: 'KEY_DOWN', role, code: e.code, repeat: e.repeat, accepted, hasTarget, targetKind, targetPropId },
+        {
+          type: 'KEY_DOWN',
+          role,
+          code: e.code,
+          repeat: e.repeat,
+          accepted,
+          hasTarget,
+          targetKind,
+          targetPropId,
+          cardOpen: role === 'interact' ? isCardOpenRef.current?.() === true : false,
+        },
         true,
       );
     };
@@ -196,6 +222,8 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
         } else {
           dispatch({ type: locked ? 'LOCK_ACQUIRED' : 'LOCK_LOST' }, false);
         }
+        // Losing the lock (Esc in the browser) closes an open card.
+        if (!locked) onCloseCardRef.current?.();
         clearInput();
       },
       onError: () => dispatch({ type: 'LOCK_DENIED' }, false),

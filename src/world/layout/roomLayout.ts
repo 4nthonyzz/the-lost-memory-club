@@ -272,11 +272,54 @@ function manualDef(id: ManualId, z: number): InteractableDef {
   });
 }
 
-/** World-local interactable props: the two desk lamps, then the three manuals. Not Stations, not Colliders. */
+/**
+ * Readable notes (task 24.2). All three are non-solid and visual only; their anchors sit on the object itself.
+ *  - desk-notebook: the notepad on the reception desk (deskParts: x = desk centre - 0.95, z = desk centre + 0.1,
+ *    on the desk top). The solid desk footprint is excluded from its line-of-sight test, like the lamps.
+ *  - cork-board: the north-wall bulletin board between the two filing cabinets, anchored at the board centre on the wall face.
+ *  - poster-shift: the Memory_Shift overlay poster (north wall, x -0.3, z -3.94; see ShiftDressing in Props.tsx). It is
+ *    invisible at t = 0, so requiresShift makes targeting exclude it until memoryShifted is true.
+ */
+function noteDefs(): InteractableDef[] {
+  const dx = (DESK.box.minX + DESK.box.maxX) / 2;
+  const dz = (DESK.box.minZ + DESK.box.maxZ) / 2;
+  return [
+    Object.freeze({
+      id: 'desk-notebook' as const,
+      kind: 'note' as const,
+      anchor: Object.freeze({ x: dx - 0.95, z: dz + 0.1 }),
+      collider: DESK.box,
+      range: PROP_INTERACTION_RANGE,
+      height: 1.0,
+    }),
+    Object.freeze({
+      id: 'cork-board' as const,
+      kind: 'note' as const,
+      anchor: Object.freeze({ x: (BULLETIN.box.minX + BULLETIN.box.maxX) / 2, z: BULLETIN.box.maxZ }),
+      collider: BULLETIN.box,
+      range: PROP_INTERACTION_RANGE,
+      height: 1.6,
+    }),
+    Object.freeze({
+      id: 'poster-shift' as const,
+      kind: 'note' as const,
+      anchor: Object.freeze({ x: -0.3, z: -3.94 }),
+      range: PROP_INTERACTION_RANGE,
+      height: 1.7,
+      requiresShift: true,
+    }),
+  ];
+}
+
+/**
+ * World-local interactable props (eight): the two desk lamps, the three manuals, then the desk notebook, the cork
+ * board and the Memory_Shift poster. Not Stations, not Colliders.
+ */
 export const INTERACTABLE_DEFS: readonly InteractableDef[] = Object.freeze([
   lampDef('desk-lamp-left'),
   lampDef('desk-lamp-right'),
   ...MANUAL_PLACEMENT.books.map((m) => manualDef(m.id, m.z)),
+  ...noteDefs(),
 ]);
 /** Rough triangle estimate: 12 per box (walls, props, floor, ceiling). */
 export function estimateTriangles(): number {

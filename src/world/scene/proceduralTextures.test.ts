@@ -799,6 +799,22 @@ describe('task 23.1: lampGlow radial falloff', () => {
     expect(alphas[0]).toBe(1)
   })
 
+  it('task 24.1: has a warm-white core, a golden-amber mid falloff and a feather that reaches alpha 0 on the last stop', () => {
+    const rgb = (color: string) => /rgba\((\d+),(\d+),(\d+),/.exec(color)!.slice(1, 4).map(Number)
+    const s = stops()
+    const [r0, g0, b0] = rgb(s[0].color)
+    expect(Math.min(r0, g0, b0)).toBeGreaterThanOrEqual(235)
+    const mid = s.find((x) => x.o >= 0.3 && x.o <= 0.5)!
+    const [r, g, b] = rgb(mid.color)
+    expect(r).toBeGreaterThan(g)
+    expect(g).toBeGreaterThan(b)
+    expect(r).toBeGreaterThanOrEqual(240)
+    expect(b).toBeLessThan(100)
+    // The gradient radius leaves a clear outer ring, so the edge pixels stay fully transparent.
+    expect(alphaOf(s[s.length - 2].color)).toBeLessThanOrEqual(0.03)
+    expect(alphaOf(s[s.length - 1].color)).toBe(0)
+  })
+
   it('draws a small bright filament core at the centre', () => {
     const { width: W } = TEXTURE_SPECS.lampGlow
     const calls = recorded()

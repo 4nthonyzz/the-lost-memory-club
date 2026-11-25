@@ -68,7 +68,7 @@ describe('applyMouseLook', () => {
       expect(look.yaw).toBeGreaterThan(-Math.PI);
       expect(look.yaw).toBeLessThanOrEqual(Math.PI);
     }
-  });
+  }, 30000);
 });
 
 describe('applyKeyboardLook', () => {

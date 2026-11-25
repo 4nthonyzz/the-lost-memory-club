@@ -161,12 +161,23 @@ describe('selectInteractionTargetAll (stations and world-local props, task 23.2)
 describe('room layout interactables (task 23.2)', () => {
   const cells = reachableCells(ROOM.start);
   const reachable = (x: number, z: number) => cells.some((c) => Math.abs(c.x - x) < 1e-6 && Math.abs(c.z - z) < 1e-6);
-  const pick = (pos: { x: number; z: number }, yaw: number) => selectInteractionTargetAll(pos, yaw, STATION_DEFS, INTERACTABLE_DEFS, COLLIDERS);
+  const pick = (pos: { x: number; z: number }, yaw: number, shifted = false) =>
+    selectInteractionTargetAll(pos, yaw, STATION_DEFS, INTERACTABLE_DEFS, COLLIDERS, undefined, shifted);
   const propId = (t: ReturnType<typeof pick>) => (t?.type === 'prop' ? t.prop.id : null);
   const stationId = (t: ReturnType<typeof pick>) => (t?.type === 'station' ? t.station.id : null);
 
-  it('declares two lamps and three manuals, non-solid, range 2.2, never Stations', () => {
-    expect(INTERACTABLE_DEFS.map((d) => d.id)).toEqual(['desk-lamp-left', 'desk-lamp-right', 'manual-snake', 'manual-maze', 'manual-frequency']);
+  it('declares eight interactables (two lamps, three manuals, notebook, cork board, poster), range 2.2, never Stations', () => {
+    expect(INTERACTABLE_DEFS.map((d) => d.id)).toEqual([
+      'desk-lamp-left',
+      'desk-lamp-right',
+      'manual-snake',
+      'manual-maze',
+      'manual-frequency',
+      'desk-notebook',
+      'cork-board',
+      'poster-shift',
+    ]);
+    expect(INTERACTABLE_DEFS.filter((d) => d.requiresShift).map((d) => d.id)).toEqual(['poster-shift']);
     for (const d of INTERACTABLE_DEFS) {
       expect(d.range).toBe(2.2);
       expect(STATION_DEFS.some((s) => (s.id as string) === d.id)).toBe(false);
@@ -191,8 +202,10 @@ describe('room layout interactables (task 23.2)', () => {
     const xs = Math.round(x * 10) / 10;
     expect(reachable(xs, 0.6)).toBe(true);
     expect(propId(pick({ x: xs, z: 0.6 }, Math.PI))).toBe(id);
-    expect(reachable(xs, 2.6)).toBe(true);
-    expect(propId(pick({ x: xs, z: 2.6 }, 0))).toBe(id);
+    // Desk side. The desk notebook is nearer than the left lamp from (-1.3, 2.6), so the left lamp is aimed at from the west end of the desk.
+    const south = id === 'desk-lamp-left' ? { x: -1.9, z: 1.6, yaw: -Math.PI / 2 } : { x: xs, z: 2.6, yaw: 0 };
+    expect(reachable(south.x, south.z)).toBe(true);
+    expect(propId(pick(south, south.yaw))).toBe(id);
     // Beyond 2.2 m the lamp is not selectable.
     expect(propId(pick({ x: xs, z: 1.45 - 2.3 }, Math.PI))).toBeNull();
   });
@@ -206,6 +219,65 @@ describe('room layout interactables (task 23.2)', () => {
     for (const z of [-1.2, 0, 1.2]) {
       const t = pick({ x: 7.2, z }, -Math.PI / 2);
       expect(t?.type === 'station' ? t.station.anchor.z : null).toBeCloseTo(z);
+    }
+  });
+});
+
+describe('readable notes in the room layout (task 24.2)', () => {
+  const cells = reachableCells(ROOM.start);
+  const reachable = (x: number, z: number) => cells.some((c) => Math.abs(c.x - x) < 1e-6 && Math.abs(c.z - z) < 1e-6);
+  const pick = (pos: { x: number; z: number }, yaw: number, shifted = false) =>
+    selectInteractionTargetAll(pos, yaw, STATION_DEFS, INTERACTABLE_DEFS, COLLIDERS, undefined, shifted);
+  const label = (t: ReturnType<typeof pick>) => (t === null ? null : t.type === 'prop' ? t.prop.id : `station:${t.station.id}`);
+  const def = (id: string) => INTERACTABLE_DEFS.find((d) => d.id === id)!;
+
+  it('places the anchors on the notebook, the bulletin board and the shift poster', () => {
+    expect(def('desk-notebook').anchor).toEqual({ x: expect.closeTo(-0.95, 9), z: expect.closeTo(1.7, 9) });
+    expect(def('cork-board').anchor.x).toBeCloseTo(-2.25, 9);
+    expect(def('cork-board').anchor.z).toBe(-3.95);
+    expect(def('poster-shift').anchor).toEqual({ x: -0.3, z: -3.94 });
+    expect(def('desk-notebook').kind).toBe('note');
+  });
+
+  it.each([
+    ['desk-notebook', { x: -0.9, z: 2.6 }, 0, false],
+    ['cork-board', { x: -2.2, z: -3.0 }, 0, false],
+    ['poster-shift', { x: -0.3, z: -3.0 }, 0, true],
+  ] as const)('%s is selected from a reachable cell within 2.2 m', (id, pos, yaw, shifted) => {
+    expect(reachable(pos.x, pos.z)).toBe(true);
+    const a = def(id).anchor;
+    expect(Math.hypot(a.x - pos.x, a.z - pos.z)).toBeLessThanOrEqual(2.2);
+    expect(label(pick(pos, yaw, shifted))).toBe(id);
+  });
+
+  it('the poster is targetable only while the room is shifted', () => {
+    const pos = { x: -0.3, z: -3.0 };
+    expect(label(pick(pos, 0, false))).toBeNull();
+    expect(label(pick(pos, 0, true))).toBe('poster-shift');
+    // The default (flag omitted) is not shifted.
+    expect(selectInteractionTargetAll(pos, 0, STATION_DEFS, INTERACTABLE_DEFS, COLLIDERS)).toBeNull();
+  });
+
+  it('the new notes do not steal Station targets where a Station is nearer', () => {
+    expect(label(pick({ x: 0, z: -0.5 }, 0, true))).toBe('station:vhs');
+    expect(label(pick({ x: 0, z: 0.4 }, 0, true))).toBe('station:vhs');
+    for (const z of [-1.2, 0, 1.2]) {
+      const t = pick({ x: 7.2, z }, -Math.PI / 2, true);
+      expect(t?.type === 'station' ? t.station.anchor.z : null).toBeCloseTo(z);
+    }
+    // Every reachable cell with a Station target from the old rules still gets a Station: notes are never nearer there.
+    const stationOnly = (pos: { x: number; z: number }, yaw: number) => selectInteractionTargetAll(pos, yaw, STATION_DEFS, [], COLLIDERS);
+    for (const c of cells.filter((_, i) => i % 7 === 0)) {
+      for (const yaw of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+        const s = stationOnly(c, yaw);
+        if (s === null) continue;
+        const all = pick(c, yaw, true);
+        if (all?.type === 'prop') {
+          const sa = (s as { type: 'station'; station: { anchor: { x: number; z: number } } }).station.anchor;
+          const pa = all.prop.anchor;
+          expect(Math.hypot(pa.x - c.x, pa.z - c.z)).toBeLessThan(Math.hypot(sa.x - c.x, sa.z - c.z));
+        }
+      }
     }
   });
 });

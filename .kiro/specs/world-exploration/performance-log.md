@@ -1,6 +1,6 @@
-# World Exploration Performance Log (task 15.4, figures refreshed by task 23.3)
+# World Exploration Performance Log (task 15.4, figures refreshed by task 24.3)
 
-**Status: PARTIALLY MEASURED. The project owner recorded a dev-sampler measurement (section 4). Hardware, browser, OS, resolution and date were not provided, so the Reference_Hardware targets cannot be confirmed.** The agent took no measurement itself (tasks 20.3, 21.3, 22.3, 23.3). **The owner measurement in section 4 was taken before Task 23 and has not been repeated**, so it does not describe the Task 23 scene (lamps, manuals, world message). Section 2 holds values computed from declared geometry and a build. Section 3 lists each target as computed, measured or not measured. First-render time and the targeting benchmark on the Reference_Hardware are still not measured. Describe any target without a recorded value as planned (Requirements 14.11, 14.12).
+**Status: PARTIALLY MEASURED. The project owner recorded a dev-sampler measurement (section 4). Hardware, browser, OS, resolution and date were not provided, so the Reference_Hardware targets cannot be confirmed.** The agent took no measurement itself (tasks 20.3, 21.3, 22.3, 23.3, 24.3). **The owner measurement in section 4 was taken before Tasks 23 and 24 and has not been repeated**, so it does not describe the Task 23 scene (lamps, manuals, lamp status pill) or the Task 24 scene (lamp cones and pools, ceiling bloom strips, Archive Document Card, notes counter). **Re-measuring is recommended** because Task 24 adds additive transparent layers (two lamp cones, two desk pools and five ceiling bloom strips) that can raise fill cost. Section 2 holds values computed from declared geometry and a build. Section 3 lists each target as computed, measured or not measured. First-render time and the targeting benchmark on the Reference_Hardware are still not measured. Describe any target without a recorded value as planned (Requirements 14.11, 14.12).
 
 ## 1. Method (human measurement)
 
@@ -56,9 +56,9 @@ The project owner has since followed steps 1 to 5 above (see section 4). The age
 | Measurement tool | `?worldPerf=1` dev sampler (`window.__worldPerf.summary()`) |
 
 ## 2. Computed static metrics
-**Computed from declared geometry, NOT runtime-measured.** Computed on the working-tree state at the time of task 23.3 (uncommitted changes present). Machine for these commands is unspecified (Windows, PowerShell). Nothing in this section is a frame-time or GPU measurement.
+**Computed from declared geometry, NOT runtime-measured.** Computed on the working-tree state at the time of task 24.3 (uncommitted changes present). Every number in this section is **computed, not runtime-measured**. Machine for these commands is unspecified (Windows, PowerShell). Nothing in this section is a frame-time or GPU measurement.
 ### 2.1 Scene detail (`npx vitest run src/world/scene/modelDetail.test.ts`)
-State of the scene after tasks 20.1, 20.2, 21.1, 21.2, 22.1, 22.2, 23.1 and 23.2 (**not verified visually**, no browser run; none of these passes has been seen in a browser). Layout (from `roomLayout.ts`):
+State of the scene after tasks 20.1, 20.2, 21.1, 21.2, 22.1, 22.2, 23.1, 23.2, 24.1 and 24.2 (**not verified visually**, no browser run; none of these passes has been seen in a browser). Layout (from `roomLayout.ts`):
 - **Three arcade cabinets** against the east wall of the Arcade_Area, x 8.4..9.2, facing -X toward both east doorways, each `onInspect('arcade')`:
   - SNAKE.EXE: z -1.7..-0.7, anchor (8.4, -1.2), `arcadeGame` `'snake'`.
   - LAST EXIT: z -0.5..0.5, anchor (8.4, 0), `arcadeGame` `'maze'`.
@@ -85,61 +85,72 @@ State of the scene after tasks 20.1, 20.2, 21.1, 21.2, 22.1, 22.2, 23.1 and 23.2
 - Task 23 (computed, not runtime-measured, **not verified visually**):
   - `lampGlow` 64x64 to 128x128 (0.021 MB to 0.083 MB, +0.062 MB): a multi-stop radial gradient with 7 stops, alpha 0 at 90 percent of the half-width, and a filament core.
   - Two desk lamps on the reception desk: `desk-lamp-left` (green banker's lamp) and `desk-lamp-right` (cream table lamp), each with a bulb, an inner shade glow, a camera-facing glow sprite and a desk light pool. ON and OFF are different shared materials. **No light was added** (4 lights).
-  - Interactable props: world-only `PropInteractableId` (`desk-lamp-left`, `desk-lamp-right`, `manual-snake`, `manual-maze`, `manual-frequency`), combined targeting `selectInteractionTargetAll` (stations 2.0 m, props 2.2 m), `PROP_INTERACT` effect that never calls `onInspect`. Lamp state is session-only React state in `WorldScene` (no storage, not in `GameState`). Messages show in the world-owned `WorldMessage` overlay (`role="status"`), not in the App HUD status line, with no timer. The per-frame cost of the combined targeting is not measured (the benchmark in section 2.3 times station targeting only).
+  - Interactable props: world-only `PropInteractableId` (task 23: `desk-lamp-left`, `desk-lamp-right`, `manual-snake`, `manual-maze`, `manual-frequency`; task 24.2 adds `desk-notebook`, `cork-board`, `poster-shift`, eight in total), combined targeting `selectInteractionTargetAll` (stations 2.0 m, props 2.2 m), `PROP_INTERACT` effect that never calls `onInspect`. Lamp state is session-only React state in `WorldScene` (no storage, not in `GameState`). Lamp status pills (and, in task 23 only, the manual texts) showed in the world-owned `WorldMessage` overlay (`role="status"`), not in the App HUD status line, with no timer. **Superseded by task 24.2:** manuals and the other readable props open the Archive Document Card instead, and the pill is used for the lamps only (texts: `Banker's lamp switched ON/OFF`, `Table lamp switched ON/OFF`). The per-frame cost of the combined targeting is not measured (the benchmark in section 2.3 times station targeting only).
   - Three manual books on `shelf-b` level 2 (y 1.117..1.397, spines at x -4.635, z 1.4 / 1.8 / 2.2; emerald, crimson, amber with a cream band); 7 ordinary books removed from that row (books 370 to 366, `shelf-b` 172 to 168). Anchors at x -4.6. The LAST EXIT and DEAD FREQUENCY manual texts describe gameplay that does not exist in `src/arcade/` (in-world lore only).
   - Net effect: 19,172 to 19,042 triangles (-130: lamps -118, manuals -12), 319 to 325 draw calls, 30 textures, 7.459 to 7.521 MB, 4 lights, 28 colliders.
+- Task 24.1 (computed, not runtime-measured, **not verified visually**; no light added):
+  - `lampGlow` is redrawn in place (still 128x128, 0.083 MB): a warm-white core, a golden-amber mid falloff and a long soft feather to alpha 0.
+  - Two additive volumetric cones, one per lamp, from the shade rim to the desk top: 12-segment open cone (24 triangles each), opacity 0.14, `DoubleSide`, `depthWrite` false. Two additive desk light pools, one per lamp (`lampPool`, `lampPoolBanker`, opacity 0.32, polygon offset), 2 mm above the desk top.
+  - **Pool radius limit, stated plainly:** the requested 0.85 m pool radius was not possible on a 0.8 m deep desk. The pool radius is capped to half the desk depth, so the decal is a 0.8 m quad (the 0.8 m desk depth). Its visible disc (90 percent of the quad) is about 0.36 m. The placement is kept inside the desk top (`lampPoolPlacement` in `modelDetail.ts`).
+  - Emissive shades: banker shade ON `#22c55e` at 0.75, table shade ON `#ffd27d` at 0.85; the OFF shades have emissive intensity 0.
+  - Room light coupling by lamps ON (ambient / west-light multipliers): 2 ON = 1.00 / 1.00, 1 ON = 0.95 / 0.88, 0 ON = 0.90 / 0.75. Applied by `applyShift` after the Memory_Shift blend and computed from the authored base values each frame, so it does not accumulate. The ambient floor is kept. `crt-light` and `arcade-light` are untouched. (`scene/lampCoupling.ts`, `scene/memoryShift.ts`, `scene/MemoryShiftDriver.tsx`.)
+  - Additive bloom strips (2 triangles each, opacity 0.16, cool white) under **five** ceiling fixtures (there are five, not two), using `lampGlow` as the map.
+  - Lights: 4, unchanged.
+- Task 24.2 (computed, not runtime-measured, **not verified visually**): the readable props (desk notebook, cork board, Memory_Shift overlay poster) were already scene geometry, so 24.2 adds eight interactable definitions (two lamps, three manuals, three readable notes) and the world overlay components `WorldInspectorCard` and `NotesCounter`, but no new triangles, textures or lights. Net effect of Task 24 on the totals: 19,042 to 19,100 triangles (+58; arithmetic check: 2 cones x 24 + 5 bloom strips x 2 = 58), 325 to 332 draw calls (estimate), 30 textures, 7.521 MB (unchanged), 4 lights, 28 colliders.
 - Unchanged: the VHS media console layout, rug, reception desk, bulletin board, wood bookcases and textured walls.
 
-Console lines, verbatim (task 23.3, from the full `npm test` run; the standalone `modelDetail.test.ts` run passed 131 tests with the same values). The `[19.2]` and `[20.2]` lines print the same 30 textures as `[22.1]`, at two and three decimals; `[22.1]` is shown in full:
+Console lines, verbatim (task 24.3, from the first full `npm test` run; the standalone `modelDetail.test.ts` run passed 137 tests with the same values). The `[15.7]`, `[19.2]` and `[20.2]` lines print the same 30 textures as `[22.1]`, at two or three decimals; `[22.1]` is shown in full. The `[22.2B]`, `[23.1]` and `[23.2]` deltas are printed against fixed baselines inside the older tests (19,056, 19,172 and 19,054), not against the previous task, so only the totals are comparable across tasks:
 ```
-[18.2] computed triangles: 19042 (detail 18800 + base 242), draw-call estimate (grouped by geometry+material): 325, books 366, slipcases 136, leaning 16, per shelf shelf-a=16 draws/178 books, shelf-b=17 draws/168 books, shelf-c=16 draws/156 books, textures 30, texture memory estimate 7.52 MB
-[18.3] computed triangles: 19042 (detail 18800 + base 242), draw-call estimate: 325, textures 30, texture memory estimate 7.52 MB, lights 4 (computed, not runtime-measured)
-[21.1] couch triangles: 388 (before 412), total 19042, textures 30, texture memory 7.52 MB
-[21.2] computed triangles 19042, crt-television 302 triangles / 9 draw calls, draw-call estimate 325, textures 30, texture memory estimate 7.52 MB (computed, not runtime-measured), lights 4
-[22.1] computed triangles 19042, draw-call estimate 325, textures 30, texture memory estimate 7.521 MB (computed, not runtime-measured): attractSnake 256x256=0.250MB, attractMaze 256x256=0.250MB, attractFrequency 256x256=0.250MB, marqueeSnake 256x64=0.063MB, marqueeMaze 256x64=0.063MB, marqueeFrequency 256x64=0.063MB, signFace 512x128=0.333MB, posterSunset 256x512=0.665MB, posterReel 256x512=0.665MB, shiftPoster 256x512=0.665MB, shiftPlaque 256x128=0.166MB, floor 128x128=0.083MB, wood 128x128=0.083MB, woodDark 128x128=0.083MB, crate 256x256=0.333MB, grille 128x128=0.083MB, spineAtlas 512x256=0.665MB, wallPanel 256x256=0.333MB, rugWoven 256x256=0.333MB, corkBoard 256x256=0.333MB, lampGlow 128x128=0.083MB, smpteBars 256x128=0.125MB, timecode 128x32=0.016MB, couchFabric 256x256=0.333MB, crtCasing 256x256=0.333MB, crtGlass 256x256=0.250MB, vcrDeck 256x128=0.166MB, vhsShell 128x128=0.083MB, metalCabinet 256x256=0.333MB, deskDetail 128x64=0.042MB
-[22.2A] triangles 19042, draw calls 325, textures 30, texture memory 7.521 MB (computed, not runtime-measured), metalCabinet 0.333 MB, crate 0.333 MB
-[22.2B] triangles 19042 (delta -14), draw calls 325, textures 30, texture memory 7.521 MB (computed, not runtime-measured), deskDetail 0.042 MB
-[23.1] triangles 19042 (delta -130), draw-call estimate 325, texture memory 7.521 MiB
-[23.2] triangles 19042 (delta from 23.1 -12), texture memory 7.521 MiB
+[18.2] computed triangles: 19100 (detail 18858 + base 242), draw-call estimate (grouped by geometry+material): 332, books 366, slipcases 136, leaning 16, per shelf shelf-a=16 draws/178 books, shelf-b=17 draws/168 books, shelf-c=16 draws/156 books, textures 30, texture memory estimate 7.52 MB
+[18.3] computed triangles: 19100 (detail 18858 + base 242), draw-call estimate: 332, textures 30, texture memory estimate 7.52 MB, lights 4 (computed, not runtime-measured)
+[21.1] couch triangles: 388 (before 412), total 19100, textures 30, texture memory 7.52 MB
+[21.2] computed triangles 19100, crt-television 302 triangles / 9 draw calls, draw-call estimate 332, textures 30, texture memory estimate 7.52 MB (computed, not runtime-measured), lights 4
+[22.1] computed triangles 19100, draw-call estimate 332, textures 30, texture memory estimate 7.521 MB (computed, not runtime-measured): attractSnake 256x256=0.250MB, attractMaze 256x256=0.250MB, attractFrequency 256x256=0.250MB, marqueeSnake 256x64=0.063MB, marqueeMaze 256x64=0.063MB, marqueeFrequency 256x64=0.063MB, signFace 512x128=0.333MB, posterSunset 256x512=0.665MB, posterReel 256x512=0.665MB, shiftPoster 256x512=0.665MB, shiftPlaque 256x128=0.166MB, floor 128x128=0.083MB, wood 128x128=0.083MB, woodDark 128x128=0.083MB, crate 256x256=0.333MB, grille 128x128=0.083MB, spineAtlas 512x256=0.665MB, wallPanel 256x256=0.333MB, rugWoven 256x256=0.333MB, corkBoard 256x256=0.333MB, lampGlow 128x128=0.083MB, smpteBars 256x128=0.125MB, timecode 128x32=0.016MB, couchFabric 256x256=0.333MB, crtCasing 256x256=0.333MB, crtGlass 256x256=0.250MB, vcrDeck 256x128=0.166MB, vhsShell 128x128=0.083MB, metalCabinet 256x256=0.333MB, deskDetail 128x64=0.042MB
+[22.2A] triangles 19100, draw calls 332, textures 30, texture memory 7.521 MB (computed, not runtime-measured), metalCabinet 0.333 MB, crate 0.333 MB
+[22.2B] triangles 19100 (delta 44), draw calls 332, textures 30, texture memory 7.521 MB (computed, not runtime-measured), deskDetail 0.042 MB
+[23.1] triangles 19100 (delta -72), draw-call estimate 332, texture memory 7.521 MiB
+[23.2] triangles 19100 (delta from 23.1 46), texture memory 7.521 MiB
+[24.1] triangles 19100 (delta 58), draw-call estimate 332, texture memory 7.521 MiB
+[24.2] triangles 19100 (delta from 19042 58), texture memory 7.521 MiB
 ```
-Result: `modelDetail.test.ts` 131 tests passed (also re-run alone: 1 file, 131 tests passed).
+Result: `modelDetail.test.ts` 137 tests passed (also re-run alone in task 24.3: 1 file, 137 tests passed).
 | Metric | Computed value (computed, not runtime-measured) | Notes |
 | --- | --- | --- |
-| Triangles | 19,042 | detail 18,800 + base 242, from declared geometry; limit 20,000; task 23 delta -130 |
-| Draw-call estimate | 325 | grouped by geometry + material; an estimate, not `renderer.info.render.calls` |
+| Triangles | 19,100 | detail 18,858 + base 242, from declared geometry; limit 20,000; margin 900; task 24 delta +58 (from 19,042) |
+| Draw-call estimate | 332 (was 325) | grouped by geometry + material; an estimate, not `renderer.info.render.calls` |
 | Books | 366 (178 + 168 + 156 per shelf) | 136 slipcases, 16 leaning books and the 3 manuals are included |
 | Textures | 30 | procedural canvas textures, all registered for disposal |
-| Texture memory estimate | 7.521 MB | estimate; limit 8 MB; margin about 0.48 MB; `lampGlow` +0.062 MB |
-| Lights | 4 | 1 ambient + 3 point, `Lighting.tsx:46-49`; task 23 added none |
-| Colliders | 28 | unchanged by tasks 22 and 23 |
+| Texture memory estimate | 7.521 MB | estimate; limit 8 MB; margin about 0.48 MB; unchanged by task 24 (`lampGlow` was redrawn in place at 128x128) |
+| Lights | 4 | 1 ambient + 3 point, `Lighting.tsx:47-50` (`M3_LIGHT_COUNT = 4`, line 14); tasks 23 and 24 added none |
+| Colliders | 28 | unchanged by tasks 22, 23 and 24 |
 
-**Triangle margin is thin.** 19,042 leaves only 958 triangles (about 5 percent) below the 20,000 limit (computed, not runtime-measured). Any further dressing should be paid for by removing geometry elsewhere. First candidates to cut: `console-cables` (1,088 triangles) and the book count (370 books). The biggest consumers, computed in task 21.3 by summing each declared object's parts with `declaredObjects()` and `countTriangles()` in a throwaway test (not kept in the repo; `modelDetail.test.ts` prints only totals; task 22 added 44 triangles overall and task 23 changed the total by -130; these per-object figures were not recomputed after task 22, and `shelf-b` and `desk` now differ): `shelf-a` 2,352, `shelf-b` 2,280, `shelf-c` 2,088, each arcade cabinet 1,316 (three cabinets, 3,948 together), `console-cables` 1,088, `filing-cabinet-a` and `filing-cabinet-b` 692 each, `desk` 672.
+**Triangle margin is thin.** 19,100 leaves only 900 triangles (about 4.5 percent) below the 20,000 limit (computed, not runtime-measured). Any further dressing should be paid for by removing geometry elsewhere. First candidates to cut: `console-cables` (1,088 triangles) and the book count (366 books). The biggest consumers, computed in task 21.3 by summing each declared object's parts with `declaredObjects()` and `countTriangles()` in a throwaway test (not kept in the repo; `modelDetail.test.ts` prints only totals; task 22 added 44 triangles overall, task 23 changed the total by -130 and task 24 by +58; these per-object figures were not recomputed after task 22, and `shelf-b` and `desk` now differ): `shelf-a` 2,352, `shelf-b` 2,280, `shelf-c` 2,088, each arcade cabinet 1,316 (three cabinets, 3,948 together), `console-cables` 1,088, `filing-cabinet-a` and `filing-cabinet-b` 692 each, `desk` 672.
 
 **Texture memory margin is also thin.** The computed 7.521 MB leaves about 0.48 MB below the 8 MB limit (computed, not runtime-measured). The largest textures are the three 256x512 posters (`posterSunset`, `posterReel`, `shiftPoster`, 0.66 MB each) and `spineAtlas` (512x256, 0.66 MB); any of them could shrink if room is needed. Task 22 freed 1.00 MB by shrinking `corkBoard` from 512x512 to 256x256, then spent most of it on four new textures and the larger `crate`. Per-texture estimate line (from `proceduralTextures.test.ts`, `[15.7]`): `textures: 30, attractSnake 256x256=0.25MB, attractMaze 256x256=0.25MB, attractFrequency 256x256=0.25MB, marqueeSnake 256x64=0.06MB, marqueeMaze 256x64=0.06MB, marqueeFrequency 256x64=0.06MB, signFace 512x128=0.33MB, posterSunset 256x512=0.66MB, posterReel 256x512=0.66MB, shiftPoster 256x512=0.66MB, shiftPlaque 256x128=0.17MB, floor 128x128=0.08MB, wood 128x128=0.08MB, woodDark 128x128=0.08MB, crate 256x256=0.33MB, grille 128x128=0.08MB, spineAtlas 512x256=0.66MB, wallPanel 256x256=0.33MB, rugWoven 256x256=0.33MB, corkBoard 256x256=0.33MB, lampGlow 128x128=0.08MB, smpteBars 256x128=0.13MB, timecode 128x32=0.02MB, couchFabric 256x256=0.33MB, crtCasing 256x256=0.33MB, crtGlass 256x256=0.25MB, vcrDeck 256x128=0.17MB, vhsShell 128x128=0.08MB, metalCabinet 256x256=0.33MB, deskDetail 128x64=0.04MB, total 7.52 MB (estimate, budget 8 MB).
 ### 2.2 Declared configuration (read from source)
 | Metric | Computed value | Source |
 | --- | --- | --- |
-| Light count | 4 (1 ambient + 3 point lights: `crt-light` (0, 1.6, -0.6), `west-light` (-2.6, 2.3, 0.2), `arcade-light` (7.4, 2.4, 0) distance 6) | `src/world/scene/Lighting.tsx` (`M3_LIGHT_COUNT = 4`, lines 14, 32-33, 46-49) |
+| Light count | 4 (1 ambient + 3 point lights: `crt-light` (0, 1.6, -0.6), `west-light` (-2.6, 2.3, 0.2), `arcade-light` (7.4, 2.4, 0) distance 6) | `src/world/scene/Lighting.tsx` (`M3_LIGHT_COUNT = 4`, line 14; the four light declarations are at lines 47-50) |
 | Shadow maps | disabled (`shadows={false}`) | `src/world/scene/WorldCanvas.tsx` |
 | DPR cap | `dpr={[1, 1.5]}` (max 1.5) | `src/world/scene/WorldCanvas.tsx` |
 | Collider count | 28 (9 walls + 4 door frames + 15 solid props) | targeting benchmark line (section 2.3) and `roomLayout.test.ts:196` |
 | Station count | 4 (`vhs` plus three `arcade` cabinets) | same line |
 | GLB total size | 0 bytes (`public/models/` contains only `.gitkeep`; no `.glb` anywhere in `public`, `src` or `tools`) | directory listing |
 ### 2.3 Targeting benchmark (`npx vitest run src/world/logic/targeting.bench.test.ts`)
-Informational, this machine, not a pass/fail threshold; machine unspecified. It times station targeting only (`selectInteractionTarget`), not the combined `selectInteractionTargetAll`. Console line, verbatim (task 23.3 standalone run):
+Informational, this machine, not a pass/fail threshold; machine unspecified. It times station targeting only (`selectInteractionTarget`), not the combined `selectInteractionTargetAll`. Console line, verbatim (task 24.3 standalone run):
 ```
-[targeting bench] method: performance.now around 20000 calls, 254 reachable cells x 16 yaws, 4 stations, 28 colliders. measured total 20.51 ms; computed 1.025 us/call; 1308 calls returned a station. No threshold applied.
+[targeting bench] method: performance.now around 20000 calls, 254 reachable cells x 16 yaws, 4 stations, 28 colliders. measured total 24.55 ms; computed 1.228 us/call; 1308 calls returned a station. No threshold applied.
 ```
-The first full `npm test` run of task 23.3 printed `measured total 35.80 ms; computed 1.790 us/call` for the same workload. Timing varies per run. This is a CPU timing on an unspecified machine and does not show frame-time performance. It must be re-run on the Reference_Hardware (step 7).
+The full `npm test` runs of task 24.3 printed `measured total 42.01 ms; computed 2.101 us/call` (run 1), `72.57 ms; 3.628 us/call` (run 2) and `40.87 ms; 2.043 us/call` (the first run after the timeout fix), for the same workload while other test files ran in parallel. Timing varies per run. This is a CPU timing on an unspecified machine and does not show frame-time performance. It must be re-run on the Reference_Hardware (step 7).
 ### 2.4 Build output (`npm run build`, Vite 7.3.8)
-Command exit code 0 (`tsc --noEmit` and `vite build`; 100 modules transformed; built in 5.34 s; task 23.3 run). PowerShell wraps Vite's chunk-size warning (written to stderr) in a `NativeCommandError` record when run directly; it is only the warning, not a failure.
+Command exit code 0 (`tsc --noEmit` and `vite build`; 104 modules transformed; built in 19.87 s; task 24.3 run). PowerShell wraps Vite's chunk-size warning (written to stderr) in a `NativeCommandError` record when run directly; it is only the warning, not a failure.
 | Asset | Size | Gzip |
 | --- | --- | --- |
 | `dist/index.html` | 0.62 kB | 0.37 kB |
-| `dist/assets/index-Rq4h3yq5.css` | 5.72 kB | 1.75 kB |
-| `dist/assets/index-DMQVbDW3.js` | 1,278.23 kB | 365.92 kB |
-**Warning:** Vite reports a chunk larger than 500 kB after minification (the single JS bundle is 1,278.23 kB). This is expected with Three.js and React Three Fiber in one chunk. It is not an error, and no code splitting was applied. The bundle size affects download and parse time, which may affect first-render time on the Reference_Hardware. `dist/` is git-ignored and was not committed.
-Related checks run for task 23.3: `npm run typecheck` exit 0; `npm test` run twice, both 29 files and 619 tests passed, exit 0 (no flakiness seen; durations 11.01 s and 12.52 s); `npm run build` exit 0.
+| `dist/assets/index-9Cio2BuJ.css` | 7.19 kB | 2.09 kB |
+| `dist/assets/index-CKsE-qHt.js` | 1,286.49 kB | 368.91 kB |
+**Warning:** Vite reports a chunk larger than 500 kB after minification (the single JS bundle is 1,286.49 kB). This is expected with Three.js and React Three Fiber in one chunk. It is not an error, and no code splitting was applied. The bundle size affects download and parse time, which may affect first-render time on the Reference_Hardware. `dist/` is git-ignored and was not committed.
+Related checks run for task 24.3: `npm run typecheck` exit 0; `npm run build` exit 0; `npm test` finally 31 files and 663 tests passed, exit 0. **Flakiness under load:** three earlier full runs had 1, 2 and 4 CPU-heavy tests time out at the 5 s default (exit 1) while the same files passed alone. Those four tests now have an explicit 30,000 ms per-test timeout (assertions unchanged); three full runs after that passed. See `test-report.md` for the table. These are test-suite timings, not runtime frame measurements.
 ## 3. Target table
 Initial targets from `requirements.md`, Requirement 14. "Computed" means derived from declared geometry or source, not measured at runtime. "Measured" values come from section 4 (project owner, dev build, `?worldPerf=1` sampler, 60 s walkthrough).
 | Target | Req. | Threshold | Status |
@@ -147,25 +158,25 @@ Initial targets from `requirements.md`, Requirement 14. "Computed" means derived
 | Median frame time at 1280x720, integrated graphics | 14.8 | <= 20 ms | measured: 16.70 ms, met on the owner's machine |
 | 95th-percentile frame time at 1280x720, integrated graphics | 14.9 | <= 33 ms | measured: 18.60 ms, met on the owner's machine |
 | First render after mount, excluding optional GLB downloads | 14.10 | <= 3 s | not measured |
-| Triangles in rendered scene | 14.4 | <= 20,000 | computed: 19,042 (declared geometry; margin 958; runtime `renderer.info` not measured) |
+| Triangles in rendered scene | 14.4 | <= 20,000 | computed: 19,100 (declared geometry; margin 900; runtime `renderer.info` not measured) |
 | Triangles, runtime `renderer.info.render.triangles` | 14.4 | <= 20,000 | measured: 10,378 in the last rendered frame from one camera position (see section 4.2; not a whole-scene count) |
-| Draw calls | n/a (reported by task 15.4) | no threshold set | computed: 325 estimate; measured before Task 23: 151 in the last rendered frame (section 4.2) |
-| Simultaneous dynamic lights | 14.2 | <= 4 | computed: 4 (1 ambient + 3 point; task 23 added none) |
+| Draw calls | n/a (reported by task 15.4) | no threshold set | computed: 332 estimate; measured before Tasks 23 and 24: 151 in the last rendered frame (section 4.2) |
+| Simultaneous dynamic lights | 14.2 | <= 4 | computed: 4 (1 ambient + 3 point; tasks 23 and 24 added none) |
 | Device pixel ratio cap | 14.1 | 1.5 | computed: `dpr={[1, 1.5]}` in source; runtime not measured |
 | Real-time shadow maps | 14.3 | disabled by default | computed: `shadows={false}` in source |
 | Post-processing passes | 14.5 | none, or at most one disablable pass | not measured (no pass found by this log; not verified here) |
 | GLB total size | task 15.4 / assets | <= 5 MB | computed: 0 bytes (no GLB files in `public/models/`) |
 | Texture memory | n/a | <= 8 MB (budget set in `proceduralTextures.test.ts`) | computed: 7.521 MB estimate (30 textures); limit 8 MB, margin about 0.48 MB; largest are the three posters and spineAtlas (0.66 MB each) |
 | Collider count | n/a | no threshold set | computed: 28 |
-| Production JS bundle | n/a | no threshold set | computed: 1,278.23 kB (365.92 kB gzip), exceeds Vite 500 kB warning |
-| Targeting benchmark | n/a | no threshold (informational) | computed: 1.025 us/call (standalone run; 1.790 us/call in the full-suite run; station targeting only), this machine, unspecified |
+| Production JS bundle | n/a | no threshold set | computed: 1,286.49 kB (368.91 kB gzip), exceeds Vite 500 kB warning |
+| Targeting benchmark | n/a | no threshold (informational) | computed: 1.228 us/call (standalone run; 2.043 us/call in a full-suite run; station targeting only), this machine, unspecified |
 Notes: the 5 MB GLB limit is not stated in Requirement 14 and comes from the task request; confirm the source (asset manifest or `THIRD_PARTY_ASSETS.md`) before citing it. Rows marked "no threshold set" have no target in Requirement 14.
 **Reference_Hardware caveat:** the requirement's Reference_Hardware (integrated graphics at 1280x720) cannot be confirmed, because the hardware and window resolution were not recorded. The two frame-time rows are met on the owner's machine only. First-render time (<= 3 s) is still not measured.
 
 **No target is achieved without a recorded runtime value in section 4.** Computed rows only show that declared geometry is within the stated limit.
 ## 4. Recorded runtime results
 
-Measured by the project owner, dev build, ?worldPerf=1 sampler, 60 s walkthrough across both rooms and all three arcade cabinets. **This measurement predates Task 23 and has not been repeated.** The scene at that time had no interactable lamps, manuals or world message, and different triangle, draw-call and texture figures. The agent did not run this measurement. Hardware, browser, OS, resolution and date: not provided (see the environment table in section 1.1; please fill them in).
+Measured by the project owner, dev build, ?worldPerf=1 sampler, 60 s walkthrough across both rooms and all three arcade cabinets. **This measurement predates Tasks 23 and 24 and has not been repeated.** The scene at that time had no interactable lamps, manuals, Archive Document Card or notes counter, none of the Task 24 additive layers (lamp cones, desk pools, ceiling bloom strips), and different triangle, draw-call and texture figures. **Re-measuring is recommended** because Task 24 adds additive transparent layers. Until then, the frame-time rows describe the earlier scene only. The agent did not run this measurement. Hardware, browser, OS, resolution and date: not provided (see the environment table in section 1.1; please fill them in).
 
 ### 4.1 Raw `window.__worldPerf.summary()` output (verbatim)
 
@@ -192,7 +203,7 @@ Measured by the project owner, dev build, ?worldPerf=1 sampler, 60 s walkthrough
 Read from `useFrameSampler.ts` and `frameStats.ts`:
 
 - **(a) Frames.** The ring buffer capacity is 3600 (`FRAME_SAMPLE_CAPACITY`). `frames: 3600` equals that capacity, so the summary covers the most recent 3600 frames, about 60 s at about 60 fps. Earlier frames of a longer walk would have been overwritten. Median and p95 are nearest-rank statistics over those samples (each sample is the frame delta in ms).
-- **(b) Triangles, draw calls, geometries, textures.** `summary()` reads `renderer.info` at the moment it is called. `triangles` and `drawCalls` are `info.render.triangles` and `info.render.calls`, which describe the last rendered frame only (three.js resets them each frame). They therefore describe one frame from one camera position, after frustum culling, with each instanced mesh counted as one draw call. They are not comparable one-to-one with the computed whole-scene figures (19,042 triangles and a 325 draw-call grouping estimate now; 19,172 and 319 when the owner measured, before Task 23; 30 declared textures). Lower numbers are expected. The computed figures stay valid as budget checks against declared geometry. Geometries (89) and textures (29) come from `info.memory`, which counts resources currently uploaded, not per frame.
+- **(b) Triangles, draw calls, geometries, textures.** `summary()` reads `renderer.info` at the moment it is called. `triangles` and `drawCalls` are `info.render.triangles` and `info.render.calls`, which describe the last rendered frame only (three.js resets them each frame). They therefore describe one frame from one camera position, after frustum culling, with each instanced mesh counted as one draw call. They are not comparable one-to-one with the computed whole-scene figures (19,100 triangles and a 332 draw-call grouping estimate now, computed; 19,172 and 319 when the owner measured, before Tasks 23 and 24; 30 declared textures). Lower numbers are expected. The computed figures stay valid as budget checks against declared geometry. Geometries (89) and textures (29) come from `info.memory`, which counts resources currently uploaded, not per frame.
 - **(c) Textures 29 vs 30 declared.** `info.memory.textures` counts textures uploaded to the GPU so far. Likely explanation, not a verified fact: one declared texture had not been uploaded yet (for example it was never visible or never used by a rendered material) or is absent. This was not investigated.
 - **(d) Frame time.** A median near 16.7 ms is consistent with a 60 Hz vsync cap. The frame time is therefore likely limited by display refresh rather than by the GPU, and the real headroom is unknown. The measurement shows the scene held about 60 fps on the owner's machine; it does not show how much faster it could run.
 - **Dev build.** Dev builds are slower than production, so these numbers are likely a lower bound on performance. This was not compared against a production build.

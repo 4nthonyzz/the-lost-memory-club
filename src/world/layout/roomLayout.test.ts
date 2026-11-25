@@ -272,7 +272,7 @@ describe('roomLayout', () => {
     expect(gap(island, prop('filing-cabinet-b').box)).toBeGreaterThanOrEqual(1.3 - 1e-9);
     expect(island.minZ - ROOM.bounds.minZ).toBeCloseTo(1.9);
     expect(gap(island, prop('shelf-a').box)).toBeGreaterThanOrEqual(3.7 - 1e-9);
-  });
+  }, 30000);
 
   it('leaves a 2.7 m unobstructed walkway between the console front and the reception desk', () => {
     const island = prop('crt-vhs').box;

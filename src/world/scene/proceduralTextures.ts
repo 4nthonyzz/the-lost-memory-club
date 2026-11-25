@@ -1090,17 +1090,19 @@ export function drawCorkBoard(c: Ctx2D, w: number, h: number, seed: number): voi
 }
 
 /**
- * Colour stops of the lamp glow radial gradient (task 23.1): a near-white filament core, warm tungsten amber,
+ * Colour stops of the lamp glow radial gradient (task 23.1, richer in 24.1): a bright warm-white core, golden amber,
  * then a long soft falloff that reaches alpha 0 at LAMP_GLOW_RADIUS_FRACTION of the half width, so the disc has no hard edge.
  */
 export const LAMP_GLOW_STOPS: Stops = [
-  [0, 'rgba(255,250,232,1)'],
-  [0.06, 'rgba(255,238,196,0.9)'],
-  [0.16, 'rgba(255,208,128,0.55)'],
-  [0.34, 'rgba(255,172,76,0.26)'],
-  [0.56, 'rgba(238,134,44,0.1)'],
-  [0.8, 'rgba(204,98,28,0.025)'],
-  [1, 'rgba(180,80,20,0)'],
+  // Task 24.1: bright warm-white core, rich golden amber mid falloff, then a smooth feather to alpha 0 at the end.
+  [0, 'rgba(255,252,240,1)'],
+  [0.05, 'rgba(255,246,214,0.95)'],
+  [0.14, 'rgba(255,224,150,0.7)'],
+  [0.3, 'rgba(255,190,80,0.42)'],
+  [0.5, 'rgba(244,156,40,0.2)'],
+  [0.7, 'rgba(214,120,22,0.075)'],
+  [0.86, 'rgba(190,100,18,0.02)'],
+  [1, 'rgba(180,90,16,0)'],
 ]
 /** Radius where the glow reaches alpha 0, as a fraction of half the canvas width (the outer ring stays clear). */
 export const LAMP_GLOW_RADIUS_FRACTION = 0.9

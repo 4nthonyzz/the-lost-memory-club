@@ -36,6 +36,8 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 
 - Approved scope change (interactive props), 2026-11-30: world-local interactable props (two desk lamps and three arcade manual books on the west bookcase) are added. They do NOT use `StationId` and never call `onInspect`; `StationId` stays `'vhs' | 'arcade'`. Pressing E on a prop is handled inside the world (lamp on/off state is session-only, not persisted, not GameState) and does not suspend world input. Because `WorldSceneProps` has no status callback and `App.tsx` is unchanged, prop messages are shown in a world-owned message line inside the world wrapper (near the interaction prompt, `role="status"`, never covering the App HUD status line); this supersedes the earlier wording "status bar". The reception desk currently has one lamp: a second lamp is added (left green-shaded banker's lamp, right cream-shaded table lamp). Lighting stays `M3_LIGHT_COUNT = 4` (lamp light is emissive meshes, a glow sprite and a desk light-pool decal only). The manual texts describe LAST EXIT and DEAD FREQUENCY gameplay that is not implemented in `src/arcade`: they are in-world lore. Budgets: fewer than 20,000 triangles (currently 19,172 computed; new geometry at most +120), at most 4 lights, texture memory at most 8 MB (`lampGlow` upgraded in place). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json` and `tools/blender/` stay unchanged.
 
+- Approved scope change (lighting and clue inspector), 2026-12-01: no new three.js lights are added (`M3_LIGHT_COUNT` stays 4). Lamp light is produced by emissive shades, additive volumetric cones, additive desk pools and glow sprites. West-light and ambient intensity are modulated by the number of lamps ON, as a multiplier applied on top of the existing Memory_Shift and flicker values (never overwriting them), and the ambient floor is kept. Ceiling fixtures get additive bloom strips. A world-owned Archive Document Card overlay (`WorldInspectorCard`) opens for readable props. It is non-blocking (no `onInspect`, no input suspension) and closes on E, Esc or when the player walks more than 2.6 m away. A session-only "NOTES READ: X / 6" counter is shown (no storage). There are eight world interactables: two lamps, three manuals, the desk notebook, the cork board and the "THE SIGNAL REMEMBERS" poster (targetable only while visible, if it is the Memory_Shift overlay poster). New lore texts are original placeholder writing, for review by the story owner (Developer 3). `StationId` and `onInspect` are unchanged. Budgets: fewer than 20,000 triangles (currently 19,042 computed; task 24 adds at most +100), at most 4 lights, texture memory at most 8 MB (7.521 MB computed; `lampGlow` is upgraded in place). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json` and `tools/blender/` stay unchanged.
+
 ## Tasks
 
 ### Milestone 1: Playable 3D room (primitives only)
@@ -890,6 +892,36 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: documentation and the spec folder only.
     - _Requirements: 14.11, 14.12, 15.3, 15.6_
 
+### Dramatic lighting and clue inspector
+
+- [x] 24. Dramatic lighting and clue inspector
+  - [x] 24.1 Lamp cones, pools, emissive shades, room light coupling and ceiling bloom
+    - Files: `src/world/scene/proceduralTextures.ts`, `src/world/scene/modelDetail.ts`, `src/world/scene/Props.tsx`, `src/world/scene/Lighting.tsx`, `src/world/scene/Room.tsx`, `src/world/scene/sharedResources.ts`, `src/world/scene/MemoryShiftDriver.tsx` or `src/world/scene/Effects.tsx` (wherever light intensities are written), `src/world/WorldScene.tsx`, and the matching tests (`proceduralTextures.test.ts`, `modelDetail.test.ts`, Memory_Shift tests updated, not weakened).
+    - Add additive volumetric cones and additive desk pools for each lamp, driven by its session-only `on` state, with emissive shades. Upgrade `lampGlow` in place. Add additive bloom strips to the ceiling fixtures. Couple west-light and ambient intensity to the number of lamps ON as a multiplier applied on top of the Memory_Shift and flicker values, never overwriting them, with the ambient floor kept.
+    - Acceptance: no new three.js light (`M3_LIGHT_COUNT` stays 4); lights at most 4; new geometry at most +100 triangles and the estimate stays below 20,000; texture memory at most 8 MB; changed textures disposed exactly once (twice-safe); colliders and Station anchors unchanged; Memory_Shift tinting and reduced motion still work; ambient never drops below the floor.
+    - Tests: `modelDetail.test.ts` (budgets, lamp-count multiplier values including 0, 1 and 2 lamps, floor kept, multiplier composes with Memory_Shift and flicker), `proceduralTextures.test.ts` (determinism with a fake context, power-of-two sizes, no randomness). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 23.3.
+    - Boundary: render-only; `src/world/` only; no new dependency; no GLB; `ASSET_MANIFEST` stays empty.
+    - _Requirements: 1.3, 1.4, 1.8, 9.1, 9.2, 9.8, 10.2, 10.3, 10.7, 12.5, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 24.2 Clue inspector card, new readable props and notes counter
+    - Files: `src/world/logic/propState.ts`, `src/world/layout/roomLayout.ts`, `src/world/logic/targeting.ts`, `src/world/worldTypes.ts`, `src/world/logic/inputMode.ts` (only if needed), `src/world/controller/useWorldInput.ts`, `src/world/controller/usePlayerRig.ts`, `src/world/WorldScene.tsx`, new `src/world/overlay/WorldInspectorCard.tsx`, `src/world/overlay/WorldOverlay.tsx`, `src/world/overlay/world.css`; tests `src/world/logic/targeting.test.ts`, `src/world/logic/propState.test.ts`, `src/world/WorldScene.test.ts`, `src/world/scene/modelDetail.test.ts`.
+    - Add the desk notebook, the cork board and the "THE SIGNAL REMEMBERS" poster as world-local readable props (eight world interactables in total with the two lamps and three manuals). The poster is targetable only while visible when it is the Memory_Shift overlay poster. E on a readable prop opens `WorldInspectorCard` (Archive Document Card) with original placeholder lore text for review by the story owner (Developer 3). The card is non-blocking: no `onInspect`, no input suspension, no pointer-lock change. It closes on E, Esc or when the player walks more than 2.6 m away. Add a session-only "NOTES READ: X / 6" counter (unique readable props read; no storage, not GameState, resets on reload).
+    - Acceptance: `StationId` stays `'vhs' | 'arcade'`; E on a prop never calls `onInspect` and never changes the input mode; E at a Station is unchanged; the card is reachable by keyboard and has `role` and accessible label; the counter increments once per unique prop; no storage access; triangle estimate below 20,000; lights at most 4; `src/App.tsx` and shared contracts unchanged.
+    - Tests: `targeting.test.ts` (new props in range, boundary, nearest wins, hidden poster not targetable), `propState.test.ts` (counter uniqueness, card open and close transitions, 2.6 m auto-close), `WorldScene.test.ts` (card opens and closes on E, Esc and distance; `onInspect` not called; Station E unchanged; counter text), `modelDetail.test.ts` (prop positions, budgets). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 24.1.
+    - Boundary: `src/world/` only; `WorldSceneProps` and `onInspect` unchanged; no import from `src/arcade/` or `src/memories/`; the import-boundary test still passes.
+    - _Requirements: 7.1, 7.2, 7.3, 7.5, 7.6, 7.7, 8.1, 8.6, 9.3, 11.14, 15.1, 15.2, 15.4, 16.6, 16.7, 16.8, 16.9, 20.1, 20.2, 20.8_
+
+  - [x] 24.3 Docs, metrics and verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, lights and texture memory, each labelled "computed, not runtime-measured". Document the Archive Document Card, the session-only notes counter, the lamp-count light coupling, and that the lore texts are placeholders pending Developer 3 review. Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final geometry and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 24.2.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional. The 17 property-based test sub-tasks can be skipped for a faster MVP. Tasks 16.2 and 16.3 are marked `*` because they must not be implemented without approval.
@@ -951,7 +983,10 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     { "id": 44, "tasks": ["22.3"] },
     { "id": 45, "tasks": ["23.1"] },
     { "id": 46, "tasks": ["23.2"] },
-    { "id": 47, "tasks": ["23.3"] }
+    { "id": 47, "tasks": ["23.3"] },
+    { "id": 48, "tasks": ["24.1"] },
+    { "id": 49, "tasks": ["24.2"] },
+    { "id": 50, "tasks": ["24.3"] }
   ]
 }
 ```

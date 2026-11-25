@@ -60,7 +60,7 @@ export interface Part {
    * Desk lamp role (task 23.1): `bulb` core, `inner` shade face, `sprite` (a camera-facing glow plane, drawn by Props.tsx
    * with a billboard) or the desk light `pool`. Sprite and pool use a never-drawn material while the lamp is off.
    */
-  lampRole?: 'bulb' | 'inner' | 'sprite' | 'pool'
+  lampRole?: 'bulb' | 'inner' | 'sprite' | 'pool' | 'cone' | 'shade'
 }
 
 /** True when the part is rendered from a cached real-size geometry (mesh scale 1). */
@@ -638,42 +638,91 @@ export function deskLampPlacement(id: string): { box: Aabb; top: number } {
   return { box: lamp.box, top: layoutProp('reception-desk').height }
 }
 
-/** Materials per lamp state: the lit set is emissive, the unlit set is dark and never drawn for sprite and pool. */
+/**
+ * Materials per lamp kind and state (task 24.1). The lit set is emissive (shade emissive, bulb, additive cone, pool
+ * and sprite); the unlit set is dark, and the cone, pool and sprite use the never-drawn `lampGlowOff`
+ * (`visible: false`). Each lamp has its own shade, cone and pool materials, so one lamp never mutates the other's.
+ */
+type LampMaterialSet = Record<NonNullable<Part['lampRole']>, MaterialKey>
 export const LAMP_MATERIALS = {
-  on: { bulb: 'bulb', inner: 'lampInnerOn', sprite: 'lampHalo', pool: 'lampPool' },
-  off: { bulb: 'lampBulbOff', inner: 'lampInnerOff', sprite: 'lampGlowOff', pool: 'lampGlowOff' },
-} as const satisfies Record<'on' | 'off', Record<NonNullable<Part['lampRole']>, MaterialKey>>
+  banker: {
+    on: { bulb: 'bulb', inner: 'lampInnerOn', sprite: 'lampHalo', pool: 'lampPoolBanker', cone: 'lampConeBanker', shade: 'lampGreenShadeOn' },
+    off: { bulb: 'lampBulbOff', inner: 'lampInnerOff', sprite: 'lampGlowOff', pool: 'lampGlowOff', cone: 'lampGlowOff', shade: 'lampGreenShade' },
+  },
+  table: {
+    on: { bulb: 'bulb', inner: 'lampInnerOn', sprite: 'lampHalo', pool: 'lampPool', cone: 'lampConeTable', shade: 'lampCreamShadeOn' },
+    off: { bulb: 'lampBulbOff', inner: 'lampInnerOff', sprite: 'lampGlowOff', pool: 'lampGlowOff', cone: 'lampGlowOff', shade: 'lampCreamShade' },
+  },
+} as const satisfies Record<DeskLampKind, Record<'on' | 'off', LampMaterialSet>>
+
+/** Largest light-pool radius wanted by the look (24.1). The desk top is only 0.8 m deep, so the fit below caps it at 0.4 m. */
+export const LAMP_POOL_RADIUS_WANTED = 0.85
+/** Gap kept between the cone bottom and the desk top so the cone never z-fights the pool decal. */
+const LAMP_CONE_FLOOR_GAP = 0.004
+
+/**
+ * Pool decal placement (24.1): the pool never hangs past the desk edge. The radius is the wanted 0.85 m capped to
+ * half the desk depth (0.4 m, so the decal is a 0.8 m quad whose visible disc, 90 % of it, is 0.36 m), and the
+ * centre is pulled inward just far enough that the whole quad lies inside the desk top rectangle.
+ */
+export function lampPoolPlacement(desk: Aabb, x: number, z: number): { cx: number; cz: number; radius: number } {
+  const radius = Math.min(LAMP_POOL_RADIUS_WANTED, (desk.maxX - desk.minX) / 2, (desk.maxZ - desk.minZ) / 2)
+  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
+  return {
+    cx: clamp(x, desk.minX + radius, desk.maxX - radius),
+    cz: clamp(z, desk.minZ + radius, desk.maxZ - radius),
+    radius,
+  }
+}
+
+/**
+ * Open light cone from the shade rim down to the desk top, built on the shared 12-sided open `cone` geometry
+ * (24 triangles; top radius 0.3 and bottom radius 0.5 of the scale). `rimRadius` is the cone radius at the rim.
+ */
+function lampCone(mat: MaterialKey, x: number, z: number, top: number, rimY: number, rimRadius: number): Part {
+  const floorY = top + LAMP_CONE_FLOOR_GAP
+  const h = rimY - floorY
+  const d = rimRadius / 0.3 // the geometry's top radius is 0.3 of the scale, so the top matches the rim
+  return { ...part('cone', mat, [x, floorY + h / 2, z], [d, h, d]), lampRole: 'cone' }
+}
 
 export function deskLampParts(box: Aabb, kind: DeskLampKind, on = true, top: number = layoutProp('reception-desk').height): Part[] {
   const { cx, cz } = centre(box)
-  const m = LAMP_MATERIALS[on ? 'on' : 'off']
+  const m = LAMP_MATERIALS[kind][on ? 'on' : 'off']
   const role = (p: Part, lampRole: NonNullable<Part['lampRole']>): Part => ({ ...p, lampRole })
+  const desk = layoutProp('reception-desk').box
   if (kind === 'banker') {
     // Shade centre: the shade sits west of the base so the whole lamp stays inside the footprint.
     const sx = cx - 0.04
+    const pool = lampPoolPlacement(desk, sx, cz)
     return [
       part('cylinderLow', 'brass', [cx + 0.11, top + 0.01, cz], [0.12, 0.02, 0.12]),
       bx('brass', [cx + 0.11, top + 0.16, cz], [0.02, 0.28, 0.02]),
       bx('brass', [cx + 0.07, top + 0.3, cz], [0.1, 0.014, 0.014]),
       // Low horizontal green glass shade: a roof plus two long side skirts, open at the ends and underneath.
-      bx('lampGreenShade', [sx, top + 0.31, cz], [0.22, 0.025, 0.13]),
-      bx('lampGreenShade', [sx, top + 0.272, cz - 0.059], [0.22, 0.05, 0.012]),
-      bx('lampGreenShade', [sx, top + 0.272, cz + 0.059], [0.22, 0.05, 0.012]),
+      role(bx(m.shade, [sx, top + 0.31, cz], [0.22, 0.025, 0.13]), 'shade'),
+      role(bx(m.shade, [sx, top + 0.272, cz - 0.059], [0.22, 0.05, 0.012]), 'shade'),
+      role(bx(m.shade, [sx, top + 0.272, cz + 0.059], [0.22, 0.05, 0.012]), 'shade'),
       role(part('plane', m.inner, [sx, top + 0.2965, cz], [0.2, 0.105, 1], [HALF_PI, 0, 0]), 'inner'),
       role(part('sphere', m.bulb, [sx, top + 0.262, cz], [0.045, 0.045, 0.045]), 'bulb'),
       role(part('plane', m.sprite, [sx, top + 0.27, cz], [0.42, 0.42, 1]), 'sprite'),
-      role(part('plane', m.pool, [sx, top + LAMP_POOL_LIFT, cz], [0.36, 0.36, 1], [-HALF_PI, 0, 0]), 'pool'),
+      // Cone from the shade skirt bottom (0.247 m up), 0.108 m rim radius, spreading to 0.18 m at the desk.
+      lampCone(m.cone, sx, cz, top, top + 0.247, 0.108),
+      role(part('plane', m.pool, [pool.cx, top + LAMP_POOL_LIFT, pool.cz], [pool.radius * 2, pool.radius * 2, 1], [-HALF_PI, 0, 0]), 'pool'),
     ]
   }
+  const pool = lampPoolPlacement(desk, cx, cz)
   return [
     part('cylinderLow', 'brass', [cx, top + 0.012, cz], [0.15, 0.024, 0.15]),
     part('cylinderLow', 'brass', [cx, top + 0.12, cz], [0.045, 0.2, 0.045]),
     // Conical cream shade, open at both ends.
-    part('cone', 'lampCreamShade', [cx, top + 0.3, cz], [0.24, 0.16, 0.24]),
+    role(part('cone', m.shade, [cx, top + 0.3, cz], [0.24, 0.16, 0.24]), 'shade'),
     role(part('plane', m.inner, [cx, top + 0.372, cz], [0.13, 0.13, 1], [HALF_PI, 0, 0]), 'inner'),
     role(part('sphere', m.bulb, [cx, top + 0.27, cz], [0.05, 0.05, 0.05]), 'bulb'),
     role(part('plane', m.sprite, [cx, top + 0.3, cz], [0.45, 0.45, 1]), 'sprite'),
-    role(part('plane', m.pool, [cx, top + LAMP_POOL_LIFT, cz], [0.38, 0.38, 1], [-HALF_PI, 0, 0]), 'pool'),
+    // Cone from the shade rim (0.22 m up, rim radius 0.12 m), spreading to 0.2 m at the desk.
+    lampCone(m.cone, cx, cz, top, top + 0.22, 0.12),
+    role(part('plane', m.pool, [pool.cx, top + LAMP_POOL_LIFT, pool.cz], [pool.radius * 2, pool.radius * 2, 1], [-HALF_PI, 0, 0]), 'pool'),
   ]
 }
 
@@ -1202,6 +1251,8 @@ export function deskParts(box: Aabb, height: number): Part[] {
 
 export const FIXTURE_LENGTH = 1.2
 export const FIXTURE_WIDTH = 0.22
+/** The bloom strip hangs this far below the ceiling: 8 mm under the tube bottom (tube bottom is 0.072 m down). */
+export const CEILING_BLOOM_DROP = 0.08
 
 /** Ceiling fixture centres, derived from the main-room and arcade-area extents in the layout. */
 export function fixtureCentres(): Array<readonly [number, number]> {
@@ -1230,6 +1281,8 @@ export function ceilingFixtureParts(cx: number, cz: number): Part[] {
   return [
     bx('metal', [cx, y - 0.03, cz], [FIXTURE_LENGTH, 0.06, FIXTURE_WIDTH]),
     bx('fluorescent', [cx, y - 0.066, cz], [FIXTURE_LENGTH - 0.1, 0.012, FIXTURE_WIDTH - 0.08]),
+    // Task 24.1: faint additive bloom strip just below the tube (2 triangles), facing down. Room.tsx skips it without the glow texture.
+    part('plane', 'ceilingBloom', [cx, y - CEILING_BLOOM_DROP, cz], [FIXTURE_LENGTH + 0.5, FIXTURE_WIDTH + 0.5, 1], [HALF_PI, 0, 0]),
   ]
 }
 

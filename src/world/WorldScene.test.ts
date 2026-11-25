@@ -5,7 +5,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 // The target source is controllable. usePlayerRig is mocked so no R3F frame loop is needed.
 // A Station id or a world-local prop id; the mock wraps it in the combined target type (task 23.2).
-type TargetId = 'vhs' | 'arcade' | 'desk-lamp-left' | 'desk-lamp-right' | 'manual-snake' | 'manual-maze' | 'manual-frequency';
+type TargetId = 'vhs' | 'arcade' | 'desk-lamp-left' | 'desk-lamp-right' | 'manual-snake' | 'manual-maze' | 'manual-frequency' | 'desk-notebook' | 'cork-board' | 'poster-shift';
 const h = vi.hoisted(() => ({
   target: null as TargetId | null,
   setTarget: null as ((id: TargetId | null) => void) | null,
@@ -199,62 +199,148 @@ describe('WorldScene feedback ownership text', () => {
   });
 });
 
-describe('WorldScene interactable props (task 23.2)', () => {
+describe('WorldScene interactable props (task 23.2, 24.2)', () => {
   const prompt = () => document.querySelector('.world-prompt')?.textContent ?? '';
   const message = () => document.querySelector('.world-message-region');
+  const card = () => document.querySelector('.world-card');
+  const cardTitle = () => card()?.querySelector('.world-card-title')?.textContent ?? null;
+  const counter = () => document.querySelector('.world-notes .world-chip')?.textContent ?? null;
   const pressE = (wrapper: HTMLElement) => {
     fireEvent.keyDown(wrapper, { code: 'KeyE', key: 'e' });
     fireEvent.keyUp(wrapper, { code: 'KeyE', key: 'e' });
   };
 
-  it('lamp prompt toggles after E, onInspect is not called, and the world message shows the lamp text', () => {
+  it('lamp prompt toggles after E, onInspect is not called, and the status pill shows the exact lamp text', () => {
     h.target = 'desk-lamp-left';
     const { wrapper, onInspect } = renderWorld();
     expect(prompt()).toBe('Press E to turn off desk lamp');
     pressE(wrapper);
     expect(prompt()).toBe('Press E to turn on desk lamp');
-    expect(message()?.textContent).toBe('Desk lamp turned off.');
+    expect(message()?.textContent).toBe("Banker's lamp switched OFF");
     pressE(wrapper);
     expect(prompt()).toBe('Press E to turn off desk lamp');
-    expect(message()?.textContent).toBe('Desk lamp turned on.');
+    expect(message()?.textContent).toBe("Banker's lamp switched ON");
     expect(onInspect).not.toHaveBeenCalled();
-    // No suspension: no panel notice.
     expect(screen.queryByText(/Station request sent/)).toBeNull();
+    expect(card()).toBeNull();
   });
 
-  it('E on a manual shows the exact manual text in a polite status region, then clears when the target changes', () => {
+  it('the right lamp shows the table lamp pill texts', () => {
+    h.target = 'desk-lamp-right';
+    const { wrapper } = renderWorld();
+    pressE(wrapper);
+    expect(message()?.textContent).toBe('Table lamp switched OFF');
+    pressE(wrapper);
+    expect(message()?.textContent).toBe('Table lamp switched ON');
+  });
+
+  it('E on a manual opens its card with the title, E again closes it, and onInspect is never called', () => {
     h.target = 'manual-maze';
     const { wrapper, onInspect } = renderWorld();
     expect(prompt()).toBe('Press E to read: LAST EXIT Manual');
-    const region = message()!;
-    expect(region.getAttribute('role')).toBe('status');
-    expect(region.getAttribute('aria-live')).toBe('polite');
-    expect(region.textContent).toBe('');
+    expect(card()).toBeNull();
     pressE(wrapper);
-    expect(region.textContent).toBe(
-      'LAST EXIT \u2014 Navigate a shifting dark labyrinth, recover three lost photograph fragments, and escape before the stalker catches you.',
-    );
+    expect(cardTitle()).toBe('LAST EXIT Manual');
+    expect(card()?.getAttribute('role')).toBe('region');
+    expect(card()?.getAttribute('aria-live')).toBe('polite');
+    expect(card()?.getAttribute('aria-label')).toBe('LAST EXIT Manual');
+    expect(card()?.textContent).toContain('Press E or move away to close');
+    expect(card()?.textContent).toContain('Cabinet status: awaiting service');
+    expect(message()?.textContent).toBe('');
+    pressE(wrapper);
+    expect(card()).toBeNull();
     expect(onInspect).not.toHaveBeenCalled();
-    act(() => h.setTarget!('manual-snake'));
-    expect(region.textContent).toBe('');
-    expect(prompt()).toBe('Press E to read: SNAKE.EXE Manual');
-    pressE(wrapper);
-    expect(region.textContent).toBe(
-      'SNAKE.EXE \u2014 Guide a serpent of magnetic VHS tape, collect tape fragments, and evade the dark shadow serpent to uncover a secret code.',
-    );
-    act(() => h.setTarget!(null));
-    expect(region.textContent).toBe('');
-    expect(message()).toBe(region);
   });
 
-  it('shows the DEAD FREQUENCY prompt and text', () => {
-    h.target = 'manual-frequency';
+  it('E with no target closes an open card, even after the target is lost', () => {
+    h.target = 'manual-snake';
     const { wrapper } = renderWorld();
-    expect(prompt()).toBe('Press E to read: DEAD FREQUENCY Manual');
     pressE(wrapper);
-    expect(message()?.textContent).toBe(
-      'DEAD FREQUENCY \u2014 Listen closely to haunted radio frequencies and repeat each audio sequence to decode hidden transmissions.',
-    );
+    expect(cardTitle()).toBe('SNAKE.EXE Manual');
+    act(() => h.setTarget!(null));
+    expect(card()).not.toBeNull();
+    pressE(wrapper);
+    expect(card()).toBeNull();
+  });
+
+  it('Escape closes the card and is not prevented', () => {
+    h.target = 'cork-board';
+    const { wrapper } = renderWorld();
+    pressE(wrapper);
+    expect(cardTitle()).toBe('Investigation Pinboard');
+    const notPrevented = fireEvent.keyDown(wrapper, { code: 'Escape', key: 'Escape' });
+    expect(notPrevented).toBe(true);
+    expect(card()).toBeNull();
+  });
+
+  it('E on a lamp while a card is open closes the card only', () => {
+    h.target = 'desk-notebook';
+    const { wrapper } = renderWorld();
+    pressE(wrapper);
+    expect(cardTitle()).toBe('Shift Log Notebook');
+    act(() => h.setTarget!('desk-lamp-left'));
+    pressE(wrapper);
+    expect(card()).toBeNull();
+    expect(prompt()).toBe('Press E to turn off desk lamp'); // still ON
+    expect(message()?.textContent).toBe('');
+    pressE(wrapper);
+    expect(message()?.textContent).toBe("Banker's lamp switched OFF");
+  });
+
+  it('opening a station closes an open card and still calls onInspect once', () => {
+    h.target = 'manual-frequency';
+    const { wrapper, onInspect } = renderWorld();
+    pressE(wrapper);
+    expect(card()).not.toBeNull();
+    act(() => h.setTarget!('vhs'));
+    pressE(wrapper);
+    expect(card()).toBeNull();
+    expect(onInspect).toHaveBeenCalledTimes(1);
+    expect(onInspect).toHaveBeenCalledWith('vhs');
+  });
+
+  it('the card disappears when the world enters inspecting after a station opened', () => {
+    h.target = 'poster-shift';
+    const { wrapper } = renderWorld();
+    pressE(wrapper);
+    expect(cardTitle()).toBe('The Signal Remembers');
+    act(() => h.setTarget!('arcade'));
+    pressE(wrapper);
+    expect(card()).toBeNull();
+    expect(counter()).toBeNull(); // hidden while inspecting
+  });
+
+  it('the notes counter goes 0, 1, unchanged on a re-read, 2 and hides while inspecting', () => {
+    h.target = 'manual-snake';
+    const { wrapper } = renderWorld();
+    expect(counter()).toBe('NOTES READ: 0 / 6');
+    expect(document.querySelector('.world-notes')?.getAttribute('aria-label')).toBe('Notes read: 0 of 6');
+    pressE(wrapper); // open
+    expect(counter()).toBe('NOTES READ: 1 / 6');
+    pressE(wrapper); // close
+    pressE(wrapper); // re-read
+    expect(counter()).toBe('NOTES READ: 1 / 6');
+    pressE(wrapper); // close
+    act(() => h.setTarget!('manual-maze'));
+    pressE(wrapper);
+    expect(counter()).toBe('NOTES READ: 2 / 6');
+    pressE(wrapper); // close
+    act(() => h.setTarget!('desk-lamp-left'));
+    pressE(wrapper);
+    expect(counter()).toBe('NOTES READ: 2 / 6'); // lamps do not count
+    act(() => h.setTarget!('vhs'));
+    pressE(wrapper);
+    expect(counter()).toBeNull();
+  });
+
+  it('shows the prompts of the new readable props', () => {
+    h.target = 'desk-notebook';
+    renderWorld();
+    expect(prompt()).toBe('Press E to read: Shift Log Notebook');
+    act(() => h.setTarget!('cork-board'));
+    expect(prompt()).toBe('Press E to examine: Investigation Pinboard');
+    act(() => h.setTarget!('poster-shift'));
+    expect(prompt()).toBe("Press E to inspect: 'The Signal Remembers' Poster");
   });
 
   it('station prompts and inspection are unchanged after a prop interaction', () => {
@@ -269,7 +355,6 @@ describe('WorldScene interactable props (task 23.2)', () => {
     expect(onInspect).toHaveBeenCalledWith('vhs');
   });
 });
-
 describe('WorldScene fallback (no WebGL)', () => {
   it('fallback buttons call onInspect with vhs and arcade', () => {
     setWebgl(false);

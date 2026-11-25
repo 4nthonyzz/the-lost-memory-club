@@ -34,6 +34,8 @@ export type ModeEvent =
       targetKind?: 'station' | 'prop' | null;
       /** Id of the targeted prop when 	argetKind is 'prop'. */
       targetPropId?: PropInteractableId | null;
+      /** True while an Archive Document Card is open. E with no target then closes it. Omitted means false. */
+      cardOpen?: boolean;
     }
   | { type: 'KEY_UP'; role: KeyRole | null }
   | { type: 'EXTERNAL_ENABLED'; value: boolean }
@@ -42,6 +44,7 @@ export type ModeEvent =
 export type ModeEffect =
   | { type: 'CALL_ON_INSPECT' }
   | { type: 'PROP_INTERACT'; id: PropInteractableId }
+  | { type: 'CLOSE_CARD' }
   | { type: 'RELEASE_POINTER_LOCK' }
   | { type: 'REQUEST_POINTER_LOCK' }
   | { type: 'CLEAR_INPUT' }
@@ -151,6 +154,10 @@ function keyDown(s: ModeState, e: Extract<ModeEvent, { type: 'KEY_DOWN' }>): Mod
         state: { ...s, eRepeatGuard: true },
         effects: [{ type: 'PROP_INTERACT', id: e.targetPropId }],
       };
+    }
+    if (!e.hasTarget && e.cardOpen) {
+      // E on nothing while a card is open closes it. One action per press (repeat guard).
+      return { state: { ...s, eRepeatGuard: true }, effects: [{ type: 'CLOSE_CARD' }] };
     }
     if (e.hasTarget) {
       // Supplied prop: never suspend; the prop alone decides suspension.

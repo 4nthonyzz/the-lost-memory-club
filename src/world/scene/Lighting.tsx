@@ -15,7 +15,7 @@ export const M3_LIGHT_COUNT = 4
 
 const POINT_BASES = [
   { color: '#4fe0d0', intensity: 6 }, // over the central CRT, cool teal
-  { color: '#ffb766', intensity: 6 }, // west archive shelves, warm tungsten
+  { color: '#ffb766', intensity: 6, lampCoupled: true }, // west archive shelves, warm tungsten; scaled by the desk lamps ON (task 24.1)
   { color: '#9a6ae0', intensity: 5 }, // Arcade_Area, warm violet
 ] as const
 
@@ -32,7 +32,8 @@ export const WEST_LIGHT_POSITION = [-2.6, 2.3, 0.2] as const
 export const ARCADE_LIGHT_POSITION = [7.4, 2.4, 0] as const
 export const ARCADE_LIGHT_DISTANCE = 6
 
-export function Lighting({ memoryShifted }: { memoryShifted: boolean }) {
+/** `lampsOn` is the number of desk lamps ON (0..2, default 2). It scales ambient and west-light via MemoryShiftDriver. */
+export function Lighting({ memoryShifted, lampsOn = 2 }: { memoryShifted: boolean; lampsOn?: number }) {
   const [initial] = useState(() => paletteFor(memoryShifted))
   const ambientRef = useRef<AmbientLight>(null)
   const p0 = useRef<PointLight>(null)
@@ -52,6 +53,7 @@ export function Lighting({ memoryShifted }: { memoryShifted: boolean }) {
         ambientRef={ambientRef}
         pointRefs={pointRefs}
         pointBases={POINT_BASES}
+        lampsOn={lampsOn}
       />
     </>
   )

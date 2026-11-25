@@ -166,3 +166,106 @@
   text-align: center;
   pointer-events: none;
 }
+
+/*
+ * Notes counter: bottom-right pill. The App HUD uses top-left (progress), top-right (menu drawer) and bottom-centre
+ * (.hud-status, bottom 12px, max-width min(560px, 100% - 440px), so at least 220px stay free on the right above 900px;
+ * at 900px and below it moves up to bottom 56px). The pill is about 150px wide and 34px tall at right 12px, bottom 12px.
+ * The world's controls hint is bottom-left; the capture and keyboard banners are top-centre.
+ */
+.world-notes {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  pointer-events: none;
+}
+
+.world-notes .world-chip {
+  padding: 6px 10px;
+  letter-spacing: 0.06em;
+}
+
+/*
+ * Archive Document Card. The region spans the free area above the prompt (bottom 22%) and the message pill
+ * (about 56px above it), below the top banners, so the card never covers the App status line, the HUD or the prompt.
+ * It is non-interactive (pointer-events: none) and sits below the App HUD (z-index 5) and modal layer (z-index 20).
+ */
+.world-card-region {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 112px;
+  bottom: calc(22% + 112px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Ink #1b1710 on paper #efe6cf is about 13:1; tag #6b1d10 about 8:1; footer #4a4030 about 8:1. */
+.world-card {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 560px;
+  max-height: min(70vh, 100%);
+  overflow: auto;
+  padding: 18px 24px 14px;
+  background: #efe6cf;
+  background-image: repeating-linear-gradient(0deg, rgba(90, 70, 40, 0.05) 0, rgba(90, 70, 40, 0.05) 1px, transparent 1px, transparent 4px);
+  color: #1b1710;
+  border: 1px solid #8a7a58;
+  border-radius: 2px;
+  box-shadow: 0 0 0 4px rgba(9, 16, 30, 0.55), 0 10px 28px rgba(0, 0, 0, 0.6);
+  font-family: 'Courier New', Courier, ui-monospace, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+  pointer-events: none;
+}
+
+.world-card p,
+.world-card h2 {
+  margin: 0;
+}
+
+.world-card-tag {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #6b1d10;
+  border-bottom: 1px dashed #8a7a58;
+  padding-bottom: 6px;
+  margin-bottom: 10px !important;
+}
+
+.world-card-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 10px !important;
+}
+
+.world-card-body {
+  margin-bottom: 8px !important;
+}
+
+.world-card-status {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6b1d10;
+  margin-bottom: 8px !important;
+}
+
+.world-card-footer {
+  margin-top: 10px !important;
+  padding-top: 6px;
+  border-top: 1px dashed #8a7a58;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: #4a4030;
+}

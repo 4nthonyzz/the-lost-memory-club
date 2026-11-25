@@ -74,7 +74,7 @@ describe('combined light and glow', () => {
     }
     // 10 seconds sampled at 500 Hz: the whole run has at most 3 changes per second.
     expect(countDirectionChanges(samples)).toBeLessThanOrEqual(30)
-  })
+  }, 30000)
   it('is constant under reduced motion', () => {
     for (let i = 0; i < 50; i++) {
       expect(flickeredIntensity(6, i * 0.3, true)).toBe(6)

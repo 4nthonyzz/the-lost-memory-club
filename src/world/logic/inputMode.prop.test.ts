@@ -94,3 +94,40 @@ describe('station E is unchanged when targetKind is supplied', () => {
     expect(reduceMode(s, stationE)).toEqual(reduceMode(s, legacy));
   });
 });
+
+describe('E with no target while an Archive Document Card is open (task 24.2)', () => {
+  const noTargetE = (o: Partial<Extract<ModeEvent, { type: 'KEY_DOWN' }>> = {}): ModeEvent => ({
+    type: 'KEY_DOWN',
+    role: 'interact',
+    code: 'KeyE',
+    repeat: false,
+    accepted: true,
+    hasTarget: false,
+    cardOpen: true,
+    ...o,
+  });
+
+  it.each([undefined, true])('emits CLOSE_CARD only, once per press, in active mode (inputEnabled %s)', (enabled) => {
+    const active = reduceMode(initialModeState(enabled), { type: 'LOCK_ACQUIRED' }).state;
+    const { state, effects } = run(active, [noTargetE(), noTargetE({ repeat: true }), noTargetE(), keyUpE, noTargetE(), keyUpE]);
+    expect(effects).toEqual([{ type: 'CLOSE_CARD' }, { type: 'CLOSE_CARD' }]);
+    expect(state.mode).toBe('active');
+    expect(state.pointerLocked).toBe(true);
+  });
+
+  it('closes instead of requesting pointer lock when the mode is capturePending', () => {
+    const r = reduceMode(initialModeState(), noTargetE());
+    expect(r.effects).toEqual([{ type: 'CLOSE_CARD' }]);
+  });
+
+  it('does nothing without an open card (unchanged behaviour)', () => {
+    const active = reduceMode(initialModeState(), { type: 'LOCK_ACQUIRED' }).state;
+    expect(reduceMode(active, noTargetE({ cardOpen: false })).effects).toEqual([]);
+  });
+
+  it('a station target still inspects while a card is open', () => {
+    const active = reduceMode(initialModeState(), { type: 'LOCK_ACQUIRED' }).state;
+    const r = reduceMode(active, { ...stationE, cardOpen: true } as ModeEvent);
+    expect(r.effects.map((e) => e.type)).toEqual(['CALL_ON_INSPECT', 'RELEASE_POINTER_LOCK', 'CLEAR_INPUT']);
+  });
+});

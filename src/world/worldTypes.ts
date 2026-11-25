@@ -47,12 +47,16 @@ export interface StationDef {
 /** Ids of the world-only interactable props. They never use StationId and never reach onInspect. */
 export type LampId = 'desk-lamp-left' | 'desk-lamp-right';
 export type ManualId = 'manual-snake' | 'manual-maze' | 'manual-frequency';
-export type PropInteractableId = LampId | ManualId;
+/** Readable world props that are not manuals: the desk notebook, the cork board and the Memory_Shift poster. */
+export type NoteId = 'desk-notebook' | 'cork-board' | 'poster-shift';
+/** Props that open the Archive Document Card (six in total). */
+export type ReadableId = ManualId | NoteId;
+export type PropInteractableId = LampId | ReadableId;
 
-/** A world-local interactable prop (a lamp or an arcade manual book). Layout data only. */
+/** A world-local interactable prop (a lamp, an arcade manual book or another readable note). Layout data only. */
 export interface InteractableDef {
   id: PropInteractableId;
-  kind: 'lamp' | 'manual';
+  kind: 'lamp' | 'manual' | 'note';
   /** Point used for distance and cone tests. */
   anchor: Vec2;
   /**
@@ -64,6 +68,11 @@ export interface InteractableDef {
   range: number;
   /** Height of the interaction point above the floor, in metres. Informational. */
   height?: number;
+  /**
+   * True when the prop exists only while the Memory_Shift look is on (the overlay poster is invisible at t = 0).
+   * Targeting excludes it unless the caller reports memoryShifted.
+   */
+  requiresShift?: boolean;
 }
 
 /** Combined result of world targeting: a Station or a world-local prop. */
