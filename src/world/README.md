@@ -1,4 +1,4 @@
-﻿# World module (`src/world/`)
+# World module (`src/world/`)
 
 First-person 3D archive room for The Lost Memory Club, built with React Three Fiber. The module renders the world, lets the player walk and look around, and reports which station the player wants to use. It does not decide what happens next.
 
@@ -13,7 +13,7 @@ Every feature below carries one of these labels.
 | **not verified** | Implemented, but no test or recorded check covers the behavior. |
 | **planned/prototype** | Not implemented, or implemented only as a stand-in. |
 
-Milestone M6 and the polish pass (media island, north-wall filing cabinets and bulletin board, wood bookcases with dense books, textured walls and rug, arcade relocation, ARCADE sign, dressing) have **no recorded browser run**. Their layout and data are verified by automated tests only; how they look and play is **not verified visually**.
+Milestone M6, the polish pass and the spatial and visual refinement pass (media island, north-wall filing cabinets and bulletin board, wood bookcases with dense books, textured walls and rug, arcade relocation, ARCADE sign, dressing, re-centred console, SMPTE monitor, cables) have **no recorded browser run**. Their layout and data are verified by automated tests only; how they look and play is **not verified visually**.
 
 ## Purpose and boundaries
 
@@ -78,23 +78,27 @@ interface WorldSceneProps {
 
 - Prompts are neutral and fixed: `Press E to inspect the CRT television` and `Press E to use the arcade cabinet`. They do not change with `memoryShifted` or with any lock state (**verified by automated test**: `WorldScene.test.ts`).
 - The world always calls `onInspect` for the targeted station. `App.tsx` decides.
-- `App.tsx` owns the HUD status line (`role="status"`, bottom center). For a locked arcade it shows `ARCADE LOCKED · Recover the VHS clue first.` The world only says, in its `aria-label`, that station messages appear in the status line at the bottom of the screen (**verified by automated test**).
+- `App.tsx` owns the HUD status line (`role="status"`, bottom center). For a locked arcade it shows `ARCADE LOCKED � Recover the VHS clue first.` The world only says, in its `aria-label`, that station messages appear in the status line at the bottom of the screen (**verified by automated test**).
 - While a station panel is open, the world shows a neutral panel notice.
 
 ## World layout
 
-Source of truth: `layout/roomLayout.ts` (**verified by automated test**: `layout/roomLayout.test.ts`, 24 tests, including grid-search reachability of both stations and with either door closed).
+Source of truth: `layout/roomLayout.ts` (**verified by automated test**: `layout/roomLayout.test.ts`, 27 tests, including grid-search reachability of both stations and with either door closed).
 
 - Main room: x -5..5, z -4..4, height 3. The player starts at (0, 3) facing north.
 - Arcade_Area: x 5.3..9.3, z -2..2, east of the main room, entered through two doors in the east wall (`door-east-north`, `door-east-south`). Door frames are colliders; the openings are not.
-- VHS station (CRT television on a media console): on a central media island at about x -0.4, z -0.3, facing +z (anchor on the south face, z = 0). It is no longer on the north wall. The island keeps at least 1.2 m of walkway on all four sides (computed from the layout, tested).
+- VHS station (CRT television on a media console): the console covers x -0.9..0.9, z -2.1..-1.5 (north-centre zone), facing +z, with the `vhs` anchor at (0, -1.5) on the south face. The CRT is centred on the console. It is no longer on the north wall. The island keeps a 2.7 m front walkway to the reception desk, 1.9 m to the north wall and 1.3 m to the filing cabinets (computed from the layout, tested). Walkway tests: `keeps at least 1.2 m of walkway on all four sides of the island` and `leaves a 2.7 m unobstructed walkway between the console front and the reception desk`.
+- Reception desk: unchanged at x -1.5..1.5, z 1.2..2.0.
+- Woven floor rug under the island: x -1.6..1.6, z -2.5..-0.1 (visual only).
+- Lights (4): ambient, `crt-light` at (0, 1.6, -0.6), a warm tungsten `west-light` at (-2.6, 2.3, 0.2) over the west bookcase and lounge zone (it replaces the former magenta light), and an arcade light at (7.3, 2.4, 0).
+- Console detail (render-only, no collider change): SMPTE colour-bar reference monitor, green 00:19:96 timecode window and metallic tape slot on the VCR, routed coaxial and power cables behind the console, an "OUT OF ORDER" dark-glass decal on the companion cabinet screen, and metric wood UVs.
 - North wall: two filing cabinets flanking a wall-mounted bulletin board.
 - Arcade cabinet: inside the Arcade_Area against its east wall (front face at x = 8.4, facing -x toward both doorways). It is no longer on the north wall.
 - ARCADE sign: hangs on the main-room face of the east wall above both doorways.
 - Dressing: reception desk (moved south of the island), three wood bookcases with dense books, couch, abandoned chair, two crates, a powered-down companion cabinet, a stack of CRT monitors, a tape stack, posters, cables, textured walls, a woven floor rug under the island, an arcade runner rug, and books on the shelves.
 - 27 colliders (walls, door frames, solid props), from the targeting benchmark line.
 
-Visual appearance of the M6 and polish-pass layout: **not verified visually** (rows S1 to S13 in `manual-test-log.md` are `not run`).
+Visual appearance of the M6, polish-pass and refinement-pass layout: **not verified visually** (rows S1 to S13 in `manual-test-log.md` are `not run`).
 
 ## Effects
 
@@ -105,7 +109,7 @@ Visual appearance of the M6 and polish-pass layout: **not verified visually** (r
 
 ## Procedural textures
 
-18 deterministic canvas textures (`scene/proceduralTextures.ts`, `scene/sharedResources.ts`): arcade screen, marquee, sign face, three posters (two ordinary, one shifted), shifted plaque, floor, wood, dark wood, crate, grille, deck, book spine atlas, wall panel, woven rug, cork board and lamp glow. Without a canvas or 2D context, materials keep flat colors. Textures are disposed on unmount. **verified by automated test** (`scene/proceduralTextures.test.ts`, 65 tests; `scene/modelDetail.test.ts`). Whether they look readable in a browser: **not verified visually** (S7 to S11 `not run`).
+21 deterministic canvas textures (`scene/proceduralTextures.ts`, `scene/sharedResources.ts`): arcade screen, marquee, sign face, three posters (two ordinary, one shifted), shifted plaque, floor, wood, dark wood, crate, grille, deck, book spine atlas, wall panel, woven rug, cork board, lamp glow, SMPTE colour bars, the OUT OF ORDER decal and the timecode window. `wallPanel` is 256x256. Without a canvas or 2D context, materials keep flat colors. Textures are disposed on unmount. **verified by automated test** (`scene/proceduralTextures.test.ts`, 77 tests; `scene/modelDetail.test.ts`). Whether they look readable in a browser: **not verified visually** (S7 to S11 `not run`).
 
 ## Asset pipeline
 
@@ -119,21 +123,20 @@ Dev builds only (`import.meta.env.DEV`). Run `npm run dev` and open the page wit
 
 ## Metrics
 
-Computed from declared geometry and source, **computed, not runtime-measured**. Source: `.kiro/specs/world-exploration/performance-log.md`. Figures re-checked with `npx vitest run src/world/scene/modelDetail.test.ts` (72 tests passed); the console line was:
-
-`[18.2] computed triangles: 15646 (detail 15404 + base 242), draw-call estimate (grouped by geometry+material): 237, books 370, slipcases 136, leaning 16, per shelf shelf-a=9 draws/178 books, shelf-b=9 draws/172 books, shelf-c=9 draws/156 books, textures 18, texture memory estimate 7.50 MB`
+Computed from declared geometry and source, **computed, not runtime-measured**. Source: `.kiro/specs/world-exploration/performance-log.md`. Figures re-checked in task 19.3 with `npx vitest run src/world/scene/modelDetail.test.ts` (85 tests passed); the console line was:
+`[18.2] computed triangles: 16772 (detail 16530 + base 242), draw-call estimate (grouped by geometry+material): 264, books 370, slipcases 136, leaning 16, per shelf shelf-a=16 draws/178 books, shelf-b=16 draws/172 books, shelf-c=16 draws/156 books, textures 21, texture memory estimate 6.81 MB`
 
 | Metric | Value | Label |
 | --- | --- | --- |
-| Triangles | 15,646 (detail 15,404 + base 242), limit 20,000 | computed, not runtime-measured |
-| Draw-call grouping estimate | 237 | computed estimate, not `renderer.info` |
+| Triangles | 16,772 (detail 16,530 + base 242), limit 20,000 | computed, not runtime-measured |
+| Draw-call grouping estimate | 264 | computed estimate, not `renderer.info` |
 | Books | 370 (shelf-a 178, shelf-b 172, shelf-c 156) | computed |
 | Lights | 4 (1 ambient + 3 point), limit 4 | computed from source |
-| Procedural textures | 18, about 7.50 MB estimated, limit 8 MB | computed, not runtime-measured |
+| Procedural textures | 21, about 6.81 MB estimated, limit 8 MB | computed, not runtime-measured |
 | Colliders | 27 | computed |
-| Targeting benchmark | informational timing only, no threshold; varies per run and machine (latest run 0.479 us/call, the full-suite run 1.197 us/call) | informational |
+| Targeting benchmark | informational timing only, no threshold; varies per run and machine (latest run 0.477 us/call, the full-suite run 1.023 us/call) | informational |
 
-**The texture memory margin is thin:** 7.50 MB computed against the 8 MB limit leaves about 0.5 MB, within 1 MB. The largest textures are `wallPanel` and `corkBoard` (512x512, 1.33 MB each). They are the first candidates to shrink or share before adding any texture.
+Texture memory margin: 6.81 MB computed against the 8 MB limit leaves about 1.19 MB. The per-texture list (MB, computed): arcadeScreen 0.50, marquee 0.25, signFace 0.33, posterSunset 0.66, posterReel 0.66, shiftPoster 0.66, shiftPlaque 0.17, floor 0.08, wood 0.08, woodDark 0.08, crate 0.08, grille 0.08, deck 0.17, spineAtlas 0.66, wallPanel 0.33, rugWoven 0.33, corkBoard 1.33, lampGlow 0.02, smpteBars 0.13, outOfOrder 0.17, timecode 0.02. `corkBoard` is the largest.
 Runtime frame-time targets (median and 95th percentile at 1280x720 on integrated graphics, first-render time, runtime triangles and draw calls) are **not measured**. See `.kiro/specs/world-exploration/performance-log.md`. No runtime performance figure is claimed here.
 
 ## Disposal and edge-case checks
@@ -160,16 +163,16 @@ npm test
 npm run build
 ```
 
-Fresh `npm test` run for this README (run twice, same result): **27 test files, 428 tests, all passed**. Files under `src/world/` and their counts:
+Fresh `npm test` run for this README (task 19.3, run twice, same result): **27 test files, 456 tests, all passed**. Files under `src/world/` and their counts:
 
 | Area | Files (tests) |
 | --- | --- |
 | Component | `WorldScene.test.ts` (10), `WorldScene.inputEnabled.test.ts` (8), `boundary.test.ts` (10) |
 | Assets | `assets/assetManifest.test.ts` (20), `assets/assets.test.ts` (9), `scene/assetIntegration.test.ts` (6) |
 | Controller | `controller/useReducedMotion.test.ts` (8) |
-| Layout | `layout/roomLayout.test.ts` (24) |
+| Layout | `layout/roomLayout.test.ts` (27) |
 | Logic | `collision` (18), `frameStats` (5), `inputMode` (29), `inputMode.supplied` (17), `inputMode.fallback` (7), `inputState` (15), `look` (20), `movement` (15), `palette` (4), `palette.full` (13), `playerStep` (9), `targeting` (14), `targeting.bench` (1, informational) |
-| Scene | `effectsTiming` (8), `memoryShift` (9), `modelDetail` (72), `proceduralTextures` (65) |
+| Scene | `effectsTiming` (8), `memoryShift` (9), `modelDetail` (85), `proceduralTextures` (77) |
 
 Outside `src/world/`: `src/App.test.ts` (8, stubbed `WorldScene`) and `src/core/gameReducer.test.ts` (4). Counts change when tests are added. Details, the 17 correctness properties and gaps: `.kiro/specs/world-exploration/test-report.md`.
 
@@ -181,11 +184,12 @@ See `.kiro/specs/world-exploration/proposals.md`. In short: P1 implemented; P3 a
 
 ## Known limitations and gaps
 
-- No browser run is recorded for M6 or the polish pass; the new layout and textures are not verified visually. The manual test log has no recorded result.
+- No browser run is recorded for M6, the polish pass or the refinement pass; the new layout and textures are not verified visually.
+- Spawn gap (open item): the spawn (0, 3) is exactly 1.0 m from the desk edge and the south wall, so a 1.2 m disc around the spawn is not clear. The test asserts 0.99 m. This was not requested in the final instructions and is not fixed. The manual test log has no recorded result.
 - Runtime frame time, first-render time and runtime triangle/draw-call counts are not measured.
 - No GLB assets and no Blender run. The scene uses primitives only.
 - No restored-memory viewer component exists in the repo. The HUD shows progress booleans only.
 - `reducedDistortion` (P2) is not wired, so there is no in-game reduced-distortion link.
 - When `inputEnabled` is absent, the world cannot tell when a panel closed.
-- The production bundle is a single 1,248.57 kB JS chunk (355.45 kB gzip) per `performance-log.md`; no code splitting.
+- The production bundle is a single 1,253.47 kB JS chunk (357.24 kB gzip) per `performance-log.md`; no code splitting.
 - Optional property-based tests are not implemented.

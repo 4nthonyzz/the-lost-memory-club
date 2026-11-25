@@ -9,8 +9,10 @@
  *   signFace     512x128 mip       0.33 MB     shiftPoster  256x512 mip  0.70 MB
  *   floor, wood, woodDark, crate, grille: 128x128 mip, 0.09 MB each     shiftPlaque 256x128 mip 0.17 MB
  *   deck 256x128 mip 0.17 MB     spineAtlas 512x256 mip 0.67 MB (task 18.2).
- *   Task 18.3: wallPanel 512x512 mip 1.33 MB, corkBoard 512x512 mip 1.33 MB, rugWoven 256x256 mip 0.33 MB,
- *   lampGlow 64x64 mip 0.02 MB. The total is checked against TEXTURE_MEMORY_BUDGET_BYTES in tests.
+ *   Task 18.3: corkBoard 512x512 mip 1.33 MB, rugWoven 256x256 mip 0.33 MB, lampGlow 64x64 mip 0.02 MB.
+ *   Task 19.2: wallPanel shrinks from 512x512 to 256x256 mip 0.33 MB (metric UVs keep the panel size). New:
+ *   smpteBars 256x128 nearest 0.13 MB, outOfOrder 256x128 mip 0.17 MB, timecode 128x32 nearest 0.02 MB.
+ *   The total is checked against TEXTURE_MEMORY_BUDGET_BYTES in tests.
  */
 import { makeRng } from './effectsTiming'
 
@@ -67,6 +69,9 @@ export type TextureId =
   | 'rugWoven'
   | 'corkBoard'
   | 'lampGlow'
+  | 'smpteBars'
+  | 'outOfOrder'
+  | 'timecode'
 
 export type TextureFilter = 'nearest' | 'mipmap'
 
@@ -653,31 +658,35 @@ export const WALL_TEXTURE_ALBEDO = [0.36, 0.34, 0.45] as const
  */
 export function drawWallPanel(c: Ctx2D, w: number, h: number, seed: number): void {
   const rnd = makeRng(seed)
+  // Pixel sizes below were authored for 512 px; `k` keeps every feature at the same world size at 256 px.
+  const k = w / 512
+  const lw = (n: number) => Math.max(1, n * k)
   const px = (m: number) => (m * w) / WALL_METRES_U
   const py = (m: number) => h - (m * h) / WALL_METRES_V
   const railY = py(WAINSCOT_HEIGHT)
   // Upper plaster.
   gradientRect(c, 0, 0, w, railY, 0, 0, 0, railY, [[0, '#686184'], [1, '#5e5878']])
-  speckle(c, rnd, 0, 0, w, railY, 320, ['#716a8c', '#544e6c', '#5b5575'], 2, 0.35)
+  speckle(c, rnd, 0, 0, w, railY, 320, ['#716a8c', '#544e6c', '#5b5575'], lw(2), 0.35)
   // Faint stains, kept away from the tile edges so the texture repeats cleanly.
   for (let i = 0; i < 5; i++) {
-    const x = 50 + rnd() * (w - 100)
-    const y = 30 + rnd() * (railY - 120)
-    const r = 14 + rnd() * 26
+    const x = 50 * k + rnd() * (w - 100 * k)
+    const y = 30 * k + rnd() * (railY - 120 * k)
+    const r = (14 + rnd() * 26) * k
     disc(c, x, y, r, '#2e2842', 0.06)
     disc(c, x, y, r * 0.6, '#2e2842', 0.06)
-    rect(c, x, y, 3, 40 + rnd() * 60, '#2e2842', 0.06)
+    rect(c, x, y, lw(3), (40 + rnd() * 60) * k, '#2e2842', 0.06)
   }
   // Picture rail and a few hairline cracks.
-  rect(c, 0, py(2.25), w, 2, '#4c4664', 0.55)
-  rect(c, 0, py(2.25) + 2, w, 1, '#7a7396', 0.35)
+  rect(c, 0, py(2.25), w, lw(2), '#4c4664', 0.55)
+  rect(c, 0, py(2.25) + lw(2), w, lw(1), '#7a7396', 0.35)
   for (let i = 0; i < 3; i++) {
-    const x = 60 + rnd() * (w - 140)
-    const y = 20 + rnd() * (railY - 100)
-    line(c, x, y, x + 6 + rnd() * 8, y + 20 + rnd() * 30, '#3c3652', 1, 0.3)
+    const x = 60 * k + rnd() * (w - 140 * k)
+    const y = 20 * k + rnd() * (railY - 100 * k)
+    line(c, x, y, x + (6 + rnd() * 8) * k, y + (20 + rnd() * 30) * k, '#3c3652', lw(1), 0.3)
   }
   // Wainscot base, panels, rails and stiles.
   rect(c, 0, railY, w, h - railY, '#4e4868')
+  const inset = 12 * k
   for (let i = 0; i < 2; i++) {
     const x0 = px(i * 1.25) + px(0.1)
     const pw = px(1.05)
@@ -685,30 +694,30 @@ export function drawWallPanel(c: Ctx2D, w: number, h: number, seed: number): voi
     const bottom = py(0.17)
     const ph = bottom - top
     rect(c, x0, top, pw, ph, '#575172')
-    line(c, x0, top, x0 + pw, top, '#7a7396', 2, 0.9)
-    line(c, x0, top, x0, bottom, '#7a7396', 2, 0.9)
-    line(c, x0, bottom, x0 + pw, bottom, '#26223a', 2, 0.9)
-    line(c, x0 + pw, top, x0 + pw, bottom, '#26223a', 2, 0.9)
+    line(c, x0, top, x0 + pw, top, '#7a7396', lw(2), 0.9)
+    line(c, x0, top, x0, bottom, '#7a7396', lw(2), 0.9)
+    line(c, x0, bottom, x0 + pw, bottom, '#26223a', lw(2), 0.9)
+    line(c, x0 + pw, top, x0 + pw, bottom, '#26223a', lw(2), 0.9)
     // Inner recessed field.
-    rect(c, x0 + 12, top + 12, pw - 24, ph - 24, '#4a4463')
-    line(c, x0 + 12, top + 12, x0 + pw - 12, top + 12, '#26223a', 2, 0.8)
-    line(c, x0 + 12, top + 12, x0 + 12, bottom - 12, '#26223a', 2, 0.8)
-    line(c, x0 + 12, bottom - 12, x0 + pw - 12, bottom - 12, '#7a7396', 1.5, 0.6)
-    line(c, x0 + pw - 12, top + 12, x0 + pw - 12, bottom - 12, '#7a7396', 1.5, 0.6)
-    speckle(c, rnd, x0 + 14, top + 14, pw - 28, ph - 28, 40, ['#3a3552', '#625b80'], 2, 0.3)
+    rect(c, x0 + inset, top + inset, pw - 2 * inset, ph - 2 * inset, '#4a4463')
+    line(c, x0 + inset, top + inset, x0 + pw - inset, top + inset, '#26223a', lw(2), 0.8)
+    line(c, x0 + inset, top + inset, x0 + inset, bottom - inset, '#26223a', lw(2), 0.8)
+    line(c, x0 + inset, bottom - inset, x0 + pw - inset, bottom - inset, '#7a7396', lw(1.5), 0.6)
+    line(c, x0 + pw - inset, top + inset, x0 + pw - inset, bottom - inset, '#7a7396', lw(1.5), 0.6)
+    speckle(c, rnd, x0 + 14 * k, top + 14 * k, pw - 28 * k, ph - 28 * k, 40, ['#3a3552', '#625b80'], lw(2), 0.3)
   }
   // Chair rail and skirting band.
-  rect(c, 0, railY - 12, w, 12, '#706991')
-  rect(c, 0, railY - 12, w, 2, '#8c85ab')
-  rect(c, 0, railY, w, 3, '#26223a', 0.7)
+  rect(c, 0, railY - inset, w, inset, '#706991')
+  rect(c, 0, railY - inset, w, lw(2), '#8c85ab')
+  rect(c, 0, railY, w, 3 * k, '#26223a', 0.7)
   const baseY = py(0.14)
   rect(c, 0, baseY, w, h - baseY, '#38334e')
-  rect(c, 0, baseY, w, 2, '#5a5478', 0.8)
+  rect(c, 0, baseY, w, lw(2), '#5a5478', 0.8)
   // Scuffs on the lower panels.
   for (let i = 0; i < 8; i++) {
-    const x = 20 + rnd() * (w - 70)
-    const y = py(0.7) + rnd() * (baseY - py(0.7) - 10)
-    line(c, x, y, x + 10 + rnd() * 24, y + 1 + rnd() * 3, '#7f7899', 1, 0.22)
+    const x = 20 * k + rnd() * (w - 70 * k)
+    const y = py(0.7) + rnd() * (baseY - py(0.7) - 10 * k)
+    line(c, x, y, x + (10 + rnd() * 24) * k, y + (1 + rnd() * 3) * k, '#7f7899', lw(1), 0.22)
   }
 }
 
@@ -900,6 +909,98 @@ export function drawLampGlow(c: Ctx2D, w: number, h: number, seed: number): void
 }
 
 // ---------------------------------------------------------------------------------------------
+// Task 19.2: reference monitor test card, powered-down glass and VCR timecode window
+// ---------------------------------------------------------------------------------------------
+
+/** Seven colour bars at 75% levels, left to right: white, yellow, cyan, green, magenta, red, blue. */
+export const SMPTE_BAR_COLORS = ['#bfbfbf', '#bfbf00', '#00bfbf', '#00bf00', '#bf00bf', '#bf0000', '#0000bf'] as const
+/** Reverse (castellation) strip under the bars: blue, black, magenta, black, cyan, black, white. */
+export const SMPTE_REVERSE_COLORS = ['#0000bf', '#131313', '#bf00bf', '#131313', '#00bfbf', '#131313', '#bfbfbf'] as const
+/** Approximate luma of each bar at 75% levels (0..0.75), used for the waveform staircase. */
+const SMPTE_BAR_LUMA = [0.75, 0.66, 0.52, 0.44, 0.31, 0.23, 0.08] as const
+
+/**
+ * SMPTE-style colour bars: the top two thirds are the seven bars, then a reverse strip, then a PLUGE strip
+ * (-I, white, +Q, black with three near-black pulses). A small waveform monitor with a staircase trace and
+ * seeded jitter sits in the top-right corner. The bars are drawn first and in order, with no random input.
+ */
+export function drawSmpteBars(c: Ctx2D, w: number, h: number, seed: number): void {
+  const rnd = makeRng(seed)
+  const barsH = Math.round((h * 2) / 3)
+  const revH = Math.round(h / 12)
+  const bx = (i: number) => Math.round((i * w) / 7)
+  SMPTE_BAR_COLORS.forEach((col, i) => rect(c, bx(i), 0, bx(i + 1) - bx(i), barsH, col))
+  SMPTE_REVERSE_COLORS.forEach((col, i) => rect(c, bx(i), barsH, bx(i + 1) - bx(i), revH, col))
+  const y0 = barsH + revH
+  const ph = h - y0
+  const seg = (a: number, b: number, col: string) => rect(c, Math.round(a * w), y0, Math.round(b * w) - Math.round(a * w), ph, col)
+  seg(0, 1 / 6, '#00214c')
+  seg(1 / 6, 2 / 6, '#ffffff')
+  seg(2 / 6, 3 / 6, '#32006a')
+  seg(3 / 6, 1, '#101010')
+  seg(4 / 6, 4 / 6 + 1 / 18, '#090909')
+  seg(5 / 6, 5 / 6 + 1 / 18, '#191919')
+  // Waveform monitor: dark panel, graticule and a jittery staircase trace.
+  const pw = Math.round(w * 0.3)
+  const pH = Math.round(h * 0.2)
+  const left = w - pw - 4
+  const top = 4
+  rect(c, left, top, pw, pH, '#000000', 0.72)
+  for (const f of [0.25, 0.5, 0.75]) line(c, left, top + pH * f, left + pw, top + pH * f, '#2a6a3a', 1, 0.7)
+  frame(c, left + 0.5, top + 0.5, pw - 1, pH - 1, '#2a6a3a', 1, 0.9)
+  c.globalAlpha = 1
+  c.strokeStyle = '#7dffb0'
+  c.lineWidth = 1
+  c.beginPath()
+  SMPTE_BAR_LUMA.forEach((luma, i) => {
+    const y = top + pH - 2 - (luma / 0.75) * (pH - 5) + (rnd() - 0.5) * 1.2
+    const xa = left + 1 + (i * (pw - 2)) / 7
+    const xb = left + 1 + ((i + 1) * (pw - 2)) / 7
+    if (i === 0) c.moveTo(xa, y)
+    else c.lineTo(xa, y)
+    c.lineTo(xb, y)
+  })
+  c.stroke()
+}
+
+/**
+ * Dark green-black glass of a powered-down cabinet: a faint diagonal reflection streak, low-contrast
+ * 'OUT OF ORDER' lettering, two strips of tape and a small paper note with illegible handwriting.
+ */
+export function drawOutOfOrder(c: Ctx2D, w: number, h: number, seed: number): void {
+  const rnd = makeRng(seed)
+  vertical(c, w, h, [[0, '#06140d'], [1, '#020805']])
+  // Reflection streaks (skewed bands).
+  triangle(c, [[w * 0.08, 0], [w * 0.3, 0], [w * 0.1, h], [0, h], [0, h * 0.4]], '#cfe8da', 0.05)
+  triangle(c, [[w * 0.34, 0], [w * 0.4, 0], [w * 0.2, h], [w * 0.15, h]], '#cfe8da', 0.035)
+  text(c, 'OUT OF ORDER', w / 2, h * 0.48, 'bold 24px monospace', '#2f5a45', 0.6)
+  // Paper note held by two strips of tape, lower right.
+  const nx = w - 78
+  const ny = h - 54
+  rect(c, nx + 2, ny + 3, 56, 40, '#000000', 0.3)
+  rect(c, nx, ny, 56, 40, '#cfc8a8', 0.62)
+  for (let i = 0; i < 3; i++) scribble(c, rnd, nx + 6, ny + 14 + i * 9, 40 - rnd() * 10, '#2a2a3a', 0.55)
+  rect(c, nx + 6, ny - 4, 18, 7, '#d8d0a0', 0.45)
+  rect(c, nx + 34, ny - 4, 18, 7, '#d8d0a0', 0.45)
+  speckle(c, rnd, 0, 0, w, h, 50, ['#ffffff', '#1c4a36'], 1, 0.12)
+  vignette(c, w, h, 24, 0.5)
+}
+
+/** Time shown on the VCR display. */
+export const TIMECODE_TEXT = '00:19:96'
+
+/** Green seven-segment style readout: ghost unlit digits, a soft halo from offset copies, bright digits. */
+export function drawTimecode(c: Ctx2D, w: number, h: number, seed: number): void {
+  const rnd = makeRng(seed)
+  const font = 'bold 22px monospace'
+  rect(c, 0, 0, w, h, '#031008')
+  text(c, '88:88:88', w / 2, h / 2 + 1, font, '#0d3a22', 0.5)
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as const) text(c, TIMECODE_TEXT, w / 2 + dx, h / 2 + 1 + dy, font, '#1fae5a', 0.35)
+  text(c, TIMECODE_TEXT, w / 2, h / 2 + 1, font, '#5dffa0')
+  speckle(c, rnd, 0, 0, w, h, 16, ['#000000', '#2a8a5a'], 1, 0.2)
+}
+
+// ---------------------------------------------------------------------------------------------
 // Table, memory estimate
 // ---------------------------------------------------------------------------------------------
 
@@ -918,10 +1019,13 @@ export const TEXTURE_SPECS: Readonly<Record<TextureId, TextureSpec>> = Object.fr
   grille: { id: 'grille', width: 128, height: 128, filter: 'mipmap', wrap: 'clamp', seed: 112, draw: drawGrille },
   deck: { id: 'deck', width: 256, height: 128, filter: 'mipmap', wrap: 'clamp', seed: 113, draw: drawDeck },
   spineAtlas: { id: 'spineAtlas', width: SPINE_ATLAS_WIDTH, height: SPINE_ATLAS_HEIGHT, filter: 'mipmap', wrap: 'clamp', seed: 114, draw: drawSpineAtlas },
-  wallPanel: { id: 'wallPanel', width: 512, height: 512, filter: 'mipmap', wrap: 'repeat', seed: 115, draw: drawWallPanel },
+  wallPanel: { id: 'wallPanel', width: 256, height: 256, filter: 'mipmap', wrap: 'repeat', seed: 115, draw: drawWallPanel },
   rugWoven: { id: 'rugWoven', width: 256, height: 256, filter: 'mipmap', wrap: 'clamp', seed: 116, draw: drawRugWoven },
   corkBoard: { id: 'corkBoard', width: 512, height: 512, filter: 'mipmap', wrap: 'clamp', seed: 117, draw: drawCorkBoard },
   lampGlow: { id: 'lampGlow', width: 64, height: 64, filter: 'mipmap', wrap: 'clamp', seed: 118, draw: drawLampGlow },
+  smpteBars: { id: 'smpteBars', width: 256, height: 128, filter: 'nearest', wrap: 'clamp', seed: 119, draw: drawSmpteBars },
+  outOfOrder: { id: 'outOfOrder', width: 256, height: 128, filter: 'mipmap', wrap: 'clamp', seed: 120, draw: drawOutOfOrder },
+  timecode: { id: 'timecode', width: 128, height: 32, filter: 'nearest', wrap: 'clamp', seed: 121, draw: drawTimecode },
 })
 
 export const TEXTURE_IDS = Object.keys(TEXTURE_SPECS) as TextureId[]

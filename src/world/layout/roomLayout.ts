@@ -101,7 +101,7 @@ const WALLS: readonly Aabb[] = Object.freeze([
 
 /**
  * Reception desk. Moved 0.7 m south in the polish pass (task 18.1, was z 0.5..1.3) so the island media
- * console keeps a 1.2 m walkway between its south face (z 0) and the desk back (z 1.2).
+ * console keeps a 2.7 m open walkway between its south face (z -1.5) and the desk back (z 1.2).
  */
 const DESK = prop('reception-desk', 'desk', box(-1.5, 1.5, 1.2, 2.0), 1.0);
 const SHELF_A = prop('shelf-a', 'shelf', box(-5, -4.6, -2.6, -0.4), 2.2);
@@ -114,14 +114,14 @@ const SHELF_C = prop('shelf-c', 'shelf', box(2, 4, 3.4, 4), 2.2, 3);
  * are parts on top of / inside this footprint. The prop id stays 'crt-vhs' (asset manifest mapping).
  * The prop height is the top of the CRT casing: console top 0.7 m + 0.6 m television.
  */
-const VHS_PROP = prop('crt-vhs', 'station', box(-1.3, 0.5, -0.6, 0), 1.3, 1, true, undefined, { facing: '+z' });
+const VHS_PROP = prop('crt-vhs', 'station', box(-0.9, 0.9, -2.1, -1.5), 1.3, 1, true, undefined, { facing: '+z' });
 
 /** North wall focal zone: two tall metal filing cabinets flanking a wall-mounted bulletin board. */
 const FILING_A = prop('filing-cabinet-a', 'furniture', box(-3.5, -3.0, -4, -3.4), 1.4, 1, true, undefined, { facing: '+z' });
 const FILING_B = prop('filing-cabinet-b', 'furniture', box(-1.5, -1.0, -4, -3.4), 1.4, 1, true, undefined, { facing: '+z' });
 const BULLETIN = prop('bulletin-board', 'detail', box(-2.95, -1.55, -4, -3.95), 1.0, 1, false, undefined, { elevation: 1.1, facing: '+z' });
-/** Floor decal under the island, 3.0 m x 2.2 m centred on the console footprint. */
-const RUG = prop('rug', 'detail', box(-1.9, 1.1, -1.4, 0.8), 0.01, 1, false, undefined, { elevation: 0.01 });
+/** Floor decal framing the island, 3.2 m x 2.4 m centred on the console footprint. */
+const RUG = prop('rug', 'detail', box(-1.6, 1.6, -2.5, -0.1), 0.01, 1, false, undefined, { elevation: 0.01 });
 /**
  * Arcade cabinet against the east wall of the Arcade_Area, 0.1 m clear of the wall (x = 9.3).
  * Its front (west) face is at x = 8.4 and looks toward both doorways.

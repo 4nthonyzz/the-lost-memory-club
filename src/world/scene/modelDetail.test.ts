@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Box3, Mesh, Object3D } from 'three'
 import { COLLIDERS, ROOM, STATION_DEFS } from '../layout/roomLayout'
 import { crtScreenPlacement } from './Effects'
-import { CRT_LIGHT_POSITION, M3_LIGHT_COUNT } from './Lighting'
+import { CRT_LIGHT_POSITION, M3_LIGHT_COUNT, WEST_LIGHT_POSITION } from './Lighting'
 import {
   ARCHIVE_BOX_IDS,
   FILING_DRAWERS,
@@ -89,6 +89,9 @@ import {
   wallGeometry,
 } from './sharedResources'
 import { BASE_WALL_COLOR } from './memoryShift'
+import { cablePathParts, consoleCableParts, deskParts, partGroupKey } from './modelDetail'
+import { textureMemoryBytes } from './proceduralTextures'
+import { WOOD_METRES_PER_REPEAT, woodBoxCount, woodBoxGeometry } from './sharedResources'
 
 const lightingSource = (
   import.meta.glob('./Lighting.tsx', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
@@ -137,8 +140,23 @@ describe('scene detail budget', () => {
 
   it('puts the crt-light above and in front of the island console', () => {
     const vhs = STATION_DEFS.find((s) => s.id === 'vhs')!
-    expect([...CRT_LIGHT_POSITION]).toEqual([vhs.anchor.x, 1.6, vhs.anchor.z + 0.8])
+    expect([...CRT_LIGHT_POSITION]).toEqual([vhs.anchor.x, 1.6, vhs.anchor.z + 0.9])
+    expect([...CRT_LIGHT_POSITION]).toEqual([0, 1.6, -0.6])
     expect(lightingSource).toContain('name="crt-light"')
+  })
+
+  it('puts the warm west light within range of the west shelf fronts', () => {
+    expect([...WEST_LIGHT_POSITION]).toEqual([-2.6, 2.3, 0.2])
+    expect(lightingSource).toContain('#ffb766')
+    const dist = /name="west-light"[^>]*distance=\{(\d+)\}/.exec(lightingSource)!
+    const range = Number(dist[1])
+    for (const id of ['shelf-a', 'shelf-b']) {
+      const b = prop(id).box
+      for (const z of [b.minZ, b.maxZ]) for (const y of [0.2, 1.1, 2.2]) {
+        const d = Math.hypot(b.maxX - WEST_LIGHT_POSITION[0], y - WEST_LIGHT_POSITION[1], z - WEST_LIGHT_POSITION[2])
+        expect(d, id).toBeLessThan(range)
+      }
+    }
   })
 
   it('declares at most 4 lights, and fluorescent fixtures are not lights', () => {
@@ -173,9 +191,9 @@ describe('layout stays the single source of truth', () => {
   it('the CRT screen part matches the placement Effects.tsx uses, derived from the island console', () => {
     const crt = prop('crt-vhs')
     const rect = crtScreenRect(crt.box, crt.height)
-    // The television is 0.9 m wide, sits 0.3 m left of the console centre, 5 cm behind its front face, on top (0.7 m).
+    // The television is 0.9 m wide, is centred on the console, 5 cm behind its front face, on top (0.7 m).
     const crtH = crt.height - CONSOLE_TOP
-    expect(rect.position[0]).toBeCloseTo((crt.box.minX + crt.box.maxX) / 2 - 0.3 - 0.05)
+    expect(rect.position[0]).toBeCloseTo((crt.box.minX + crt.box.maxX) / 2 - 0.05)
     expect(rect.position[1]).toBeCloseTo(CONSOLE_TOP + crtH / 2)
     expect(rect.position[2]).toBeCloseTo(crt.box.maxZ - 0.05 + 0.005)
     expect(rect.scale[0]).toBeCloseTo(0.9 * 0.6)
@@ -201,8 +219,8 @@ describe('layout stays the single source of truth', () => {
     const names = declaredObjects().map((o) => o.name)
     for (const n of ['crt-television', 'vcr-deck', 'media-console', 'console-tapes', 'reference-monitor']) expect(names).toContain(n)
     const monitor = referenceMonitorParts(crt.box)
-    expect(monitor.filter((p) => p.mat === 'screenOff')).toHaveLength(1)
-    expect(monitor.some((p) => p.mat === 'crtScreen')).toBe(false)
+    expect(monitor.filter((p) => p.mat === 'smpteScreen')).toHaveLength(1)
+    expect(monitor.some((p) => p.mat === 'crtScreen' || p.mat === 'screenOff')).toBe(false)
     // Only the television carries the shared crtScreen plane.
     const all = [...mediaConsoleParts(crt.box), ...vcrDeckParts(crt.box), ...consoleTapeParts(crt.box), ...monitor]
     expect(all.some((p) => p.mat === 'crtScreen')).toBe(false)
@@ -237,7 +255,8 @@ describe('layout stays the single source of truth', () => {
     const c = prop('arcade-companion')
     const parts = arcadeCabinetParts(facingFrame(c.box, c.facing).local, c.height, false)
     expect(parts.some((p) => p.mat === 'arcadeScreen' || p.mat === 'marquee')).toBe(false)
-    expect(parts.filter((p) => p.mat === 'screenOff')).toHaveLength(1)
+    expect(parts.filter((p) => p.mat === 'outOfOrderScreen')).toHaveLength(1)
+    expect(parts.some((p) => p.mat === 'screenOff')).toBe(false)
     expect(parts.filter((p) => p.mat === 'marqueeOff')).toHaveLength(1)
     expect(materials.screenOff.type).toBe('MeshLambertMaterial')
   })
@@ -956,9 +975,242 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
     )
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
-    expect(report.textureCount).toBe(18)
+    expect(report.textureCount).toBe(21)
     for (const name of ['conduit', 'ventilation', 'cable-loops', 'corner-posts', 'wall-clock', 'desk-lamp', 'desk-lamp-glow']) {
       expect(report.objects.map((o) => o.name)).toContain(name)
     }
+  })
+})
+
+describe('task 19.2: texture headroom and craftsmanship', () => {
+  afterEach(() => setCanvasFactory(null))
+
+  const extentOf = (p: Part) => {
+    const size: Vec3 = p.geo === 'plane' ? [p.scale[0], p.scale[1], 0] : p.scale
+    const half = orientedHalfExtents(size, p.rot ?? [0, 0, 0])
+    return {
+      minX: p.pos[0] - half[0],
+      maxX: p.pos[0] + half[0],
+      minY: p.pos[1] - half[1],
+      maxY: p.pos[1] + half[1],
+      minZ: p.pos[2] - half[2],
+      maxZ: p.pos[2] + half[2],
+    }
+  }
+
+  it('wallPanel is 256 x 256 and the texture memory estimate dropped below 7 MB', () => {
+    const wall = TEXTURE_SPECS.wallPanel
+    expect([wall.width, wall.height]).toEqual([256, 256])
+    const report = sceneDetailReport()
+    const perTexture = TEXTURE_IDS.map((id) => `${id} ${TEXTURE_SPECS[id].width}x${TEXTURE_SPECS[id].height}=${(textureMemoryBytes(TEXTURE_SPECS[id]) / 1048576).toFixed(2)}MB`)
+    console.info(
+      `[19.2] computed triangles: ${report.totalTriangles} (detail ${report.detailTriangles} + base ${report.baseTriangles}), draw-call estimate ${report.totalDrawCalls}, ` +
+        `textures ${report.textureCount}, texture memory estimate ${(report.textureMemoryBytes / 1048576).toFixed(2)} MB (computed, not runtime-measured): ${perTexture.join(', ')}`,
+    )
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
+    expect(report.textureMemoryBytes).toBeLessThan(7.0 * 1048576)
+    expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
+    expect(report.totalDrawCalls).toBeLessThan(400)
+    expect(report.textureCount).toBe(TEXTURE_IDS.length)
+  })
+
+  it('the reference monitor uses the smpte material, separate from the shared crtScreen', () => {
+    const crt = prop('crt-vhs')
+    const monitor = referenceMonitorParts(crt.box)
+    expect(monitor.filter((p) => p.mat === 'smpteScreen')).toHaveLength(1)
+    expect(monitor.some((p) => p.mat === 'crtScreen')).toBe(false)
+    expect(materials.smpteScreen).not.toBe(materials.crtScreen)
+    expect(materials.smpteScreen.type).toBe('MeshBasicMaterial')
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    expect(materials.smpteScreen.map).toBe(getSharedTexture('smpteBars'))
+    expect(getSharedTexture('smpteBars')?.magFilter).toBe(1003) // NearestFilter
+    expect(getSharedTexture('smpteBars')?.colorSpace).toBe('srgb')
+    // Dimmed: its colour multiplier is darker than white, and the shared CRT is not bound to this texture.
+    expect(materials.smpteScreen.color.r).toBeLessThan(1)
+    expect(materials.crtScreen.map).toBeNull()
+  })
+
+  it('the companion cabinet uses the out-of-order glass and never arcadeScreen', () => {
+    const c = prop('arcade-companion')
+    const parts = arcadeCabinetParts(facingFrame(c.box, c.facing).local, c.height, false)
+    expect(parts.filter((p) => p.mat === 'outOfOrderScreen')).toHaveLength(1)
+    expect(parts.some((p) => p.mat === 'arcadeScreen')).toBe(false)
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    expect(materials.outOfOrderScreen.map).toBe(getSharedTexture('outOfOrder'))
+    expect(materials.arcadeScreen.map).toBe(getSharedTexture('arcadeScreen'))
+    expect(materials.arcadeScreen.map).not.toBe(materials.outOfOrderScreen.map)
+    // The active cabinet is unchanged.
+    const a = prop('arcade-cabinet')
+    expect(arcadeCabinetParts(facingFrame(a.box, a.facing).local, a.height).filter((p) => p.mat === 'arcadeScreen')).toHaveLength(1)
+  })
+
+  it('the VCR has a glowing timecode window and a metallic tape slot', () => {
+    const crt = prop('crt-vhs')
+    const parts = vcrDeckParts(crt.box)
+    const tc = parts.filter((p) => p.mat === 'timecode')
+    expect(tc).toHaveLength(1)
+    expect(tc[0].geo).toBe('plane')
+    // The 128 x 32 texture is 4:1 and the plane keeps that ratio.
+    expect(tc[0].scale[0] / tc[0].scale[1]).toBeCloseTo(4)
+    expect(parts.filter((p) => p.mat === 'tapeSlotMetal').length).toBeGreaterThanOrEqual(2)
+    expect(materials.timecode.type).toBe('MeshBasicMaterial')
+    expect(materials.tapeSlotMetal.type).toBe('MeshStandardMaterial')
+    expect(materials.tapeSlotMetal.metalness).toBeGreaterThanOrEqual(0.6)
+    expect(materials.tapeSlotMetal.metalness).toBeLessThanOrEqual(0.8)
+    expect(materials.tapeSlotMetal.roughness).toBeCloseTo(0.35, 1)
+    // Everything stays on the VCR's front, inside the console footprint.
+    for (const p of [...tc, ...parts.filter((q) => q.mat === 'tapeSlotMetal')]) {
+      expect(p.pos[0]).toBeGreaterThan(crt.box.minX)
+      expect(p.pos[0]).toBeLessThan(crt.box.maxX)
+      expect(p.pos[1]).toBeLessThan(CONSOLE_TOP - 0.1)
+    }
+  })
+
+  it('without a canvas the new materials keep flat colours', () => {
+    setCanvasFactory(null)
+    ensureSharedTextures()
+    for (const m of [materials.smpteScreen, materials.outOfOrderScreen, materials.timecode]) expect(m.map).toBeNull()
+    expect(getSharedTexture('smpteBars')).toBeNull()
+    expect(getSharedTexture('outOfOrder')).toBeNull()
+    expect(getSharedTexture('timecode')).toBeNull()
+  })
+
+  it('routes black, grey and one red cable behind the console, inside its footprint plus 5 cm', () => {
+    const crt = prop('crt-vhs')
+    const cables = consoleCableParts(crt.box)
+    expect(cables.length).toBeGreaterThan(10)
+    expect(cables.every((p) => p.geo === 'cylinderLow')).toBe(true)
+    const mats = new Set(cables.map((p) => p.mat))
+    expect([...mats].sort()).toEqual(['cableBlack', 'cableGrey', 'cableRed'])
+    // One red cable: its segments form a single connected run.
+    const red = cables.filter((p) => p.mat === 'cableRed')
+    expect(red.length).toBeGreaterThan(3)
+    const room = ROOM.bounds
+    for (const p of cables) {
+      const e = extentOf(p)
+      const where = `${p.mat} at ${p.pos.join(',')}`
+      expect(e.minX, where).toBeGreaterThanOrEqual(crt.box.minX - 0.05)
+      expect(e.maxX, where).toBeLessThanOrEqual(crt.box.maxX + 0.05)
+      expect(e.minZ, where).toBeGreaterThanOrEqual(crt.box.minZ - 0.05)
+      expect(e.maxZ, where).toBeLessThanOrEqual(crt.box.maxZ + 0.05)
+      expect(e.minY, where).toBeGreaterThanOrEqual(0)
+      expect(e.maxY, where).toBeLessThan(crt.height)
+      expect(e.minX).toBeGreaterThan(room.minX)
+      expect(e.maxX).toBeLessThan(room.maxX)
+      expect(e.minZ).toBeGreaterThan(room.minZ)
+    }
+    // Some run along the top and some down the back.
+    expect(cables.some((p) => Math.abs(p.pos[1] - 0.74) < 0.06)).toBe(true)
+    expect(cables.some((p) => p.pos[1] < 0.4 && p.pos[2] < crt.box.minZ)).toBe(true)
+    expect(declaredObjects().map((o) => o.name)).toContain('console-cables')
+  })
+
+  it('cable segments follow their path: each cylinder axis points from one path point to the next', () => {
+    // A straight horizontal run along +x must have its Y axis rotated onto +x.
+    const [seg] = cablePathParts([[0, 1, 0], [1, 1, 0]], 'cableBlack', 0.02).filter((p) => p.scale[1] > 0.2)
+    const rot = seg.rot!
+    const o = new Object3D()
+    o.rotation.set(rot[0], rot[1], rot[2])
+    o.updateMatrix()
+    const axis = [o.matrix.elements[4], o.matrix.elements[5], o.matrix.elements[6]]
+    expect(axis[0]).toBeCloseTo(1, 5)
+    expect(axis[1]).toBeCloseTo(0, 5)
+    expect(axis[2]).toBeCloseTo(0, 5)
+    // A diagonal in the xz plane.
+    const [d] = cablePathParts([[0, 0, 0], [1, 0.5, -1]], 'cableBlack', 0.02).filter((p) => p.scale[1] > 0.4)
+    const o2 = new Object3D()
+    o2.rotation.set(d.rot![0], d.rot![1], d.rot![2])
+    o2.updateMatrix()
+    const len = Math.hypot(1, 0.5, 1)
+    expect(o2.matrix.elements[4]).toBeCloseTo(1 / len, 5)
+    expect(o2.matrix.elements[5]).toBeCloseTo(0.5 / len, 5)
+    expect(o2.matrix.elements[6]).toBeCloseTo(-1 / len, 5)
+  })
+
+  it('wood boxes get metric UVs: the grain span is length / 0.6 m along the longest axis', () => {
+    const dims = [1.2, 0.03, 0.3] as const
+    const g = woodBoxGeometry(...dims)
+    expect(woodBoxGeometry(...dims)).toBe(g)
+    const uv = g.getAttribute('uv')
+    // In-plane edge lengths per face (+x, -x, +y, -y, +z, -z).
+    const edges = [[0.3, 0.03], [0.3, 0.03], [1.2, 0.3], [1.2, 0.3], [1.2, 0.03], [1.2, 0.03]]
+    for (let f = 0; f < 6; f++) {
+      const us = [0, 1, 2, 3].map((k) => uv.getX(f * 4 + k))
+      const vs = [0, 1, 2, 3].map((k) => uv.getY(f * 4 + k))
+      const du = Math.max(...us) - Math.min(...us)
+      const dv = Math.max(...vs) - Math.min(...vs)
+      const [long, short] = edges[f]
+      // Grain (u) follows the face's longer edge; both spans are proportional to the real length.
+      expect(du, `face ${f} u`).toBeCloseTo(long / WOOD_METRES_PER_REPEAT, 6)
+      expect(dv, `face ${f} v`).toBeCloseTo(short / WOOD_METRES_PER_REPEAT, 6)
+    }
+    // The long faces span 2 repeats along the board.
+    expect(Math.max(...[16, 17, 18, 19].map((i) => uv.getX(i))) - Math.min(...[16, 17, 18, 19].map((i) => uv.getX(i)))).toBeCloseTo(2, 6)
+    // A board whose longest axis is Y (a side panel) runs the grain vertically: u spans the height.
+    const side = woodBoxGeometry(0.045, 1.8, 0.3).getAttribute('uv')
+    const sideFront = [16, 17, 18, 19].map((i) => ({ u: side.getX(i), v: side.getY(i) }))
+    const span = (k: 'u' | 'v') => Math.max(...sideFront.map((p) => p[k])) - Math.min(...sideFront.map((p) => p[k]))
+    expect(span('u')).toBeCloseTo(1.8 / WOOD_METRES_PER_REPEAT, 6)
+    expect(span('v')).toBeCloseTo(0.045 / WOOD_METRES_PER_REPEAT, 6)
+  })
+
+  it('long boards are flagged metric, grouped by size, and keep the geometry count small', () => {
+    const sizes = new Set<string>()
+    for (const id of SHELF_IDS) {
+      const p = prop(id)
+      const parts = shelfFrameParts(p.box, p.height)
+      expect(parts.every((q) => q.metric === true)).toBe(true)
+      for (const q of parts) sizes.add(partGroupKey(q))
+      // Draw groups per bookcase stay small (boards and side panels of equal size are instanced).
+      expect(new Set(parts.map(partGroupKey)).size).toBeLessThanOrEqual(10)
+    }
+    expect(sizes.size).toBeLessThan(SHELF_IDS.length * 10)
+    const desk = prop('reception-desk')
+    const dp = deskParts(desk.box, desk.height)
+    expect(dp.filter((q) => q.metric).length).toBe(2)
+    expect(dp.filter((q) => q.metric && q.mat === 'wood')[0].scale[0]).toBeGreaterThan(2)
+    const console_ = mediaConsoleParts(prop('crt-vhs').box)
+    expect(console_.filter((q) => q.metric)).toHaveLength(1)
+    // Non-board parts and rotated books never use the metric path.
+    expect(consoleTapeParts(prop('crt-vhs').box).some((q) => q.metric)).toBe(false)
+    // Real size scale is kept, so every layout assertion on `scale` still holds.
+    expect(partGroupKey({ geo: 'box', mat: 'wood', pos: [0, 0, 0], scale: [1, 2, 3] })).toBe('box|wood')
+  })
+
+  it('disposes every cached wood geometry once, twice-safe, and rebuilds afterwards', () => {
+    const g = woodBoxGeometry(0.5, 0.05, 0.2)
+    const h = woodBoxGeometry(0.7, 0.03, 0.2)
+    expect(woodBoxCount()).toBeGreaterThanOrEqual(2)
+    const spies = [g, h].map((x) => vi.spyOn(x, 'dispose'))
+    disposeSharedResources()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+    expect(woodBoxCount()).toBe(0)
+    expect(() => disposeSharedResources()).not.toThrow()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+    expect(woodBoxGeometry(0.5, 0.05, 0.2)).not.toBe(g)
+  })
+
+  it('each new texture is created once and disposed exactly once, twice-safe', () => {
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    const ids = ['smpteBars', 'outOfOrder', 'timecode', 'wallPanel'] as const
+    const spies = ids.map((id) => vi.spyOn(getSharedTexture(id)!, 'dispose'))
+    expect(materials.timecode.map).toBe(getSharedTexture('timecode'))
+    expect(liveTextureCount()).toBe(TEXTURE_IDS.length)
+    disposeSharedResources()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+    expect(materials.smpteScreen.map).toBeNull()
+    expect(materials.outOfOrderScreen.map).toBeNull()
+    expect(materials.timecode.map).toBeNull()
+    expect(() => disposeSharedResources()).not.toThrow()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+  })
+
+  it('still adds no light and does not change colliders', () => {
+    expect(M3_LIGHT_COUNT).toBe(4)
+    const solid = ROOM.props.filter((p) => p.solid).map((p) => p.box)
+    expect(COLLIDERS).toEqual([...ROOM.walls, ...ROOM.doors.flatMap((d) => d.frames), ...solid])
   })
 })

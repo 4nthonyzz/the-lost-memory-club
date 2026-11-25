@@ -62,12 +62,12 @@ describe('roomLayout', () => {
 
   it('puts the vhs Station on the central island facing +z and moves the arcade Station into the Arcade_Area', () => {
     const vhs = ROOM.stations.find((s) => s.id === 'vhs')!;
-    expect(vhs.collider).toEqual({ minX: -1.3, maxX: 0.5, minZ: -0.6, maxZ: 0 });
+    expect(vhs.collider).toEqual({ minX: -0.9, maxX: 0.9, minZ: -2.1, maxZ: -1.5 });
     expect(vhs.collider).toBe(prop('crt-vhs').box);
     expect(vhs.facing).toBe('+z');
     expect(prop('crt-vhs').facing).toBe('+z');
     // Anchor on the south (player-facing) face, centred on the console.
-    expect(vhs.anchor).toEqual({ x: -0.4, z: 0 });
+    expect(vhs.anchor).toEqual({ x: 0, z: -1.5 });
     expect(vhs.collider.maxX - vhs.collider.minX).toBeCloseTo(1.8);
     expect(vhs.collider.maxZ - vhs.collider.minZ).toBeCloseTo(0.6);
     // The old north-wall CRT collider is gone.
@@ -166,11 +166,18 @@ describe('roomLayout', () => {
     const rug = prop('rug');
     expect(rug.solid).toBe(false);
     expect(rug.elevation).toBeCloseTo(0.01);
-    expect(rug.box.maxX - rug.box.minX).toBeCloseTo(3.0);
-    expect(rug.box.maxZ - rug.box.minZ).toBeCloseTo(2.2);
+    expect(rug.box.maxX - rug.box.minX).toBeCloseTo(3.2);
+    expect(rug.box.maxZ - rug.box.minZ).toBeCloseTo(2.4);
     const island = prop('crt-vhs').box;
     expect((rug.box.minX + rug.box.maxX) / 2).toBeCloseTo((island.minX + island.maxX) / 2);
-    expect((rug.box.minZ + rug.box.maxZ) / 2).toBeCloseTo(-0.3);
+    expect((rug.box.minZ + rug.box.maxZ) / 2).toBeCloseTo(-1.3);
+    expect(rug.box).toEqual({ minX: -1.6, maxX: 1.6, minZ: -2.5, maxZ: -0.1 });
+    // The rug frames the console but touches neither the desk nor the north filing cabinets.
+    for (const id of ['reception-desk', 'filing-cabinet-a', 'filing-cabinet-b']) {
+      const o = prop(id).box;
+      const hit = rug.box.minX < o.maxX && rug.box.maxX > o.minX && rug.box.minZ < o.maxZ && rug.box.maxZ > o.minZ;
+      expect(hit, id).toBe(false);
+    }
     for (const p of ROOM.props.filter((q) => q.id.startsWith('archive-boxes'))) expect(p.solid).toBe(false);
   });
 
@@ -195,8 +202,39 @@ describe('roomLayout', () => {
         for (const c of others) expect(distToBox(p, c)).toBeGreaterThan(0);
       }
     }
-    // The nearest solid is the reception desk, south of the island.
-    expect(gap(island, prop('reception-desk').box)).toBeGreaterThanOrEqual(1.2 - 1e-9);
+    // Per side: desk 2.7 m south, filing cabinets 1.3 m north-west, north wall 1.9 m, shelves 3.7 m west.
+    expect(gap(island, prop('reception-desk').box)).toBeCloseTo(2.7);
+    expect(gap(island, prop('filing-cabinet-b').box)).toBeGreaterThanOrEqual(1.3 - 1e-9);
+    expect(island.minZ - ROOM.bounds.minZ).toBeCloseTo(1.9);
+    expect(gap(island, prop('shelf-a').box)).toBeGreaterThanOrEqual(3.7 - 1e-9);
+  });
+
+  it('leaves a 2.7 m unobstructed walkway between the console front and the reception desk', () => {
+    const island = prop('crt-vhs').box;
+    const desk = prop('reception-desk').box;
+    const walk: Aabb = { minX: island.minX - PLAYER_RADIUS, maxX: island.maxX + PLAYER_RADIUS, minZ: island.maxZ, maxZ: desk.minZ };
+    expect(walk.maxZ - walk.minZ).toBeGreaterThanOrEqual(2.2);
+    expect(walk.maxZ - walk.minZ).toBeCloseTo(2.7);
+    for (const c of COLLIDERS) {
+      const hit = walk.minX < c.maxX && walk.maxX > c.minX && walk.minZ < c.maxZ && walk.maxZ > c.minZ;
+      expect(hit).toBe(false);
+    }
+  });
+
+  it('keeps the spawn and a 1.0 m disc around it clear of colliders (desk edge and south wall are exactly 1.0 m away)', () => {
+    expect(ROOM.start).toEqual({ x: 0, z: 3 });
+    expect(overlapsAny(ROOM.start, 0.99, COLLIDERS)).toBe(false);
+    expect(overlapsAny(ROOM.start, 1.2, COLLIDERS)).toBe(true);
+  });
+
+  it('reaches both Stations and the area behind the island near the bulletin board and filing cabinets', () => {
+    const cells = reachableCells(ROOM.start);
+    const near = (x: number, z: number) => cells.some((c) => Math.hypot(c.x - x, c.z - z) < 0.06);
+    for (const s of ROOM.stations) expect(cells.some((c) => Math.hypot(c.x - s.anchor.x, c.z - s.anchor.z) <= INTERACTION_RANGE * 0.9)).toBe(true);
+    // Between the island back (z -2.1) and the cabinets (z -3.4), in front of the bulletin board (x -2.25).
+    expect(near(-2.2, -2.8)).toBe(true);
+    expect(near(0, -2.8)).toBe(true);
+    expect(near(-1.25, -2.8)).toBe(true);
   });
 
   it('selects vhs from a reachable cell in front of the console, within range and cone', () => {

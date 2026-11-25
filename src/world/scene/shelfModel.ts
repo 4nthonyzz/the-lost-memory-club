@@ -179,7 +179,9 @@ export function shelfInnerBounds(box: Aabb, height: number): Aabb & { levels: Sh
 
 /** A box in the local shelf frame; sx runs along local x, sz along local z. */
 function localPart(g: ShelfGeometry, mat: MaterialKey, lx: number, y: number, lz: number, sx: number, sy: number, sz: number): Part {
-  return bx(mat, shelfLocalToWorld(g, lx, y, lz), g.alongX ? [sx, sy, sz] : [sz, sy, sx])
+  const part = bx(mat, shelfLocalToWorld(g, lx, y, lz), g.alongX ? [sx, sy, sz] : [sz, sy, sx])
+  // Wood boards get metric UVs (task 19.2): the grain tiles along the longest axis instead of stretching.
+  return mat === 'wood' || mat === 'woodDark' ? { ...part, metric: true } : part
 }
 
 /**

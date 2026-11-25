@@ -14,6 +14,7 @@ import {
   LinearMipmapLinearFilter,
   MeshBasicMaterial,
   MeshLambertMaterial,
+  MeshStandardMaterial,
   NearestFilter,
   PlaneGeometry,
   RepeatWrapping,
@@ -169,6 +170,19 @@ export const materials = {
   crtScreen: new MeshBasicMaterial({ color: BASE_CRT_SCREEN_COLOR }),
   arcadeScreen: new MeshBasicMaterial({ color: BASE_ARCADE_SCREEN_COLOR }),
   led: new MeshBasicMaterial({ color: '#ff4040' }),
+  /**
+   * 19.2: fixed-colour detail screens. None of them is tinted by Memory_Shift (that driver only owns
+   * crtScreen and arcadeScreen). The reference monitor card is dimmed so it never outshines the main CRT.
+   * Flat colours are the fallback when no canvas exists.
+   */
+  smpteScreen: new MeshBasicMaterial({ color: '#3c4650' }),
+  outOfOrderScreen: new MeshBasicMaterial({ color: '#050a07' }),
+  timecode: new MeshBasicMaterial({ color: '#2a8a5a' }),
+  /** Brushed-metal tape slot flap and frame rails on the VCR. */
+  tapeSlotMetal: new MeshStandardMaterial({ color: '#9aa0aa', metalness: 0.7, roughness: 0.35 }),
+  cableBlack: lambert('#101014'),
+  cableGrey: lambert('#5a5d66'),
+  cableRed: lambert('#a02020'),
   /** Memory_Shift set dressing, faded by opacity. */
   shiftPoster: overlay('#8a1c2e'),
   shiftPlaque: overlay('#2a0a14'),
@@ -211,9 +225,50 @@ export function wallGeometry(box: { minX: number; maxX: number; minZ: number; ma
   return g
 }
 
+/**
+ * Wood boards with metric UVs (task 19.2). The wood texture repeats once per WOOD_METRES_PER_REPEAT metres,
+ * so the grain keeps its scale on long boards instead of stretching over one face. The texture's grain runs
+ * along its u axis, so on every face u follows the longer of the face's two in-plane edges: the grain runs
+ * along the board's longest axis, and an end cap uses the longer of its own two edges.
+ * Geometries are real-size boxes (the part's mesh scale is 1), cached by dimensions rounded to 0.1 mm so
+ * equal boards share one geometry and one instanced draw. Disposed once by disposeSharedResources().
+ */
+export const WOOD_METRES_PER_REPEAT = 0.6
+const woodBoxCache = new Map<string, BoxGeometry>()
+
+const round4 = (v: number) => Math.round(v * 1e4) / 1e4
+
+export function woodBoxGeometry(w: number, h: number, d: number): BoxGeometry {
+  const sx = round4(w)
+  const sy = round4(h)
+  const sz = round4(d)
+  const key = `${sx},${sy},${sz}`
+  const cached = woodBoxCache.get(key)
+  if (cached) return cached
+  const g = new BoxGeometry(sx, sy, sz)
+  const pos = g.getAttribute('position')
+  const uv = g.getAttribute('uv')
+  const size = [sx, sy, sz] as const
+  // Face order: +x, -x, +y, -y, +z, -z. In-plane axes (a, b) of each face as indices into x, y, z.
+  const axes = [[2, 1], [2, 1], [0, 2], [0, 2], [0, 1], [0, 1]] as const
+  for (let i = 0; i < uv.count; i++) {
+    const [a, b] = axes[Math.floor(i / 4)]
+    const pa = [pos.getX(i), pos.getY(i), pos.getZ(i)][a] + size[a] / 2
+    const pb = [pos.getX(i), pos.getY(i), pos.getZ(i)][b] + size[b] / 2
+    if (size[b] > size[a]) uv.setXY(i, pb / WOOD_METRES_PER_REPEAT, pa / WOOD_METRES_PER_REPEAT)
+    else uv.setXY(i, pa / WOOD_METRES_PER_REPEAT, pb / WOOD_METRES_PER_REPEAT)
+  }
+  uv.needsUpdate = true
+  woodBoxCache.set(key, g)
+  return g
+}
+
+/** Number of live cached wood geometries (tests and reports). */
+export const woodBoxCount = (): number => woodBoxCache.size
+
 // ---------------------------------------------------------------------------------------------
-// Procedural canvas textures (task 15.7, 18.3). Deterministic, drawn once, never redrawn per frame.
-// Budget: 18 textures, about 7.5 MB estimated (see proceduralTextures.ts), limit 8 MB.
+// Procedural canvas textures (task 15.7, 18.3, 19.2). Deterministic, drawn once, never redrawn per frame.
+// Budget: 21 textures (see proceduralTextures.ts for the estimate), limit 8 MB.
 // ---------------------------------------------------------------------------------------------
 
 /** The part of a canvas element that createCanvasTexture needs. */
@@ -332,6 +387,10 @@ const TEXTURE_BINDINGS: readonly TextureBinding[] = [
   { material: 'rugWoven', texture: 'rugWoven', color: '#ffffff' },
   { material: 'cork', texture: 'corkBoard', color: '#ffffff' },
   { material: 'lampHalo', texture: 'lampGlow', color: '#ffffff' },
+  /** Slightly dimmed multiplier: the reference card stays below the main CRT's brightness. */
+  { material: 'smpteScreen', texture: 'smpteBars', color: '#b8b8b8' },
+  { material: 'outOfOrderScreen', texture: 'outOfOrder', color: '#ffffff' },
+  { material: 'timecode', texture: 'timecode', color: '#ffffff' },
 ]
 
 /**
@@ -381,6 +440,8 @@ export function disposeSharedResources(): void {
   for (const g of spineGeometries) g.dispose()
   for (const g of wallGeometryCache.values()) g.dispose()
   wallGeometryCache.clear()
+  for (const g of woodBoxCache.values()) g.dispose()
+  woodBoxCache.clear()
   for (const m of Object.values(materials)) m.dispose()
   disposeTextures()
 }

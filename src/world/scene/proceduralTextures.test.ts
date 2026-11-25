@@ -13,6 +13,8 @@ import {
   textureMemoryBytes,
   totalTextureMemoryBytes,
   WALL_TEXTURE_ALBEDO,
+  SMPTE_BAR_COLORS,
+  TIMECODE_TEXT,
   type TextureId,
 } from './proceduralTextures'
 import { RecordingContext } from './recordingContext'
@@ -213,6 +215,68 @@ describe('wall, rug, cork board and lamp glow (task 18.3)', () => {
     const glow = run('lampGlow')
     expect(glow.calls[0].op).toBe('clearRect')
     expect(glow.calls.filter((c) => c.op === 'arc').length).toBeGreaterThan(10)
+  })
+})
+
+describe('task 19.2: smaller wall texture, reference card, glass and timecode', () => {
+  it('wallPanel is 256 x 256, mipmapped and repeating, and keeps its rail and panel proportions', () => {
+    const s = TEXTURE_SPECS.wallPanel
+    expect([s.width, s.height, s.filter, s.wrap]).toEqual([256, 256, 'mipmap', 'repeat'])
+    // A 512 px wall texture cost 512 * 512 * 4 * 1.33; the 256 px one saves about 1.0 MB.
+    const saved = textureMemoryBytes({ width: 512, height: 512, filter: 'mipmap' }) - textureMemoryBytes(s)
+    expect(saved).toBeGreaterThan(1.0e6)
+    const rects = run('wallPanel').calls.filter((c) => c.op === 'fillRect')
+    // Chair rail: a full-width band whose top sits 1.05 m up the 3 m repeat, 12 px at 512 px = 6 px here.
+    const railY = 256 - (1.05 * 256) / 3
+    expect(rects.some((r) => r.args[0] === 0 && r.args[2] === 256 && r.args[3] === 6 && r.args[1] === railY - 6)).toBe(true)
+  })
+
+  it('smpteBars draws the seven 75% bars first, left to right, covering the full width', () => {
+    const calls = run('smpteBars').calls
+    const fills = calls.filter((c) => c.op === 'set fillStyle').map((c) => String(c.args[0]))
+    expect(fills.slice(0, 7)).toEqual([...SMPTE_BAR_COLORS])
+    expect(SMPTE_BAR_COLORS.map((col) => col.toLowerCase())).toEqual(['#bfbfbf', '#bfbf00', '#00bfbf', '#00bf00', '#bf00bf', '#bf0000', '#0000bf'])
+    const { width: W, height: H } = TEXTURE_SPECS.smpteBars
+    const bars = calls.filter((c) => c.op === 'fillRect').slice(0, 7).map((c) => c.args as number[])
+    expect(bars.map((b) => b[0])).toEqual([...bars.map((b) => b[0])].sort((a, b) => a - b))
+    expect(bars.reduce((n, b) => n + b[2], 0)).toBe(W)
+    for (const b of bars) expect(b[3]).toBe(Math.round((H * 2) / 3))
+    // Reverse strip and PLUGE strip follow, and a waveform trace is stroked.
+    expect(fills.slice(7, 14)).toEqual(['#0000bf', '#131313', '#bf00bf', '#131313', '#00bfbf', '#131313', '#bfbfbf'])
+    expect(fills).toContain('#00214c')
+    expect(fills).toContain('#32006a')
+    expect(calls.some((c) => c.op === 'stroke')).toBe(true)
+    expect(run('smpteBars').texts()).toEqual([])
+  })
+
+  it('smpteBars is nearest-filtered and clamped; outOfOrder is mipmapped; timecode is nearest', () => {
+    expect(TEXTURE_SPECS.smpteBars).toMatchObject({ width: 256, height: 128, filter: 'nearest', wrap: 'clamp' })
+    expect(TEXTURE_SPECS.outOfOrder).toMatchObject({ width: 256, height: 128, filter: 'mipmap', wrap: 'clamp' })
+    expect(TEXTURE_SPECS.timecode).toMatchObject({ width: 128, height: 32, filter: 'nearest', wrap: 'clamp' })
+  })
+
+  it("outOfOrder shows 'OUT OF ORDER' in low contrast on dark glass", () => {
+    const ctx = run('outOfOrder')
+    expect(ctx.texts()).toContain('OUT OF ORDER')
+    // The lettering is a dim green on near-black, not a bright fill.
+    const idx = ctx.calls.findIndex((c) => c.op === 'fillText' && c.args[0] === 'OUT OF ORDER')
+    const colour = String(ctx.calls.slice(0, idx).filter((c) => c.op === 'set fillStyle').pop()!.args[0])
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(colour.slice(i, i + 2), 16))
+    expect(Math.max(r, g, b)).toBeLessThan(0x70)
+    const alpha = ctx.calls.slice(0, idx).filter((c) => c.op === 'set globalAlpha').pop()!.args[0] as number
+    expect(alpha).toBeLessThan(0.8)
+  })
+
+  it("timecode reads '00:19:96' in green", () => {
+    const ctx = run('timecode')
+    expect(ctx.texts()).toContain(TIMECODE_TEXT)
+    expect(TIMECODE_TEXT).toBe('00:19:96')
+    const fills = ctx.calls.filter((c) => c.op === 'set fillStyle').map((c) => String(c.args[0]))
+    expect(fills).toContain('#5dffa0')
+  })
+
+  it('the three new textures are registered', () => {
+    for (const id of ['smpteBars', 'outOfOrder', 'timecode'] as const) expect(TEXTURE_IDS).toContain(id)
   })
 })
 

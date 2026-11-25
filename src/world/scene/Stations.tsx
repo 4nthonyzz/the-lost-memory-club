@@ -9,6 +9,7 @@ import type { Aabb, Facing } from '../worldTypes'
 import {
   arcadeCabinetParts,
   bulletinBoardParts,
+  consoleCableParts,
   consoleTapeParts,
   crtTelevisionParts,
   filingCabinetParts,
@@ -62,7 +63,10 @@ export function VcrDeck({ box }: { box: Aabb }) {
 
 /** Wide wooden media console with a VCR bay, a cabinet, stacked tapes and a small reference monitor (own dim screen). */
 export function MediaConsole({ box }: { box: Aabb }) {
-  const parts = useMemo(() => [...mediaConsoleParts(box), ...consoleTapeParts(box), ...referenceMonitorParts(box)], [box])
+  const parts = useMemo(
+    () => [...mediaConsoleParts(box), ...consoleTapeParts(box), ...referenceMonitorParts(box), ...consoleCableParts(box)],
+    [box],
+  )
   return <PartMeshes parts={parts} />
 }
 

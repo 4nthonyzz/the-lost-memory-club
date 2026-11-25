@@ -25,6 +25,16 @@ export interface Part {
   scale: Vec3
   /** Euler XYZ radians. */
   rot?: Vec3
+  /**
+   * Wood board with metric UVs (task 19.2): `scale` is the real size, rendered from a cached real-size
+   * box geometry (mesh scale 1) so the grain tiles per metre. Boards of equal size share one draw call.
+   */
+  metric?: boolean
+}
+
+/** Draw-call group of a part: geometry + material, plus the board size for metric wood parts. */
+export function partGroupKey(p: Part): string {
+  return p.metric ? `${p.geo}|${p.mat}|${p.scale.map((v) => Math.round(v * 1e4)).join(',')}` : `${p.geo}|${p.mat}`
 }
 
 /** Triangles per shared unit geometry. A test checks these against the real three.js geometries. */
@@ -44,6 +54,8 @@ const HALF_PI = Math.PI / 2
 const part = (geo: GeometryKey, mat: MaterialKey, pos: Vec3, scale: Vec3, rot?: Vec3): Part =>
   rot ? { geo, mat, pos, scale, rot } : { geo, mat, pos, scale }
 const bx = (mat: MaterialKey, pos: Vec3, scale: Vec3, rot?: Vec3) => part('box', mat, pos, scale, rot)
+/** Unrotated wood board with metric UVs (long boards: grain tiles instead of stretching). */
+const wd = (mat: 'wood' | 'woodDark', pos: Vec3, scale: Vec3): Part => ({ geo: 'box', mat, pos, scale, metric: true })
 
 function offset(parts: readonly Part[], o: Vec3): Part[] {
   return parts.map((p) => ({ ...p, pos: [p.pos[0] + o[0], p.pos[1] + o[1], p.pos[2] + o[2]] as const }))
@@ -76,7 +88,7 @@ export const CRT_Y0 = CONSOLE_TOP
 
 /** Television footprint on the console: width, x offset from the console centre, and recess from the front face. */
 const CRT_W = 0.9
-const CRT_DX = -0.3
+const CRT_DX = 0
 const CRT_RECESS = 0.05
 
 /** World (or local) placement of the television in the frame of `box`: centre x and the z of its front face. */
@@ -95,7 +107,7 @@ export function crtScreenRect(box: Aabb, height: number) {
   }
 }
 
-/** `box` is the console footprint; the television sits on top of it, left of centre. */
+/** `box` is the console footprint; the television sits on top of it, centred on the console. */
 export function crtTelevisionParts(box: Aabb, height: number): Part[] {
   const f = crtFrame(box)
   const w = f.w
@@ -152,7 +164,7 @@ export function mediaConsoleParts(box: Aabb): Part[] {
     bx('wood', [box.minX + CONSOLE_PANEL / 2, 0.38, cz], [CONSOLE_PANEL, 0.6, d]),
     bx('wood', [box.maxX - CONSOLE_PANEL / 2, 0.38, cz], [CONSOLE_PANEL, 0.6, d]),
     bx('woodDark', [cx, 0.38, box.minZ + 0.01], [w - 0.08, 0.6, 0.02]),
-    bx('wood', [cx, bodyH, cz], [w + 0.06, 0.04, d + 0.04]),
+    wd('wood', [cx, bodyH, cz], [w + 0.06, 0.04, d + 0.04]),
     bx('wood', [cx + BAY_RIGHT_DX, 0.38, cz], [CONSOLE_PANEL, 0.6, d - 0.04]),
     // Lower shelf of the VCR bay and the dark bay interior behind it.
     bx('wood', [cx + (BAY_RIGHT_DX - w / 2) / 2, SHELF_Y, cz], [BAY_RIGHT_DX + w / 2 - 2 * CONSOLE_PANEL, 0.03, d - 0.04]),
@@ -178,7 +190,13 @@ export function vcrDeckParts(box: Aabb): Part[] {
     bx('tapeBlack', [vcx - 0.12, y + 0.005, front - 0.045], [0.19, 0.026, 0.104]),
     bx('tapeLabel', [vcx - 0.12, y + 0.0185, front - 0.02], [0.1, 0.002, 0.03]),
     ...[0, 1, 2, 3].map((i) => bx('metal', [vcx + 0.08 + i * 0.045, y - 0.015, zf + 0.002], [0.035, 0.02, 0.01])),
-    bx('displayGreen', [vcx + 0.22, y + 0.02, zf + 0.002], [0.08, 0.02, 0.008]),
+    // Metallic tape slot: a top rail, a bottom rail and a thin flap in front of the dark slot opening.
+    bx('tapeSlotMetal', [vcx - 0.12, y + 0.0275, zf + 0.003], [0.3, 0.006, 0.008]),
+    bx('tapeSlotMetal', [vcx - 0.12, y - 0.0175, zf + 0.003], [0.3, 0.006, 0.008]),
+    bx('tapeSlotMetal', [vcx - 0.12, y + 0.0215, zf + 0.0035], [0.26, 0.007, 0.004]),
+    // Timecode window: dark recess with the glowing green readout plane (00:19:96) in front of it.
+    bx('bezel', [vcx + 0.22, y + 0.02, zf + 0.002], [0.09, 0.03, 0.008]),
+    part('plane', 'timecode', [vcx + 0.22, y + 0.02, zf + 0.0066], [0.08, 0.02, 1]),
     part('cylinderLow', 'led', [vcx + 0.26, y - 0.015, zf + 0.002], [0.015, 0.01, 0.015], [HALF_PI, 0, 0]),
   ]
 }
@@ -193,7 +211,7 @@ export function consoleTapeParts(box: Aabb): Part[] {
     }
     parts.push(bx('tapeLabel', [x, y0 + 0.03 * n + 0.001, z], [0.1, 0.002, 0.06]))
   }
-  stack(cx + 0.3, cz + d / 2 - 0.2, CONSOLE_TOP, 4, 0.12)
+  stack(cx - 0.66, cz + d / 2 - 0.2, CONSOLE_TOP, 4, 0.12)
   stack(cx + BAY_RIGHT_DX - 0.17, cz + d / 2 - 0.2, SHELF_Y + 0.015, 3, 0.1)
   return parts
 }
@@ -201,7 +219,7 @@ export function consoleTapeParts(box: Aabb): Part[] {
 /** Small secondary reference monitor on the right end of the console top. Own dim screen, not the shared crtScreen. */
 export function referenceMonitorParts(box: Aabb): Part[] {
   const { cx, cz, w, d } = centre(box)
-  const mx = cx + w / 2 - 0.32
+  const mx = cx + w / 2 - 0.2
   const mw = 0.34
   const mh = 0.28
   const y0 = CONSOLE_TOP
@@ -210,8 +228,65 @@ export function referenceMonitorParts(box: Aabb): Part[] {
     bx('casing', [mx, y0 + mh / 2, front - 0.1], [mw, mh, 0.2]),
     bx('casingDark', [mx, y0 + mh / 2 + 0.01, front - 0.26], [mw * 0.6, mh * 0.7, 0.14]),
     bx('bezel', [mx, y0 + mh / 2, front + 0.002], [mw * 0.86, mh * 0.82, 0.006]),
-    part('plane', 'screenOff', [mx, y0 + mh / 2, front + 0.006], [mw * 0.74, mh * 0.66, 1]),
+    part('plane', 'smpteScreen', [mx, y0 + mh / 2, front + 0.006], [mw * 0.74, mh * 0.66, 1]),
     part('cylinderLow', 'led', [mx + mw * 0.38, y0 + 0.03, front + 0.003], [0.015, 0.01, 0.015], [HALF_PI, 0, 0]),
+  ]
+}
+
+/** Corner-cutting smoothing (one Chaikin pass): keeps the end points and never leaves the control polygon. */
+function smoothPath(pts: readonly Vec3[]): Vec3[] {
+  const out: Vec3[] = [pts[0]]
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i]
+    const b = pts[i + 1]
+    out.push(
+      [0.75 * a[0] + 0.25 * b[0], 0.75 * a[1] + 0.25 * b[1], 0.75 * a[2] + 0.25 * b[2]],
+      [0.25 * a[0] + 0.75 * b[0], 0.25 * a[1] + 0.75 * b[1], 0.25 * a[2] + 0.75 * b[2]],
+    )
+  }
+  out.push(pts[pts.length - 1])
+  return out
+}
+
+/**
+ * One round cable as low-segment cylinders (8 sides) along a smoothed path. A cylinder's axis is Y; Euler XYZ
+ * (Rx * Ry * Rz) first tilts it by gamma about Z, then turns it by beta about Y so the axis follows the segment.
+ * Each cylinder is a little longer than its segment so bends leave no gaps.
+ */
+export function cablePathParts(path: readonly Vec3[], mat: MaterialKey, thick: number): Part[] {
+  const pts = smoothPath(path)
+  const parts: Part[] = []
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i]
+    const b = pts[i + 1]
+    const dx = b[0] - a[0]
+    const dy = b[1] - a[1]
+    const dz = b[2] - a[2]
+    const len = Math.hypot(dx, dy, dz)
+    if (len < 1e-6) continue
+    const s = Math.hypot(dx, dz) / len
+    const gamma = Math.acos(Math.max(-1, Math.min(1, dy / len)))
+    const beta = s < 1e-9 ? 0 : Math.atan2(dz / len, -dx / len)
+    parts.push(part('cylinderLow', mat, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2], [thick, len + thick * 0.5, thick], [0, beta, gamma]))
+  }
+  return parts
+}
+
+/**
+ * Coaxial and power cables of the media console (task 19.2): a black VCR to TV coax, a grey TV to reference
+ * monitor coax along the console top, a red power cable from the monitor and a black TV power cable. The
+ * three that leave the top run over the back edge of the slab and down the back panel, a few centimetres
+ * behind it. All stay within 5 cm of the console footprint. Shapes derive from the footprint only.
+ */
+export function consoleCableParts(box: Aabb): Part[] {
+  const { cx } = centre(box)
+  const z0 = box.minZ
+  const p = (dx: number, y: number, dz: number): Vec3 => [cx + dx, y, z0 + dz]
+  return [
+    ...cablePathParts([p(-0.15, 0.76, 0.075), p(-0.5, 0.725, 0), p(-0.5, 0.69, -0.03), p(-0.5, 0.2, -0.025), p(-0.45, 0.06, -0.02)], 'cableBlack', 0.018),
+    ...cablePathParts([p(0.15, 0.77, 0.075), p(0.28, 0.73, 0.1), p(0.45, 0.728, 0.13), p(0.6, 0.77, 0.152)], 'cableGrey', 0.016),
+    ...cablePathParts([p(0.77, 0.82, 0.152), p(0.82, 0.725, 0.04), p(0.82, 0.69, -0.03), p(0.82, 0.3, -0.03), p(0.7, 0.04, -0.02)], 'cableRed', 0.018),
+    ...cablePathParts([p(0, 0.74, 0.075), p(0.05, 0.72, 0), p(0.05, 0.69, -0.03), p(0.05, 0.3, -0.03), p(0.3, 0.04, -0.02)], 'cableBlack', 0.018),
   ]
 }
 
@@ -512,7 +587,7 @@ export function arcadeCabinetParts(box: Aabb, height: number, powered = true): P
   if (powered) return parts
   return parts.map((p) =>
     p.mat === 'arcadeScreen'
-      ? { ...p, mat: 'screenOff' as const }
+      ? { ...p, mat: 'outOfOrderScreen' as const }
       : p.mat === 'marquee'
         ? { ...p, mat: 'marqueeOff' as const }
         : p.mat === 'coinGlow'
@@ -901,8 +976,8 @@ export function deskParts(box: Aabb, height: number): Part[] {
   const lampX = box.minX + 0.3
   const f = box.maxZ
   return [
-    bx('woodDark', [cx, (height - 0.06) / 2, cz], [w, height - 0.06, d]),
-    bx('wood', [cx, top - 0.03, cz], [w + 0.1, 0.06, d + 0.1]),
+    wd('woodDark', [cx, (height - 0.06) / 2, cz], [w, height - 0.06, d]),
+    wd('wood', [cx, top - 0.03, cz], [w + 0.1, 0.06, d + 0.1]),
     // Front: knee-space recess, drawer bank on the left, cabinet door on the right.
     bx('bezel', [cx, 0.45, f + 0.002], [1.1, 0.7, 0.004]),
     bx('wood', [cx - 1.0, 0.7, f + 0.006], [0.6, 0.22, 0.012]),
@@ -1014,7 +1089,7 @@ export function countTriangles(parts: readonly Part[]): number {
 
 /** Draw calls after grouping by geometry + material (one InstancedMesh or Mesh per group). */
 export function countDrawCalls(parts: readonly Part[]): number {
-  return new Set(parts.map((p) => `${p.geo}|${p.mat}`)).size
+  return new Set(parts.map(partGroupKey)).size
 }
 
 export interface SceneDetailReport {
@@ -1052,6 +1127,7 @@ export function declaredObjects(): Array<{ name: string; parts: Part[]; extraTri
     { name: 'media-console', parts: mediaConsoleParts(crt.box) },
     { name: 'console-tapes', parts: consoleTapeParts(crt.box) },
     { name: 'reference-monitor', parts: referenceMonitorParts(crt.box) },
+    { name: 'console-cables', parts: consoleCableParts(crt.box) },
     { name: 'filing-cabinet-a', parts: filingCabinetParts(prop('filing-cabinet-a').box, prop('filing-cabinet-a').height, 0) },
     { name: 'filing-cabinet-b', parts: filingCabinetParts(prop('filing-cabinet-b').box, prop('filing-cabinet-b').height, 1) },
     { name: 'conduit', parts: conduitParts() },
