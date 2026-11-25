@@ -9,6 +9,7 @@ type TargetId = 'vhs' | 'arcade' | 'desk-lamp-left' | 'desk-lamp-right' | 'manua
 const h = vi.hoisted(() => ({
   target: null as TargetId | null,
   setTarget: null as ((id: TargetId | null) => void) | null,
+  heldKeysRef: null as { current: { roles: ReadonlySet<string> } } | null,
 }));
 
 vi.mock('./scene/WorldCanvas', () => ({
@@ -34,7 +35,8 @@ vi.mock('./controller/usePlayerRig', async () => {
     return { type: 'prop' as const, prop: INTERACTABLE_DEFS.find((d) => d.id === id)! };
   };
   return {
-    usePlayerRig: (opts: { onTargetChange: (t: ReturnType<typeof wrap>) => void }) => {
+    usePlayerRig: (opts: { onTargetChange: (t: ReturnType<typeof wrap>) => void; heldKeysRef: { current: { roles: ReadonlySet<string> } } }) => {
+      h.heldKeysRef = opts.heldKeysRef;
       h.setTarget = (id) => {
         h.target = id;
         opts.onTargetChange(wrap(id));
@@ -511,5 +513,155 @@ describe('WorldScene fallback (no WebGL)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Use the arcade cabinet' }));
     expect(onInspect).toHaveBeenNthCalledWith(1, 'vhs');
     expect(onInspect).toHaveBeenNthCalledWith(2, 'arcade');
+  });
+});
+
+describe('WorldScene scrollable card (task 28.1)', () => {
+  const card = () => document.querySelector('.world-card') as HTMLElement | null;
+  const held = () => [...(h.heldKeysRef?.current.roles ?? [])];
+  const pressE = (wrapper: HTMLElement) => {
+    fireEvent.keyDown(wrapper, { code: 'KeyE', key: 'e' });
+    fireEvent.keyUp(wrapper, { code: 'KeyE', key: 'e' });
+  };
+  /** jsdom does no layout: give the card a scrollTop backing value and a client height. */
+  const makeScrollable = (el: HTMLElement) => {
+    let top = 0;
+    Object.defineProperty(el, 'scrollTop', { configurable: true, get: () => top, set: (v: number) => { top = Math.max(0, v); } });
+    Object.defineProperty(el, 'clientHeight', { configurable: true, get: () => 300 });
+    return el;
+  };
+  const open = (id: TargetId = 'manual-snake') => {
+    h.target = id;
+    const r = renderWorld();
+    pressE(r.wrapper);
+    return { ...r, el: makeScrollable(card()!) };
+  };
+  const wheel = (deltaY: number, deltaMode = 0) => {
+    const e = new WheelEvent('wheel', { deltaY, deltaMode, cancelable: true });
+    window.dispatchEvent(e);
+    return e;
+  };
+
+  it('wheel scrolls the card and is prevented; lines and pages are normalised to pixels', () => {
+    const { el } = open();
+    const e = wheel(100);
+    expect(e.defaultPrevented).toBe(true);
+    expect(el.scrollTop).toBe(100);
+    wheel(2, 1);
+    expect(el.scrollTop).toBe(132);
+    wheel(1, 2);
+    expect(el.scrollTop).toBe(432);
+  });
+
+  it('wheel does nothing without a card, and the listener follows the card lifetime', () => {
+    const add = vi.spyOn(window, 'addEventListener');
+    const remove = vi.spyOn(window, 'removeEventListener');
+    h.target = 'manual-snake';
+    const { wrapper, unmount } = renderWorld();
+    expect(wheel(100).defaultPrevented).toBe(false);
+    expect(add.mock.calls.filter((c) => c[0] === 'wheel')).toHaveLength(0);
+    pressE(wrapper);
+    const added = add.mock.calls.filter((c) => c[0] === 'wheel');
+    expect(added).toHaveLength(1);
+    expect(added[0][2]).toEqual({ passive: false });
+    fireEvent.keyDown(wrapper, { code: 'Escape', key: 'Escape' });
+    expect(card()).toBeNull();
+    expect(remove.mock.calls.filter((c) => c[0] === 'wheel')).toHaveLength(1);
+    expect(wheel(100).defaultPrevented).toBe(false);
+    pressE(wrapper);
+    expect(add.mock.calls.filter((c) => c[0] === 'wheel')).toHaveLength(2);
+    unmount();
+    expect(remove.mock.calls.filter((c) => c[0] === 'wheel')).toHaveLength(2);
+  });
+
+  it('ArrowDown and ArrowUp scroll the card, are prevented and do not become held movement keys; W still moves', () => {
+    const { wrapper, el } = open();
+    expect(fireEvent.keyDown(wrapper, { code: 'ArrowDown', key: 'ArrowDown' })).toBe(false);
+    expect(el.scrollTop).toBe(48);
+    expect(held()).not.toContain('backward');
+    fireEvent.keyDown(wrapper, { code: 'ArrowDown', key: 'ArrowDown', repeat: true });
+    expect(el.scrollTop).toBe(96);
+    expect(fireEvent.keyDown(wrapper, { code: 'ArrowUp', key: 'ArrowUp' })).toBe(false);
+    expect(el.scrollTop).toBe(48);
+    expect(held()).not.toContain('forward');
+    fireEvent.keyDown(wrapper, { code: 'KeyW', key: 'w' });
+    expect(held()).toContain('forward');
+    expect(el.scrollTop).toBe(48);
+    fireEvent.keyDown(wrapper, { code: 'ArrowLeft', key: 'ArrowLeft' });
+    expect(held()).toContain('left');
+  });
+
+  it('PageDown and PageUp scroll by about one page', () => {
+    const { wrapper, el } = open();
+    expect(fireEvent.keyDown(wrapper, { code: 'PageDown', key: 'PageDown' })).toBe(false);
+    expect(el.scrollTop).toBe(268);
+    fireEvent.keyDown(wrapper, { code: 'PageUp', key: 'PageUp' });
+    expect(el.scrollTop).toBe(0);
+    expect(held()).toEqual([]);
+  });
+
+  it('without a card ArrowUp / ArrowDown move the player and PageDown is not claimed', () => {
+    const { wrapper } = renderWorld();
+    expect(fireEvent.keyDown(wrapper, { code: 'ArrowUp', key: 'ArrowUp' })).toBe(false);
+    expect(held()).toContain('forward');
+    fireEvent.keyDown(wrapper, { code: 'ArrowDown', key: 'ArrowDown' });
+    expect(held()).toContain('backward');
+    expect(fireEvent.keyDown(wrapper, { code: 'PageDown', key: 'PageDown' })).toBe(true);
+    expect(wheel(100).defaultPrevented).toBe(false);
+  });
+
+  it('arrows held before the card opens stop moving the player, W held stays', () => {
+    h.target = 'manual-snake';
+    const { wrapper } = renderWorld();
+    fireEvent.keyDown(wrapper, { code: 'ArrowUp', key: 'ArrowUp' });
+    fireEvent.keyDown(wrapper, { code: 'KeyS', key: 's' });
+    expect(held()).toEqual(expect.arrayContaining(['forward', 'backward']));
+    pressE(wrapper);
+    expect(held()).toEqual(['backward']);
+    fireEvent.keyDown(wrapper, { code: 'KeyW', key: 'w' });
+    fireEvent.keyUp(wrapper, { code: 'ArrowUp', key: 'ArrowUp' });
+    expect(held()).toContain('forward');
+  });
+
+  it('scrollTop resets on a page switch and when another document opens', () => {
+    const { wrapper, el } = open('manual-snake');
+    wheel(200);
+    expect(el.scrollTop).toBe(200);
+    fireEvent.keyDown(wrapper, { code: 'Digit2', key: '2' });
+    expect(el.scrollTop).toBe(0);
+    wheel(150);
+    expect(el.scrollTop).toBe(150);
+    // E on nothing closes the card; the next document starts at the top.
+    act(() => h.setTarget!(null));
+    pressE(wrapper);
+    expect(card()).toBeNull();
+    act(() => h.setTarget!('manual-maze'));
+    pressE(wrapper);
+    expect(card()?.getAttribute('data-card-id')).toBe('manual-maze');
+    expect(card()!.scrollTop).toBe(0);
+  });
+
+  it('clicks and mousedown on the card body or scrollbar never request pointer lock; the canvas still does', () => {
+    const { el } = open();
+    const body = el.querySelector('.world-card-body') as HTMLElement;
+    for (const node of [body, el]) {
+      fireEvent.mouseDown(node);
+      fireEvent.click(node);
+    }
+    expect(lockSpy).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('canvas'));
+    expect(lockSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('page tab buttons still work by click and E / Esc / 1 / 2 are unchanged', () => {
+    const { wrapper } = open();
+    fireEvent.click(document.getElementById('world-card-tab-2')!);
+    expect(document.getElementById('world-card-tab-2')!.getAttribute('aria-selected')).toBe('true');
+    expect(lockSpy).not.toHaveBeenCalled();
+    fireEvent.keyDown(wrapper, { code: 'Digit1', key: '1' });
+    expect(document.getElementById('world-card-tab-1')!.getAttribute('aria-selected')).toBe('true');
+    h.setTarget!(null as never);
+    pressE(wrapper);
+    expect(card()).toBeNull();
   });
 });

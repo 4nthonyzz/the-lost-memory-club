@@ -196,6 +196,37 @@ describe('room layout interactables (task 23.2)', () => {
     expect(propId(pick({ x: -3.8, z }, Math.PI / 2))).toBe(id);
   });
 
+  it('places the protruding manual anchors at x -4.52, 0.035 m in front of the spine face, with a line-of-sight box equal to the book volume (task 28.2)', () => {
+    const manuals = INTERACTABLE_DEFS.filter((d) => d.kind === 'manual');
+    expect(manuals.map((d) => [d.anchor.x, d.anchor.z])).toEqual([
+      [-4.52, 1.4],
+      [-4.52, 1.8],
+      [-4.52, 2.2],
+    ]);
+    for (const d of manuals) {
+      expect(d.collider!.maxX).toBeCloseTo(-4.555, 9);
+      expect(d.collider!.minX).toBeCloseTo(-4.845, 9);
+      expect(d.collider!.maxZ - d.collider!.minZ).toBeCloseTo(0.085, 9);
+      expect((d.collider!.minZ + d.collider!.maxZ) / 2).toBeCloseTo(d.anchor.z, 9);
+      // The books are not colliders, and the anchor is outside every solid footprint, so no collider hides it from the aisle.
+      expect(COLLIDERS).not.toContain(d.collider);
+      expect(COLLIDERS.some((c) => d.anchor.x >= c.minX && d.anchor.x <= c.maxX && d.anchor.z >= c.minZ && d.anchor.z <= c.maxZ)).toBe(false);
+      expect(COLLIDERS.some((c) => segmentIntersectsAabb({ x: -3.8, z: d.anchor.z }, d.anchor, c))).toBe(false);
+    }
+  });
+
+  it('the middle manual wins from the middle cell and stations and other props do not take over', () => {
+    expect(reachable(-3.8, 1.8)).toBe(true);
+    const t = pick({ x: -3.8, z: 1.8 }, Math.PI / 2);
+    expect(propId(t)).toBe('manual-maze');
+    expect(stationId(t)).toBeNull();
+    // Aiming from the cells next to the end manuals picks them, not the middle one.
+    expect(propId(pick({ x: -3.8, z: 1.4 }, Math.PI / 2))).toBe('manual-snake');
+    expect(propId(pick({ x: -3.8, z: 2.2 }, Math.PI / 2))).toBe('manual-frequency');
+    // Looking away (east) selects none of them.
+    expect(propId(pick({ x: -3.8, z: 1.8 }, -Math.PI / 2))).not.toBe('manual-maze');
+  });
+
   it.each([
     ['desk-lamp-left', -1.27],
     ['desk-lamp-right', 1.27],

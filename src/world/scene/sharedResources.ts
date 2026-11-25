@@ -98,13 +98,29 @@ function remapBoxUv(g: BoxGeometry, rect: UvRect, faces: readonly number[], plai
 }
 
 /**
- * Unit box per arcade manual (task 27.1), in MANUAL_STRIP_KEYS order: the +z face (the spine, which faces +X toward the room on
- * the west bookcase) shows the manual's own spine strip of cabinetAndManualDetail, every other face the plain cover-cloth stripe.
- * Sized by instance scale like the spine variants.
+ * Unit box per arcade manual (tasks 27.1 and 28.2), in MANUAL_STRIP_KEYS order: the +z face (the spine, which faces +X toward the room
+ * on the west bookcase) shows the manual's own spine strip of cabinetAndManualDetail, the two side faces (+x and -x of the box, which
+ * are the exposed covers once the book protrudes) show its cover panel, and the top, bottom and back (-z) show its plain cloth stripe.
+ * One box (12 triangles) per manual, sized by instance scale like the spine variants.
  */
+function manualBoxGeometry(strip: UvRect, cover: UvRect, plain: UvRect): BoxGeometry {
+  const g = new BoxGeometry(1, 1, 1)
+  const uv = g.getAttribute('uv')
+  for (let i = 0; i < uv.count; i++) {
+    const face = Math.floor(i / 4)
+    const r = face === BOX_FACE_FRONT ? strip : face === 0 || face === 1 ? cover : plain
+    uv.setXY(i, r.u0 + uv.getX(i) * (r.u1 - r.u0), r.v0 + uv.getY(i) * (r.v1 - r.v0))
+  }
+  uv.needsUpdate = true
+  return g
+}
+
 export const manualGeometries: Readonly<Record<(typeof MANUAL_STRIP_KEYS)[number], BoxGeometry>> = Object.freeze(
   Object.fromEntries(
-    MANUAL_STRIP_KEYS.map((id, i) => [id, remapBoxUv(new BoxGeometry(1, 1, 1), detailUvRect(CABINET_DETAIL_REGIONS.strips[i]), [BOX_FACE_FRONT], detailUvRect(CABINET_DETAIL_REGIONS.cover))]),
+    MANUAL_STRIP_KEYS.map((id, i) => [
+      id,
+      manualBoxGeometry(detailUvRect(CABINET_DETAIL_REGIONS.strips[i]), detailUvRect(CABINET_DETAIL_REGIONS.covers[i]), detailUvRect(CABINET_DETAIL_REGIONS.plains[i])),
+    ]),
   ),
 ) as Record<(typeof MANUAL_STRIP_KEYS)[number], BoxGeometry>
 
@@ -232,7 +248,7 @@ export const materials = {
   /** 24.1 banker shade: OFF is dark green glass with no emission; ON adds emissive #16a34a at 0.38 (25.1). Separate per lamp, swapped per mesh. */
   lampGreenShade: new MeshLambertMaterial({ color: '#16503a', emissive: '#16a34a', emissiveIntensity: 0 }),
   lampGreenShadeOn: new MeshLambertMaterial({ color: '#1f7a4e', emissive: '#16a34a', emissiveIntensity: 0.38 }),
-  /** 27.1: arcade manuals. White base multiplied by each book's instance colour; the cabinetAndManualDetail spine strips carry the printed label band that replaced the old cream band part. */
+  /** 27.1, 28.2: arcade manuals. White base and white instance colour: the cabinetAndManualDetail spine, cover and cloth pixels carry the exact manual colours (#16a34a, #e11d48, #f59e0b). */
   manualBook: lambert('#ffffff'),
   /** 27.1: coin door and kick plate of the arcade cabinets (steel, lit like the old `metal` #777c86). The texture is the colour, so the multiplier is white; the flat grey is the no-canvas fallback. */
   cabinetPanel: lambert('#777c86'),

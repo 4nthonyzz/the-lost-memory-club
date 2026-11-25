@@ -15,6 +15,7 @@ import {
   type PropState,
 } from './logic/propState';
 import type { CardPage } from './logic/archiveDocuments';
+import type { CardScroll } from './logic/inputState';
 import { INTERACTABLE_DEFS } from './layout/roomLayout';
 import type { InteractionTarget, PropInteractableId, Vec2 } from './worldTypes';
 import { Effects } from './scene/Effects';
@@ -35,6 +36,11 @@ export interface WorldSceneProps {
 
 /** Delay before a lost WebGL context without restore switches to the fallback. */
 const CONTEXT_RESTORE_TIMEOUT_MS = 3000;
+
+/** Pixels per ArrowUp / ArrowDown press while a card is open. */
+const CARD_LINE_SCROLL_PX = 48;
+/** Overlap kept between pages when PageUp / PageDown scroll the card. */
+const CARD_PAGE_OVERLAP_PX = 32;
 
 const WORLD_LABEL =
   'First-person 3D archive room. Click the scene to capture the mouse. ' +
@@ -123,6 +129,12 @@ function WorldInteractive({
   const onCardPage = useCallback((page: CardPage) => setPropState((s) => reduceCardPage(s, page)), []);
   const getCardAnchor = useCallback(() => cardAnchorRef.current, []);
   const isCardOpen = useCallback(() => cardOpenRef.current, []);
+  const onCardScroll = useCallback((s: CardScroll) => {
+    const el = wrapperRef.current?.querySelector<HTMLElement>('[data-world-card]');
+    if (!el) return;
+    const px = s.kind === 'line' ? CARD_LINE_SCROLL_PX : Math.max(CARD_LINE_SCROLL_PX, el.clientHeight - CARD_PAGE_OVERLAP_PX);
+    el.scrollTop += s.dir * px;
+  }, []);
   const inspectStation = useCallback(
     (id: StationId) => {
       closeCard(); // opening a station closes any open card
@@ -145,14 +157,18 @@ function WorldInteractive({
     onCloseCard: closeCard,
     isCardOpen,
     onCardPage,
+    onCardScroll,
     inputEnabled,
   });
   // Keep the refs in step with the committed state (the open card id is the single source).
   const openCard = propState.openCard;
+  const { releaseCardArrows } = input;
   useEffect(() => {
     cardOpenRef.current = openCard !== null;
     cardAnchorRef.current = openCard === null ? null : (INTERACTABLE_DEFS.find((d) => d.id === openCard)?.anchor ?? null);
-  }, [openCard]);
+    // ArrowUp / ArrowDown scroll the card now, so movement they were driving stops.
+    if (openCard !== null) releaseCardArrows();
+  }, [openCard, releaseCardArrows]);
   // The station panel opening (inspecting) closes the card.
   useEffect(() => {
     if (input.mode === 'inspecting') closeCard();

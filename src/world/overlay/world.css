@@ -188,7 +188,7 @@
 /*
  * Archive Document Card. The region spans the free area above the prompt (bottom 22%) and the message pill
  * (about 56px above it), below the top banners, so the card never covers the App status line, the HUD or the prompt.
- * It is non-interactive (pointer-events: none) and sits below the App HUD (z-index 5) and modal layer (z-index 20).
+ * The region is non-interactive (pointer-events: none; only the card accepts the mouse) and sits below the App HUD (z-index 5) and modal layer (z-index 20).
  */
 .world-card-region {
   position: absolute;
@@ -214,7 +214,6 @@
   width: 100%;
   max-width: 580px;
   max-height: min(70vh, 100%);
-  overflow: auto;
   padding: 14px 20px 12px;
   background-color: var(--card-bg);
   color: var(--card-ink);
@@ -225,7 +224,27 @@
   font-size: 13px;
   line-height: 1.5;
   text-align: left;
-  pointer-events: none;
+  /* The card is the single scroll container and captures the mouse (wheel, scrollbar drag). The region stays inert. */
+  pointer-events: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--card-accent) var(--card-pill-bg);
+}
+
+.world-card::-webkit-scrollbar {
+  width: 10px;
+}
+
+.world-card::-webkit-scrollbar-track {
+  background: var(--card-pill-bg);
+  border-left: 1px solid var(--card-ink);
+}
+
+.world-card::-webkit-scrollbar-thumb {
+  background: var(--card-accent);
+  border: 1px solid var(--card-ink);
+  border-radius: 0;
 }
 
 .world-card p,
@@ -297,7 +316,7 @@
   font-weight: 700;
 }
 
-/* Page buttons. The container ignores the pointer; the buttons accept it so they work when the pointer is not locked. */
+/* Page buttons. They are useful when the pointer is not locked; clicks on them never request pointer lock. */
 .world-card-tabs {
   display: flex;
   flex-wrap: wrap;

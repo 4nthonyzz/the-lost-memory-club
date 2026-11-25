@@ -44,6 +44,8 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 
 - Approved scope change (themed inspector and cabinet detail), 2026-12-04: one new 256x128 texture `cabinetAndManualDetail` is added (left half: coin door and control-deck legends for the three arcade cabinets; right half: three illustrated manual spines), mapped onto existing faces with zero new triangles. `rugWoven`, `wood`, `woodDark` and `spineAtlas` are sharpened in place. The Archive Document Card gains per-document themes, status pills, inline SVG header art and two pages switched with keys 1 and 2 (also clickable buttons when the pointer is not locked; while pointer-locked there is no cursor, so keys are the input), without releasing pointer lock or moving the player. E, Esc and walking more than 2.6 m away still close it. In-world status text such as "CABINET 01 // PLAYABLE" is diegetic and is accurate only once the Snake game ships in `src/arcade`. Budgets: triangles at most 19,200 (currently 19,188), at most 4 lights, texture memory at most 7.85 MB (currently 7.537 MB), texture count 32. `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged.
 
+- Approved scope change (scrollable card and protruding manuals), 2026-12-05: the Archive Document Card scrolls with the mouse wheel (window `wheel` listener, `passive: false`, attached only while a card is open, also while pointer-locked) and with ArrowUp / ArrowDown / PageUp / PageDown. While a card is open, ArrowUp / ArrowDown scroll the card and do not move the player (W / S still move). The card becomes `pointer-events: auto` with a styled scrollbar so it can be dragged when the cursor is visible. Clicks and mousedown inside the card never request pointer lock: the world click handler ignores targets inside the card, because React `stopPropagation` alone does not stop the native wrapper listener. `scrollTop` resets on open and on page switch. The three manuals protrude 0.08 m toward +X as 0.31 x 0.085 x 0.29 m volumes with anchors at x -4.52, z 1.4 / 1.8 / 2.2, showing spine art and cover art on the exposed side faces using the right half of `cabinetAndManualDetail` (redrawn in place, 0 bytes). Budgets: triangles at most 19,200 (currently 19,152; 0 extra), at most 4 lights, texture memory at most 7.85 MB (currently 7.703 MiB; 0 extra). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged.
+
 ## Tasks
 
 ### Milestone 1: Playable 3D room (primitives only)
@@ -1018,6 +1020,36 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: documentation and the spec folder only.
     - _Requirements: 14.11, 14.12, 15.3, 15.6_
 
+### Scrollable card and protruding manuals
+
+- [x] 28. Scrollable card and protruding themed manuals
+  - [x] 28.1 Wheel, key and scrollbar scrolling for the document card
+    - Files: `src/world/overlay/WorldInspectorCard.tsx`, `src/world/WorldScene.tsx`, `src/world/controller/useWorldInput.ts`, `src/world/logic/inputState.ts`, `src/world/logic/inputMode.ts` or `src/world/logic/propState.ts` (only if needed), `src/world/overlay/world.css`; tests `src/world/WorldScene.test.ts`, `src/world/logic/inputState.test.ts`, `src/world/logic/inputMode.prop.test.ts`.
+    - Add a window `wheel` listener (`passive: false`) attached only while a card is open, working also while pointer-locked, plus ArrowUp / ArrowDown / PageUp / PageDown scrolling. While a card is open ArrowUp / ArrowDown scroll the card and do not move the player; W / S still move. The card gets `pointer-events: auto` and a styled scrollbar. The world click handler ignores clicks and mousedown whose target is inside the card, so they never request pointer lock. `scrollTop` resets on open and on page switch.
+    - Acceptance: wheel scrolls the card (also when pointer-locked) and the page is not scrolled; the wheel listener is removed when the card closes or the world unmounts; click inside the card does not call `requestPointerLock`; no `onInspect` call, no mode change; ArrowUp / ArrowDown do not move the player while a card is open and do move it otherwise; scroll position resets on open and page switch.
+    - Tests: `WorldScene.test.ts` (wheel scroll, listener add and removal, click inside card does not request lock, scroll reset), `inputState.test.ts` (key roles for scroll keys while the card is open), `inputMode.prop.test.ts` (no mode change, no `CALL_ON_INSPECT`, no lock effect). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 27.3.
+    - Boundary: `src/world/` only; `WorldSceneProps` and `onInspect` unchanged; no storage access; no import from `src/arcade/` or `src/memories/`.
+    - _Requirements: 4.10, 7.5, 7.6, 7.7, 8.1, 11.12, 11.13, 11.14, 11.23, 15.1, 15.2, 15.4, 20.2, 20.8_
+
+  - [x] 28.2 Protruding manual volumes with spine and cover art
+    - Files: `src/world/scene/shelfModel.ts`, `src/world/scene/modelDetail.ts`, `src/world/scene/proceduralTextures.ts`, `src/world/scene/sharedResources.ts` (only if needed), `src/world/layout/roomLayout.ts`; tests `src/world/scene/modelDetail.test.ts`, `src/world/scene/proceduralTextures.test.ts`, `src/world/logic/targeting.test.ts`, `src/world/layout/roomLayout.test.ts`.
+    - Make the three manuals protrude 0.08 m toward +X as 0.31 x 0.085 x 0.29 m volumes with anchors at x -4.52, z 1.4 / 1.8 / 2.2. Show spine art and cover art on the exposed side faces using the right half of `cabinetAndManualDetail`, redrawn in place (size unchanged, 0 extra bytes).
+    - Acceptance: triangle estimate at most 19,200 (0 extra from 19,152); lights at most 4; texture memory at most 7.85 MB (0 extra); texture count unchanged; the manuals stay targetable within 2.2 m and do not block walkways or change colliders in a way that breaks reachability; `cabinetAndManualDetail` disposed exactly once (twice-safe); Memory_Shift tinting still works.
+    - Tests: `modelDetail.test.ts` (manual dimensions and anchors, budgets, disposal once and twice-safe), `proceduralTextures.test.ts` (determinism with a fake context, same size, no randomness), `targeting.test.ts` (each manual targetable from the aisle, nearest wins), `roomLayout.test.ts` (anchors, reachability and clearances unchanged). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 28.1.
+    - Boundary: render and layout data only; `src/world/` only; no new dependency; no GLB; `ASSET_MANIFEST` stays empty; `StationId` and `onInspect` unchanged.
+    - _Requirements: 1.3, 1.4, 1.8, 6.1, 7.1, 7.2, 7.3, 9.8, 12.5, 13.8, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 28.3 Docs, metrics and verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, lights and texture memory, each labelled "computed, not runtime-measured". Document the card scroll controls and the protruding manuals. Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final geometry and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 28.2.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional. The 17 property-based test sub-tasks can be skipped for a faster MVP. Tasks 16.2 and 16.3 are marked `*` because they must not be implemented without approval.
@@ -1091,7 +1123,10 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     { "id": 56, "tasks": ["26.3"] },
     { "id": 57, "tasks": ["27.1"] },
     { "id": 58, "tasks": ["27.2"] },
-    { "id": 59, "tasks": ["27.3"] }
+    { "id": 59, "tasks": ["27.3"] },
+    { "id": 60, "tasks": ["28.1"] },
+    { "id": 61, "tasks": ["28.2"] },
+    { "id": 62, "tasks": ["28.3"] }
   ]
 }
 ```

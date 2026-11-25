@@ -243,6 +243,14 @@ export const PROP_INTERACTION_RANGE = 2.2;
 export const MANUAL_PLACEMENT = Object.freeze({
   shelfId: 'shelf-b',
   level: 2,
+  /**
+   * Task 28.2: each manual is a 0.085 (along z) x 0.31 x 0.29 m (along x) volume whose spine face is at x -4.555, so the book is pulled
+   * 0.08 m toward +x compared with the flush row (spines at -4.635) and sticks out 0.045 m past the bookcase front (x -4.6). The
+   * volumes are non-solid. Back face at x -4.845.
+   */
+  spineX: -4.555,
+  backX: -4.845,
+  thickness: 0.085,
   books: Object.freeze([
     Object.freeze({ id: 'manual-snake' as const, z: 1.4 }),
     Object.freeze({ id: 'manual-maze' as const, z: 1.8 }),
@@ -267,9 +275,10 @@ function manualDef(id: ManualId, z: number): InteractableDef {
   return Object.freeze({
     id,
     kind: 'manual' as const,
-    // On the bookcase front face (x = -4.6), centred on the book.
-    anchor: Object.freeze({ x: SHELF_B.box.maxX, z }),
-    collider: SHELF_B.box,
+    // Task 28.2: 0.035 m in front of the protruding spine face (x -4.555), centred on the book.
+    anchor: Object.freeze({ x: -4.52, z }),
+    // The book's own footprint is excluded from its line-of-sight test (it is not in COLLIDERS; this box only identifies it).
+    collider: box(MANUAL_PLACEMENT.backX, MANUAL_PLACEMENT.spineX, z - MANUAL_PLACEMENT.thickness / 2, z + MANUAL_PLACEMENT.thickness / 2),
     range: PROP_INTERACTION_RANGE,
     height: 1.25,
   });

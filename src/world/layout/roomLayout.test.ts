@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { PLAYER_RADIUS, INTERACTION_RANGE } from '../logic/constants';
 import { overlapsAny } from '../logic/collision';
 import { segmentIntersectsAabb, selectInteractionStation, selectInteractionTarget } from '../logic/targeting';
-import { COLLIDERS, ROOM, estimateTriangles, reachableCells } from './roomLayout';
+import { COLLIDERS, INTERACTABLE_DEFS, ROOM, estimateTriangles, reachableCells } from './roomLayout';
 import type { Aabb, Facing, StationDef, Vec2 } from '../worldTypes';
 
 const inside = (x: number, z: number, b: Aabb) =>
@@ -290,6 +290,34 @@ describe('roomLayout', () => {
     expect(ROOM.start).toEqual({ x: 0, z: 3 });
     expect(overlapsAny(ROOM.start, 0.99, COLLIDERS)).toBe(false);
     expect(overlapsAny(ROOM.start, 1.2, COLLIDERS)).toBe(true);
+  });
+
+  it('places the three protruding manual interactables at x -4.52, as non-solid volumes that leave the 1.2 m west walkway clear (task 28.2)', () => {
+    const manuals = INTERACTABLE_DEFS.filter((d) => d.kind === 'manual');
+    expect(manuals.map((d) => d.id)).toEqual(['manual-snake', 'manual-maze', 'manual-frequency']);
+    expect(manuals.map((d) => [d.anchor.x, d.anchor.z])).toEqual([
+      [-4.52, 1.4],
+      [-4.52, 1.8],
+      [-4.52, 2.2],
+    ]);
+    const shelf = prop('shelf-b').box;
+    for (const d of manuals) {
+      // The volume is 0.29 x 0.085 m in plan, spine face at x -4.555 (0.045 m past the bookcase front at -4.6), not a collider.
+      expect(d.collider).toEqual({ minX: -4.845, maxX: -4.555, minZ: expect.closeTo(d.anchor.z - 0.0425, 9), maxZ: expect.closeTo(d.anchor.z + 0.0425, 9) });
+      expect(COLLIDERS.some((c) => c === d.collider)).toBe(false);
+      expect(d.anchor.x).toBeGreaterThan(shelf.maxX);
+      expect(d.anchor.x).toBeGreaterThan(d.collider!.maxX);
+    }
+    // No solid footprint stands in the 1.2 m strip in front of the bookcase (x -4.6 .. -3.4) along the manual row.
+    for (const c of COLLIDERS) {
+      expect(c.maxX <= -4.6 + 1e-9 || c.minX >= -3.4 - 1e-9 || c.maxZ <= 0.4 || c.minZ >= 2.6, `${JSON.stringify(c)}`).toBe(true);
+    }
+    // The books are not solid, so the reachable cells are exactly those of the bookcase alone: the cells in front of each book stay reachable.
+    const cells = reachableCells(ROOM.start);
+    for (const d of manuals) expect(cells.some((c) => Math.abs(c.x + 3.8) < 1e-6 && Math.abs(c.z - d.anchor.z) < 1e-6)).toBe(true);
+    const nearest = Math.min(...cells.filter((c) => c.z >= 0.4 && c.z <= 2.6).map((c) => c.x));
+    expect(nearest).toBeCloseTo(-4.6 + PLAYER_RADIUS, 1);
+    expect(ROOM.props.filter((p) => p.solid).length).toBe(COLLIDERS.length - ROOM.walls.length - ROOM.doors.reduce((n, door) => n + door.frames.length, 0));
   });
 
   it('reaches both Stations and the area behind the island near the bulletin board and filing cabinets', () => {

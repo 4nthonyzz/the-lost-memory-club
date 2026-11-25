@@ -1,4 +1,4 @@
-import type { CSSProperties, MouseEvent, ReactElement } from 'react';
+import { useEffect, useLayoutEffect, useRef, type CSSProperties, type MouseEvent, type ReactElement } from 'react';
 import {
   ARCHIVE_DOCUMENTS,
   ARCHIVE_FOOTER_HINT,
@@ -127,12 +127,54 @@ const ART: Readonly<Record<DocTheme, () => ReactElement>> = {
 
 /**
  * Archive Document Card. A non-modal paper/terminal document shown inside the world wrapper. It is not a dialog:
- * there is no focus trap and no focus move. The container ignores the pointer; only the two page buttons accept
- * clicks (useful when the pointer is not locked). Keys 1 and 2 switch pages and are handled by the world input.
+ * there is no focus trap and no focus move. The card is the single scroll container and takes the mouse (wheel and
+ * scrollbar); the region around it ignores the pointer. The two page buttons are useful when the pointer is not locked.
+ * Keys 1 and 2 switch pages and are handled by the world input.
  * It closes on E, Esc or by walking away.
  */
 export function WorldInspectorCard({ id = null, page = 1, onPage }: WorldInspectorCardProps) {
   if (id === null) return null;
+  return <OpenCard id={id} page={page} onPage={onPage} />;
+}
+
+const LINE_PX = 16;
+
+/** Mounted only while a card is open, so its listeners exist only then. */
+function OpenCard({ id, page, onPage }: { id: ReadableId; page: CardPage; onPage?: (page: CardPage) => void }) {
+  const cardRef = useRef<HTMLElement | null>(null);
+  // Wheel scrolls the card, also while the pointer is locked (the wheel is still delivered). Not passive so the page never scrolls.
+  useEffect(() => {
+    const onWheel = (e: WheelEvent) => {
+      const el = cardRef.current;
+      if (!el) return;
+      e.preventDefault();
+      const unit = e.deltaMode === 1 ? LINE_PX : e.deltaMode === 2 ? el.clientHeight : 1;
+      el.scrollTop += e.deltaY * unit;
+    };
+    window.addEventListener('wheel', onWheel, { passive: false });
+    return () => window.removeEventListener('wheel', onWheel);
+  }, []);
+  // Card clicks and presses never reach the world wrapper (which would request pointer lock). Buttons are left alone so
+  // React's delegated handlers still run; the wrapper ignores BUTTON targets.
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return undefined;
+    const stop = (e: Event) => {
+      if ((e.target as Element | null)?.closest?.('button')) return;
+      e.stopPropagation();
+    };
+    el.addEventListener('mousedown', stop);
+    el.addEventListener('click', stop);
+    return () => {
+      el.removeEventListener('mousedown', stop);
+      el.removeEventListener('click', stop);
+    };
+  }, []);
+  // A new document or page always starts at the top.
+  useLayoutEffect(() => {
+    if (cardRef.current) cardRef.current.scrollTop = 0;
+  }, [id, page]);
+
   const doc = ARCHIVE_DOCUMENTS[id];
   const palette = CARD_PALETTES[doc.theme];
   const active = doc.pages[page - 1];
@@ -153,6 +195,8 @@ export function WorldInspectorCard({ id = null, page = 1, onPage }: WorldInspect
     <div className="world-card-region">
       <section
         className="world-card"
+        ref={cardRef}
+        data-world-card="true"
         role="region"
         aria-label={doc.title}
         aria-live="polite"

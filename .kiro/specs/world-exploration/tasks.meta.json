@@ -1425,6 +1425,49 @@
         "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
         "timestamp": 1795637378444
       }
+    ],
+    "28.1 Wheel, key and scrollbar scrolling for the document card": [
+      {
+        "executionId": "d73710a2-a3ad-4acd-adfb-5faad5cc710c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795638093702
+      },
+      {
+        "executionId": "d73710a2-a3ad-4acd-adfb-5faad5cc710c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795638407036
+      }
+    ],
+    "28.2 Protruding manual volumes with spine and cover art": [
+      {
+        "executionId": "d73710a2-a3ad-4acd-adfb-5faad5cc710c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795638406306
+      },
+      {
+        "executionId": "d73710a2-a3ad-4acd-adfb-5faad5cc710c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795639163229
+      }
+    ],
+    "28.3 Docs, metrics and verification": [
+      {
+        "executionId": "d73710a2-a3ad-4acd-adfb-5faad5cc710c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795639162905
+      },
+      {
+        "executionId": "d73710a2-a3ad-4acd-adfb-5faad5cc710c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795639805960
+      }
+    ],
+    "28. Scrollable card and protruding themed manuals": [
+      {
+        "executionId": "d73710a2-a3ad-4acd-adfb-5faad5cc710c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795639806079
+      }
     ]
   }
 }

@@ -41,6 +41,7 @@ import {
   CABINET_SERIAL_TEXT,
   MANUAL_SPINE_TITLES,
   MANUAL_STRIP_KEYS,
+  MANUAL_COVER_COLOURS,
   detailUvRect,
   cabinetCardV,
   marqueeFontSize,
@@ -1076,7 +1077,7 @@ describe('task 27.1: cabinetAndManualDetail (arcade cabinet front and manual spi
     transforms.forEach((t, i) => {
       const [x0, , x1] = CABINET_DETAIL_REGIONS.strips[i]
       expect(t[4] > x0 && t[4] < x1).toBe(true)
-      expect(t[5] > 54 && t[5] < 120).toBe(true)
+      expect(t[5] > 40 && t[5] < 122).toBe(true)
     })
     expect(withT.calls.filter((c) => c.op === 'save')).toHaveLength(withT.calls.filter((c) => c.op === 'restore').length)
 
@@ -1090,17 +1091,23 @@ describe('task 27.1: cabinetAndManualDetail (arcade cabinet front and manual spi
     })
   })
 
-  it('draws the amber 89.4 MHz wave emblem on the third spine and no text outside the strips on the right half', () => {
+  it('draws the amber 89.4 MHz oscilloscope on the third cover and keeps right-half text inside the strips and covers', () => {
     const texts = textCalls(run(ID))
     const mhz = texts.find((t) => t.s === FREQUENCY_TEXT)!
     expect(FREQUENCY_TEXT).toBe('89.4 MHz')
-    const third = CABINET_DETAIL_REGIONS.strips[2]
-    expect(mhz.x > third[0] && mhz.x < third[2]).toBe(true)
+    const third = CABINET_DETAIL_REGIONS.covers[2]
+    expect(mhz.x > third[0] && mhz.x < third[2] && mhz.y > third[1] && mhz.y < third[3]).toBe(true)
+    // The three cover titles are the same whole strings as the spines, one per cover, inside their own panel.
+    CABINET_DETAIL_REGIONS.covers.forEach((cv, i) => {
+      const t = texts.find((q) => q.s === MANUAL_SPINE_TITLES[i] && q.x > cv[0] && q.x < cv[2])!
+      expect(t, MANUAL_SPINE_TITLES[i]).toBeDefined()
+      expect(t.y > cv[1] && t.y < cv[3]).toBe(true)
+    })
     for (const t of texts.filter((q) => q.x >= 128)) {
-      expect(CABINET_DETAIL_REGIONS.strips.some((s) => t.x > s[0] && t.x < s[2]), t.s).toBe(true)
+      const inside = [...CABINET_DETAIL_REGIONS.strips, ...CABINET_DETAIL_REGIONS.covers].some((s) => t.x > s[0] && t.x < s[2] && t.y > s[1] && t.y < s[3])
+      expect(inside, t.s).toBe(true)
     }
   })
-
   it('has no brand names in any string', () => {
     for (const s of [...run(ID).texts(), ...runWithTransform().texts()]) expect(s).not.toMatch(brands)
   })
@@ -1109,8 +1116,8 @@ describe('task 27.1: cabinetAndManualDetail (arcade cabinet front and manual spi
     const R = CABINET_DETAIL_REGIONS
     const left = [R.door, R.lip, R.kick, R.plainSteel, R.plainDark]
     for (const r of left) expect(r[0] >= 0 && r[2] <= 128 && r[1] >= 0 && r[3] <= H).toBe(true)
-    for (const r of [...R.strips, R.cover]) expect(r[0] >= 128 && r[2] <= W && r[1] >= 0 && r[3] <= H).toBe(true)
-    const all = [...left, ...R.strips, R.cover]
+    for (const r of [...R.strips, ...R.covers, ...R.plains]) expect(r[0] >= 128 && r[2] <= W && r[1] >= 0 && r[3] <= H).toBe(true)
+    const all = [...left, ...R.strips, ...R.covers, ...R.plains]
     for (let i = 0; i < all.length; i++) {
       for (let j = i + 1; j < all.length; j++) {
         const a = all[i]
@@ -1123,7 +1130,10 @@ describe('task 27.1: cabinetAndManualDetail (arcade cabinet front and manual spi
     expect(aspect(R.lip) / (1 / 0.07)).toBeCloseTo(1, 1) // deck lip 1.0 x 0.07 m
     expect(aspect(R.kick) / (0.98 / 0.13)).toBeCloseTo(1, 1) // kick plate 0.98 x 0.13 m
     expect(MANUAL_STRIP_KEYS).toHaveLength(3)
-    for (const s of R.strips) expect(s[2] - s[0]).toBeGreaterThanOrEqual(41)
+    for (const s of R.strips) expect(s[2] - s[0]).toBeGreaterThanOrEqual(20)
+    // Task 28.2: the spine face is 0.085 x 0.31 m (20 x 128 px) and the cover face 0.29 x 0.31 m (64 x 42 px), so the covers are drawn about 1.6x wider than tall.
+    for (const s of R.strips) expect((s[2] - s[0]) * 0.00425).toBeCloseTo(0.085, 2)
+    for (const s of R.covers) expect((s[2] - s[0]) * 0.0045).toBeCloseTo(0.29, 2)
   })
 
   it('maps UV windows to the same regions: inside their half, top of the canvas is v = 1', () => {
@@ -1134,7 +1144,7 @@ describe('task 27.1: cabinetAndManualDetail (arcade cabinet front and manual spi
       expect(u.u0).toBeLessThan(u.u1)
       expect(u.v0).toBeLessThan(u.v1)
     }
-    for (const r of [...CABINET_DETAIL_REGIONS.strips, CABINET_DETAIL_REGIONS.cover]) {
+    for (const r of [...CABINET_DETAIL_REGIONS.strips, ...CABINET_DETAIL_REGIONS.covers, ...CABINET_DETAIL_REGIONS.plains]) {
       const u = detailUvRect(r)
       expect(u.u0).toBeGreaterThanOrEqual(0.5)
       expect(u.u1).toBeLessThanOrEqual(1)
@@ -1143,17 +1153,24 @@ describe('task 27.1: cabinetAndManualDetail (arcade cabinet front and manual spi
     expect(detailUvRect(CABINET_DETAIL_REGIONS.door).v1).toBeCloseTo(1 - 0.5 / 128, 6)
   })
 
-  it('keeps the spine backgrounds near neutral so the book colour still multiplies through', () => {
-    const fills = run(ID).calls.filter((c) => c.op === 'set fillStyle').map((c) => String(c.args[0]))
-    // Strip ground and cover cloth: light neutral greys (r = g = b, at least 0xc0).
-    for (const grey of ['#cfcfcf', '#d2d2d2', '#fbfbfb']) {
-      expect(fills).toContain(grey)
-      const v = parseInt(grey.slice(1, 3), 16)
-      expect(v).toBeGreaterThanOrEqual(0xc0)
-    }
+  it('paints the exact manual colours (#16a34a, #e11d48, #f59e0b) as spine, cover and plain-cloth ground, and keeps the left half strings unchanged', () => {
+    expect([...MANUAL_COVER_COLOURS]).toEqual(['#16a34a', '#e11d48', '#f59e0b'])
+    const ctx = run(ID)
+    const fills = ctx.calls.filter((c) => c.op === 'set fillStyle').map((c) => String(c.args[0]))
+    for (const hue of MANUAL_COVER_COLOURS) expect(fills, hue).toContain(hue)
+    // Each manual's ground is drawn as a full strip, a full cover panel and a plain stripe.
+    const rects = ctx.calls.filter((c) => c.op === 'fillRect').map((c) => c.args as number[])
+    MANUAL_COVER_COLOURS.forEach((hue, i) => {
+      const grounds = [CABINET_DETAIL_REGIONS.strips[i], CABINET_DETAIL_REGIONS.covers[i], CABINET_DETAIL_REGIONS.plains[i]]
+      for (const [x0, y0, x1, y1] of grounds) expect(rects.some((q) => q[0] === x0 && q[1] === y0 && q[2] === x1 - x0 && q[3] === y1 - y0), `${hue} ${x0},${y0}`).toBe(true)
+    })
+    const left = textCalls(run(ID))
+      .filter((t) => t.x < 128)
+      .map((t) => t.s)
+      .sort()
+    expect(left).toEqual(['25\u00a2', '25\u00a2', '1P START', 'ACTION', 'INSERT COIN', 'MOVE', 'REJECT', 'SER. 0996-LMC'].sort())
   })
 })
-
 describe('task 27.1: sharpened in place (rugWoven, wood, woodDark, spineAtlas)', () => {
   const SHARPENED = [
     ['rugWoven', 256, 256],

@@ -1878,7 +1878,13 @@ export interface UvRect {
  *  - lip: the 1.0 x 0.07 m front face of the control deck (the player-facing lip, tilted with the deck);
  *  - kick: the 0.98 x 0.13 m kick plate;
  *  - plainSteel / plainDark: flat stripes that every other face of those boxes samples, so no legend shows on the sides.
- * Right half (x 128..255): three manual spines, 41 px wide and 128 px tall each, plus a plain cover-cloth stripe (x 251..255).
+ * Right half (x 128..255), redrawn in place in task 28.2 for the protruding manuals (0.085 x 0.31 x 0.29 m boxes):
+ *  - strips: three spine strips, 20 x 128 px each (x 128..187), mapped onto the +x face of a manual (0.085 x 0.31 m, about 4.25 mm per px
+ *    across and 2.4 mm per px along the spine);
+ *  - covers: three cover panels, 64 x 42 px each, stacked in one column (x 188..251, y 0..41, 43..84, 86..127), mapped onto both side faces
+ *    (0.29 x 0.31 m, about 4.5 mm per px across and 7.4 mm per px up, so shapes are drawn about 1.6x wider than tall to look square);
+ *  - plains: three 4 x 38 px stripes of plain cloth (x 252..255), one per manual, in that manual's own colour, for the top, bottom and back.
+ * The manual colours are painted into the texture (the manual instances multiply it by white).
  */
 export const CABINET_DETAIL_REGIONS = Object.freeze({
   door: [0, 0, 66, 86] as PxRect,
@@ -1886,13 +1892,25 @@ export const CABINET_DETAIL_REGIONS = Object.freeze({
   kick: [0, 99, 128, 116] as PxRect,
   plainSteel: [0, 117, 128, 122] as PxRect,
   plainDark: [0, 123, 128, 128] as PxRect,
-  cover: [251, 4, 256, 124] as PxRect,
   strips: Object.freeze([
-    [128, 0, 169, 128] as PxRect,
-    [169, 0, 210, 128] as PxRect,
-    [210, 0, 251, 128] as PxRect,
+    [128, 0, 148, 128] as PxRect,
+    [148, 0, 168, 128] as PxRect,
+    [168, 0, 188, 128] as PxRect,
+  ]),
+  covers: Object.freeze([
+    [188, 0, 252, 42] as PxRect,
+    [188, 43, 252, 85] as PxRect,
+    [188, 86, 252, 128] as PxRect,
+  ]),
+  plains: Object.freeze([
+    [252, 2, 256, 40] as PxRect,
+    [252, 44, 256, 82] as PxRect,
+    [252, 86, 256, 124] as PxRect,
   ]),
 })
+
+/** Exact cloth colours of the three manuals (emerald, crimson, amber), painted into the texture as spine, cover and plain-cloth ground. */
+export const MANUAL_COVER_COLOURS = Object.freeze(['#16a34a', '#e11d48', '#f59e0b'] as const)
 
 /** Manual spine strips, left to right, and the title printed along each one. */
 export const MANUAL_STRIP_KEYS = ['manual-snake', 'manual-maze', 'manual-frequency'] as const
@@ -1920,8 +1938,11 @@ export function detailUvRect(px: PxRect): UvRect {
 /** Pixel x of the left half of the texture ends here: the cabinet art lives left of it, the manual spines right of it. */
 export const CABINET_DETAIL_HALF_X = 128
 
-/** Vertical text on a spine is squashed along its reading direction: the spine face is stretched about 1.5x in v (0.06 x 0.28 m on 41 x 128 px). */
-const SPINE_TEXT_SQUASH = 2 / 3
+/**
+ * Scale of vertical spine text along its reading direction. The spine face (0.085 x 0.31 m on 20 x 128 px) is about 1.8x wider per px
+ * across than along, so glyphs come out tall and narrow; a factor of 1 keeps the long titles inside 84 px at a legible size.
+ */
+const SPINE_TEXT_SQUASH = 1
 
 /** Horizontal brushing: one faint light or dark streak per row inside the rectangle. */
 function brushed(c: Ctx2D, rnd: () => number, x: number, y: number, w: number, h: number, base: string): void {
@@ -1930,15 +1951,14 @@ function brushed(c: Ctx2D, rnd: () => number, x: number, y: number, w: number, h
 }
 
 /**
- * Title printed along a spine, reading downward. With a transform-capable context the whole string is drawn rotated 90 degrees
- * clockwise (and condensed to cancel the vertical stretch of the face); otherwise the letters are stacked, one per line.
+ * Title printed along a spine, reading downward. With a transform-capable context the whole string is drawn rotated 90 degrees\n * clockwise; otherwise the letters are stacked, one per line.
  * The text stays inside x (cx +- 8) and y0..y1.
  */
 function spineTitle(c: Ctx2D, s: string, cx: number, y0: number, y1: number, ink: string): void {
   const len = y1 - y0
   const chars = [...s].length
   if (c.setTransform) {
-    const fs = Math.max(6, Math.min(11, Math.floor(len / (SPINE_TEXT_SQUASH * MARQUEE_CHAR_WIDTH_EM * chars))))
+    const fs = Math.max(6, Math.min(9, Math.floor(len / (SPINE_TEXT_SQUASH * MARQUEE_CHAR_WIDTH_EM * chars))))
     c.save()
     // x' = -y + cx, y' = squash * x + centre: text x runs down the canvas, text y runs to the left.
     c.setTransform(0, SPINE_TEXT_SQUASH, -1, 0, cx, (y0 + y1) / 2)
@@ -1953,71 +1973,145 @@ function spineTitle(c: Ctx2D, s: string, cx: number, y0: number, y1: number, ink
   })
 }
 
-/** Emblem ground: a white tile (it multiplies to the book colour, so the print on it reads as a dark tone of that colour) with a thin rule. */
-function emblemGround(c: Ctx2D, x0: number, ink: string): void {
-  rect(c, x0 + 3, 8, 35, 24, '#ffffff')
-  frame(c, x0 + 3.5, 8.5, 34, 23, ink, 1, 0.8)
-}
+/** Per-manual palette: dark CRT-style window ground, light glow tint, spine and title ink (dark on emerald and amber, pale on crimson, each at least 4.5:1). */
+const MANUAL_ART = Object.freeze([
+  { ground: '#07140c', glow: '#86efac', bright: '#dcfce7', ink: '#04210f' },
+  { ground: '#1a0610', glow: '#fb7185', bright: '#ffe4e6', ink: '#ffe4e6' },
+  { ground: '#1c1203', glow: '#fde68a', bright: '#fffbeb', ink: '#2b1700' },
+] as const)
 
-/** Green pixel serpent on a 4 px grid (8 columns x 5 rows) with a lit eye, and one dim prey pixel. */
-function snakeEmblem(c: Ctx2D, x0: number, ink: string): void {
-  const cells: ReadonlyArray<readonly [number, number]> = [[0, 3], [1, 3], [2, 3], [2, 2], [2, 1], [3, 1], [4, 1], [5, 1], [5, 2], [5, 3], [6, 3], [7, 3]]
-  const gx = x0 + 5
-  const gy = 10
-  for (const [col, row] of cells) rect(c, gx + col * 4, gy + row * 4, 3, 3, ink)
-  rect(c, gx + 7 * 4 + 1, gy + 3 * 4 + 1, 1, 1, '#ffffff')
-  rect(c, gx + 7 * 4, gy, 3, 3, ink, 0.45)
-}
-
-/** Crimson maze (square spiral walls) beside a key. */
-function mazeEmblem(c: Ctx2D, x0: number, ink: string): void {
-  frame(c, x0 + 5.5, 10.5, 19, 19, ink, 1.5)
-  const walls: ReadonlyArray<readonly [number, number, number, number]> = [[9, 10, 9, 22], [9, 22, 17, 22], [13, 14, 21, 14], [21, 14, 21, 26], [13, 18, 13, 26], [13, 26, 17, 26]]
-  for (const [ax, ay, bx2, by2] of walls) line(c, x0 + ax, ay, x0 + bx2, by2, ink, 1.5)
-  ring(c, x0 + 31, 15, 3.5, ink, 1.5)
-  line(c, x0 + 31, 18.5, x0 + 31, 29, ink, 1.5)
-  line(c, x0 + 31, 26, x0 + 35, 26, ink, 1.5)
-  line(c, x0 + 31, 29, x0 + 34, 29, ink, 1.5)
-}
-
-/** Amber radio wave over a baseline, with the tuned frequency under it. */
-function waveEmblem(c: Ctx2D, x0: number, ink: string): void {
-  line(c, x0 + 5, 18, x0 + 36, 18, ink, 1, 0.45)
-  c.globalAlpha = 1
-  c.strokeStyle = ink
-  c.lineWidth = 1.5
-  c.beginPath()
-  for (let i = 0; i <= 15; i++) {
-    const x = x0 + 5 + i * 2
-    const y = 18 + Math.sin(i * 0.95) * 6 * (1 - Math.abs(i - 7.5) / 12)
-    if (i === 0) c.moveTo(x, y)
-    else c.lineTo(x, y)
+/** Small spine badge (14 x 26 px dark window) with a tiny icon of the game, in the top part of the spine. */
+function spineIcon(c: Ctx2D, i: number, x0: number): void {
+  const art = MANUAL_ART[i]
+  rect(c, x0 + 3, 8, 14, 26, art.ground)
+  frame(c, x0 + 3.5, 8.5, 13, 25, art.glow, 1, 0.6)
+  if (i === 0) {
+    // Serpent: an S of 3 x 2 px cells with a lit head.
+    const cells: ReadonlyArray<readonly [number, number]> = [[0, 0], [1, 0], [2, 0], [2, 1], [2, 2], [1, 2], [0, 2], [0, 3], [0, 4], [1, 4], [2, 4]]
+    for (const [col, row] of cells) rect(c, x0 + 5 + col * 3, 12 + row * 4, 3, 2, art.glow)
+    rect(c, x0 + 11, 28, 3, 2, art.bright)
+  } else if (i === 1) {
+    // Corridor walls with one gold photo fragment.
+    for (const [ax, ay, bx2, by2] of [[5, 12, 5, 26], [5, 26, 12, 26], [9, 16, 9, 30], [9, 16, 15, 16], [13, 20, 13, 30]] as const) line(c, x0 + ax, ay, x0 + bx2, by2, art.glow, 1)
+    rect(c, x0 + 11, 10, 4, 3, '#facc15')
+  } else {
+    // Oscilloscope wave over a baseline.
+    line(c, x0 + 5, 21, x0 + 15, 21, art.glow, 1, 0.4)
+    c.globalAlpha = 1
+    c.strokeStyle = art.bright
+    c.lineWidth = 1
+    c.beginPath()
+    for (let k = 0; k <= 10; k++) {
+      const y = 12 + k * 1.8
+      const x = x0 + 10 + Math.sin(k * 1.2) * 4
+      if (k === 0) c.moveTo(x, y)
+      else c.lineTo(x, y)
+    }
+    c.stroke()
   }
-  c.stroke()
-  text(c, FREQUENCY_TEXT, x0 + 20.5, 28, 'bold 5px monospace', ink)
 }
 
+/** One spine strip: manual-coloured cloth, foil bands, a game badge and the title running down the spine. */
 function drawManualSpine(c: Ctx2D, i: number): void {
   const [x0, , x1] = CABINET_DETAIL_REGIONS.strips[i]
   const cx = (x0 + x1) / 2
-  const inks = ['#0b3d1e', '#5a0a1a', '#4a2a00'] as const
-  const ink = inks[i]
-  // Neutral light-grey cloth: the book colour multiplies it, so the cover colour still reads.
-  rect(c, x0, 0, x1 - x0, 128, '#cfcfcf')
-  rect(c, x0 + 1, 3, x1 - x0 - 2, 2, '#ffffff', 0.9)
-  rect(c, x0 + 1, 123, x1 - x0 - 2, 2, '#ffffff', 0.9)
-  rect(c, x0 + 1, 8, 1, 112, '#ffffff', 0.3)
-  rect(c, x1 - 2, 8, 1, 112, '#ffffff', 0.25)
-  emblemGround(c, x0, ink)
-  if (i === 0) snakeEmblem(c, x0, ink)
-  else if (i === 1) mazeEmblem(c, x0, ink)
-  else waveEmblem(c, x0, ink)
-  // The lighter label band that used to be a separate cream part: near white, so it multiplies to the pure book colour.
-  rect(c, x0 + 1, 34, x1 - x0 - 2, 16, '#fbfbfb')
-  rect(c, x0 + 1, 34, x1 - x0 - 2, 1, ink, 0.8)
-  rect(c, x0 + 1, 49, x1 - x0 - 2, 1, ink, 0.8)
-  text(c, 'MANUAL', cx, 42, 'bold 6px monospace', ink)
-  spineTitle(c, MANUAL_SPINE_TITLES[i], cx, 54, 120, '#14140f')
+  const art = MANUAL_ART[i]
+  rect(c, x0, 0, x1 - x0, 128, MANUAL_COVER_COLOURS[i])
+  // Rounded-hinge shading: a dark groove and a light edge on each side.
+  rect(c, x0, 0, 1, 128, '#000000', 0.3)
+  rect(c, x1 - 1, 0, 1, 128, '#000000', 0.3)
+  rect(c, x0 + 1, 8, 1, 112, '#ffffff', 0.25)
+  // Foil bands at the head and tail.
+  rect(c, x0 + 1, 3, x1 - x0 - 2, 2, art.bright, 0.85)
+  rect(c, x0 + 1, 123, x1 - x0 - 2, 2, art.bright, 0.85)
+  spineIcon(c, i, x0)
+  rect(c, x0 + 2, 37, x1 - x0 - 4, 1, art.ink, 0.7)
+  spineTitle(c, MANUAL_SPINE_TITLES[i], cx, 40, 122, art.ink)
+}
+
+/** Cover 1: a pixel serpent made of a VHS tape winds across a CRT grid. 4 x 3 px cells look square on the 0.29 x 0.31 m face. */
+function drawSnakeCover(c: Ctx2D, wx: number, wy: number): void {
+  const art = MANUAL_ART[0]
+  // CRT grid.
+  for (let gx = 0; gx <= 54; gx += 6) rect(c, wx + gx, wy, 1, 22, MANUAL_COVER_COLOURS[0], 0.3)
+  for (let gy = 0; gy <= 22; gy += 4) rect(c, wx, wy + gy, 54, 1, MANUAL_COVER_COLOURS[0], 0.3)
+  // Body path: (col, row) on a 4 x 3 px lattice, offset (3, 1) inside the window.
+  const path: ReadonlyArray<readonly [number, number]> = [
+    [0, 5], [1, 5], [2, 5], [3, 5], [4, 5], [5, 5], [6, 5], [7, 5], [8, 5], [8, 4], [8, 3], [7, 3], [6, 3], [5, 3], [4, 3], [3, 3], [2, 3], [2, 2], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1],
+  ]
+  // Soft glow first, then the tape-brown-free emerald body.
+  for (const [col, row] of path) rect(c, wx + 2 + col * 4, wy + row * 3, 5, 4, MANUAL_COVER_COLOURS[0], 0.4)
+  path.forEach(([col, row], k) => rect(c, wx + 3 + col * 4, wy + 1 + row * 3, 3, 2, k % 2 ? art.glow : '#4ade80'))
+  // Head: a tiny VHS cassette with two reels.
+  rect(c, wx + 3 + 8 * 4, wy + 1 * 3, 8, 6, art.bright)
+  frame(c, wx + 3 + 8 * 4 + 0.5, wy + 1 * 3 + 0.5, 7, 5, '#04210f', 1)
+  rect(c, wx + 3 + 8 * 4 + 1.5, wy + 1 * 3 + 2, 2, 2, '#04210f')
+  rect(c, wx + 3 + 8 * 4 + 4.5, wy + 1 * 3 + 2, 2, 2, '#04210f')
+  // Prey pixel.
+  rect(c, wx + 46, wy + 16, 3, 3, art.bright, 0.9)
+}
+
+/** Cover 2: labyrinth corridor walls with three golden photograph fragments. */
+function drawMazeCover(c: Ctx2D, wx: number, wy: number): void {
+  const art = MANUAL_ART[1]
+  const walls: ReadonlyArray<readonly [number, number, number, number]> = [
+    [6, 0, 6, 14], [6, 14, 18, 14], [12, 6, 12, 22], [12, 6, 26, 6], [20, 6, 20, 16], [20, 16, 34, 16], [26, 0, 26, 6], [32, 6, 32, 22], [32, 6, 46, 6], [40, 6, 40, 16], [40, 16, 53, 16], [46, 0, 46, 6],
+  ]
+  for (const [ax, ay, bx2, by2] of walls) line(c, wx + ax + 0.5, wy + ay + 0.5, wx + bx2 + 0.5, wy + by2 + 0.5, MANUAL_COVER_COLOURS[1], 3, 0.45)
+  for (const [ax, ay, bx2, by2] of walls) line(c, wx + ax + 0.5, wy + ay + 0.5, wx + bx2 + 0.5, wy + by2 + 0.5, art.glow, 1, 0.95)
+  // Three torn photograph fragments (gold prints with a dark picture area), each a different shape.
+  const gold = '#facc15'
+  rect(c, wx + 2, wy + 16, 6, 4, gold)
+  rect(c, wx + 3, wy + 17, 3, 2, '#5a3a05')
+  rect(c, wx + 23, wy + 9, 5, 4, gold)
+  rect(c, wx + 24, wy + 10, 2, 2, '#5a3a05')
+  triangle(c, [[wx + 43, wy + 8], [wx + 49, wy + 8], [wx + 43, wy + 13]], gold)
+  rect(c, wx + 44, wy + 9, 2, 1, '#5a3a05')
+}
+
+/** Cover 3: a glowing oscilloscope trace tuned to 89.4 MHz. */
+function drawFrequencyCover(c: Ctx2D, wx: number, wy: number): void {
+  const art = MANUAL_ART[2]
+  for (let gx = 0; gx <= 54; gx += 9) rect(c, wx + gx, wy, 1, 22, MANUAL_COVER_COLOURS[2], 0.3)
+  for (let gy = 2; gy <= 22; gy += 5) rect(c, wx, wy + gy, 54, 1, MANUAL_COVER_COLOURS[2], 0.3)
+  text(c, FREQUENCY_TEXT, wx + 40, wy + 4, 'bold 5px monospace', art.glow)
+  const trace = (lw: number, color: string, alpha: number) => {
+    c.globalAlpha = alpha
+    c.strokeStyle = color
+    c.lineWidth = lw
+    c.beginPath()
+    for (let k = 0; k <= 52; k++) {
+      const x = wx + 1 + k
+      const y = wy + 14 + Math.sin(k * 0.45) * 5 * (1 - Math.abs(k - 26) / 40)
+      if (k === 0) c.moveTo(x, y)
+      else c.lineTo(x, y)
+    }
+    c.stroke()
+    c.globalAlpha = 1
+  }
+  trace(3, MANUAL_COVER_COLOURS[2], 0.4)
+  trace(1, art.bright, 1)
+}
+
+/**
+ * One cover panel (64 x 42 px): manual-coloured cloth with a dark 54 x 22 px window for the art and the title on a plate below.
+ * Titles are horizontal and read upright on both side faces.
+ */
+function drawManualCover(c: Ctx2D, i: number): void {
+  const [x0, y0, x1, y1] = CABINET_DETAIL_REGIONS.covers[i]
+  const art = MANUAL_ART[i]
+  rect(c, x0, y0, x1 - x0, y1 - y0, MANUAL_COVER_COLOURS[i])
+  rect(c, x0, y0, x1 - x0, 1, '#ffffff', 0.25)
+  rect(c, x0, y1 - 1, x1 - x0, 1, '#000000', 0.3)
+  const wx = x0 + 5
+  const wy = y0 + 4
+  rect(c, wx, wy, 54, 22, art.ground)
+  frame(c, wx - 0.5, wy - 0.5, 55, 23, art.ink, 1, 0.8)
+  if (i === 0) drawSnakeCover(c, wx, wy)
+  else if (i === 1) drawMazeCover(c, wx, wy)
+  else drawFrequencyCover(c, wx, wy)
+  rect(c, x0 + 5, y0 + 29, 54, 1, art.ink, 0.6)
+  text(c, MANUAL_SPINE_TITLES[i], (x0 + x1) / 2, y0 + 35, `bold ${i === 2 ? 5 : 6}px monospace`, art.ink)
 }
 
 function drawCabinetDoor(c: Ctx2D, rnd: () => number): void {
@@ -2080,7 +2174,7 @@ function drawKickPlate(c: Ctx2D, rnd: () => number): void {
 }
 
 /**
- * Arcade cabinet front and manual spines, 256 x 128 (task 27.1). See CABINET_DETAIL_REGIONS for the layout. Original text only
+ * Arcade cabinet front and manual spines and covers, 256 x 128 (task 27.1, right half redrawn in task 28.2). See CABINET_DETAIL_REGIONS for the layout. Original text only
  * ("SER. 0996-LMC" is the club's own serial plate). Deterministic: seeded streaks, no Math.random.
  */
 export function drawCabinetAndManualDetail(c: Ctx2D, w: number, h: number, seed: number): void {
@@ -2091,10 +2185,14 @@ export function drawCabinetAndManualDetail(c: Ctx2D, w: number, h: number, seed:
   drawDeckLip(c)
   drawKickPlate(c, rnd)
   brushed(c, rnd, 0, 117, 128, 5, '#7f858f')
-  // Right half: three manual spines and the plain cover-cloth stripe used by every other face of a book.
-  rect(c, CABINET_DETAIL_HALF_X, 0, w - CABINET_DETAIL_HALF_X, h, '#cfcfcf')
-  for (let i = 0; i < 3; i++) drawManualSpine(c, i)
-  rect(c, 251, 0, 5, 128, '#d2d2d2')
+  // Right half (task 28.2): three spine strips, three cover panels and one plain-cloth stripe per manual, all in the manual's own colour.
+  rect(c, CABINET_DETAIL_HALF_X, 0, w - CABINET_DETAIL_HALF_X, h, '#14141a')
+  for (let i = 0; i < 3; i++) {
+    drawManualSpine(c, i)
+    drawManualCover(c, i)
+    const [px0, py0, px1, py1] = CABINET_DETAIL_REGIONS.plains[i]
+    rect(c, px0, py0, px1 - px0, py1 - py0, MANUAL_COVER_COLOURS[i])
+  }
 }
 
 // Table, memory estimate

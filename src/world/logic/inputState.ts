@@ -14,7 +14,9 @@ export type KeyRole =
   | 'pitchDown'
   | 'interact'
   | 'page1'
-  | 'page2';
+  | 'page2'
+  | 'scrollPageUp'
+  | 'scrollPageDown';
 
 const ROLE_BY_CODE: Readonly<Record<string, KeyRole>> = {
   KeyW: 'forward',
@@ -34,11 +36,35 @@ const ROLE_BY_CODE: Readonly<Record<string, KeyRole>> = {
   Numpad1: 'page1',
   Digit2: 'page2',
   Numpad2: 'page2',
+  PageUp: 'scrollPageUp',
+  PageDown: 'scrollPageDown',
 };
 
-/** Roles that are one-shot actions, never held (interact and the card page keys). */
+/** Roles that are one-shot actions, never held (interact, the card page keys and PageUp / PageDown). */
 export function isActionRole(role: KeyRole): boolean {
-  return role === 'interact' || role === 'page1' || role === 'page2';
+  return role === 'interact' || role === 'page1' || role === 'page2' || role === 'scrollPageUp' || role === 'scrollPageDown';
+}
+
+/** A request to scroll the open Archive Document Card: one line step or one page, up (-1) or down (1). */
+export interface CardScroll {
+  kind: 'line' | 'page';
+  dir: -1 | 1;
+}
+
+/** Keys that scroll the card while it is open. ArrowUp / ArrowDown stop being movement keys in that state. */
+export function cardScrollFor(code: string): CardScroll | null {
+  switch (code) {
+    case 'ArrowUp':
+      return { kind: 'line', dir: -1 };
+    case 'ArrowDown':
+      return { kind: 'line', dir: 1 };
+    case 'PageUp':
+      return { kind: 'page', dir: -1 };
+    case 'PageDown':
+      return { kind: 'page', dir: 1 };
+    default:
+      return null;
+  }
 }
 
 /** Maps a physical key (event.code) to a role, or null when unused. */

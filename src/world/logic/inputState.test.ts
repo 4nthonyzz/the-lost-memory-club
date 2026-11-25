@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   EMPTY_HELD_KEYS,
+  cardScrollFor,
   isActionRole,
   isKeyEventAccepted,
   keyRole,
@@ -105,5 +106,23 @@ describe('toMovementInput and toLookKeys', () => {
     }
     expect(toMovementInput(s)).toEqual({ forward: true, backward: false, left: false, right: true });
     expect(toLookKeys(s)).toEqual({ yawLeft: false, yawRight: true, pitchUp: false, pitchDown: true });
+  });
+});
+
+describe('card scroll keys (task 28.1)', () => {
+  it('maps PageUp / PageDown to one-shot roles that are never held', () => {
+    expect(keyRole('PageUp')).toBe('scrollPageUp');
+    expect(keyRole('PageDown')).toBe('scrollPageDown');
+    expect(isActionRole('scrollPageUp')).toBe(true);
+    expect(isActionRole('scrollPageDown')).toBe(true);
+  });
+
+  it('cardScrollFor maps the four scroll keys and nothing else', () => {
+    expect(cardScrollFor('ArrowUp')).toEqual({ kind: 'line', dir: -1 });
+    expect(cardScrollFor('ArrowDown')).toEqual({ kind: 'line', dir: 1 });
+    expect(cardScrollFor('PageUp')).toEqual({ kind: 'page', dir: -1 });
+    expect(cardScrollFor('PageDown')).toEqual({ kind: 'page', dir: 1 });
+    expect(cardScrollFor('KeyW')).toBeNull();
+    expect(cardScrollFor('ArrowLeft')).toBeNull();
   });
 });

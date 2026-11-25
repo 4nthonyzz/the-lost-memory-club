@@ -72,6 +72,7 @@ import {
   shelfInnerBounds,
   instanceColour,
   MANUAL_SIZE,
+  MANUAL_BOOKS,
   vcrDeckParts,
   type Part,
   type Vec3,
@@ -86,6 +87,7 @@ import {
   TEXTURE_IDS,
   TEXTURE_MEMORY_BUDGET_BYTES,
   TEXTURE_SPECS,
+  MANUAL_COVER_COLOURS,
   VCR_CHASSIS_COLOR,
   spineCellUv,
   totalTextureMemoryBytes,
@@ -116,6 +118,8 @@ const TASK_26_1_TRIANGLES = 64
 
 /** Task 27.1: the three cream manual band boxes (12 triangles each) are replaced by a printed band in the texture: -36 triangles. */
 const TASK_27_1_TRIANGLES = -36
+/** Task 28.2: the thicker manuals (0.085 m instead of 0.06 m) displace three more ordinary books on shelf-b (12 triangles each); the manuals themselves stay one box each. */
+const TASK_28_2_TRIANGLES = -36
 /** Task 27.1: cabinetAndManualDetail, 256 x 128 mipmapped (estimate 174,326 bytes), added on top of the older memory caps below. */
 const TASK_27_1_TEXTURE_BYTES = Math.round(256 * 128 * 4 * 1.33)
 
@@ -543,7 +547,8 @@ describe('bookcase contents', () => {
       const lv = inner.levels[b.level]
       const where = `${b.group} ${b.kind} level ${b.level} at ${b.pos.map((v) => v.toFixed(3)).join(',')}`
       expect(b.pos[0] - half[0], where).toBeGreaterThanOrEqual(inner.minX - 1e-9)
-      expect(b.pos[0] + half[0], where).toBeLessThanOrEqual(inner.maxX + 1e-9)
+      // Task 28.2: the manuals are the only items that protrude, up to their spine face at x -4.555 (0.06 m past the interior front).
+      expect(b.pos[0] + half[0], where).toBeLessThanOrEqual((b.group === 'manual' ? -4.555 : inner.maxX) + 1e-9)
       expect(b.pos[2] - half[2], where).toBeGreaterThanOrEqual(inner.minZ - 1e-9)
       expect(b.pos[2] + half[2], where).toBeLessThanOrEqual(inner.maxZ + 1e-9)
       expect(b.pos[1] - half[1], where).toBeGreaterThanOrEqual(lv.floor - 1e-9)
@@ -633,27 +638,26 @@ describe('arcade manuals on the west bookcase (task 23.2)', () => {
   it('has three distinct manuals with the emerald, crimson and amber covers on the eye-level shelf', () => {
     expect(MANUAL_PLACEMENT.shelfId).toBe('shelf-b')
     expect(manuals.map((b) => b.manualId)).toEqual(['manual-snake', 'manual-maze', 'manual-frequency'])
-    expect(manuals.map((b) => instanceColour(b))).toEqual(['#1e8a55', '#a3192f', '#cc8a1c'])
+    // Task 28.2: the cloth colours are painted into the texture, so the instance colour is white (see the 28.2 block below).
+    expect(manuals.map((b) => instanceColour(b))).toEqual(['#ffffff', '#ffffff', '#ffffff'])
     const lv = inner.levels[MANUAL_PLACEMENT.level]
     expect(lv.floor).toBeGreaterThanOrEqual(1.1)
     expect(lv.floor).toBeLessThanOrEqual(1.4)
     for (const b of manuals) {
       const e = ext(b)
-      // Slightly larger than the ordinary books, standing on the board, top at or below 1.4 m.
+      // Thick collector hardcover (task 28.2), standing on the board, under the next board.
       expect(b.size[0]).toBe(MANUAL_SIZE[0])
-      expect(b.size[1]).toBeGreaterThanOrEqual(BOOK_HEIGHT_RANGE[1] - 0.02)
+      expect(b.size[1]).toBeGreaterThanOrEqual(BOOK_HEIGHT_RANGE[1])
       expect(e.minY).toBeCloseTo(lv.floor, 9)
-      expect(e.maxY).toBeLessThanOrEqual(1.4)
-      // Spine faces +x at the bookcase front, inside the bookcase volume.
-      expect(e.maxX).toBeGreaterThanOrEqual(-4.65)
-      expect(e.maxX).toBeLessThanOrEqual(-4.62)
+      expect(e.maxY).toBeLessThanOrEqual(lv.ceil - 0.003 + 1e-9)
+      // Spine faces +x and protrudes past the bookcase front (task 28.2); the back stays inside the bookcase.
+      expect(e.maxX).toBeCloseTo(-4.555, 9)
       expect(e.minX).toBeGreaterThanOrEqual(inner.minX - 1e-9)
-      expect(e.maxX).toBeLessThanOrEqual(inner.maxX + 1e-9)
       expect(e.minZ).toBeGreaterThanOrEqual(inner.minZ - 1e-9)
       expect(e.maxZ).toBeLessThanOrEqual(inner.maxZ + 1e-9)
-      // The anchor is centred on the spine, on the bookcase front.
+      // The anchor is 0.035 m in front of the spine, centred on the book.
       const def = INTERACTABLE_DEFS.find((d) => d.id === b.manualId)!
-      expect(def.anchor.x).toBe(p.box.maxX)
+      expect(def.anchor.x).toBe(-4.52)
       expect(def.anchor.z).toBeCloseTo(b.pos[2], 9)
     }
   })
@@ -1221,7 +1225,7 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
       const report = sceneDetailReport()
       expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
       expect(report.totalTriangles - 19042).toBeLessThanOrEqual(82 + TASK_26_1_TRIANGLES) // 25.1 adds 18 (caps +16, liner +2); 25.2 adds 6 (three glow decals)
-      expect(report.totalTriangles - 19042).toBe(82 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES)
+      expect(report.totalTriangles - 19042).toBe(82 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES)
       expect(report.textureCount).toBe(32)
       expect(report.textureMemoryBytes / 1048576).toBeCloseTo(7.537 + TASK_27_1_TEXTURE_BYTES / 1048576, 2) // 7.521 + coneFalloff 0.016
       expect(report.textureMemoryBytes).toBeLessThanOrEqual(8 * 1048576)
@@ -2035,7 +2039,7 @@ describe('task 22.1: media island, armchair and VHS shells', () => {
     // Task 23.1 replaced the two old desk lamps (470 triangles) with two new ones (352): -118.
     // Task 23.2 replaced 7 ordinary books on shelf-b (-84) with 3 manuals and 3 spine bands (+72): -12.
     // Task 24.1: two lamp cones (+48) and five ceiling bloom strips (+10) = +58.
-    expect(report.totalTriangles).toBe(19128 - 72 + 116 - 118 - 12 + 58 + 18 + 6 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES) // 27.1: -36 (three cream manual band boxes) // 25.1: +16 brass caps, +2 liner; 25.2: +6 floor glow decals; 26.1: +64 coffee discs
+    expect(report.totalTriangles).toBe(19128 - 72 + 116 - 118 - 12 + 58 + 18 + 6 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES) // 27.1: -36 (three cream manual band boxes) // 25.1: +16 brass caps, +2 liner; 25.2: +6 floor glow decals; 26.1: +64 coffee discs
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
   })
 
@@ -2545,7 +2549,7 @@ describe('task 25.1: lamp craft, soft cones, richer pools, notebook move', () =>
     const report = sceneDetailReport()
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
     expect(report.totalTriangles - 19100).toBeLessThanOrEqual(24 + TASK_26_1_TRIANGLES) // 25.2 adds 6 more
-    expect(report.totalTriangles - 19100).toBe(24 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES)
+    expect(report.totalTriangles - 19100).toBe(24 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES)
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(MAX_LIGHTS).toBe(4)
     expect(report.textureCount).toBe(32)
@@ -2623,7 +2627,7 @@ describe('task 25.2 arcade floor glow decals', () => {
     const report = sceneDetailReport()
     expect(report.objects.map((o) => o.name)).toContain('arcade-floor-glow')
     expect(report.objects.find((o) => o.name === 'arcade-floor-glow')!.triangles).toBe(6)
-    expect(report.totalTriangles).toBe(19118 + 6 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES)
+    expect(report.totalTriangles).toBe(19118 + 6 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES)
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(report.textureCount).toBe(32)
@@ -2694,7 +2698,7 @@ describe('task 26.1: anisotropy, VCR chassis and mug detail', () => {
   it('keeps the budgets: at most 19,200 triangles (computed), 4 lights, 32 textures within 7.85 MB', () => {
     const report = sceneDetailReport()
     expect(report.totalTriangles).toBeLessThanOrEqual(19200)
-    expect(report.totalTriangles - 19124).toBe(TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES)
+    expect(report.totalTriangles - 19124).toBe(TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES)
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(report.textureCount).toBe(32)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.85 * 1048576)
@@ -2797,9 +2801,10 @@ describe('task 27.1: cabinet front detail and manual spines (cabinetAndManualDet
     const p = prop(MANUAL_PLACEMENT.shelfId)
     const manuals = shelfContents(p.id, p.box, p.height).instances.filter((b) => b.manualId)
     expect(manuals.map((b) => b.manualId)).toEqual([...MANUAL_STRIP_KEYS])
-    const cover = detailUvRect(R.cover)
     manuals.forEach((b, i) => {
       const strip = detailUvRect(R.strips[i])
+      const cover = detailUvRect(R.covers[i])
+      const plain = detailUvRect(R.plains[i])
       expect(strip.u0).toBeGreaterThanOrEqual(0.5)
       expect(strip.u1).toBeLessThanOrEqual(1)
       const g = manualGeometries[b.manualId!]
@@ -2807,7 +2812,9 @@ describe('task 27.1: cabinet front detail and manual spines (cabinetAndManualDet
         expect(u).toBeCloseTo(x > 0 ? strip.u1 : strip.u0, 9)
         expect(v).toBeCloseTo(y > 0 ? strip.v1 : strip.v0, 9)
       }
-      for (const f of [0, 1, 2, 3, 5]) for (const [u, v] of faceUvs(g, f)) expect(inRect(u, v, cover), `${b.manualId} face ${f}`).toBe(true)
+      // Task 28.2: the two side faces (+x and -x of the box) show the cover panel, the rest the plain cloth.
+      for (const f of [0, 1]) for (const [u, v] of faceUvs(g, f)) expect(inRect(u, v, cover), `${b.manualId} face ${f}`).toBe(true)
+      for (const f of [2, 3, 5]) for (const [u, v] of faceUvs(g, f)) expect(inRect(u, v, plain), `${b.manualId} face ${f}`).toBe(true)
       // The instance keeps its colour, size and yaw, and the spine (+z) turns to +X, toward the room.
       expect(b.rot[1]).toBeCloseTo(Math.PI / 2, 9)
       expect(Math.sin(b.rot[1])).toBeCloseTo(1, 9)
@@ -2876,7 +2883,7 @@ describe('task 27.1: cabinet front detail and manual spines (cabinetAndManualDet
     const report = sceneDetailReport()
     expect(report.totalTriangles).toBeLessThanOrEqual(19200)
     expect(report.totalTriangles - 19188).toBeLessThanOrEqual(0)
-    expect(report.totalTriangles - 19188).toBe(TASK_27_1_TRIANGLES)
+    expect(report.totalTriangles - 19188).toBe(TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES)
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(MAX_LIGHTS).toBe(4)
     expect(report.textureCount).toBe(32)
@@ -2896,5 +2903,182 @@ describe('task 27.1: cabinet front detail and manual spines (cabinetAndManualDet
     disposeSharedResources()
     for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
     expect(liveTextureCount()).toBe(0)
+  })
+})
+
+describe('task 28.2: protruding manual volumes with spine and cover art', () => {
+  afterEach(() => setCanvasFactory(null))
+  const p = prop(MANUAL_PLACEMENT.shelfId)
+  const c = shelfContents(p.id, p.box, p.height)
+  const inner = shelfInnerBounds(p.box, p.height)
+  const lv = inner.levels[MANUAL_PLACEMENT.level]
+  const manuals = c.instances.filter((b) => b.group === 'manual')
+  type Box3d = { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number }
+  const ext = (b: { size: Vec3; rot: Vec3; pos: Vec3 }): Box3d => {
+    const h = orientedHalfExtents(b.size, b.rot)
+    return { minX: b.pos[0] - h[0], maxX: b.pos[0] + h[0], minY: b.pos[1] - h[1], maxY: b.pos[1] + h[1], minZ: b.pos[2] - h[2], maxZ: b.pos[2] + h[2] }
+  }
+  const partExt = (q: Part): Box3d => ({
+    minX: q.pos[0] - q.scale[0] / 2,
+    maxX: q.pos[0] + q.scale[0] / 2,
+    minY: q.pos[1] - q.scale[1] / 2,
+    maxY: q.pos[1] + q.scale[1] / 2,
+    minZ: q.pos[2] - q.scale[2] / 2,
+    maxZ: q.pos[2] + q.scale[2] / 2,
+  })
+  /** True when the open interiors of two boxes overlap (touching faces are allowed, 1e-6 tolerance). */
+  const intersects = (a: Box3d, b: Box3d) =>
+    a.minX < b.maxX - 1e-6 && a.maxX > b.minX + 1e-6 && a.minY < b.maxY - 1e-6 && a.maxY > b.minY + 1e-6 && a.minZ < b.maxZ - 1e-6 && a.maxZ > b.minZ + 1e-6
+  const inRect = (u: number, v: number, r: { u0: number; u1: number; v0: number; v1: number }) =>
+    u >= r.u0 - 1e-9 && u <= r.u1 + 1e-9 && v >= r.v0 - 1e-9 && v <= r.v1 + 1e-9
+  const faceUvs = (g: (typeof manualGeometries)[(typeof MANUAL_STRIP_KEYS)[number]], f: number) => {
+    const uv = g.getAttribute('uv')
+    return [0, 1, 2, 3].map((k) => [uv.getX(f * 4 + k), uv.getY(f * 4 + k)] as const)
+  }
+
+  it('each manual is 0.085 x 0.31 x 0.29 m (the 0.31 m height fits under the next board with at least 3 mm to spare)', () => {
+    expect([...MANUAL_SIZE]).toEqual([0.085, 0.31, 0.29])
+    expect(lv.ceil - lv.floor - 0.31).toBeGreaterThanOrEqual(0.003)
+    expect(manuals).toHaveLength(3)
+    for (const b of manuals) {
+      expect(b.size).toEqual([0.085, 0.31, 0.29])
+      const e = ext(b)
+      // Thickness runs along the shelf (z), depth along x.
+      expect(e.maxZ - e.minZ).toBeCloseTo(0.085, 9)
+      expect(e.maxX - e.minX).toBeCloseTo(0.29, 9)
+      expect(e.maxY - e.minY).toBeCloseTo(0.31, 9)
+    }
+  })
+
+  it('the spine face is at x -4.555, 0.08 m further toward +x than the flush spine line (-4.635), and sticks out 0.045 m past the bookcase front', () => {
+    const FLUSH_SPINE_X = -4.635
+    for (const b of manuals) {
+      const e = ext(b)
+      expect(e.maxX).toBeCloseTo(-4.555, 9)
+      expect(e.minX).toBeCloseTo(-4.845, 9)
+      expect(e.maxX - FLUSH_SPINE_X).toBeCloseTo(0.08, 9)
+      expect(e.maxX - p.box.maxX).toBeCloseTo(0.045, 9)
+      expect(e.maxX).toBeGreaterThan(p.box.maxX)
+    }
+    expect(manuals.map((b) => b.pos[2])).toEqual([1.4, 1.8, 2.2].map((z) => expect.closeTo(z, 9)))
+    expect(MANUAL_PLACEMENT.spineX).toBe(-4.555)
+    expect(MANUAL_PLACEMENT.backX).toBe(-4.845)
+  })
+
+  it('stands on its board and stays inside the level vertically', () => {
+    for (const b of manuals) {
+      const e = ext(b)
+      expect(e.minY).toBeCloseTo(lv.floor, 9)
+      expect(e.maxY).toBeLessThanOrEqual(lv.ceil - 0.003 + 1e-9)
+    }
+  })
+
+  it('does not intersect the carcass (back panel, boards, side panels) or the cardboard box parts', () => {
+    const frame = shelfFrameParts(p.box, p.height)
+    for (const b of manuals) {
+      const e = ext(b)
+      for (const q of [...frame, ...c.boxParts]) expect(intersects(e, partExt(q)), `${b.manualId} vs ${q.mat} at ${q.pos.map((v) => v.toFixed(3)).join(',')}`).toBe(false)
+    }
+  })
+
+  it('does not intersect any neighbouring book, and the leaning and stacked items of that shelf stay supported', () => {
+    for (const m of manuals) {
+      for (const b of c.instances.filter((q) => q !== m)) expect(intersects(ext(m), ext(b)), `${m.manualId} vs ${b.group} at z ${b.pos[2].toFixed(3)}`).toBe(false)
+    }
+    c.instances.forEach((b, i) => {
+      if (b.group === 'lean') {
+        // A leaning book always rests on the row book placed right after it.
+        expect(c.instances[i + 1]?.group, `lean at ${i}`).toBe('row')
+        expect(c.instances[i + 1].level).toBe(b.level)
+      }
+    })
+    // Every stack keeps its full set of layers (2 to 4), so none loses its lower books.
+    const perLevel = new Map<number, number>()
+    for (const b of c.instances.filter((q) => q.group === 'stack')) perLevel.set(b.level, (perLevel.get(b.level) ?? 0) + 1)
+    for (const [level, n] of perLevel) expect(n, `stack level ${level}`).toBeGreaterThanOrEqual(2)
+    // Deterministic: a second call returns the same layout.
+    expect(shelfContents(p.id, p.box, p.height)).toEqual(c)
+    // The cardboard box of the manual level is complete or gone, never half of it.
+    const levelBoxParts = c.boxParts.filter((q) => q.pos[1] >= lv.floor - 1e-6 && q.pos[1] <= lv.ceil)
+    expect([0, 5]).toContain(levelBoxParts.length)
+  })
+
+  it('the manuals are not colliders: they do not touch any solid footprint outside the bookcase and leave the 1.2 m walkway in front of it clear', () => {
+    for (const b of manuals) {
+      const e = ext(b)
+      for (const col of COLLIDERS) {
+        if (col === p.box) continue
+        expect(e.maxX <= col.minX + 1e-9 || e.minX >= col.maxX - 1e-9 || e.maxZ <= col.minZ + 1e-9 || e.minZ >= col.maxZ - 1e-9).toBe(true)
+      }
+      // Only the part inside the bookcase footprint overlaps it; everything in front of it is free floor.
+      expect(e.maxX - p.box.maxX).toBeLessThan(0.05)
+    }
+    // The walkway strip x -4.6 .. -3.4 holds no collider, with or without the books.
+    const walkway = { minX: -4.6, maxX: -3.4, minZ: 0.4, maxZ: 2.6 }
+    for (const col of COLLIDERS) {
+      expect(col.maxX <= walkway.minX + 1e-9 || col.minX >= walkway.maxX - 1e-9 || col.maxZ <= walkway.minZ || col.minZ >= walkway.maxZ).toBe(true)
+    }
+    expect(manuals.every((b) => ext(b).maxX < walkway.minX + 0.05)).toBe(true)
+    for (const def of INTERACTABLE_DEFS.filter((d) => d.kind === 'manual')) expect(COLLIDERS).not.toContain(def.collider)
+  })
+
+  it('maps the spine strip onto +x, the cover panel onto both side faces (world +z and -z), and plain cloth onto the top, bottom and back', () => {
+    const R = CABINET_DETAIL_REGIONS
+    manuals.forEach((b, i) => {
+      // After the yaw of pi/2 the box +z face (spine) points to +x, and its +x / -x faces point to -z / +z.
+      expect(Math.sin(b.rot[1])).toBeCloseTo(1, 9)
+      expect(Math.cos(b.rot[1])).toBeCloseTo(0, 9)
+      const g = manualGeometries[b.manualId!]
+      const strip = detailUvRect(R.strips[i])
+      const cover = detailUvRect(R.covers[i])
+      const plain = detailUvRect(R.plains[i])
+      for (const [u, v] of faceUvs(g, BOX_FACE_FRONT)) expect(inRect(u, v, strip), `${b.manualId} spine`).toBe(true)
+      for (const f of [0, 1]) for (const [u, v] of faceUvs(g, f)) expect(inRect(u, v, cover), `${b.manualId} cover face ${f}`).toBe(true)
+      for (const f of [2, 3, 5]) for (const [u, v] of faceUvs(g, f)) expect(inRect(u, v, plain), `${b.manualId} plain face ${f}`).toBe(true)
+      // The strip, cover and plain regions do not overlap, so spine art never shows on a cover.
+      expect(strip.u1 <= cover.u0 || cover.u1 <= strip.u0).toBe(true)
+      expect(plain.u0).toBeGreaterThanOrEqual(cover.u1 - 1e-9)
+    })
+    expect(new Set(MANUAL_STRIP_KEYS.map((k) => manualGeometries[k])).size).toBe(3)
+    // One box per manual: 12 triangles (36 index triplets of a BoxGeometry).
+    for (const k of MANUAL_STRIP_KEYS) expect(manualGeometries[k].getIndex()!.count / 3).toBe(GEOMETRY_TRIANGLES.box)
+  })
+
+  it('colour decision: the exact cloth colours are painted into the texture and the manuals multiply it by white', () => {
+    expect(MANUAL_COVER_COLOURS.map((h) => h)).toEqual(['#16a34a', '#e11d48', '#f59e0b'])
+    expect(manuals.map((b) => MANUAL_BOOKS[b.manualId!].cover)).toEqual(['#16a34a', '#e11d48', '#f59e0b'])
+    expect(manuals.map((b) => instanceColour(b))).toEqual(['#ffffff', '#ffffff', '#ffffff'])
+    expect(`#${materials.manualBook.color.getHexString()}`).toBe('#ffffff')
+  })
+
+  it('keeps the budgets with zero added triangles: at most 19,200 and 36 fewer than 19,152 (three displaced books), 4 lights, 32 textures and unchanged texture memory (at most 7.85 MB)', () => {
+    const report = sceneDetailReport()
+    const BEFORE_28_2 = 19188 + TASK_27_1_TRIANGLES
+    expect(BEFORE_28_2).toBe(19152)
+    expect(report.totalTriangles).toBeLessThanOrEqual(19200)
+    // The manuals add no triangles; the wider volumes displace three ordinary books, so the total can only go down.
+    expect(report.totalTriangles - BEFORE_28_2).toBe(TASK_28_2_TRIANGLES)
+    expect(report.totalTriangles - BEFORE_28_2).toBeLessThanOrEqual(0)
+    expect(M3_LIGHT_COUNT).toBe(4)
+    expect(MAX_LIGHTS).toBe(4)
+    expect(report.textureCount).toBe(32)
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.85 * 1048576)
+    expect(TEXTURE_SPECS.cabinetAndManualDetail).toMatchObject({ width: 256, height: 128 })
+    expect(textureMemoryBytes(TEXTURE_SPECS.cabinetAndManualDetail)).toBe(TASK_27_1_TEXTURE_BYTES)
+    expect(report.textureMemoryBytes / 1048576).toBeCloseTo(7.703, 3)
+    console.info(`[28.2] triangles ${report.totalTriangles} (delta ${report.totalTriangles - BEFORE_28_2}), textures ${report.textureCount}, texture memory ${(report.textureMemoryBytes / 1048576).toFixed(3)} MiB (computed)`)
+  })
+
+  it('disposes the cached manual geometries and the shared texture exactly once per disposeSharedResources()', () => {
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    const tex = getSharedTexture('cabinetAndManualDetail')!
+    const texSpy = vi.spyOn(tex, 'dispose')
+    const geoSpies = MANUAL_STRIP_KEYS.map((k) => vi.spyOn(manualGeometries[k], 'dispose'))
+    disposeSharedResources()
+    expect(texSpy).toHaveBeenCalledTimes(1)
+    for (const s of geoSpies) expect(s).toHaveBeenCalledTimes(1)
+    disposeSharedResources()
+    expect(texSpy).toHaveBeenCalledTimes(1)
   })
 })
