@@ -80,6 +80,7 @@ function PlayerRigHost({
   const rig = usePlayerRig({
     heldKeysRef: input.heldKeysRef,
     consumeMouseDelta: input.consumeMouseDelta,
+    clearEpochRef: input.clearEpochRef,
     getMode: input.getMode,
     onTargetChange,
     memoryShifted,

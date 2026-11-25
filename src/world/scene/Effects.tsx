@@ -199,7 +199,7 @@ export function Effects({ active = true }: EffectsProps) {
 
     noise.material.opacity = NOISE_BASE_OPACITY * glowFactor(t, reduced)
 
-    // Animated attract screens (task 29.2): redrawn in place at most 12 times per second, paused while inactive (this
+    // Animated attract screens (task 29.2): redrawn in place at most 24 times per second (ATTRACT_MAX_HZ; the overlay noise stays at 12 Hz), paused while inactive (this
     // callback returns early), and returned once to the elapsed = 0 static frame under reduced motion.
     const attract = stepAttractClock(attractRef.current, step, true, reduced)
     attractRef.current = attract.clock

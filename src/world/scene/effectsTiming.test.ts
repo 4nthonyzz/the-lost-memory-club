@@ -11,7 +11,15 @@ import {
   type DustBounds,
 } from './effectsTiming'
 
-import { attractPulseLevel } from './proceduralTextures'
+import {
+  MAZE_PING_PERIOD_SEC,
+  SNAKE_FRAGMENT_SPACING,
+  SNAKE_STEP_SEC,
+  attractPulseLevel,
+  frequencyLockLevel,
+  mazePhotoPulse,
+  mazePingLevel,
+} from './proceduralTextures'
 import { ATTRACT_MAX_HZ, INITIAL_ATTRACT_CLOCK, stepAttractClock, type AttractClock } from './effectsTiming'
 
 describe('task 29.2: attract screen clock and pulse', () => {
@@ -26,13 +34,15 @@ describe('task 29.2: attract screen clock and pulse', () => {
     return { clock, redrawTimes }
   }
 
-  it.each([60, 144])('redraws at most 12 and at least 10 times per second at %i fps', (fps) => {
+  it.each([60, 144])('redraws at most 24 and at least 20 times in every rolling second at %i fps', (fps) => {
     const { redrawTimes } = run(fps, 10, true, false)
-    expect(ATTRACT_MAX_HZ).toBe(12)
-    for (let s = 0; s < 10; s++) {
-      const n = redrawTimes.filter((t) => t >= s && t < s + 1).length
-      expect(n, `second ${s}`).toBeLessThanOrEqual(12)
-      expect(n, `second ${s}`).toBeGreaterThanOrEqual(10)
+    expect(ATTRACT_MAX_HZ).toBe(24)
+    expect(NOISE_MAX_HZ).toBe(12) // the CRT overlay noise keeps its own 12 Hz constant
+    for (let i = 0; i < fps * 9; i++) {
+      const start = i / fps
+      const n = redrawTimes.filter((t) => t >= start - 1e-9 && t < start + 1 - 1e-6).length
+      expect(n, `window at ${start}`).toBeLessThanOrEqual(24)
+      expect(n, `window at ${start}`).toBeGreaterThanOrEqual(20)
     }
   })
 
@@ -60,13 +70,28 @@ describe('task 29.2: attract screen clock and pulse', () => {
     expect(resumed.clock.elapsed).toBeCloseTo(running.elapsed + 1, 5)
   })
 
-  it('the collection pulse changes luminance direction at most 3 times in every rolling second', () => {
+  // Photosensitivity (task 30.3): every animated brightness component, sampled at 240 Hz for 40 s.
+  const COMPONENTS: Record<string, (t: number) => number> = {
+    'snake collection pulse': attractPulseLevel,
+    'maze radar ping': mazePingLevel,
+    'maze photo shimmer 0': (t) => mazePhotoPulse(t, 0),
+    'maze photo shimmer 1': (t) => mazePhotoPulse(t, 1),
+    'maze photo shimmer 2': (t) => mazePhotoPulse(t, 2),
+    'frequency lock pulse': frequencyLockLevel,
+  }
+  it.each(Object.keys(COMPONENTS))('%s changes direction at most 3 times in every rolling second', (name) => {
     const rate = 240
-    const samples = Array.from({ length: rate * 40 }, (_, i) => attractPulseLevel(i / rate))
-    expect(Math.max(...samples)).toBeGreaterThan(0.99)
-    for (let start = 0; start + rate <= samples.length; start += 12) {
-      expect(countDirectionChanges(samples.slice(start, start + rate + 1)), `window at ${start / rate}s`).toBeLessThanOrEqual(3)
+    const fn = COMPONENTS[name]
+    const samples = Array.from({ length: rate * 40 }, (_, i) => fn(i / rate))
+    expect(Math.max(...samples), name).toBeGreaterThan(0.99)
+    for (let start = 0; start + rate <= samples.length; start += 6) {
+      expect(countDirectionChanges(samples.slice(start, start + rate + 1)), `${name} window at ${start / rate}s`).toBeLessThanOrEqual(3)
     }
+  })
+
+  it('snake collections are at least 1.5 s apart, so pulses are at most one per 1.5 s', () => {
+    expect(SNAKE_STEP_SEC * SNAKE_FRAGMENT_SPACING).toBeGreaterThanOrEqual(1.5)
+    expect(MAZE_PING_PERIOD_SEC).toBeGreaterThanOrEqual(1)
   })
 })
 

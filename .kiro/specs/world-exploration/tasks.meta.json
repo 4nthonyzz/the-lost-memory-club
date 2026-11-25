@@ -1511,6 +1511,66 @@
         "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
         "timestamp": 1795641888085
       }
+    ],
+    "30.1 Remove the right desk lamp square artefact": [
+      {
+        "executionId": "5abe65d5-3482-44a6-968e-ad85b92aab3b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795642368549
+      },
+      {
+        "executionId": "5abe65d5-3482-44a6-968e-ad85b92aab3b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795642811369
+      }
+    ],
+    "30.2 Smooth camera look and movement": [
+      {
+        "executionId": "5abe65d5-3482-44a6-968e-ad85b92aab3b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795642811915
+      },
+      {
+        "executionId": "ba125fd3-c33a-4c15-a649-0481e91a035f",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795644429235
+      },
+      {
+        "executionId": "ba125fd3-c33a-4c15-a649-0481e91a035f",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795644624595
+      }
+    ],
+    "30.3 24 Hz fluid attract animations": [
+      {
+        "executionId": "ba125fd3-c33a-4c15-a649-0481e91a035f",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795644625204
+      },
+      {
+        "executionId": "ba125fd3-c33a-4c15-a649-0481e91a035f",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795644892431
+      }
+    ],
+    "30.4 Docs, metrics and verification": [
+      {
+        "executionId": "ba125fd3-c33a-4c15-a649-0481e91a035f",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795644891688
+      },
+      {
+        "executionId": "ba125fd3-c33a-4c15-a649-0481e91a035f",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795645608948
+      }
+    ],
+    "30. Lamp fix, smooth motion and 24 Hz attract screens": [
+      {
+        "executionId": "ba125fd3-c33a-4c15-a649-0481e91a035f",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795645609127
+      }
     ]
   }
 }

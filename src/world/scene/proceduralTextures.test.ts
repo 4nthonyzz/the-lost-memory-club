@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  LAMP_GLOW_RADIUS_FRACTION,
   SPINE_ATLAS_HEIGHT,
   SPINE_ATLAS_WIDTH,
   SPINE_CELL_WIDTH,
@@ -53,6 +54,14 @@ import {
   ATTRACT_FRAME_DRAWERS,
   ATTRACT_PULSE_SEC,
   ATTRACT_SEEDS,
+  FREQUENCY_OLD_SCROLL_RATE,
+  FREQUENCY_SCROLL_RATE,
+  MAZE_ANOMALY_SPEED,
+  MAZE_SURVIVOR_SPEED,
+  SNAKE_CELLS_PER_SEC,
+  SNAKE_FIRST_FRAGMENT_STEP,
+  SNAKE_FRAGMENT_SPACING,
+  frequencyLockLevel,
   MAZE_ANOMALY_LOOP,
   MAZE_SURVIVOR_LOOP,
   SNAKE_BODY_LENGTH,
@@ -848,6 +857,19 @@ describe('task 23.1: lampGlow radial falloff', () => {
     expect(alphaOf(s[s.length - 1].color)).toBe(0)
   })
 
+  it('task 30.1: alpha is 0 at and beyond 90 % of the half-width and at the corners (last stop alpha 0, radius <= 0.9 x half-width)', () => {
+    const { width: W } = TEXTURE_SPECS.lampGlow
+    const [, , , , , r1] = recorded().find((c) => c.op === 'createRadialGradient')!.args as number[]
+    expect(r1).toBeLessThanOrEqual(0.9 * (W / 2) + 1e-9)
+    expect(LAMP_GLOW_RADIUS_FRACTION).toBeLessThanOrEqual(0.9)
+    const s = stops()
+    expect(s[s.length - 1].o).toBe(1)
+    expect(alphaOf(s[s.length - 1].color)).toBe(0)
+    // fillRect repeats the last stop outside the gradient radius, so everything past r1 (the whole border and every corner) is alpha 0.
+    const corner = Math.hypot(W / 2, W / 2)
+    expect(corner).toBeGreaterThan(r1)
+  })
+
   it('draws a small bright filament core at the centre', () => {
     const { width: W } = TEXTURE_SPECS.lampGlow
     const calls = recorded()
@@ -1326,7 +1348,7 @@ describe('task 29.2: animated attract screens (pure frame renderers)', () => {
     // Just before collection the head chases the fragment. At the collection step it stands on it, then the fragment moves on.
     let previousFragment = snakeStateAt(0).fragment
     for (let k = 0; k < 5; k++) {
-      const collectStep = 12 + 11 * k
+      const collectStep = SNAKE_FIRST_FRAGMENT_STEP + SNAKE_FRAGMENT_SPACING * k
       const before = snakeStateAt((collectStep - 0.5) * SNAKE_STEP_SEC)
       const at = snakeStateAt(collectStep * SNAKE_STEP_SEC)
       expect(before.fragment).toEqual(previousFragment)
@@ -1341,11 +1363,106 @@ describe('task 29.2: animated attract screens (pure frame renderers)', () => {
 
   it('snake: the collection pulse is soft (a single bump of at most 1 s, 0 elsewhere) and draws a small ring only while it lasts', () => {
     expect(attractPulseLevel(0)).toBe(0)
-    expect(attractPulseLevel(2.9)).toBe(0)
-    expect(attractPulseLevel(3 + ATTRACT_PULSE_SEC / 2)).toBeCloseTo(1, 5)
-    expect(attractPulseLevel(3 + ATTRACT_PULSE_SEC + 0.01)).toBe(0)
+    const first = SNAKE_FIRST_FRAGMENT_STEP * SNAKE_STEP_SEC // 1.6 s
+    expect(attractPulseLevel(first - 0.1)).toBe(0)
+    expect(attractPulseLevel(first + ATTRACT_PULSE_SEC / 2)).toBeCloseTo(1, 5)
+    expect(attractPulseLevel(first + ATTRACT_PULSE_SEC + 0.01)).toBe(0)
     const rings = (t: number) => frameLog('attractSnake', t).calls.filter((c) => c.op === 'arc' && (c.args[2] as number) > 6).length
-    expect(rings(3.5)).toBeGreaterThan(rings(5))
+    expect(rings(first + 0.3)).toBeGreaterThan(rings(first + 1.2))
+  })
+
+  it('task 30.3 snake: about 7.5 cells per second and the head position changes continuously between cell steps', () => {
+    expect(SNAKE_CELLS_PER_SEC).toBe(7.5)
+    expect(snakeStateAt(1).pathIndex - snakeStateAt(0).pathIndex).toBeCloseTo(7.5, 9)
+    expect(SNAKE_FRAGMENT_SPACING * SNAKE_STEP_SEC).toBeGreaterThanOrEqual(1.5)
+    for (let step = 0; step < SNAKE_PATH.length + 3; step++) {
+      for (const f of [0.25, 0.5, 0.75]) {
+        const s = snakeStateAt((step + f) * SNAKE_STEP_SEC)
+        const a = SNAKE_PATH[step % SNAKE_PATH.length]
+        const b = SNAKE_PATH[(step + 1) % SNAKE_PATH.length]
+        const between = (v: number, p: number, q: number) => (p === q ? v === p : v > Math.min(p, q) && v < Math.max(p, q))
+        expect(between(s.headPos[0], a[0], b[0]) && between(s.headPos[1], a[1], b[1]), `step ${step} f ${f}`).toBe(true)
+        // Moves along a grid line: one coordinate stays on the integer cell.
+        expect(Number.isInteger(s.headPos[0]) || Number.isInteger(s.headPos[1])).toBe(true)
+      }
+    }
+    // The drawn head follows: the head rectangle (colour #c8ffe0) is at a non-cell-aligned pixel position between steps.
+    const headRect = (t: number) => {
+      const calls = frameLog('attractSnake', t).calls
+      const i = calls.findIndex((c, k) => c.op === 'set fillStyle' && c.args[0] === '#c8ffe0' && calls[k + 1]?.op === 'fillRect')
+      return calls[i + 1].args as number[]
+    }
+    const mid = headRect(10.5 * SNAKE_STEP_SEC)
+    expect(mid[0] % 16 !== 0 || (mid[1] - 1) % 16 !== 0).toBe(true)
+  })
+
+  it('task 30.3 maze: the survivor moves about 75 px/s and the anomaly about 55 px/s along their loops', () => {
+    expect(MAZE_SURVIVOR_SPEED).toBe(75)
+    expect(MAZE_ANOMALY_SPEED).toBe(55)
+    const loopLength = (loop: readonly (readonly [number, number])[]) => loop.reduce((s, a, i) => s + Math.hypot(loop[(i + 1) % loop.length][0] - a[0], loop[(i + 1) % loop.length][1] - a[1]), 0)
+    for (const t of [0, 0.37, 2.2]) {
+      const a = mazeActorsAt(t)
+      const b = mazeActorsAt(t + 0.05)
+      // Short straight stretch: the speed is the distance over the interval unless a corner is inside it.
+      const ds = Math.hypot(b.survivor[0] - a.survivor[0], b.survivor[1] - a.survivor[1]) / 0.05
+      expect(ds).toBeGreaterThan(0)
+      expect(ds).toBeLessThanOrEqual(75 + 1e-6)
+    }
+    // Travelled path length over one whole loop period equals loop length: sample finely and sum segments.
+    const travelled = (fn: (t: number) => readonly [number, number], seconds: number) => {
+      let d = 0
+      let prev = fn(0)
+      for (let i = 1; i <= seconds * 1000; i++) {
+        const p = fn(i / 1000)
+        d += Math.hypot(p[0] - prev[0], p[1] - prev[1])
+        prev = p
+      }
+      return d
+    }
+    expect(travelled((t) => mazeActorsAt(t).survivor, 1)).toBeGreaterThan(70)
+    expect(travelled((t) => mazeActorsAt(t).survivor, 1)).toBeLessThan(75.5)
+    expect(travelled((t) => mazeActorsAt(t).anomaly, 1)).toBeGreaterThan(50)
+    expect(travelled((t) => mazeActorsAt(t).anomaly, 1)).toBeLessThan(55.5)
+    // After exactly one loop period the actor is back at its start.
+    const periodS = loopLength(MAZE_SURVIVOR_LOOP) / 75
+    const back = mazeActorsAt(periodS).survivor
+    expect(Math.hypot(back[0] - MAZE_SURVIVOR_LOOP[0][0], back[1] - MAZE_SURVIVOR_LOOP[0][1])).toBeLessThan(1e-6)
+    // The radar ping is a soft ring around the survivor that is drawn with a changing radius.
+    const pingRadius = (t: number) => frameLog('attractMaze', t).calls.filter((c) => c.op === 'arc' && (c.args[2] as number) >= 5).map((c) => c.args[2])
+    expect(pingRadius(0.2)).not.toEqual(pingRadius(0.6))
+  })
+
+  it('task 30.3 frequency: the scroll is 2.2 times faster, modulation stays inside the scope, and the lock pulse peaks at 89.4 MHz', () => {
+    expect(FREQUENCY_SCROLL_RATE / FREQUENCY_OLD_SCROLL_RATE).toBeCloseTo(2.2, 9)
+    expect(FREQUENCY_OLD_SCROLL_RATE).toBe(7)
+    // Find the time the marker is at 89.4 MHz on the way up.
+    let tBest = 0
+    for (let i = 0; i < 5000; i++) {
+      const t = i / 1000
+      if (Math.abs(frequencyMarkerMhz(t) - 89.4) < Math.abs(frequencyMarkerMhz(tBest) - 89.4)) tBest = t
+    }
+    expect(Math.abs(frequencyMarkerMhz(tBest) - 89.4)).toBeLessThan(0.01)
+    expect(frequencyLockLevel(tBest)).toBeGreaterThan(0.99)
+    for (const t of [0, 0.01, 2, 4, 5, 7, 9.5]) expect(frequencyLockLevel(t), `t=${t}`).toBeLessThan(frequencyLockLevel(tBest))
+    // One bump per 10 s sweep: no lock on the way down.
+    let bumps = 0
+    let was = false
+    for (let i = 0; i < 20000; i++) {
+      const on = frequencyLockLevel(i / 1000) > 0
+      if (on && !was) bumps++
+      was = on
+    }
+    expect(bumps).toBe(2) // two sweeps in 20 s
+    // Waveform y stays inside the scope panel (y 44..164) on all sampled frames.
+    for (const t of SAMPLE_TIMES) {
+      const calls = frameLog('attractFrequency', t).calls
+      const start = calls.findIndex((c) => c.op === 'set strokeStyle' && c.args[0] === '#ff9a1a')
+      expect(start, `t=${t}`).toBeGreaterThan(0)
+      const wave: number[] = []
+      for (let k = start; calls[k].op !== 'stroke'; k++) if (calls[k].op === 'lineTo') wave.push(calls[k].args[1] as number)
+      expect(wave.length).toBeGreaterThan(40)
+      for (const y of wave) expect(y >= 48 && y <= 160, `t=${t} y=${y}`).toBe(true)
+    }
   })
 
   it('maze: survivor and anomaly move along their loops and stay inside the screen; the survivor passes the three photos', () => {

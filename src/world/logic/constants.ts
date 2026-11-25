@@ -25,3 +25,7 @@ export const DT_MAX = 0.1;
 export const MAX_STEP = 0.1;
 /** Constant camera eye height above the floor, in world units. */
 export const EYE_HEIGHT = 1.6;
+/** Look smoothing rate (1/s) for the exponential approach of the rendered look to the target. Initial value, validated in testing. */
+export const LOOK_SMOOTHING_LAMBDA = 32;
+/** Movement smoothing rate (1/s) for the exponential approach of the velocity to the target. Initial value, validated in testing. */
+export const MOVE_SMOOTHING_LAMBDA = 20;

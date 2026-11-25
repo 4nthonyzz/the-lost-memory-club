@@ -70,6 +70,8 @@ export interface WorldInput {
   heldKeysRef: { current: HeldKeys };
   mouseDeltaRef: { current: MouseDelta };
   consumeMouseDelta: () => MouseDelta;
+  /** Incremented every time input is cleared (CLEAR_INPUT, blur). The rig snaps its smoothing state when it changes. */
+  clearEpochRef: { current: number };
   /** Stops forward / backward movement that comes only from ArrowUp / ArrowDown. Call when a card opens. */
   releaseCardArrows: () => void;
 }
@@ -83,6 +85,7 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
   const dispatchRef = useRef<((event: ModeEvent, gesture: boolean) => void) | null>(null);
   const prevInputEnabledRef = useRef<boolean | undefined>(options.inputEnabled);
   const heldKeysRef = useRef<HeldKeys>(EMPTY_HELD_KEYS);
+  const clearEpochRef = useRef(0);
   const [mode, setMode] = useState<InputMode>(stateRef.current.mode);
   const [keyboardLookHint, setKeyboardLookHint] = useState<boolean>(false);
 
@@ -127,6 +130,7 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
 
     const clearInput = () => {
       physicalRef.current.clear();
+      clearEpochRef.current += 1;
       heldKeysRef.current = reduceHeldKeys(heldKeysRef.current, { type: 'clear' });
       clearMouseDelta();
     };
@@ -312,5 +316,5 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
 
   const releaseCardArrows = useCallback(() => releaseArrowsRef.current(), []);
 
-  return { mode, keyboardLookHint, getMode, heldKeysRef, mouseDeltaRef, consumeMouseDelta, releaseCardArrows };
+  return { mode, keyboardLookHint, getMode, heldKeysRef, mouseDeltaRef, consumeMouseDelta, clearEpochRef, releaseCardArrows };
 }

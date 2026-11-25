@@ -304,6 +304,14 @@ function hash01(n: number): number {
   return (x >>> 0) / 4294967296
 }
 
+/** Scanlines under one globalAlpha and one fillStyle (the redraw runs 24 times per second, so per-line style writes are avoided). */
+function batchedScanlines(c: Ctx2D, w: number, h: number, step: number, alpha: number): void {
+  c.globalAlpha = alpha
+  c.fillStyle = '#000000'
+  for (let y = 0; y < h; y += step) c.fillRect(0, y, w, 1)
+  c.globalAlpha = 1
+}
+
 // ---- SNAKE.EXE ----
 
 const SNAKE_CELL = 16
@@ -325,21 +333,39 @@ function expandLoop(corners: readonly Pt[]): Pt[] {
 
 /** Every cell of the loop, in travel order (34 cells). */
 export const SNAKE_PATH: readonly Pt[] = Object.freeze(expandLoop(SNAKE_WAYPOINTS))
-/** The serpent moves one cell per step. */
-export const SNAKE_STEP_SEC = 0.25
+/** Cells per second of the serpent (task 30.3; it was 4). */
+export const SNAKE_CELLS_PER_SEC = 7.5
+/** One path cell per step. The drawn positions are interpolated inside each step. */
+export const SNAKE_STEP_SEC = 1 / SNAKE_CELLS_PER_SEC
 /** Body segments behind the head. */
 export const SNAKE_BODY_LENGTH = 11
 /** Step at which the head first reaches a fragment, and the number of path cells between successive fragments. */
 export const SNAKE_FIRST_FRAGMENT_STEP = 12
-export const SNAKE_FRAGMENT_SPACING = 11
-/** Length of the soft collection pulse. Collections are 11 steps (2.75 s) apart, so pulses never overlap. */
+export const SNAKE_FRAGMENT_SPACING = 12
+/** Length of the soft collection pulse. Collections are 12 steps (1.6 s) apart, so pulses never overlap and stay at least 1.5 s apart. */
 export const ATTRACT_PULSE_SEC = 1
 
 const pathCell = (index: number): Pt => SNAKE_PATH[((index % SNAKE_PATH.length) + SNAKE_PATH.length) % SNAKE_PATH.length]
 
+/**
+ * Position (in cell units, fractional) at a fractional path index. It interpolates linearly between two consecutive path cells,
+ * which are always grid neighbours (also across the loop wrap), so motion follows a grid line and corners turn through the corner cell.
+ */
+export function snakePathPosition(pathIndex: number): Pt {
+  const i = Math.floor(pathIndex)
+  const f = pathIndex - i
+  const a = pathCell(i)
+  const b = pathCell(i + 1)
+  return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]
+}
+
 export interface SnakeState {
   /** Steps taken so far. */
   step: number
+  /** Fractional path index of the head (step + progress inside the step). */
+  pathIndex: number
+  /** Interpolated head position in cell units. */
+  headPos: Pt
   head: Pt
   /** Cell of the head's next move, for the facing direction. */
   next: Pt
@@ -356,18 +382,22 @@ export interface SnakeState {
 /** Deterministic snake state at `elapsedSec`. When the head reaches the fragment, the fragment respawns 11 cells further along the path. */
 export function snakeStateAt(elapsedSec: number): SnakeState {
   const e = finiteTime(elapsedSec)
-  const step = Math.floor(e / SNAKE_STEP_SEC)
+  // The tiny epsilon keeps exact step boundaries (i * SNAKE_STEP_SEC) on the step they belong to despite float rounding.
+  const step = Math.floor(e / SNAKE_STEP_SEC + 1e-9)
   const collected = step >= SNAKE_FIRST_FRAGMENT_STEP ? Math.floor((step - SNAKE_FIRST_FRAGMENT_STEP) / SNAKE_FRAGMENT_SPACING) + 1 : 0
   const fragmentStep = SNAKE_FIRST_FRAGMENT_STEP + SNAKE_FRAGMENT_SPACING * collected
   const lastStep = SNAKE_FIRST_FRAGMENT_STEP + SNAKE_FRAGMENT_SPACING * (collected - 1)
+  const pathIndex = e / SNAKE_STEP_SEC
   return {
     step,
+    pathIndex,
+    headPos: snakePathPosition(pathIndex),
     head: pathCell(step),
     next: pathCell(step + 1),
     fragment: pathCell(fragmentStep),
     collected,
     collectedCell: collected > 0 ? pathCell(lastStep) : null,
-    pulseAge: collected > 0 ? e - lastStep * SNAKE_STEP_SEC : Infinity,
+    pulseAge: collected > 0 ? Math.max(0, e - lastStep * SNAKE_STEP_SEC) : Infinity,
   }
 }
 
@@ -388,16 +418,19 @@ export function drawAttractSnakeFrame(c: Ctx2D, w: number, h: number, elapsedSec
   const s = snakeStateAt(e)
   const pulse = attractPulseLevel(e)
   vertical(c, w, h, [[0, '#020a05'], [1, '#04140a']])
-  // Dark play grid.
+  // Dark play grid (one style assignment for all lines).
+  c.globalAlpha = 0.35
+  c.fillStyle = '#0e4a2a'
   for (let k = 16; k < w; k += 16) {
-    rect(c, k, 0, 1, h, '#0e4a2a', 0.35)
-    rect(c, 0, k, w, 1, '#0e4a2a', 0.35)
+    c.fillRect(k, 0, 1, h)
+    c.fillRect(0, k, w, 1)
   }
+  c.globalAlpha = 1
   const cellX = (cx: number) => cx * SNAKE_CELL
   const cellY = (cy: number) => cy * SNAKE_CELL
-  // Shadow serpent: very faint, trailing far behind the real one.
+  // Shadow serpent: very faint, trailing far behind the real one (sub-cell positions, like the real serpent).
   for (let i = 0; i < 6; i++) {
-    const p = pathCell(s.step - SNAKE_BODY_LENGTH - 6 - i)
+    const p = snakePathPosition(s.pathIndex - SNAKE_BODY_LENGTH - 6 - i)
     rect(c, cellX(p[0]) - 2, cellY(p[1]) - 3 + (i % 2) * 2, 20, 18, '#0f6a3a', 0.18)
   }
   // Tape fragment: a glowing cassette label. Its glow lifts softly during the collection pulse.
@@ -415,7 +448,7 @@ export function drawAttractSnakeFrame(c: Ctx2D, w: number, h: number, elapsedSec
   }
   // The serpent: tape segments (cassette body, label strip, two reel dots), tail first, then the head.
   for (let i = SNAKE_BODY_LENGTH; i >= 1; i--) {
-    const p = pathCell(s.step - i)
+    const p = snakePathPosition(s.pathIndex - i)
     const x = cellX(p[0])
     const y = cellY(p[1])
     rect(c, x + 1, y + 2, 14, 12, '#1f9c52')
@@ -424,8 +457,8 @@ export function drawAttractSnakeFrame(c: Ctx2D, w: number, h: number, elapsedSec
     disc(c, x + 5, y + 10, 2, '#02140a')
     disc(c, x + 11, y + 10, 2, '#02140a')
   }
-  const hx = cellX(s.head[0])
-  const hy = cellY(s.head[1])
+  const hx = cellX(s.headPos[0])
+  const hy = cellY(s.headPos[1])
   rect(c, hx, hy + 1, 16, 14, '#c8ffe0')
   const dx = s.next[0] - s.head[0]
   const dy = s.next[1] - s.head[1]
@@ -449,7 +482,7 @@ export function drawAttractSnakeFrame(c: Ctx2D, w: number, h: number, elapsedSec
   c.globalAlpha = 1
   speckle(c, rnd, 0, 0, w, h, 50, ['#2fa874', '#7dffc0', '#0a3a28'], 2, 0.25)
   cornerBrackets(c, w, h, 6, 14, '#7dffc0')
-  scanlines(c, w, h, 2, 0.3)
+  batchedScanlines(c, w, h, 2, 0.3)
   vignette(c, w, h, 40, 0.68)
 }
 
@@ -470,8 +503,17 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 export const MAZE_SURVIVOR_LOOP: readonly Pt[] = Object.freeze([[31, 82], [31, 187], [75, 187], [75, 222], [210, 222], [210, 137], [150, 137], [150, 82]] as Pt[])
 /** A separate, smaller loop patrolled by the red shadow anomaly. */
 export const MAZE_ANOMALY_LOOP: readonly Pt[] = Object.freeze([[110, 160], [190, 160], [190, 200], [110, 200]] as Pt[])
-export const MAZE_SURVIVOR_SPEED = 40
-export const MAZE_ANOMALY_SPEED = 28
+/** Task 30.3: pixels per second along the loops (were 40 and 28). Motion is continuous, with no stepping. */
+export const MAZE_SURVIVOR_SPEED = 75
+export const MAZE_ANOMALY_SPEED = 55
+/** Radar ping around the survivor: one soft expanding ring every 1.25 s (alpha is a sin^2 bump, so it fades in and out smoothly). */
+export const MAZE_PING_PERIOD_SEC = 1.25
+export const MAZE_PING_MAX_RADIUS = 26
+
+/** Ping brightness in 0..1: sin^2 of the ping phase. At most 2 direction changes per 1.25 s. */
+export function mazePingLevel(elapsedSec: number): number {
+  return Math.sin(Math.PI * fract(finiteTime(elapsedSec) / MAZE_PING_PERIOD_SEC)) ** 2
+}
 /** Glow pulse of the photo fragments: a 0.5 Hz sinusoid is one bright-dark cycle per 2 s (2 direction changes per 2 s). */
 export const MAZE_PHOTO_PULSE_HZ = 0.5
 
@@ -552,6 +594,7 @@ export function drawAttractMazeFrame(c: Ctx2D, w: number, h: number, elapsedSec:
   }
   // Actors: the survivor (warm dot with a halo) and the red shadow anomaly.
   const actors = mazeActorsAt(e)
+  ring(c, actors.survivor[0], actors.survivor[1], 5 + (MAZE_PING_MAX_RADIUS - 5) * fract(e / MAZE_PING_PERIOD_SEC), '#ffd24a', 1.5, 0.45 * mazePingLevel(e))
   disc(c, actors.survivor[0], actors.survivor[1], 6, '#ffd24a', 0.3)
   disc(c, actors.survivor[0], actors.survivor[1], 3.5, '#fff2c0')
   disc(c, actors.anomaly[0], actors.anomaly[1], 8, '#000000', 0.85)
@@ -562,7 +605,7 @@ export function drawAttractMazeFrame(c: Ctx2D, w: number, h: number, elapsedSec:
   text(c, 'LAST EXIT', w / 2, 24, 'bold 26px monospace', '#ff4a6a')
   speckle(c, rnd, 0, 0, w, h, 50, ['#c8203c', '#8a3ad0', '#000000'], 2, 0.22)
   cornerBrackets(c, w, h, 6, 14, '#ff4a6a')
-  scanlines(c, w, h, 2, 0.32)
+  batchedScanlines(c, w, h, 2, 0.32)
   vignette(c, w, h, 44, 0.68)
 }
 
@@ -581,11 +624,37 @@ const DIAL_STATION_MHZ = 89.4
 /** The scanning tuning marker sweeps the whole dial and back in this many seconds. */
 export const FREQUENCY_SWEEP_SEC = 10
 
-/** Scanning marker position on the dial in MHz (triangle wave between 88 and 108). */
+/** Waveform scroll rate in radians per second: 2.2 times the rate before task 30.3 (7). */
+export const FREQUENCY_OLD_SCROLL_RATE = 7
+export const FREQUENCY_SCROLL_RATE = FREQUENCY_OLD_SCROLL_RATE * 2.2
+
+/** Scanning marker position on the dial in MHz: a cosine-eased sweep between 88 and 108 (no sharp turn at the ends). */
 export function frequencyMarkerMhz(elapsedSec: number): number {
   const phase = fract(finiteTime(elapsedSec) / FREQUENCY_SWEEP_SEC)
-  const tri = phase < 0.5 ? phase * 2 : 2 - phase * 2
-  return DIAL_MIN_MHZ + (DIAL_MAX_MHZ - DIAL_MIN_MHZ) * tri
+  return DIAL_MIN_MHZ + (DIAL_MAX_MHZ - DIAL_MIN_MHZ) * (0.5 - 0.5 * Math.cos(TAU * phase))
+}
+
+/** Half width in MHz of the signal-lock glow bump. */
+const LOCK_WIDTH_MHZ = 1.2
+
+/**
+ * Signal-lock glow in 0..1: a cos^2 bump while the marker passes 89.4 MHz on its way up (one bump per sweep, none on the way back down).
+ * The bump lasts well under a second, so it adds 2 luminance direction changes per 10 s sweep.
+ */
+export function frequencyLockLevel(elapsedSec: number): number {
+  const phase = fract(finiteTime(elapsedSec) / FREQUENCY_SWEEP_SEC)
+  if (phase >= 0.5) return 0
+  const d = Math.abs(frequencyMarkerMhz(elapsedSec) - DIAL_STATION_MHZ)
+  return d < LOCK_WIDTH_MHZ ? Math.cos((Math.PI * d) / (2 * LOCK_WIDTH_MHZ)) ** 2 : 0
+}
+
+/** Time-smooth value noise in -0.5..0.5: hashed values at 8 per second, blended with a smoothstep (no stepping). */
+function smoothNoise(index: number, elapsedSec: number): number {
+  const t = elapsedSec * 8
+  const k = Math.floor(t)
+  const f = t - k
+  const s = f * f * (3 - 2 * f)
+  return lerp(hash01(index * 31 + k * 977), hash01(index * 31 + (k + 1) * 977), s) - 0.5
 }
 
 /** Retro radio oscilloscope: a live amber waveform scrolls over the grid with modulated spikes, and a marker scans the dial. */
@@ -606,17 +675,20 @@ export function drawAttractFrequencyFrame(c: Ctx2D, w: number, h: number, elapse
   // Waveform: a sine that scrolls left with a slowly modulated amplitude and tears into noise on the right.
   // Three narrow signal spikes drift across it. Drawn twice for a soft glow.
   const mid = sy + sh / 2
-  const tick = Math.floor(e * 8)
   const amp = 34 * (1 + 0.2 * Math.sin(e * 1.3))
+  // Harmonics with slowly varying amplitudes; the sum is normalised so the envelope stays inside the scope.
+  const a2 = 0.45 * (0.5 + 0.5 * Math.sin(e * 0.7))
+  const a3 = 0.25 * (0.5 + 0.5 * Math.sin(e * 0.45 + 1))
+  const scroll = e * FREQUENCY_SCROLL_RATE
   const pts: Array<[number, number]> = []
   for (let x = sx + 4, i = 0; x <= sx + sw - 4; x += 4, i++) {
     const u = (x - sx) / sw
-    const clean = Math.sin(u * 22 - e * 7) * amp
-    const noise = (hash01(i * 31 + tick * 977) - 0.5) * 2 * 40
+    const clean = ((Math.sin(u * 22 - scroll) + a2 * Math.sin(u * 37 - scroll * 1.37) + a3 * Math.sin(u * 53 - scroll * 0.71)) / 1.7) * amp
+    const noise = smoothNoise(i, e) * 2 * 40
     const mix = u < 0.5 ? 0 : Math.min(1, (u - 0.5) / 0.25)
     let spike = 0
     for (let j = 0; j < 3; j++) {
-      const bump = Math.max(0, 1 - Math.abs(u - fract(0.15 + j * 0.33 + e * 0.06)) / 0.035)
+      const bump = Math.max(0, 1 - Math.abs(u - fract(0.15 + j * 0.33 + e * 0.06 * 2.2)) / 0.035)
       spike += bump * (j % 2 === 0 ? 1 : -1) * (30 + 16 * Math.sin(e * 2 + j))
     }
     const y = mid - (clean * (1 - mix) + noise * mix + spike)
@@ -643,6 +715,7 @@ export function drawAttractFrequencyFrame(c: Ctx2D, w: number, h: number, elapse
     line(c, x, 196, x, (m - DIAL_MIN_MHZ) % 5 === 0 ? 182 : 189, '#ffc23a', 1, 0.85)
   }
   const nx = dialX(DIAL_STATION_MHZ)
+  disc(c, nx, 194, 14, '#ffc23a', 0.3 * frequencyLockLevel(e)) // soft signal-lock glow
   line(c, nx, 178, nx, 210, '#ff3a3a', 2)
   disc(c, nx, 210, 2, '#ff3a3a')
   const mx = dialX(frequencyMarkerMhz(e))
@@ -653,7 +726,7 @@ export function drawAttractFrequencyFrame(c: Ctx2D, w: number, h: number, elapse
   text(c, 'DEAD FREQUENCY', w / 2, 20, 'bold 20px monospace', '#2ad8d0')
   speckle(c, rnd, 0, 0, w, h, 50, ['#2ad8d0', '#ffc23a', '#000000'], 2, 0.2)
   cornerBrackets(c, w, h, 6, 14, '#ffc23a')
-  scanlines(c, w, h, 2, 0.32)
+  batchedScanlines(c, w, h, 2, 0.32)
   vignette(c, w, h, 40, 0.68)
 }
 

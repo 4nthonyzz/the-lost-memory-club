@@ -37,8 +37,11 @@ export function shouldUpdateNoise(
   return { update: true, accumulator: acc % interval }
 }
 
-/** Attract screen redraw cap (updates per second): the same 12 Hz as the static noise. */
-export const ATTRACT_MAX_HZ = NOISE_MAX_HZ
+/**
+ * Attract screen redraw cap (updates per second). Task 30.3: raised from 12 Hz to 24 Hz. It is a separate constant from
+ * NOISE_MAX_HZ, so the CRT overlay static noise stays at 12 Hz.
+ */
+export const ATTRACT_MAX_HZ = 24
 
 export interface AttractClock {
   /** Animation clock in seconds. It only advances while the effects are active and motion is allowed. */

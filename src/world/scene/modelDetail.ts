@@ -111,6 +111,8 @@ export const GEOMETRY_TRIANGLES: Readonly<Record<GeometryKey, number>> = {
   sphere: 80, // 8 x 6 segments
   cone: 24, // open truncated cone, 12 radial segments, no caps
   collar: 8, // open square tube (4 radial segments, no caps): the banker's lamp brass end caps (25.1)
+  disc: 24, // 24-segment circle: lamp halo, desk pool and the table lamp's inner glow (30.1)
+  lampCone: 48, // open truncated cone, 24 radial segments, no caps: the volumetric lamp light (30.1)
 }
 
 export const SCENE_TRIANGLE_BUDGET = 20000
@@ -689,32 +691,42 @@ export const LAMP_POOL_RADIUS_WANTED = 0.85
 const LAMP_CONE_FLOOR_GAP = 0.004
 
 /**
- * Pool decal placement (24.1): the pool never hangs past the desk edge. The radius is the wanted 0.85 m capped to
- * half the desk depth (0.4 m, so the decal is a 0.8 m quad whose visible disc, 90 % of it, is 0.36 m), and the
- * centre is pulled inward just far enough that the whole quad lies inside the desk top rectangle.
+ * Pool decal placement (30.1): a flat round disc centred directly beneath the shade. The radius is the wanted 0.85 m
+ * capped to the distance from the lamp axis to the nearest desk top edge, so the disc stays inside the desk top
+ * rectangle without moving its centre away from the lamp (the old quad was shifted inward and looked off-axis).
  */
 export function lampPoolPlacement(desk: Aabb, x: number, z: number): { cx: number; cz: number; radius: number } {
-  const radius = Math.min(LAMP_POOL_RADIUS_WANTED, (desk.maxX - desk.minX) / 2, (desk.maxZ - desk.minZ) / 2)
-  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
-  return {
-    cx: clamp(x, desk.minX + radius, desk.maxX - radius),
-    cz: clamp(z, desk.minZ + radius, desk.maxZ - radius),
-    radius,
-  }
+  const radius = Math.max(0, Math.min(LAMP_POOL_RADIUS_WANTED, x - desk.minX, desk.maxX - x, z - desk.minZ, desk.maxZ - z))
+  return { cx: x, cz: z, radius }
 }
 
 /**
- * Open light cone from the shade rim down to the desk top, built on the shared 12-sided open `cone` geometry
- * (24 triangles; top radius 0.3 and bottom radius 0.5 of the scale). `rimRadius` is the cone radius at the rim.
- * UV orientation (25.1): CylinderGeometry maps v = 1 to the top ring (the shade rim) and v = 0 to the bottom, and a
- * CanvasTexture is flipped (flipY), so canvas row 0 of coneFalloff lands at the rim and the fade runs down to the desk.
- * No UV flip is needed.
+ * Shade opening of each lamp, as height above the desk top and radius (30.1). Table: the cream cone shade bottom rim
+ * (y 0.22, radius 0.12). Banker: the hood underside between the two skirts (the skirt bottom at y 0.247; the clear
+ * opening is half of 0.13 m - 2 x 0.006 m = 0.053 m wide on each side of the axis).
  */
-function lampCone(mat: MaterialKey, x: number, z: number, top: number, rimY: number, rimRadius: number): Part {
+export const LAMP_SHADE_OPENING: Readonly<Record<DeskLampKind, { readonly rimY: number; readonly radius: number }>> = {
+  banker: { rimY: 0.247, radius: 0.053 },
+  table: { rimY: 0.22, radius: 0.12 },
+}
+/** The light cone top radius is this fraction of the shade opening radius, so no cone face leaves the shade. */
+export const LAMP_CONE_TOP_FRACTION = 0.85
+/** Height above the desk top where the cone top starts: inside the shade, above its bottom rim and just below the bulb centre. */
+export const LAMP_CONE_TOP_Y: Readonly<Record<DeskLampKind, number>> = { banker: 0.255, table: 0.25 }
+
+/**
+ * Open light cone from just inside the shade down to the desk top, built on the shared 24-sided open `lampCone`
+ * geometry (48 triangles; top radius 0.25 and bottom radius 0.5 of the scale). Its top radius is 85 % of the shade opening
+ * and it starts above the shade rim, so every face is inside the shade where it passes the rim.
+ * UV orientation (25.1): CylinderGeometry maps v = 1 to the top ring and v = 0 to the bottom, and a CanvasTexture is
+ * flipped (flipY), so canvas row 0 of coneFalloff lands at the top and the fade runs down to the desk. No UV flip is needed.
+ */
+function lampCone(mat: MaterialKey, kind: DeskLampKind, x: number, z: number, top: number): Part {
   const floorY = top + LAMP_CONE_FLOOR_GAP
-  const h = rimY - floorY
-  const d = rimRadius / 0.3 // the geometry's top radius is 0.3 of the scale, so the top matches the rim
-  return { ...part('cone', mat, [x, floorY + h / 2, z], [d, h, d]), lampRole: 'cone' }
+  const topY = top + LAMP_CONE_TOP_Y[kind]
+  const h = topY - floorY
+  const d = (LAMP_SHADE_OPENING[kind].radius * LAMP_CONE_TOP_FRACTION) / 0.25 // the geometry's top radius is 0.25 of the scale
+  return { ...part('lampCone', mat, [x, floorY + h / 2, z], [d, h, d]), lampRole: 'cone' }
 }
 
 export function deskLampParts(box: Aabb, kind: DeskLampKind, on = true, top: number = layoutProp('reception-desk').height): Part[] {
@@ -739,11 +751,13 @@ export function deskLampParts(box: Aabb, kind: DeskLampKind, on = true, top: num
       role(part('plane', LAMP_MATERIALS.banker[on ? 'on' : 'off'].liner, [sx, top + 0.2955, cz], [0.17, 0.085, 1], [HALF_PI, 0, 0]), 'liner'),
       // 25.1: two brass end caps (8 triangles each): open square collars sleeved around the hood ends (axis along x).
       ...[-1, 1].map((s) => part('collar', 'brass', [sx + s * 0.1, top + 0.285, cz], [0.085, 0.024, 0.14], [0, 0, HALF_PI])),
-      role(part('sphere', m.bulb, [sx, top + 0.262, cz], [0.045, 0.045, 0.045]), 'bulb'),
-      role(part('plane', m.sprite, [sx, top + 0.27, cz], [0.42, 0.42, 1]), 'sprite'),
-      // Cone from the shade skirt bottom (0.247 m up), 0.108 m rim radius, spreading to 0.18 m at the desk.
-      lampCone(m.cone, sx, cz, top, top + 0.247, 0.108),
-      role(part('plane', m.pool, [pool.cx, top + LAMP_POOL_LIFT, pool.cz], [pool.radius * 2, pool.radius * 2, 1], [-HALF_PI, 0, 0]), 'pool'),
+      // 30.1 budget: 8-sided low cylinder (32 triangles) instead of the 80-triangle sphere.
+      role(part('cylinderLow', m.bulb, [sx, top + 0.262, cz], [0.045, 0.045, 0.045]), 'bulb'),
+      // 30.1: round halo (24-segment disc, drawn camera-facing by Props.tsx).
+      role(part('disc', m.sprite, [sx, top + 0.27, cz], [0.42, 0.42, 1]), 'sprite'),
+      // 30.1: cone from inside the hood (0.255 m up), top radius 85 % of the 0.053 m hood opening, spreading to 0.09 m at the desk.
+      lampCone(m.cone, 'banker', sx, cz, top),
+      role(part('disc', m.pool, [pool.cx, top + LAMP_POOL_LIFT, pool.cz], [pool.radius * 2, pool.radius * 2, 1], [-HALF_PI, 0, 0]), 'pool'),
     ]
   }
   const pool = lampPoolPlacement(desk, cx, cz)
@@ -752,12 +766,15 @@ export function deskLampParts(box: Aabb, kind: DeskLampKind, on = true, top: num
     part('cylinderLow', 'brass', [cx, top + 0.12, cz], [0.045, 0.2, 0.045]),
     // Conical cream shade, open at both ends.
     role(part('cone', m.shade, [cx, top + 0.3, cz], [0.24, 0.16, 0.24]), 'shade'),
-    role(part('plane', m.inner, [cx, top + 0.372, cz], [0.13, 0.13, 1], [HALF_PI, 0, 0]), 'inner'),
-    role(part('sphere', m.bulb, [cx, top + 0.27, cz], [0.05, 0.05, 0.05]), 'bulb'),
-    role(part('plane', m.sprite, [cx, top + 0.3, cz], [0.45, 0.45, 1]), 'sprite'),
-    // Cone from the shade rim (0.22 m up, rim radius 0.12 m), spreading to 0.2 m at the desk.
-    lampCone(m.cone, cx, cz, top, top + 0.22, 0.12),
-    role(part('plane', m.pool, [pool.cx, top + LAMP_POOL_LIFT, pool.cz], [pool.radius * 2, pool.radius * 2, 1], [-HALF_PI, 0, 0]), 'pool'),
+    // 30.1: the inner glow was a 0.13 m square whose corners (half-diagonal 0.092 m) stuck out of the 0.074 m shade radius at
+    // y 0.372. It is now a 0.12 m disc (radius 0.06 m) that stays inside the shade.
+    role(part('disc', m.inner, [cx, top + 0.372, cz], [0.12, 0.12, 1], [HALF_PI, 0, 0]), 'inner'),
+    // 30.1 budget: the bulb is an 8-sided low cylinder (32 triangles) instead of the 80-triangle sphere.
+    role(part('cylinderLow', m.bulb, [cx, top + 0.27, cz], [0.05, 0.05, 0.05]), 'bulb'),
+    // 30.1: no camera-facing halo sprite on the table lamp: the cone, pool, inner glow and emissive shade already read.
+    // 30.1: cone from inside the shade (0.25 m up), top radius 85 % of the 0.12 m shade opening, spreading to 0.204 m at the desk.
+    lampCone(m.cone, 'table', cx, cz, top),
+    role(part('disc', m.pool, [pool.cx, top + LAMP_POOL_LIFT, pool.cz], [pool.radius * 2, pool.radius * 2, 1], [-HALF_PI, 0, 0]), 'pool'),
   ]
 }
 

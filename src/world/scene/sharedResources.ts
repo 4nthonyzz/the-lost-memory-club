@@ -7,6 +7,7 @@ import {
   AdditiveBlending,
   BoxGeometry,
   CanvasTexture,
+  CircleGeometry,
   DoubleSide,
   ClampToEdgeWrapping,
   CylinderGeometry,
@@ -46,6 +47,9 @@ import {
   type TextureId,
 } from './proceduralTextures'
 
+/** Radial segments of every round lamp glow surface and light cone (task 30.1). */
+const LAMP_RADIAL_SEGMENTS = 24
+
 export const geometries = {
   /** Unit box; size it with mesh `scale`. */
   box: new BoxGeometry(1, 1, 1),
@@ -61,6 +65,16 @@ export const geometries = {
   cone: new CylinderGeometry(0.3, 0.5, 1, 12, 1, true),
   /** Open square tube (task 25.1): 4 radial segments turned 45 degrees at radius sqrt(1/2), so the section is exactly 1 x 1 (scale = real size). 8 triangles. */
   collar: new CylinderGeometry(Math.SQRT1_2, Math.SQRT1_2, 1, 4, 1, true, Math.PI / 4),
+  /**
+   * Unit disc (task 30.1): diameter 1, 24 radial segments (24 triangles), facing +z with UVs inscribed in the unit square like the plane.
+   * Every glow-like lamp surface (halo sprite, desk pool, inner shade glow) uses it, so no glow ever has square corners.
+   */
+  disc: new CircleGeometry(0.5, LAMP_RADIAL_SEGMENTS),
+  /**
+   * Open light cone of a desk lamp (task 30.1): bottom diameter 1, top diameter 0.5, 24 radial segments, no caps (48 triangles).
+   * Scale uniformly by 4 x the wanted top radius.
+   */
+  lampCone: new CylinderGeometry(0.25, 0.5, 1, LAMP_RADIAL_SEGMENTS, 1, true),
 }
 
 /**

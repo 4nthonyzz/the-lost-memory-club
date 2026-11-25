@@ -48,6 +48,8 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 
 - Approved scope change (open-book manuals and animated attract screens), 2026-12-06: the three manual cards render as an open two-page book (both pages side by side on wide viewports, stacked on narrow ones). Keys 1 and 2 and clicks select and highlight a page, and scroll it into view when stacked. Wheel, arrow keys, page keys and the scrollbar keep working. The four room clues keep their own layouts. The three attract screens are animated in place by redrawing the existing `attractSnake`, `attractMaze` and `attractFrequency` canvases at most 12 times per second from the existing `Effects` `useFrame` (no timers, no new textures). Animation stops while inspecting and is static under reduced motion. `elapsedSec = 0` reproduces the static frame. Any collection flash is a soft pulse that keeps luminance changes at or below 3 per second (Requirement 10). Budgets: triangles at most 19,200 (currently 19,116), at most 4 lights, 32 textures, texture memory at most 7.85 MB (currently 7.703 MiB). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged.
 
+- Approved scope change (lamp fix, smooth motion, 24 Hz attract), 2026-12-07: the `desk-lamp-right` square glow/cone artefact is removed (round, radially faded glow and pool geometry with at least 24 segments, cone top tucked inside the shade's bottom opening, pool flat just above the desk). Camera look (yaw/pitch, lambda about 32) and movement velocity (lambda about 20) use frame-rate-independent exponential smoothing `1 - exp(-lambda * dt)`, bypassed (alpha = 1) under reduced motion; collision, bounds and pointer-lock behaviour are unchanged. The attract-screen redraw throttle rises from 12 Hz to 24 Hz (estimated texture uploads about 18.8 MB/s, not measured) with faster, interpolated motion, and every brightness pulse keeps at most 3 direction changes per rolling second. Budgets: triangles at most 19,200 (currently 19,116), at most 4 lights, 32 textures, texture memory at most 7.85 MB (7.703 MiB). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged. The earlier 12 Hz redraw wording in the open-book/attract scope change and in task 29.2 is superseded by this bullet.
+
 ## Tasks
 
 ### Milestone 1: Playable 3D room (primitives only)
@@ -1082,6 +1084,45 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: documentation and the spec folder only.
     - _Requirements: 14.11, 14.12, 15.3, 15.6_
 
+### Lamp fix, smooth motion and 24 Hz attract screens
+
+- [x] 30. Lamp fix, smooth motion and 24 Hz attract screens
+  - [x] 30.1 Remove the right desk lamp square artefact
+    - Files: `src/world/scene/modelDetail.ts`, `src/world/scene/sharedResources.ts`, `src/world/scene/Props.tsx`, `src/world/scene/proceduralTextures.ts` (if needed); tests `src/world/scene/modelDetail.test.ts`, `src/world/scene/proceduralTextures.test.ts`.
+    - Make the `desk-lamp-right` glow sprite and pool round and radially faded, using geometry with at least 24 segments. Tuck the cone top inside the shade's bottom opening. Lay the pool flat just above the desk surface.
+    - Acceptance: no square edge is visible in glow, cone or pool; glow and pool geometry have at least 24 segments; cone top lies inside the shade opening; pool sits just above the desk without z-fighting; triangle estimate at most 19,200; lights at most 4; texture count 32; texture memory at most 7.85 MB (computed); each texture disposed exactly once (twice-safe); colliders and Station anchors unchanged; Memory_Shift tinting still works.
+    - Tests: `modelDetail.test.ts` (segment counts at least 24, cone top inside shade, pool height above desk, budgets, disposal once and twice-safe); `proceduralTextures.test.ts` (glow texture deterministic with a fake context, alpha is zero at the edge, unchanged size). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 29.3.
+    - Boundary: render-only; `src/world/` only; no new dependency; no GLB; `ASSET_MANIFEST` stays empty.
+    - _Requirements: 1.3, 1.4, 1.8, 9.1, 9.2, 9.8, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 30.2 Smooth camera look and movement
+    - Files: `src/world/logic/playerStep.ts`, `src/world/logic/movement.ts` and `src/world/logic/look.ts` (if needed), `src/world/controller/usePlayerRig.ts`, `src/world/WorldScene.tsx` (if needed); tests `src/world/logic/playerStep.test.ts`, `src/world/logic/look.test.ts`, `src/world/logic/movement.test.ts`, `src/world/WorldScene.test.ts`.
+    - Apply frame-rate-independent exponential smoothing with alpha = `1 - exp(-lambda * dt)` (using clamped dt) to camera look (yaw and pitch, lambda about 32) and movement velocity (lambda about 20). Under reduced motion alpha is 1 (no smoothing). Collision, bounds, pitch limits, yaw wrapping and pointer-lock behaviour are unchanged. Smoothing is a pure function.
+    - Acceptance: the smoothed value converges to the target; results are consistent across frame rates within tolerance; alpha is 1 under reduced motion; zero input stops the player without drift; position stays valid (no overlap, inside bounds); pitch stays within 80 degrees; yaw stays finite and wrapped; no pointer-lock change.
+    - Tests: `playerStep.test.ts` (alpha formula, convergence, frame-rate consistency, reduced-motion bypass, stop on zero input, collision still applied); `look.test.ts` and `movement.test.ts` (limits and wrapping preserved, NaN and large dt safe); `WorldScene.test.ts` (no `onInspect` or lock regression). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 30.1.
+    - Boundary: `src/world/` only; pure logic stays free of React, three.js and DOM; `WorldSceneProps` and `onInspect` unchanged.
+    - _Requirements: 3.1, 3.2, 3.3, 3.6, 3.10, 3.11, 4.2, 4.3, 4.4, 4.5, 6.2, 6.4, 6.5, 10.4, 10.6, 13.1, 13.2_
+
+  - [x] 30.3 24 Hz fluid attract animations
+    - Files: `src/world/scene/proceduralTextures.ts`, `src/world/scene/effectsTiming.ts`, `src/world/scene/Effects.tsx`; tests `src/world/scene/proceduralTextures.test.ts`, `src/world/scene/effectsTiming.test.ts`.
+    - Raise the attract-screen redraw throttle from 12 Hz to 24 Hz (estimated texture uploads about 18.8 MB/s, not measured). Make motion faster and interpolated between frames. Every brightness pulse keeps at most 3 direction changes per rolling second. Animation stays off while inspecting and static under reduced motion; `elapsedSec = 0` still reproduces the static frame; no timers, no new textures.
+    - Acceptance: redraw rate at most 24 per second; pulses have at most 3 direction changes in any rolling second; animation stops while inspecting and is static under reduced motion; textures are deterministic for a given `elapsedSec`; texture count 32; texture memory at most 7.85 MB (computed); triangle estimate at most 19,200; lights at most 4; each texture disposed exactly once.
+    - Tests: `proceduralTextures.test.ts` (determinism for fixed `elapsedSec`, `elapsedSec = 0` equals the static frame, sizes unchanged); `effectsTiming.test.ts` (24 Hz cap, rolling-second direction-change limit, stop while inspecting, static under reduced motion). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 30.2.
+    - Boundary: render-only; `src/world/` only; no new dependency; no GLB; `ASSET_MANIFEST` stays empty.
+    - _Requirements: 9.8, 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 14.2, 14.4, 14.5, 14.6, 14.7_
+
+  - [x] 30.4 Docs, metrics and verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, lights and texture memory, each labelled "computed, not runtime-measured". Document the lamp fix, the smoothing constants and the 24 Hz attract throttle (upload estimate labelled not measured). Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final geometry and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 30.3.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional. The 17 property-based test sub-tasks can be skipped for a faster MVP. Tasks 16.2 and 16.3 are marked `*` because they must not be implemented without approval.
@@ -1161,7 +1202,11 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     { "id": 62, "tasks": ["28.3"] },
     { "id": 63, "tasks": ["29.1"] },
     { "id": 64, "tasks": ["29.2"] },
-    { "id": 65, "tasks": ["29.3"] }
+    { "id": 65, "tasks": ["29.3"] },
+    { "id": 66, "tasks": ["30.1"] },
+    { "id": 67, "tasks": ["30.2"] },
+    { "id": 68, "tasks": ["30.3"] },
+    { "id": 69, "tasks": ["30.4"] }
   ]
 }
 ```

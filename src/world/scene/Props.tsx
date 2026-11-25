@@ -43,7 +43,11 @@ export function Desk({ box, height }: { box: Aabb; height: number }) {
   return <PartMeshes parts={parts} />
 }
 
-/** A flat glow plane that always faces the camera (a sprite built from the shared unit plane and shared materials). */
+/**
+ * A round glow disc that always faces the camera (task 30.1): the shared 24-segment unit disc with the shared halo material.
+ * Copying the camera quaternion keeps the disc parallel to the screen, so it never reads as a tilted shape; the lampGlow texture is alpha 0
+ * from 90 % of its radius outward, so the rim of the disc is invisible. Only the banker lamp has a sprite (the table lamp has none).
+ */
 function GlowSprite({ part }: { part: Part }) {
   const ref = useRef<Mesh>(null)
   useFrame(({ camera }) => {

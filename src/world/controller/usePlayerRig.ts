@@ -4,6 +4,7 @@
 // Mouse and keyboard look (I/J/K/L) both apply in any lock state; frozen while inspecting.
 import { useCallback, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { useReducedMotion } from './useReducedMotion';
 import { relocateToValid } from '../logic/collision';
 import { EYE_HEIGHT, PLAYER_RADIUS } from '../logic/constants';
 import type { HeldKeys } from '../logic/inputState';
@@ -19,6 +20,8 @@ import type { MouseDelta } from './usePointerLock';
 export interface UsePlayerRigOptions {
   heldKeysRef: { current: HeldKeys };
   consumeMouseDelta: () => MouseDelta;
+  /** Optional counter bumped when input is cleared (blur, CLEAR_INPUT). A change snaps velocity to 0 and the look to its target. */
+  clearEpochRef?: { current: number };
   getMode: () => InputMode;
   /** Called only when the interaction target changes. */
   onTargetChange?: (target: InteractionTarget | null) => void;
@@ -52,32 +55,49 @@ export function usePlayerRig(options: UsePlayerRigOptions): PlayerRig {
   if (posRef.current === null) {
     posRef.current = relocateToValid(ROOM.start, PLAYER_RADIUS, COLLIDERS, ROOM.bounds, ROOM.start);
   }
+  // lookRef is the RENDERED look (camera, movement direction, targeting). targetLookRef takes the raw input.
   const lookRef = useRef<Look>({ yaw: ROOM.startYaw, pitch: 0 });
+  const targetLookRef = useRef<Look>({ yaw: ROOM.startYaw, pitch: 0 });
+  const velocityRef = useRef<Vec2>({ x: 0, z: 0 });
+  const reducedMotion = useReducedMotion();
+  const reducedRef = useRef(reducedMotion);
+  const seenEpochRef = useRef(0);
+  reducedRef.current = reducedMotion;
   const targetRef = useRef<InteractionTarget | null>(null);
 
   const getTarget = useCallback((): InteractionTarget | null => targetRef.current, []);
 
   useFrame((state, delta) => {
-    const { heldKeysRef, consumeMouseDelta, getMode, onTargetChange, memoryShifted, getCardAnchor, onCardAutoClose } = optionsRef.current;
+    const { heldKeysRef, consumeMouseDelta, clearEpochRef, getMode, onTargetChange, memoryShifted, getCardAnchor, onCardAutoClose } = optionsRef.current;
     const camera = state.camera;
     let pos = posRef.current as Vec2;
 
     const mode = getMode();
-    if (mode !== 'inspecting') {
-      const step = stepPlayer({
-        pos,
-        look: lookRef.current,
-        keys: heldKeysRef.current,
-        mouseDelta: consumeMouseDelta(),
-        dt: delta,
-        mode,
-        colliders: COLLIDERS,
-        bounds: ROOM.bounds,
-      });
-      pos = step.pos;
-      posRef.current = pos;
-      lookRef.current = step.look;
+    const epoch = clearEpochRef?.current ?? 0;
+    const snap = epoch !== seenEpochRef.current;
+    seenEpochRef.current = epoch;
+    // In 'inspecting' stepPlayer freezes: zero velocity, rendered look snaps to the target, mouse delta is not consumed.
+    const step = stepPlayer({
+      pos,
+      look: lookRef.current,
+      targetLook: targetLookRef.current,
+      velocity: velocityRef.current,
+      reducedMotion: reducedRef.current,
+      snap,
+      keys: heldKeysRef.current,
+      mouseDelta: mode === 'inspecting' ? { x: 0, y: 0 } : consumeMouseDelta(),
+      dt: delta,
+      mode,
+      colliders: COLLIDERS,
+      bounds: ROOM.bounds,
+    });
+    pos = step.pos;
+    posRef.current = pos;
+    lookRef.current = step.look;
+    targetLookRef.current = step.targetLook;
+    velocityRef.current = step.velocity;
 
+    if (mode !== 'inspecting') {
       const target = selectInteractionTargetAll(pos, lookRef.current.yaw, STATION_DEFS, INTERACTABLE_DEFS, COLLIDERS, undefined, memoryShifted === true);
       if (!sameTarget(target, targetRef.current)) {
         targetRef.current = target;
