@@ -19,6 +19,11 @@ import {
   MARQUEE_PALETTES,
   MARQUEE_TEXTS,
   MARQUEE_TEXT_MARGIN,
+  FABRIC_METRES_PER_REPEAT,
+  FABRIC_SEAM_INSET,
+  FABRIC_WALES,
+  CRT_BADGE_TEXT,
+  CRT_LED_COLOR,
   marqueeFontSize,
   marqueeTextWidth,
   type TextureId,
@@ -404,5 +409,115 @@ describe('texture memory estimate', () => {
         `, total ${(total / 1048576).toFixed(2)} MB (estimate, budget 8 MB)`,
     )
     expect(total).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
+  })
+})
+
+describe('task 21.1: couchFabric upholstery texture', () => {
+  const spec = TEXTURE_SPECS.couchFabric
+  const calls = (op: string) => run('couchFabric').calls.filter((c) => c.op === op)
+
+  it('is a 256 x 256 mipmapped repeating texture with its own seed', () => {
+    expect([spec.width, spec.height]).toEqual([256, 256])
+    expect(spec.filter).toBe('mipmap')
+    expect(spec.wrap).toBe('repeat')
+    expect(TEXTURE_IDS.filter((id) => id !== 'couchFabric').every((id) => TEXTURE_SPECS[id].seed !== spec.seed)).toBe(true)
+  })
+
+  it('draws the same calls for the same seed and different calls for another seed', () => {
+    expect(run('couchFabric').hash()).toBe(run('couchFabric').hash())
+    expect(run('couchFabric', spec.seed + 1).hash()).not.toBe(run('couchFabric').hash())
+  })
+
+  it('draws one vertical rib set: many full-height thin rectangles, about one wale per centimetre', () => {
+    const ribs = calls('fillRect').filter((c) => (c.args[3] as number) === 256 && (c.args[2] as number) <= 8)
+    expect(ribs.length).toBeGreaterThanOrEqual(FABRIC_WALES * 2)
+    expect(FABRIC_METRES_PER_REPEAT / FABRIC_WALES).toBeCloseTo(0.01, 6)
+  })
+
+  it('draws dashed stitched seams near all four tile edges', () => {
+    const dashes = calls('lineTo').map((c) => c.args as number[])
+    const moves = calls('moveTo').map((c) => c.args as number[])
+    expect(dashes.length).toBeGreaterThanOrEqual(60)
+    const near = (v: number, edge: number) => Math.abs(v - edge) <= FABRIC_SEAM_INSET + 1
+    const onEdge = (p: number[]) => near(p[0], 0) || near(p[0], 256) || near(p[1], 0) || near(p[1], 256)
+    expect(moves.filter(onEdge).length).toBe(moves.length)
+    expect(moves.some((p) => near(p[1], 0))).toBe(true)
+    expect(moves.some((p) => near(p[1], 256))).toBe(true)
+    expect(moves.some((p) => near(p[0], 0))).toBe(true)
+    expect(moves.some((p) => near(p[0], 256))).toBe(true)
+    // Dashes are short and have gaps: every dash is 8 px long.
+    for (let i = 0; i < dashes.length; i++) expect(Math.hypot(dashes[i][0] - moves[i][0], dashes[i][1] - moves[i][1])).toBeCloseTo(8, 6)
+  })
+
+  it('is near neutral and mid-high key: only light grey-red fills, no text, no brand names', () => {
+    const ctx = run('couchFabric')
+    expect(ctx.texts()).toEqual([])
+    const base = ctx.calls.find((c) => c.op === 'set fillStyle')!.args[0] as string
+    const ch = [1, 3, 5].map((i) => parseInt(base.slice(i, i + 2), 16))
+    expect(Math.min(...ch)).toBeGreaterThanOrEqual(0xb0)
+    expect(Math.max(...ch) - Math.min(...ch)).toBeLessThanOrEqual(0x10)
+    expect(ctx.log.join(' ').toLowerCase()).not.toMatch(/sony|panasonic|jvc|nintendo|sega|atari|vhs/)
+  })
+})
+
+describe('task 21.2: crtCasing and crtGlass textures', () => {
+  const brands = /sony|panasonic|jvc|toshiba|samsung|sharp|zenith|rca|nintendo|sega|atari|vhs/i
+  const rects = (id: TextureId) => run(id).calls.filter((c) => c.op === 'fillRect').map((c) => c.args as number[])
+
+  it('are 256 x 256 with the intended filters, wraps and unique seeds', () => {
+    expect(TEXTURE_SPECS.crtCasing).toMatchObject({ width: 256, height: 256, filter: 'mipmap', wrap: 'clamp' })
+    expect(TEXTURE_SPECS.crtGlass).toMatchObject({ width: 256, height: 256, filter: 'nearest', wrap: 'clamp' })
+    for (const id of ['crtCasing', 'crtGlass'] as const) {
+      expect(TEXTURE_IDS).toContain(id)
+      expect(TEXTURE_IDS.filter((o) => o !== id).every((o) => TEXTURE_SPECS[o].seed !== TEXTURE_SPECS[id].seed)).toBe(true)
+    }
+    expect(textureMemoryBytes(TEXTURE_SPECS.crtGlass)).toBeLessThanOrEqual(0.25 * 1048576)
+  })
+
+  it.each(['crtCasing', 'crtGlass'] as const)('%s is deterministic per seed and uses no brand names', (id) => {
+    expect(run(id).hash()).toBe(run(id).hash())
+    expect(run(id, TEXTURE_SPECS[id].seed + 1).hash()).not.toBe(run(id).hash())
+    for (const s of run(id).texts()) expect(s).not.toMatch(brands)
+  })
+
+  it('crtCasing prints the generic badge, dial labels and a red power LED dot', () => {
+    const ctx = run('crtCasing')
+    expect(CRT_BADGE_TEXT).toBe('KV-1996')
+    expect(ctx.texts()).toContain('KV-1996')
+    expect(ctx.texts()).toEqual(expect.arrayContaining(['CH', 'VOL']))
+    const fills = ctx.calls.filter((c) => c.op === 'set fillStyle').map((c) => String(c.args[0]))
+    expect(fills).toContain(CRT_LED_COLOR)
+    expect(ctx.calls.some((c) => c.op === 'arc' && (c.args[2] as number) <= 3)).toBe(true)
+  })
+
+  it('crtCasing draws many small louver slots, fine grain, 12 dial ticks per knob and recessed seam lines', () => {
+    const r = rects('crtCasing')
+    const vertical = r.filter((a) => a[2] === 4 && a[3] === 12)
+    const horizontal = r.filter((a) => a[2] === 12 && a[3] === 4)
+    expect(vertical.length + horizontal.length).toBeGreaterThanOrEqual(60)
+    expect(r.filter((a) => a[2] === 1 && a[3] === 1).length).toBeGreaterThanOrEqual(1000)
+    const ctx = run('crtCasing')
+    expect(ctx.calls.filter((c) => c.op === 'moveTo').length).toBeGreaterThanOrEqual(24 + 4)
+  })
+
+  it('crtCasing is near neutral (grey base) so the material colour sets charcoal', () => {
+    const base = run('crtCasing').calls.find((c) => c.op === 'set fillStyle')!.args[0] as string
+    const ch = [1, 3, 5].map((i) => parseInt(base.slice(i, i + 2), 16))
+    expect(Math.max(...ch) - Math.min(...ch)).toBeLessThanOrEqual(0x10)
+  })
+
+  it('crtGlass draws full-width scanlines, a vignette gradient, darkened corners and the NO SIGNAL card', () => {
+    const ctx = run('crtGlass')
+    const r = rects('crtGlass')
+    expect(r.filter((a) => a[0] === 0 && a[2] === 256 && a[3] === 1).length).toBeGreaterThanOrEqual(100)
+    expect(ctx.calls.filter((c) => c.op === 'createLinearGradient').length).toBeGreaterThanOrEqual(5)
+    for (const [x, y] of [[0, 0], [238, 0], [0, 238], [238, 238]]) expect(r.some((a) => a[0] === x && a[1] === y && a[2] === 18)).toBe(true)
+    expect(ctx.texts()).toEqual(expect.arrayContaining(['NO SIGNAL', 'CH 03']))
+  })
+
+  it('crtGlass keeps phosphor stripes and grain specks', () => {
+    const r = rects('crtGlass')
+    expect(r.filter((a) => a[2] === 1 && a[3] === 256).length).toBeGreaterThanOrEqual(100)
+    expect(r.filter((a) => a[2] === 1 && a[3] === 1).length).toBeGreaterThanOrEqual(400)
   })
 })

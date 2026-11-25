@@ -5,7 +5,11 @@ import {
   BASE_ARCADE_SCREEN_COLOR,
   BASE_CRT_SCREEN_COLOR,
   BASE_WALL_COLOR,
+  COUCH_FABRIC_COLORS,
   applyShift,
+  couchBaseColor,
+  couchShiftColor,
+  crtScreenBaseColor,
   arcadeScreenBaseColor,
   mixHex,
   overlayOpacity,
@@ -36,6 +40,11 @@ function makeTargets() {
       { material: { color: new FakeColor() }, baseColor: ARCADE_SCREEN_BASE_COLORS.frequency },
     ],
     overlays: [{ material: { opacity: 0, visible: false }, maxOpacity: 0.9 }],
+    couch: [
+      { material: { color: new FakeColor() }, baseColor: COUCH_FABRIC_COLORS.couchBody.flat },
+      { material: { color: new FakeColor() }, baseColor: COUCH_FABRIC_COLORS.couchCushion.flat },
+      { material: { color: new FakeColor() }, baseColor: COUCH_FABRIC_COLORS.couchPillow.flat },
+    ],
   }
   return targets satisfies ShiftTargets
 }
@@ -132,6 +141,29 @@ describe('applyShift', () => {
     for (const i of [1, 2, 3]) expect(t.screens[i].material.color.hex).toBe('#ffffff')
   })
 
+  it('CRT glass (task 21.2): white base while textured, exact flat base without a texture, tinted at t = 1', () => {
+    expect(crtScreenBaseColor(true)).toBe('#ffffff')
+    expect(crtScreenBaseColor(false)).toBe(BASE_CRT_SCREEN_COLOR)
+    // Textured.
+    const t = makeTargets()
+    t.screens[0].baseColor = crtScreenBaseColor(true)
+    applyShift(0, t)
+    expect(t.screens[0].material.color.hex).toBe('#ffffff')
+    applyShift(1, t)
+    expect(t.screens[0].material.color.hex).toBe(PALETTE_SHIFTED.screenEmissive)
+    applyShift(0.5, t)
+    expect(t.screens[0].material.color.hex).toBe(mixHex('#ffffff', PALETTE_SHIFTED.screenEmissive, 0.5))
+    applyShift(0, t)
+    expect(t.screens[0].material.color.hex).toBe('#ffffff')
+    // Flat fallback.
+    const f = makeTargets()
+    f.screens[0].baseColor = crtScreenBaseColor(false)
+    applyShift(0, f)
+    expect(f.screens[0].material.color.hex).toBe(BASE_CRT_SCREEN_COLOR)
+    applyShift(1, f)
+    expect(f.screens[0].material.color.hex).toBe(PALETTE_SHIFTED.screenEmissive)
+  })
+
   it('textured wall: near-white multiplier at t = 0, the shifted wall tint is reached at t = 1 through the baked albedo', () => {
     const channels = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
     for (const ch of channels(BASE_WALL_COLOR)) expect(ch).toBeGreaterThanOrEqual(0xe0)
@@ -148,6 +180,40 @@ describe('applyShift', () => {
     })
     applyShift(0.5, t)
     expect(t.wall.color.hex).not.toBe(BASE_WALL_COLOR)
+  })
+
+  it('couch upholstery: exact authored colour at t = 0, a darker duller tone at t = 1, a mix at t = 0.5 (flat and textured bases)', () => {
+    const lum = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).reduce((a, b) => a + b, 0)
+    const keys = ['couchBody', 'couchCushion', 'couchPillow'] as const
+    for (const textured of [false, true]) {
+      const t = makeTargets()
+      t.couch.forEach((s, i) => (s.baseColor = couchBaseColor(keys[i], textured)))
+      applyShift(1, t)
+      applyShift(0, t)
+      t.couch.forEach((s, i) => expect(s.material.color.hex).toBe(couchBaseColor(keys[i], textured)))
+      applyShift(1, t)
+      t.couch.forEach((s) => {
+        expect(s.material.color.hex).toBe(couchShiftColor(s.baseColor))
+        expect(s.material.color.hex).not.toBe(s.baseColor)
+        expect(lum(s.material.color.hex)).toBeLessThan(lum(s.baseColor))
+      })
+      applyShift(0.5, t)
+      t.couch.forEach((s) => {
+        const mid = s.material.color.hex
+        expect(mid).toBe(mixHex(s.baseColor, couchShiftColor(s.baseColor), 0.5))
+        expect(lum(mid)).toBeLessThan(lum(s.baseColor))
+        expect(lum(mid)).toBeGreaterThan(lum(couchShiftColor(s.baseColor)))
+      })
+      applyShift(0, t)
+      t.couch.forEach((s, i) => expect(s.material.color.hex).toBe(couchBaseColor(keys[i], textured)))
+    }
+  })
+
+  it('targets without couch entries still shift everything else', () => {
+    const t = makeTargets() as ShiftTargets
+    delete t.couch
+    applyShift(1, t)
+    expect(t.wall.color).toBeDefined()
   })
 
   it('clamps invalid t', () => {

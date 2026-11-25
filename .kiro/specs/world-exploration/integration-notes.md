@@ -27,9 +27,9 @@ Final `WorldSceneProps`: `onInspect(station: StationId)`, `memoryShifted: boolea
 | App passes the prop, dialogs, Escape, focus return, status messages | verified by automated test with a stubbed `WorldScene`: `src/App.test.ts` (8 tests) |
 | M1 to M5 in a browser | verified manually by the project owner per the owner's report; no recorded log (every row of `manual-test-log.md` is `not run`) |
 | End-to-end sequences (a) and (b) below in a real browser, HUD layout on small or short viewports | not verified (no recorded result) |
-| M6, the polish pass (tasks 18.1 to 18.3) and the refinement pass (tasks 19.1 to 19.2: re-centred media console, new lighting, SMPTE monitor, timecode, cables) and the three-cabinet arcade pass (tasks 20.1 and 20.2) in a browser | not verified visually (no browser run recorded). Layout data and budgets are verified by `src/world/layout/roomLayout.test.ts` (31 tests) and `src/world/scene/modelDetail.test.ts` (91 tests) |
+| M6, the polish pass (tasks 18.1 to 18.3) and the refinement pass (tasks 19.1 to 19.2: re-centred media console, new lighting, SMPTE monitor, timecode, cables) and the three-cabinet arcade pass (tasks 20.1 and 20.2) and the task 21 couch fix, couch fabric, CRT casing and CRT glass textures in a browser | not verified visually (no browser run recorded). Layout data and budgets are verified by `src/world/layout/roomLayout.test.ts` (31 tests) and `src/world/scene/modelDetail.test.ts` (104 tests) |
 
-Fresh `npm test` at the time of task 20.3: 27 files, 484 tests, all passed (run twice, same result). `npm run typecheck` and `npm run build` exited 0.
+Fresh `npm test` at the time of task 21.3: 27 files, 519 tests, all passed (run twice, same result). `npm run typecheck` and `npm run build` exited 0.
 
 ## Arcade area (M6, three cabinets from tasks 20.1 and 20.2)
 
@@ -61,15 +61,20 @@ Open item: the spawn (0, 3) is exactly 1.0 m from the desk edge (z 2.0) and from
 
 ## Computed metrics
 
-Computed from declared geometry and source, computed, not runtime-measured. Source: `performance-log.md`, re-checked in task 20.3 with `npx vitest run src/world/scene/modelDetail.test.ts` (91 tests passed).
+Computed from declared geometry and source, computed, not runtime-measured. Source: `performance-log.md`, re-checked in task 21.3 with `npx vitest run src/world/scene/modelDetail.test.ts` (104 tests passed).
 
-- Triangles: 19,152 (detail 18,910 + base 242), limit 20,000. The margin is thin: about 850 triangles (4 percent). The biggest consumers are the three bookshelves (2,352 + 2,280 + 2,088) and the three cabinets (1,316 each).
-- Draw-call grouping estimate: 283 (not `renderer.info`).
+- Triangles: 19,128 (detail 18,886 + base 242), limit 20,000. The margin is thin: about 870 triangles (4 percent). The biggest consumers are the three bookshelves (2,352 + 2,280 + 2,088) and the three cabinets (1,316 each).
+- Draw-call grouping estimate: about 286 (not `renderer.info`).
 - Lights: 4 (1 ambient + 3 point: `crt-light`, `west-light`, `arcade-light`), limit 4.
-- Procedural textures: 23, 6.668 MB estimate, limit 8 MB (margin about 1.33 MB). The largest is `corkBoard` (512x512, 1.33 MB). Per-texture list: `performance-log.md` section 2.1.
-- Colliders: 28.
-- Targeting benchmark: informational timing only, varies per run (0.569 us/call standalone, 1.592 us/call in the full-suite run of task 20.3).
-Runtime frame-time targets are not measured. See `performance-log.md`. No performance claim is made.
+- Procedural textures: 26, 7.58 MB estimate, limit 8 MB. The margin is also thin: about 0.42 MB. New in task 21: `couchFabric` 0.33, `crtCasing` 0.33, `crtGlass` 0.25 MB. The largest is `corkBoard` (512x512, 1.33 MB). First candidates to cut if room is needed: `console-cables` (1,088 triangles), the book count, and `corkBoard` at 256x256. Per-texture list: `performance-log.md` section 2.1.
+- Colliders: 28 (the task 21 couch change adds none).
+- Targeting benchmark: informational timing only, varies per run (0.451 us/call standalone, 1.346 us/call in the full-suite run of task 21.3).
+All figures above are computed, not runtime-measured. Runtime frame-time targets are not measured; task 15.4 stays open. See `performance-log.md`. No performance claim is made.
+
+## Couch and CRT surface changes (tasks 21.1 and 21.2)
+- Couch: the dark patch came from a dark "worn patch" box 4 mm above the middle cushion. It is removed, with a second hidden patch. Roll caps are 4 mm shorter to avoid coplanar faces. The pillow is in the left seat corner, checked by an oriented-box no-intersection test. The couch has 388 triangles (was 412). It uses the new `couchFabric` texture and the `couchBody`, `couchCushion` and `couchPillow` materials with metric fabric UVs, tinted by `memoryShift`.
+- CRT: new `crtCasing` texture (generic "KV-1996" badge, metric UV, one tile across the front shell) and `crtGlass` on the shared `crtScreen` material (white base when textured, teal flat fallback). The casing fallback is charcoal. Geometry is unchanged (302 triangles).
+- No change to `StationId`, `onInspect`, colliders or station anchors, so `App.tsx` needs no change. Task 21 is **not verified visually**.
 
 ## Known gaps
 

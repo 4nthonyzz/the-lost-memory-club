@@ -22,7 +22,7 @@ import {
   SphereGeometry,
 } from 'three'
 import { ROOM } from '../layout/roomLayout'
-import { ARCADE_SCREEN_BASE_COLORS, BASE_CRT_SCREEN_COLOR, BASE_WALL_COLOR, arcadeScreenBaseColor } from './memoryShift'
+import { ARCADE_SCREEN_BASE_COLORS, BASE_CRT_SCREEN_COLOR, BASE_WALL_COLOR, COUCH_FABRIC_COLORS, CRT_CASING_COLORS, arcadeScreenBaseColor, crtScreenBaseColor } from './memoryShift'
 import {
   FLOOR_METRES_PER_REPEAT,
   SPINE_CASE_SIDE_CELL,
@@ -116,7 +116,12 @@ export const materials = {
   fabric: lambert('#3d5a4c'),
   fabricLight: lambert('#4f7561'),
   rugLight: lambert('#8c3446'),
-  rugWorn: lambert('#55202e'),
+  /** 21.1 couch upholstery. Flat colours are the no-canvas fallback; with the couchFabric texture the multiplier is the textured hue. Tinted by Memory_Shift. */
+  couchBody: lambert(COUCH_FABRIC_COLORS.couchBody.flat),
+  couchCushion: lambert(COUCH_FABRIC_COLORS.couchCushion.flat),
+  couchPillow: lambert(COUCH_FABRIC_COLORS.couchPillow.flat),
+  /** 21.2 CRT television housing (dedicated: `casing` is shared with other objects). Flat charcoal is the no-canvas fallback. */
+  crtCasing: lambert(CRT_CASING_COLORS.flat),
   crateSlat: lambert('#6e5230'),
   spineA: lambert('#a02a2a'),
   spineB: lambert('#2a4aa0'),
@@ -246,11 +251,17 @@ const woodBoxCache = new Map<string, BoxGeometry>()
 
 const round4 = (v: number) => Math.round(v * 1e4) / 1e4
 
-export function woodBoxGeometry(w: number, h: number, d: number): BoxGeometry {
+/**
+ * Real-size box with metric UVs (task 21.1 generalises the wood board geometry): the texture repeats once per
+ * `metresPerRepeat` metres on every face. With `alignGrain` u follows the longer in-plane edge (wood grain);
+ * otherwise u is the first in-plane axis and v the second, which keeps vertical ribs vertical on the sides
+ * (+-x faces: u = z, v = y; +-z faces: u = x, v = y; +-y faces: u = x, v = z). One cache, one disposal.
+ */
+export function metricBoxGeometry(w: number, h: number, d: number, metresPerRepeat: number, alignGrain = false): BoxGeometry {
   const sx = round4(w)
   const sy = round4(h)
   const sz = round4(d)
-  const key = `${sx},${sy},${sz}`
+  const key = `${alignGrain ? 'grain' : 'plain'}|${metresPerRepeat}|${sx},${sy},${sz}`
   const cached = woodBoxCache.get(key)
   if (cached) return cached
   const g = new BoxGeometry(sx, sy, sz)
@@ -263,16 +274,21 @@ export function woodBoxGeometry(w: number, h: number, d: number): BoxGeometry {
     const [a, b] = axes[Math.floor(i / 4)]
     const pa = [pos.getX(i), pos.getY(i), pos.getZ(i)][a] + size[a] / 2
     const pb = [pos.getX(i), pos.getY(i), pos.getZ(i)][b] + size[b] / 2
-    if (size[b] > size[a]) uv.setXY(i, pb / WOOD_METRES_PER_REPEAT, pa / WOOD_METRES_PER_REPEAT)
-    else uv.setXY(i, pa / WOOD_METRES_PER_REPEAT, pb / WOOD_METRES_PER_REPEAT)
+    if (alignGrain && size[b] > size[a]) uv.setXY(i, pb / metresPerRepeat, pa / metresPerRepeat)
+    else uv.setXY(i, pa / metresPerRepeat, pb / metresPerRepeat)
   }
   uv.needsUpdate = true
   woodBoxCache.set(key, g)
   return g
 }
 
+export const woodBoxGeometry = (w: number, h: number, d: number): BoxGeometry => metricBoxGeometry(w, h, d, WOOD_METRES_PER_REPEAT, true)
+
 /** Number of live cached wood geometries (tests and reports). */
-export const woodBoxCount = (): number => woodBoxCache.size
+export const woodBoxCount = (): number => [...woodBoxCache.keys()].filter((k) => k.startsWith('grain|')).length
+
+/** Number of live cached upholstery (non-grain) metric geometries. */
+export const fabricBoxCount = (): number => [...woodBoxCache.keys()].filter((k) => k.startsWith('plain|')).length
 
 // ---------------------------------------------------------------------------------------------
 // Procedural canvas textures (task 15.7, 18.3, 19.2). Deterministic, drawn once, never redrawn per frame.
@@ -397,6 +413,12 @@ const TEXTURE_BINDINGS: readonly TextureBinding[] = [
   { material: 'bookSpine', texture: 'spineAtlas', color: '#ffffff' },
   /** The wall colour stays a near-white multiplier owned by Memory_Shift, so no `color` here. */
   { material: 'wall', texture: 'wallPanel' },
+  { material: 'couchBody', texture: 'couchFabric', color: COUCH_FABRIC_COLORS.couchBody.textured, fallbackColor: COUCH_FABRIC_COLORS.couchBody.flat },
+  { material: 'couchCushion', texture: 'couchFabric', color: COUCH_FABRIC_COLORS.couchCushion.textured, fallbackColor: COUCH_FABRIC_COLORS.couchCushion.flat },
+  { material: 'couchPillow', texture: 'couchFabric', color: COUCH_FABRIC_COLORS.couchPillow.textured, fallbackColor: COUCH_FABRIC_COLORS.couchPillow.flat },
+  { material: 'crtCasing', texture: 'crtCasing', color: CRT_CASING_COLORS.textured, fallbackColor: CRT_CASING_COLORS.flat },
+  /** The glass texture carries the look, so the multiplier is white; Memory_Shift tints it from there. */
+  { material: 'crtScreen', texture: 'crtGlass', color: crtScreenBaseColor(true), fallbackColor: crtScreenBaseColor(false) },
   { material: 'rugWoven', texture: 'rugWoven', color: '#ffffff' },
   { material: 'cork', texture: 'corkBoard', color: '#ffffff' },
   { material: 'lampHalo', texture: 'lampGlow', color: '#ffffff' },

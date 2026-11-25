@@ -53,6 +53,51 @@ export function arcadeScreenBaseColor(game: ArcadeScreenGame, textured: boolean)
   return textured ? BASE_ARCADE_SCREEN_COLOR : ARCADE_SCREEN_BASE_COLORS[game]
 }
 
+/**
+ * Couch upholstery colours (task 21.1). `flat` is the authored colour without a canvas (the no-texture
+ * fallback). `textured` is the multiplier used with the near-neutral couchFabric texture (mean albedo about
+ * 0.8), lifted so the lit result reads like the flat colour.
+ */
+export const COUCH_FABRIC_COLORS = Object.freeze({
+  couchBody: { flat: '#7a2c3c', textured: '#98374b' },
+  couchCushion: { flat: '#8c3446', textured: '#af4158' },
+  couchPillow: { flat: '#26b5c9', textured: '#30e2fb' },
+})
+
+export type CouchMaterialKey = keyof typeof COUCH_FABRIC_COLORS
+
+/** Colour the shift restores at t = 0 for a couch material. */
+export function couchBaseColor(key: CouchMaterialKey, textured: boolean): string {
+  return textured ? COUCH_FABRIC_COLORS[key].textured : COUCH_FABRIC_COLORS[key].flat
+}
+
+/**
+ * Colour a couch material reaches at t = 1: the authored colour darkened, desaturated, then nudged toward
+ * the shifted accent, so the red couch turns a dull bruised rose and the cyan pillow a dull grey-pink.
+ */
+export function couchShiftColor(base: string): string {
+  const c = parse(base)
+  const grey = (c[0] + c[1] + c[2]) / 3
+  const dull = c.map((v) => Math.round((v + (grey - v) * 0.45) * 0.55))
+  const hex = `#${dull.map((v) => v.toString(16).padStart(2, '0')).join('')}`
+  return mixHex(hex, PALETTE_SHIFTED.accent, 0.18)
+}
+
+/**
+ * Colour the CRT glass shift restores at t = 0 (task 21.2): white when the crtGlass texture is attached
+ * (the texture carries the look), the flat teal BASE_CRT_SCREEN_COLOR otherwise.
+ */
+export function crtScreenBaseColor(textured: boolean): string {
+  return textured ? BASE_ARCADE_SCREEN_COLOR : BASE_CRT_SCREEN_COLOR
+}
+
+/**
+ * CRT television housing colours (task 21.2). `flat` is the no-canvas fallback (charcoal, replacing the old
+ * light casing look in fallback mode). `textured` multiplies the near-neutral crtCasing texture (mean
+ * albedo about 0.7) to charcoal / warm slate.
+ */
+export const CRT_CASING_COLORS = Object.freeze({ flat: '#3a393f', textured: '#4d4b55' })
+
 /** Share of the shifted light color mixed into each point light at t = 1. */
 export const POINT_LIGHT_TINT = 0.6
 /** Point light intensity multiplier at t = 1. */
@@ -74,6 +119,8 @@ export interface ShiftTargets {
   wall: { color: ColorLike }
   screens: Array<{ material: { color: ColorLike }; baseColor: string }>
   overlays: Array<{ material: { opacity: number; visible: boolean }; maxOpacity: number }>
+  /** Couch upholstery (task 21.1): t = 0 is exactly `baseColor`, t = 1 is `couchShiftColor(baseColor)`. */
+  couch?: Array<{ material: { color: ColorLike }; baseColor: string }>
 }
 
 function clamp01(v: number): number {
@@ -131,6 +178,9 @@ export function applyShift(t: number, targets: ShiftTargets): void {
   targets.wall.color.set(mixHex(BASE_WALL_COLOR, wallShiftColor(), k))
   for (const s of targets.screens) {
     s.material.color.set(mixHex(s.baseColor, PALETTE_SHIFTED.screenEmissive, k))
+  }
+  for (const s of targets.couch ?? []) {
+    s.material.color.set(mixHex(s.baseColor, couchShiftColor(s.baseColor), k))
   }
   for (const o of targets.overlays) {
     o.material.opacity = overlayOpacity(k, o.maxOpacity)

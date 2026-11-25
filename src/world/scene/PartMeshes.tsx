@@ -5,12 +5,20 @@
  */
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { Color, Object3D, type InstancedMesh } from 'three'
-import { instanceColour, partGroupKey, type BookInstance, type Part } from './modelDetail'
-import { ensureSharedTextures, geometries, materials, spineGeometries, woodBoxGeometry } from './sharedResources'
+import { instanceColour, isRealSizePart, partGroupKey, type BookInstance, type Part } from './modelDetail'
+import { FABRIC_METRES_PER_REPEAT } from './proceduralTextures'
+import { ensureSharedTextures, geometries, materials, metricBoxGeometry, spineGeometries, woodBoxGeometry } from './sharedResources'
 
 /** Metric wood boards use a cached real-size geometry and unit mesh scale; every other part scales the unit geometry. */
-const geometryOf = (p: Part) => (p.metric ? woodBoxGeometry(p.scale[0], p.scale[1], p.scale[2]) : geometries[p.geo])
-const scaleOf = (p: Part): [number, number, number] => (p.metric ? [1, 1, 1] : [p.scale[0], p.scale[1], p.scale[2]])
+const geometryOf = (p: Part) =>
+  p.metric
+    ? woodBoxGeometry(p.scale[0], p.scale[1], p.scale[2])
+    : p.metricFabric
+      ? metricBoxGeometry(p.scale[0], p.scale[1], p.scale[2], FABRIC_METRES_PER_REPEAT)
+      : p.metricRepeat
+        ? metricBoxGeometry(p.scale[0], p.scale[1], p.scale[2], p.metricRepeat)
+        : geometries[p.geo]
+const scaleOf = (p: Part): [number, number, number] => (isRealSizePart(p) ? [1, 1, 1] : [p.scale[0], p.scale[1], p.scale[2]])
 
 function InstancedGroup({ items }: { items: readonly Part[] }) {
   const ref = useRef<InstancedMesh>(null)

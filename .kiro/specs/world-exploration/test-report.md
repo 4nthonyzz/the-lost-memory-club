@@ -1,6 +1,6 @@
 # World Exploration: Test Report
 
-Task 15.1, counts refreshed by task 20.3. Requirements 13.2, 13.10, 13.11, 13.14, 15.6. Related: `design.md` (Correctness Properties), `manual-test-log.md`, `tasks.md`.
+Task 15.1, counts refreshed by task 21.3. Requirements 13.2, 13.10, 13.11, 13.14, 15.6. Related: `design.md` (Correctness Properties), `manual-test-log.md`, `tasks.md`.
 
 ## Result of the audit run
 
@@ -8,10 +8,10 @@ Command: `npm test` (Vitest, `vite.config.ts`: `environment: 'node'`, `include: 
 
 ```
 Test Files  27 passed (27)
-     Tests  484 passed (484)
+     Tests  519 passed (519)
 ```
 
-Task 20.3 ran `npm test` twice. Both runs passed 27 files and 484 tests (exit 0), so no flakiness was seen. The first run reported `Duration  7.67s`, the second `Duration  9.84s`. `npm run typecheck` and `npm run build` exited 0. The suite still has 27 files. Compared with the 456-test count of task 19.3, 28 tests were added to existing files by tasks 20.1 and 20.2 (roomLayout +4, modelDetail +6, proceduralTextures +15, assetManifest +2, memoryShift +1).
+Task 21.3 ran `npm test` twice. Both runs passed 27 files and 519 tests (exit 0), so no flakiness was seen. The first run reported `Duration  5.81s`, the second `Duration  5.86s`. `npm run typecheck` and `npm run build` exited 0. The suite still has 27 files. Compared with the 484-test count of task 20.3, 35 tests were added to existing files by tasks 21.1 and 21.2 (modelDetail +13, proceduralTextures +19, memoryShift +3). All of them check computed data, none is visual.
 
 These numbers describe the repository at the time of the audit. They change when tests are added or removed.
 
@@ -52,10 +52,10 @@ These numbers describe the repository at the time of the audit. They change when
 | `src/world/logic/targeting.bench.test.ts` | 1 (informational timing, asserts no speed) |
 | `src/world/scene/assetIntegration.test.ts` | 6 |
 | `src/world/scene/effectsTiming.test.ts` | 8 |
-| `src/world/scene/memoryShift.test.ts` | 10 |
-| `src/world/scene/modelDetail.test.ts` | 91 |
-| `src/world/scene/proceduralTextures.test.ts` | 92 |
-| **Total** | **484 in 27 files** |
+| `src/world/scene/memoryShift.test.ts` | 13 |
+| `src/world/scene/modelDetail.test.ts` | 104 |
+| `src/world/scene/proceduralTextures.test.ts` | 111 |
+| **Total** | **519 in 27 files** |
 
 New test areas since the audit (polish pass, tasks 18.1 to 18.3), all computed from declared data, none visual: island media console and 1.2 m walkway clearance (`roomLayout.test.ts`), north-wall filing cabinets and bulletin board, book and shelf counts, triangle budget below 20,000, texture memory within 8 MB, at most 4 lights, disposal of all textures and wall geometries (`modelDetail.test.ts`), new procedural textures (`proceduralTextures.test.ts`), and memory-shift tint of the new materials (`memoryShift.test.ts`). Which exact tests were added by which task is not itemized here.
 
@@ -63,9 +63,10 @@ New test areas from the refinement pass (tasks 19.1 and 19.2), all computed from
 
 New test areas from the arcade pass (tasks 20.1 and 20.2), all computed from declared data, none visual:
 - `roomLayout.test.ts` (31 tests): three solid cabinets on the east wall with the approved footprints (SNAKE.EXE z -1.7..-0.7, LAST EXIT z -0.5..0.5, DEAD FREQUENCY z 0.7..1.7, x 8.4..9.2, anchors (8.4, -1.2), (8.4, 0), (8.4, 1.2), games `snake`, `maze`, `frequency`); moved dressing (`crt-stack` and the crates out of the Arcade_Area); reachability of a cell in front of every cabinet anchor through each door separately; a 1.2 m wide lane from each door to every cabinet anchor free of solid props; line of sight through the doorways to the cabinets; targeting each cabinet from a reachable cell; 28 colliders (9 walls, 4 door frames, 15 solid props).
-- `modelDetail.test.ts` (91 tests): 19,152 triangles below 20,000, texture memory within 8 MB, one screen plane and one marquee per cabinet in its own game materials, three distinct T-molding accents, `arcade-light` (7.4, 2.4, 0) distance 6 lighting all three anchors evenly, at most 4 lights, and the removed arcade materials and textures.
-- `proceduralTextures.test.ts` (92 tests): the six attract-screen and marquee textures, 23 textures at 6.668 MB, every texture disposed exactly once and safe to dispose twice.
-- `assetManifest.test.ts` (22 tests) and `memoryShift.test.ts` (10 tests) were extended for the new materials.
+- `modelDetail.test.ts` (104 tests): 19,128 triangles below 20,000, texture memory within 8 MB, one screen plane and one marquee per cabinet in its own game materials, three distinct T-molding accents, `arcade-light` (7.4, 2.4, 0) distance 6 lighting all three anchors evenly, at most 4 lights, and the removed arcade materials and textures.
+- `proceduralTextures.test.ts` (111 tests): the six attract-screen and marquee textures, 26 textures at 7.58 MB, every texture disposed exactly once and safe to dispose twice.
+- `assetManifest.test.ts` (22 tests) and `memoryShift.test.ts` (13 tests) were extended for the new materials.
+New test areas from the couch and CRT pass (tasks 21.1 and 21.2), all computed from declared data, none visual: couch pillow inside its footprint with an oriented-box no-intersection test, no collider added, couch triangles 388 (was 412), no "worn patch" parts left, roll caps shortened to avoid coplanar faces, `couchFabric` texture and `couchBody`/`couchCushion`/`couchPillow` materials with `memoryShift` tint (`modelDetail.test.ts`, `memoryShift.test.ts`); `crtCasing` and `crtGlass` textures, the `crtScreen` material (white base when textured, teal flat fallback), charcoal casing fallback, `crt-television` 302 triangles / 9 draw calls, total 19,128 triangles, 26 textures, 7.58 MB, 4 lights (`modelDetail.test.ts`, `proceduralTextures.test.ts`). Task 21 is **not verified visually**; task 15.4 stays open.
 The three cabinets all call `onInspect('arcade')`; the `arcadeGame` field is world data only. No test covers which game the App panel opens, because `App.tsx` and `src/arcade/` are unchanged and every cabinet opens the same panel. The three-cabinet scene is **not verified visually**.
 
 **Known gap (open item):** the spawn (0, 3) is exactly 1.0 m from the desk edge (z 2.0) and from the south wall (z 4). A 1.2 m disc around the spawn is therefore not clear; the test asserts 0.99 m, not 1.2 m. This was not requested in the final instructions and is not fixed.
@@ -111,7 +112,7 @@ These tests combine several modules or render components; none uses a real brows
 | World component (jsdom) | `src/world/WorldScene.test.ts`, `src/world/WorldScene.inputEnabled.test.ts` | Prompts, listeners, pointer-lock request after click, key filtering, no-WebGL fallback, supplied `inputEnabled` prop. |
 | Boundary between modules | `src/world/boundary.test.ts` | 10 tests. |
 | Assets | `src/world/assets/assetManifest.test.ts`, `src/world/assets/assets.test.ts`, `src/world/scene/assetIntegration.test.ts` | Manifest and loading logic; no real GLB parse in a browser. |
-| Procedural textures | `src/world/scene/proceduralTextures.test.ts` | 92 tests on generated data (23 textures, 6.668 MB computed estimate, computed, not runtime-measured). |
+| Procedural textures | `src/world/scene/proceduralTextures.test.ts` | 111 tests on generated data (26 textures, 7.58 MB computed estimate, computed, not runtime-measured). |
 | Effects | `src/world/scene/effectsTiming.test.ts`, `src/world/scene/memoryShift.test.ts` | Timing and state logic. |
 | Layout reachability | `src/world/layout/roomLayout.test.ts` | Grid search from the start position. |
 | Reduced motion | `src/world/controller/useReducedMotion.test.ts` | 8 tests. |

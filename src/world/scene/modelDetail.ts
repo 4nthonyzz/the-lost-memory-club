@@ -30,11 +30,25 @@ export interface Part {
    * box geometry (mesh scale 1) so the grain tiles per metre. Boards of equal size share one draw call.
    */
   metric?: boolean
+  /**
+   * Upholstery box with metric UVs (task 21.1): like `metric`, but without the grain alignment, and the
+   * texture repeats once per FABRIC_METRES_PER_REPEAT metres. Real-size geometry, mesh scale 1.
+   */
+  metricFabric?: boolean
+  /**
+   * Metric UVs with an explicit tile size (task 21.2): real-size box, mesh scale 1, and the texture repeats
+   * once per `metricRepeat` metres (plain, not grain-aligned). Used by the CRT casing, whose tile is one
+   * front-face width.
+   */
+  metricRepeat?: number
 }
 
-/** Draw-call group of a part: geometry + material, plus the board size for metric wood parts. */
+/** True when the part is rendered from a cached real-size geometry (mesh scale 1). */
+export const isRealSizePart = (p: Part): boolean => Boolean(p.metric || p.metricFabric || p.metricRepeat)
+
+/** Draw-call group of a part: geometry + material, plus the board size for metric parts. */
 export function partGroupKey(p: Part): string {
-  return p.metric ? `${p.geo}|${p.mat}|${p.scale.map((v) => Math.round(v * 1e4)).join(',')}` : `${p.geo}|${p.mat}`
+  return isRealSizePart(p) ? `${p.geo}|${p.mat}|${p.scale.map((v) => Math.round(v * 1e4)).join(',')}` : `${p.geo}|${p.mat}`
 }
 
 /** Triangles per shared unit geometry. A test checks these against the real three.js geometries. */
@@ -107,6 +121,9 @@ export function crtScreenRect(box: Aabb, height: number) {
   }
 }
 
+/** Television shell: real-size box on the crtCasing material, one texture tile per shell width. */
+const crtShell = (pos: Vec3, scale: Vec3): Part => ({ ...bx('crtCasing', pos, scale), metricRepeat: scale[0] })
+
 /** `box` is the console footprint; the television sits on top of it, centred on the console. */
 export function crtTelevisionParts(box: Aabb, height: number): Part[] {
   const f = crtFrame(box)
@@ -119,9 +136,11 @@ export function crtTelevisionParts(box: Aabb, height: number): Part[] {
   const sh = h * 0.7
   const t = 0.05
   const local: Part[] = [
-    // Stepped casing: front shell, narrower middle shell, tapered tube.
-    bx('casing', [0, cy, -0.07], [w * 0.94, h, 0.14]),
-    bx('casing', [0, cy, -0.21], [w * 0.84, h * 0.9, 0.14]),
+    // Stepped casing: front shell, narrower middle shell, tapered tube. The two shells use the crtCasing
+    // material with metric UVs; one texture tile spans the shell width, so the front face (aspect about
+    // 1.41:1) shows the lower 71% of the tile (canvas y 74..256) undistorted.
+    crtShell([0, cy, -0.07], [w * 0.94, h, 0.14]),
+    crtShell([0, cy, -0.21], [w * 0.84, h * 0.9, 0.14]),
     bx('casingDark', [0, cy - 0.02, -0.38], [w * 0.6, h * 0.66, 0.2]),
     // Raised bezel frame around the screen, so the screen reads as recessed.
     bx('bezel', [sx, cy + sh / 2 + t / 2, 0.015], [sw + 2 * t, t, 0.03]),
@@ -925,6 +944,25 @@ export function armchairParts(box: Aabb): Part[] {
   return parts
 }
 
+/** Top of the seat cushions, and the lean of the back cushions about the couch's length (x) axis. */
+export const COUCH_SEAT_TOP = 0.42
+export const COUCH_BACK_TILT = 0.12
+/** Size of the throw pillow (x, y, z) and the contact gaps used when it is placed. */
+export const COUCH_PILLOW_SIZE: Vec3 = [0.29, 0.3, 0.08]
+export const COUCH_PILLOW_GAP = 0.0015
+
+/** Upholstery box: real-size geometry with metric UVs, so the corduroy wales keep their size on every part. */
+const fb = (mat: MaterialKey, pos: Vec3, scale: Vec3, rot?: Vec3): Part => ({ ...bx(mat, pos, scale, rot), metricFabric: true })
+
+/**
+ * Couch (task 21.1). Front faces -z, backrest on the +z side. Fixes over the first version:
+ * - The cyan throw pillow no longer cuts through the backrest and seat. It stands in the left seat corner,
+ *   leaning with the same tilt as the back cushions: its rear face is parallel to the back cushion front face
+ *   (1.5 mm gap), its lowest edge rests 1 mm above the seat top and its left face touches the armrest by 1.5 mm.
+ * - The two dark "worn patch" boxes are removed. The one on the middle seat cushion was a hard-edged dark
+ *   rectangle lying 4 mm above the cushion top, the one on the back cushion was buried inside the backrest.
+ * - Roll cylinders stop 2 mm short of the faces they sit against, so no cap is coplanar with a box face.
+ */
 export function couchParts(box: Aabb): Part[] {
   const { cx, cz, w, d } = centre(box)
   const parts: Part[] = []
@@ -932,35 +970,43 @@ export function couchParts(box: Aabb): Part[] {
     for (const lz of [box.minZ + 0.08, box.maxZ - 0.08]) parts.push(part('cylinderLow', 'woodDark', [lx, 0.04, lz], [0.07, 0.08, 0.07]))
   }
   parts.push(
-    bx('rug', [cx, 0.18, cz], [w, 0.2, d]),
+    fb('couchBody', [cx, 0.18, cz], [w, 0.2, d]),
     // Backrest on the +z side.
-    bx('rug', [cx, 0.555, box.maxZ - 0.1], [w - 0.4, 0.55, 0.2]),
-    // Arms with rolled tops.
-    bx('rug', [box.minX + 0.1, 0.45, cz], [0.2, 0.34, d]),
-    bx('rug', [box.maxX - 0.1, 0.45, cz], [0.2, 0.34, d]),
-    part('cylinder', 'rug', [box.minX + 0.1, 0.62, cz], [0.2, d, 0.2], [HALF_PI, 0, 0]),
-    part('cylinder', 'rug', [box.maxX - 0.1, 0.62, cz], [0.2, d, 0.2], [HALF_PI, 0, 0]),
-    // Rolled top along the backrest and a tilted throw pillow in the left corner.
-    part('cylinderLow', 'rug', [cx, 0.84, box.maxZ - 0.1], [0.16, w - 0.4, 0.16], [0, 0, HALF_PI]),
-    bx('sideArtB', [box.minX + 0.42, 0.52, cz + 0.12], [0.3, 0.3, 0.08], [-0.4, 0.5, 0.3]),
+    fb('couchBody', [cx, 0.555, box.maxZ - 0.1], [w - 0.4, 0.55, 0.2]),
+    // Arms with rolled tops (rolls are 4 mm shorter than the arms).
+    fb('couchBody', [box.minX + 0.1, 0.45, cz], [0.2, 0.34, d]),
+    fb('couchBody', [box.maxX - 0.1, 0.45, cz], [0.2, 0.34, d]),
+    part('cylinder', 'couchBody', [box.minX + 0.1, 0.62, cz], [0.2, d - 0.004, 0.2], [HALF_PI, 0, 0]),
+    part('cylinder', 'couchBody', [box.maxX - 0.1, 0.62, cz], [0.2, d - 0.004, 0.2], [HALF_PI, 0, 0]),
+    // Rolled top along the backrest.
+    part('cylinderLow', 'couchBody', [cx, 0.84, box.maxZ - 0.1], [0.16, w - 0.404, 0.16], [0, 0, HALF_PI]),
   )
   const inner = w - 0.4
   const sw = inner / 3 - 0.01
   const sd = d - 0.24
   const seatZ = box.minZ + 0.02 + sd / 2
+  const backZ = box.maxZ - 0.26
+  const backY = 0.62
+  const backD = 0.12
   for (let i = 0; i < 3; i++) {
     const x = box.minX + 0.2 + (i + 0.5) * (inner / 3)
     parts.push(
-      bx('rugLight', [x, 0.35, seatZ], [sw, 0.14, sd]),
-      bx('rugLight', [x, 0.62, box.maxZ - 0.26], [sw, 0.4, 0.12], [0.12, 0, 0]),
+      fb('couchCushion', [x, 0.35, seatZ], [sw, 0.14, sd]),
+      fb('couchCushion', [x, backY, backZ], [sw, 0.4, backD], [COUCH_BACK_TILT, 0, 0]),
     )
   }
-  const midX = box.minX + 0.2 + 1.5 * (inner / 3)
-  // Darker worn patch on the middle seat cushion and one on its back cushion.
-  parts.push(
-    bx('rugWorn', [midX, 0.422, seatZ - 0.08], [sw * 0.7, 0.004, sd * 0.5]),
-    bx('rugWorn', [midX, 0.66, box.maxZ - 0.195], [sw * 0.5, 0.18, 0.004], [0.12, 0, 0]),
-  )
+  // Throw pillow in the left seat corner. Rotation about x by the back-cushion tilt; position solved from the
+  // seat top (lowest edge), the armrest inner face (x) and the back cushion front plane (parallel rear face).
+  const th = COUCH_BACK_TILT
+  const s = Math.sin(th)
+  const c = Math.cos(th)
+  const [pw, ph, pd] = COUCH_PILLOW_SIZE
+  const py = COUCH_SEAT_TOP + 0.001 + (ph / 2) * c + (pd / 2) * s
+  const frontY = backY + (backD / 2) * s
+  const frontZ = backZ - (backD / 2) * c
+  const pz = frontZ + ((py - frontY) * s - (pd / 2 + COUCH_PILLOW_GAP)) / c
+  const px = box.minX + 0.2 + COUCH_PILLOW_GAP + pw / 2
+  parts.push(fb('couchPillow', [px, py, pz], COUCH_PILLOW_SIZE, [th, 0, 0]))
   return parts
 }
 

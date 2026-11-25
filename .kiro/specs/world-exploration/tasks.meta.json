@@ -1102,6 +1102,49 @@
         "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
         "timestamp": 1795610784129
       }
+    ],
+    "21.1 Couch geometry fix and upholstery texture": [
+      {
+        "executionId": "6efcd75e-f6b7-4440-9523-cb4e26973884",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795612099659
+      },
+      {
+        "executionId": "6efcd75e-f6b7-4440-9523-cb4e26973884",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795612589455
+      }
+    ],
+    "21.2 CRT casing texture and glass screen": [
+      {
+        "executionId": "6efcd75e-f6b7-4440-9523-cb4e26973884",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795612589679
+      },
+      {
+        "executionId": "6efcd75e-f6b7-4440-9523-cb4e26973884",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795612904810
+      }
+    ],
+    "21.3 Docs, metrics and verification": [
+      {
+        "executionId": "6efcd75e-f6b7-4440-9523-cb4e26973884",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795612905214
+      },
+      {
+        "executionId": "6efcd75e-f6b7-4440-9523-cb4e26973884",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795613096675
+      }
+    ],
+    "21. Couch fix and CRT craftsmanship": [
+      {
+        "executionId": "6efcd75e-f6b7-4440-9523-cb4e26973884",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795613096787
+      }
     ]
   }
 }

@@ -11,6 +11,8 @@
  *   Task 19.2: wallPanel 256x256 mip 0.33 MB, smpteBars 256x128 nearest 0.13 MB, timecode 128x32 nearest 0.02 MB.
  *   Task 20.2: three attract screens 256x256 nearest 0.25 MB each and three marquees 256x64 nearest 0.06 MB each
  *   replace the old arcadeScreen, marquee, outOfOrder and deck textures.
+ *   Task 21.1: couchFabric 256x256 mip 0.33 MB.
+ *   Task 21.2: crtCasing 256x256 mip 0.33 MB, crtGlass 256x256 nearest 0.25 MB.
  *   The total is checked against TEXTURE_MEMORY_BUDGET_BYTES in tests.
  */
 import { makeRng } from './effectsTiming'
@@ -73,6 +75,9 @@ export type TextureId =
   | 'lampGlow'
   | 'smpteBars'
   | 'timecode'
+  | 'couchFabric'
+  | 'crtCasing'
+  | 'crtGlass'
 
 export type TextureFilter = 'nearest' | 'mipmap'
 
@@ -1136,6 +1141,145 @@ export function drawTimecode(c: Ctx2D, w: number, h: number, seed: number): void
 }
 
 // ---------------------------------------------------------------------------------------------
+// Task 21.1: couch upholstery
+// ---------------------------------------------------------------------------------------------
+
+/** One texture tile covers this many metres, and holds this many wales (about 1 cm each). */
+export const FABRIC_METRES_PER_REPEAT = 0.32
+export const FABRIC_WALES = 32
+/** Stitched seam lines sit this many px inside the tile edge. */
+export const FABRIC_SEAM_INSET = 7
+
+/**
+ * 1990s corduroy/velvet upholstery, near-neutral (mean albedo about 0.8) so a material colour multiplier
+ * sets the hue. Vertical ribs: an alternating dark groove and light crown per wale with a little noise,
+ * fine pile specks, dashed stitched seams just inside the tile edges and soft edge shading. Tiles seamlessly
+ * in the rib direction; the seams and the shading mark the cushion panels.
+ */
+export function drawCouchFabric(c: Ctx2D, w: number, h: number, seed: number): void {
+  const rnd = makeRng(seed)
+  rect(c, 0, 0, w, h, '#cdc2c0')
+  const wale = w / FABRIC_WALES
+  for (let i = 0; i < FABRIC_WALES; i++) {
+    const x = i * wale
+    // Groove (dark), shoulder, crown highlight; strength varies a little from wale to wale.
+    rect(c, x, 0, wale * 0.3, h, '#7d706e', 0.5 + rnd() * 0.12)
+    rect(c, x + wale * 0.3, 0, wale * 0.15, h, '#9a8d8b', 0.25)
+    rect(c, x + wale * 0.55, 0, wale * 0.25, h, '#ffffff', 0.14 + rnd() * 0.08)
+  }
+  // Fine pile noise.
+  speckle(c, rnd, 0, 0, w, h, 900, ['#ffffff', '#6e6260', '#b4a8a6'], 1, 0.14)
+  // Soft edge shading, then stitched seams (dashes) on top of it.
+  vignette(c, w, h, 30, 0.24)
+  const e = FABRIC_SEAM_INSET
+  for (let p = 6; p + 8 <= w - 6; p += 14) {
+    line(c, p, e, p + 8, e, '#4f4240', 1.5, 0.55)
+    line(c, p, h - e, p + 8, h - e, '#4f4240', 1.5, 0.55)
+  }
+  for (let p = 6; p + 8 <= h - 6; p += 14) {
+    line(c, e, p, e, p + 8, '#4f4240', 1.5, 0.55)
+    line(c, w - e, p, w - e, p + 8, '#4f4240', 1.5, 0.55)
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Task 21.2: CRT television casing and glass
+// ---------------------------------------------------------------------------------------------
+
+/** Generic badge printed on the television housing. Not a real trademark. */
+export const CRT_BADGE_TEXT = 'KV-1996'
+/** Colour of the power LED dot. */
+export const CRT_LED_COLOR = '#ff2a2a'
+
+/**
+ * Molded housing, 256 x 256, near neutral (the material multiplier sets charcoal / warm slate). One tile spans
+ * the front shell width (0.846 m), so the front face shows canvas y 74..256 undistorted (metres per px about
+ * 0.0033 in both axes). Coordinates were derived from the television part layout:
+ *  - the bezel and screen cover x 16..210, y 87..244, so the visible front strips are: left x 0..16,
+ *    right x 210..256 (dials, labels, LED), top y 74..87 (badge), bottom y 244..256;
+ *  - side faces show the left 16% of the tile (u = depth), so the vertical louvers sit at x 4..40;
+ *  - top faces show the bottom 16% of the tile (v = depth), so the horizontal louvers sit at y 222..244.
+ * Dial centres match the two knob parts (x 244, y 120 and 150); the LED matches the LED part (x 249, y 244).
+ */
+export function drawCrtCasing(c: Ctx2D, w: number, h: number, seed: number): void {
+  const rnd = makeRng(seed)
+  rect(c, 0, 0, w, h, '#b4b3b8')
+  // Fine molded-plastic grain: light and dark specks, plus a few faint horizontal tool streaks.
+  speckle(c, rnd, 0, 0, w, h, 1400, ['#ffffff', '#7c7b80', '#98979c'], 1, 0.16)
+  for (let i = 0; i < 14; i++) rect(c, 0, Math.floor(rnd() * h), w, 1, '#ffffff', 0.05)
+  // Side vent louvers (vertical slots) and top vent louvers (horizontal slots).
+  for (let col = 0; col < 5; col++) {
+    for (let row = 0; row < 7; row++) {
+      const x = 4 + col * 8
+      const y = 90 + row * 18
+      rect(c, x, y, 4, 12, '#1a1a1d', 0.92)
+      rect(c, x + 4, y, 1, 12, '#ffffff', 0.18)
+    }
+  }
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 11; col++) {
+      const x = 24 + col * 16
+      const y = 222 + row * 7
+      rect(c, x, y, 12, 4, '#1a1a1d', 0.92)
+      rect(c, x, y + 4, 12, 1, '#ffffff', 0.18)
+    }
+  }
+  // Recessed bezel seam lines: a dark groove with a light lip next to it.
+  line(c, 14.5, 74, 14.5, 256, '#4a494e', 1.5, 0.85)
+  line(c, 16, 74, 16, 256, '#ffffff', 1, 0.2)
+  line(c, 211, 74, 211, 256, '#4a494e', 1.5, 0.85)
+  line(c, 14, 88.5, 212, 88.5, '#4a494e', 1.5, 0.85)
+  // Badge on the top strip above the bezel.
+  rect(c, 76, 75, 74, 11, '#2c2c30', 0.9)
+  text(c, CRT_BADGE_TEXT, 113, 81, 'bold 9px monospace', '#ffffff', 0.95)
+  // Channel (CH) and volume (VOL) dials: 12 tick marks around each knob, labels to the left, numbers above.
+  for (const [cy, label] of [[120, 'CH'], [150, 'VOL']] as const) {
+    for (let k = 0; k < 12; k++) {
+      const a = (k * TAU) / 12
+      line(c, 244 + Math.cos(a) * 10.5, cy + Math.sin(a) * 10.5, 244 + Math.cos(a) * 12.5, cy + Math.sin(a) * 12.5, '#ffffff', 1, 0.9)
+    }
+    text(c, label, 221, cy, 'bold 8px monospace', '#ffffff', 0.95)
+  }
+  text(c, '1 2 3 4 5 6', 233, 100, 'bold 5px monospace', '#ffffff', 0.85)
+  text(c, '7 8 9 10 11 12', 233, 107, 'bold 5px monospace', '#ffffff', 0.85)
+  // Power LED: soft halo and a solid dot (the LED part sits on top of it).
+  disc(c, 249, 244, 7, CRT_LED_COLOR, 0.25)
+  disc(c, 249, 244, 3, CRT_LED_COLOR)
+  text(c, 'PWR', 228, 244, 'bold 5px monospace', '#ffffff', 0.85)
+}
+
+/**
+ * Glass of the CRT, 256 x 256 nearest-filtered, drawn for a 1.29:1 screen (it stretches horizontally, which
+ * suits wide monospace lettering). The colour multiplier is white, so this is what the player sees at t = 0:
+ * a dim blue-black "NO SIGNAL / CH 03" card over a faint colour-bar pattern, RGB phosphor stripes, scanlines,
+ * grain, a faint reflection highlight and a darkened curved-glass vignette with darker corners.
+ */
+export function drawCrtGlass(c: Ctx2D, w: number, h: number, seed: number): void {
+  const rnd = makeRng(seed)
+  vertical(c, w, h, [[0, '#030816'], [1, '#071230']])
+  // Faint test pattern: seven muted colour bars near the top and a grey ramp near the bottom.
+  const bars = ['#8a8a96', '#8a8a30', '#308a8a', '#308a30', '#8a308a', '#8a3030', '#30308a']
+  bars.forEach((col, i) => rect(c, 16 + i * 32, 24, 32, 40, col, 0.2))
+  for (let i = 0; i < 8; i++) rect(c, 16 + i * 28, 214, 28, 14, '#c0c8e0', 0.04 + i * 0.012)
+  // Message card.
+  text(c, 'NO SIGNAL', w / 2 + 1, 119, 'bold 30px monospace', '#02050f', 0.9)
+  text(c, 'NO SIGNAL', w / 2, 117, 'bold 30px monospace', '#a8c8ff', 0.85)
+  text(c, 'CH 03', w / 2, 156, 'bold 22px monospace', '#7ea6e8', 0.8)
+  text(c, 'INSERT TAPE', w / 2, 190, 'bold 14px monospace', '#6d8cc4', 0.6)
+  // Phosphor triad: red, green and blue vertical stripes, one px wide on a 2 px pitch.
+  const triad = ['#ff3030', '#30ff30', '#3030ff']
+  for (let x = 0, i = 0; x < w; x += 2, i++) rect(c, x, 0, 1, h, triad[i % 3], 0.05)
+  speckle(c, rnd, 0, 0, w, h, 500, ['#ffffff', '#4a6ab0', '#000000'], 1, 0.12)
+  scanlines(c, w, h, 2, 0.28)
+  // Reflection: a soft diagonal sheen at the top left and a thin highlight edge.
+  gradientRect(c, 0, 0, 150, 110, 0, 0, 120, 100, [[0, 'rgba(255,255,255,0.12)'], [1, 'rgba(255,255,255,0)']])
+  line(c, 20, 12, 96, 12, '#ffffff', 2, 0.1)
+  // Curved-glass vignette and darker corners.
+  vignette(c, w, h, 56, 0.75)
+  for (const [x, y] of [[0, 0], [w - 18, 0], [0, h - 18], [w - 18, h - 18]] as const) rect(c, x, y, 18, 18, '#000000', 0.35)
+}
+
+// ---------------------------------------------------------------------------------------------
 // Table, memory estimate
 // ---------------------------------------------------------------------------------------------
 
@@ -1163,6 +1307,9 @@ export const TEXTURE_SPECS: Readonly<Record<TextureId, TextureSpec>> = Object.fr
   lampGlow: { id: 'lampGlow', width: 64, height: 64, filter: 'mipmap', wrap: 'clamp', seed: 118, draw: drawLampGlow },
   smpteBars: { id: 'smpteBars', width: 256, height: 128, filter: 'nearest', wrap: 'clamp', seed: 119, draw: drawSmpteBars },
   timecode: { id: 'timecode', width: 128, height: 32, filter: 'nearest', wrap: 'clamp', seed: 121, draw: drawTimecode },
+  couchFabric: { id: 'couchFabric', width: 256, height: 256, filter: 'mipmap', wrap: 'repeat', seed: 126, draw: drawCouchFabric },
+  crtCasing: { id: 'crtCasing', width: 256, height: 256, filter: 'mipmap', wrap: 'clamp', seed: 127, draw: drawCrtCasing },
+  crtGlass: { id: 'crtGlass', width: 256, height: 256, filter: 'nearest', wrap: 'clamp', seed: 128, draw: drawCrtGlass },
 })
 
 export const TEXTURE_IDS = Object.keys(TEXTURE_SPECS) as TextureId[]

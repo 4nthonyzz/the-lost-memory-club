@@ -30,6 +30,8 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 
 - Approved scope change (three arcade cabinets), 2026-11-27: the Arcade_Area east wall (x 8.4..9.2, facing -X) holds three interactive cabinets that replace the active cabinet, the powered-down companion cabinet and (if it conflicts) the CRT stack: SNAKE.EXE (z -1.7..-0.7, anchor (8.4, -1.2)), LAST EXIT (z -0.5..0.5, anchor (8.4, 0)) and DEAD FREQUENCY (z 0.7..1.7, anchor (8.4, 1.2)). `StationId` stays `'vhs' | 'arcade'`. All three cabinets call `onInspect('arcade')`. An optional `arcadeGame?: 'snake' | 'maze' | 'frequency'` field is layout and world data only. `App.tsx` and `src/arcade/` are unchanged, so all three currently open the same App arcade panel. Budgets stay: fewer than 20,000 triangles, at most 4 lights, texture memory at most 8 MB. `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json` and `tools/blender/` stay unchanged. Earlier wording about a single arcade cabinet (x around 8.4, z 0) and the companion cabinet is superseded by this bullet.
 
+- Approved scope change (couch and CRT craftsmanship), 2026-11-28: the couch pillow clipping and the middle-cushion artefact are fixed, and two new 256x256 textures (`couchFabric`, `crtCasing`) plus a CRT glass screen texture (scanlines, curved-glass vignette, phosphor grain) are allowed. Every new texture is registered in `sharedResources.ts` and disposed exactly once (`disposeSharedResources()` is twice-safe), with a flat-colour fallback if a texture is unavailable. `memoryShift` tints the new materials cleanly over t = 0..1. Budgets stay: fewer than 20,000 triangles (currently 19,152 computed, so geometry changes must be near zero or net-negative), at most 4 lights, texture memory at most 8 MB. `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json` and `tools/blender/` stay unchanged. No real trademarks are used; the CRT badge reads the generic "KV-1996".
+
 ## Tasks
 
 ### Milestone 1: Playable 3D room (primitives only)
@@ -783,6 +785,36 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: documentation and the spec folder only.
     - _Requirements: 14.11, 14.12, 15.3, 15.6_
 
+### Couch and CRT craftsmanship
+
+- [x] 21. Couch fix and CRT craftsmanship
+  - [x] 21.1 Couch geometry fix and upholstery texture
+    - Files: `src/world/scene/modelDetail.ts` (`couchParts`), `src/world/scene/Props.tsx`, `src/world/scene/proceduralTextures.ts`, `src/world/scene/sharedResources.ts`, `src/world/scene/memoryShift.ts`, `src/world/scene/modelDetail.test.ts`, `src/world/scene/proceduralTextures.test.ts`, and the Memory_Shift test file (updated, not weakened).
+    - Place the pillow in the seat corner against the armrest and the backrest with zero intersection. Remove the middle-cushion z-fighting by eliminating coplanar overlapping faces. Add a `couchFabric` 256x256 `CanvasTexture` with corduroy/velvet ribbing, stitched seams and edge shading, registered in `sharedResources.ts`, with a flat-colour fallback. `memoryShift` tints the couch material over t = 0..1.
+    - Acceptance: pillow has zero intersection with the armrest, backrest and seat cushions; no two couch parts have coplanar overlapping faces; triangle estimate below 20,000 (net-negative or near zero change from 19,152); lights at most 4; texture memory at most 8 MB; colliders unchanged; `couchFabric` disposed exactly once.
+    - Tests: `modelDetail.test.ts` (oriented-box overlap test for the pillow against every couch part, coplanar-face test, triangle and light budgets, colliders unchanged, disposal once and twice-safe); `proceduralTextures.test.ts` (determinism with a fake context, 256x256, no randomness); Memory_Shift tint test at t = 0, 0.5 and 1. Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 20.3.
+    - Boundary: render-only; `src/world/` only; no new dependency; no GLB; `ASSET_MANIFEST` stays empty.
+    - _Requirements: 1.3, 1.4, 1.8, 9.1, 9.2, 9.8, 12.5, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 21.2 CRT casing texture and glass screen
+    - Files: `src/world/scene/modelDetail.ts`, `src/world/scene/Stations.tsx`, `src/world/scene/Effects.tsx`, `src/world/scene/proceduralTextures.ts`, `src/world/scene/sharedResources.ts`, `src/world/scene/memoryShift.ts`, `src/world/scene/modelDetail.test.ts`, `src/world/scene/proceduralTextures.test.ts`, and the Memory_Shift and Effects test files (updated, not weakened).
+    - Add a `crtCasing` 256x256 texture: charcoal/warm-slate molded plastic with grain, vent louvers, bezel seams, dial markings, a red power LED dot and the generic badge "KV-1996" (no real trademark). Add a CRT glass screen texture with scanlines, corner vignette and phosphor grain. Keep the shared `crtScreen` material, the `crt-light` and the `crtScreenPlacement()` contract in `Effects.tsx` unchanged. Textures are registered in `sharedResources.ts` with flat-colour fallbacks. `memoryShift` tints the new materials over t = 0..1.
+    - Acceptance: triangle estimate below 20,000 (near zero or net-negative change); lights at most 4; texture memory at most 8 MB; colliders and Station anchors unchanged; new textures disposed exactly once; static-noise effect still targets the CRT screen only.
+    - Tests: `proceduralTextures.test.ts` (determinism, 256x256, no randomness, badge text is "KV-1996"); `modelDetail.test.ts` (disposal once and twice-safe, budgets, shared `crtScreen` material still used, colliders unchanged); Effects test for `crtScreenPlacement()`; Memory_Shift tint test at t = 0, 0.5 and 1. Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 21.1.
+    - Boundary: render-only; `src/world/` only; no new dependency; no GLB; `ASSET_MANIFEST` stays empty.
+    - _Requirements: 1.3, 1.4, 1.8, 9.1, 9.2, 9.8, 10.1, 12.5, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 21.3 Docs, metrics and verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, lights and texture memory, each labelled "computed, not runtime-measured". Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final geometry and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 21.2.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional. The 17 property-based test sub-tasks can be skipped for a faster MVP. Tasks 16.2 and 16.3 are marked `*` because they must not be implemented without approval.
@@ -835,7 +867,10 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     { "id": 35, "tasks": ["19.3"] },
     { "id": 36, "tasks": ["20.1"] },
     { "id": 37, "tasks": ["20.2"] },
-    { "id": 38, "tasks": ["20.3"] }
+    { "id": 38, "tasks": ["20.3"] },
+    { "id": 39, "tasks": ["21.1"] },
+    { "id": 40, "tasks": ["21.2"] },
+    { "id": 41, "tasks": ["21.3"] }
   ]
 }
 ```

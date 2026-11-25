@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Box3, Mesh, Object3D } from 'three'
+import { Box3, Euler, Matrix3, Matrix4, Mesh, Object3D, Vector3 } from 'three'
+import { OBB } from 'three/examples/jsm/math/OBB.js'
 import { COLLIDERS, ROOM, STATION_DEFS } from '../layout/roomLayout'
 import { crtScreenPlacement } from './Effects'
 import { ARCADE_LIGHT_DISTANCE, ARCADE_LIGHT_POSITION, CRT_LIGHT_POSITION, M3_LIGHT_COUNT, WEST_LIGHT_POSITION } from './Lighting'
@@ -42,6 +43,7 @@ import {
   armchairParts,
   crtStackParts,
   couchParts,
+  COUCH_SEAT_TOP,
   crateParts,
   CONSOLE_TOP,
   bulletinBoardParts,
@@ -91,10 +93,12 @@ import {
   spineGeometries,
   wallGeometry,
 } from './sharedResources'
-import { ARCADE_SCREEN_BASE_COLORS, BASE_WALL_COLOR } from './memoryShift'
+import { ARCADE_SCREEN_BASE_COLORS, BASE_CRT_SCREEN_COLOR, BASE_WALL_COLOR, CRT_CASING_COLORS } from './memoryShift'
 import { cablePathParts, consoleCableParts, deskParts, partGroupKey } from './modelDetail'
 import { textureMemoryBytes } from './proceduralTextures'
-import { WOOD_METRES_PER_REPEAT, woodBoxCount, woodBoxGeometry } from './sharedResources'
+import { WOOD_METRES_PER_REPEAT, fabricBoxCount, metricBoxGeometry, woodBoxCount, woodBoxGeometry } from './sharedResources'
+import { FABRIC_METRES_PER_REPEAT } from './proceduralTextures'
+import { COUCH_FABRIC_COLORS } from './memoryShift'
 
 const lightingSource = (
   import.meta.glob('./Lighting.tsx', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
@@ -1048,8 +1052,9 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
     )
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
-    // 21 textures after 18.3; task 20.2 removed four (arcadeScreen, marquee, outOfOrder, deck) and added six.
-    expect(report.textureCount).toBe(23)
+    // 21 textures after 18.3; task 20.2 removed four (arcadeScreen, marquee, outOfOrder, deck) and added six; task 21.1 added couchFabric.
+    // Task 21.2 adds crtCasing and crtGlass.
+    expect(report.textureCount).toBe(26)
     for (const name of ['conduit', 'ventilation', 'cable-loops', 'corner-posts', 'wall-clock', 'desk-lamp', 'desk-lamp-glow']) {
       expect(report.objects.map((o) => o.name)).toContain(name)
     }
@@ -1082,7 +1087,9 @@ describe('task 19.2: texture headroom and craftsmanship', () => {
         `textures ${report.textureCount}, texture memory estimate ${(report.textureMemoryBytes / 1048576).toFixed(2)} MB (computed, not runtime-measured): ${perTexture.join(', ')}`,
     )
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
-    expect(report.textureMemoryBytes).toBeLessThan(7.0 * 1048576)
+    // 7.0 MB after 19.2; task 21.1 adds couchFabric (0.33 MB), so the headroom check is now 7.5 MB (budget stays 8 MB).
+    // Task 21.2 adds crtCasing (0.33 MB) and crtGlass (0.25 MB): the headroom check is now 7.7 MB.
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.7 * 1048576)
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
     expect(report.totalDrawCalls).toBeLessThan(400)
     expect(report.textureCount).toBe(TEXTURE_IDS.length)
@@ -1102,7 +1109,9 @@ describe('task 19.2: texture headroom and craftsmanship', () => {
     expect(getSharedTexture('smpteBars')?.colorSpace).toBe('srgb')
     // Dimmed: its colour multiplier is darker than white, and the shared CRT is not bound to this texture.
     expect(materials.smpteScreen.color.r).toBeLessThan(1)
-    expect(materials.crtScreen.map).toBeNull()
+    // Since 21.2 the shared CRT carries its own crtGlass texture, never the reference card's bars.
+    expect(materials.crtScreen.map).toBe(getSharedTexture('crtGlass'))
+    expect(materials.crtScreen.map).not.toBe(materials.smpteScreen.map)
   })
 
   it('the old out-of-order glass, single arcade screen, marquee and deck materials and textures are gone', () => {
@@ -1331,8 +1340,9 @@ describe('task 20.2: attract screen and marquee textures on the cabinets', () =>
   it('texture count and memory after the change, every texture disposed exactly once, twice-safe', () => {
     setCanvasFactory(() => fakeCanvas())
     ensureSharedTextures()
-    expect(liveTextureCount()).toBe(23)
-    expect(TEXTURE_IDS).toHaveLength(23)
+    // 23 after task 20.2, plus couchFabric (21.1), crtCasing and crtGlass (21.2).
+    expect(liveTextureCount()).toBe(26)
+    expect(TEXTURE_IDS).toHaveLength(26)
     const total = totalTextureMemoryBytes()
     const perTexture = TEXTURE_IDS.map((id) => `${id} ${TEXTURE_SPECS[id].width}x${TEXTURE_SPECS[id].height}=${(textureMemoryBytes(TEXTURE_SPECS[id]) / 1048576).toFixed(3)}MB`)
     const report = sceneDetailReport()
@@ -1358,5 +1368,265 @@ describe('task 20.2: attract screen and marquee textures on the cabinets', () =>
       const parts = arcadeCabinetParts(facingFrame(a.box, a.facing).local, a.height, ARCADE_CABINET_GAMES[id])
       for (const p of parts) expect(p.mat in materials, p.mat).toBe(true)
     }
+  })
+})
+
+describe('task 21.1: couch pillow, cushion faces and upholstery texture', () => {
+  afterEach(() => setCanvasFactory(null))
+
+  const couch = prop('couch')
+  const parts = () => couchParts(couch.box)
+  const obbOf = (p: Part) => {
+    const rot = new Matrix3().setFromMatrix4(new Matrix4().makeRotationFromEuler(new Euler(...(p.rot ?? [0, 0, 0]))))
+    return new OBB(new Vector3(...p.pos), new Vector3(p.scale[0] / 2, p.scale[1] / 2, p.scale[2] / 2), rot)
+  }
+
+  it('the throw pillow penetrates no other couch part, with at most 2 mm of contact gap on the seat', () => {
+    const all = parts()
+    const p = all.find((q) => q.mat === 'couchPillow')!
+    const po = obbOf(p)
+    const others = all.filter((q) => q !== p)
+    for (const q of others) expect(po.intersectsOBB(obbOf(q), 1e-6), `${q.geo}/${q.mat} at ${q.pos.join(',')}`).toBe(false)
+    // Sanity: the old, clipping transform (centre 0.52 m up, tilted [-0.4, 0.5, 0.3]) is detected as an intersection.
+    const old: Part = { geo: 'box', mat: 'sideArtB', pos: [couch.box.minX + 0.42, 0.52, (couch.box.minZ + couch.box.maxZ) / 2 + 0.12], scale: [0.3, 0.3, 0.08], rot: [-0.4, 0.5, 0.3] }
+    expect(others.some((q) => obbOf(old).intersectsOBB(obbOf(q), 1e-6))).toBe(true)
+    // It rests on the seat: lowest point of the oriented box is 0..2 mm above the seat top.
+    const half = orientedHalfExtents(p.scale, p.rot ?? [0, 0, 0])
+    const lowest = p.pos[1] - half[1]
+    expect(lowest).toBeGreaterThanOrEqual(COUCH_SEAT_TOP - 1e-9)
+    expect(lowest - COUCH_SEAT_TOP).toBeLessThanOrEqual(0.002)
+    // Against the armrest inner face (x = minX + 0.2), within 2 mm and not through it.
+    expect(p.pos[0] - half[0] - (couch.box.minX + 0.2)).toBeGreaterThanOrEqual(0)
+    expect(p.pos[0] - half[0] - (couch.box.minX + 0.2)).toBeLessThanOrEqual(0.002)
+    // Inside the couch footprint and below the backrest top; leaning toward the backrest.
+    expect(p.pos[0] + half[0]).toBeLessThan(couch.box.maxX)
+    expect(p.pos[2] - half[2]).toBeGreaterThan(couch.box.minZ)
+    expect(p.pos[2] + half[2]).toBeLessThan(couch.box.maxZ)
+    expect(p.pos[1] + half[1]).toBeLessThan(0.9)
+    expect(p.rot![0]).toBeGreaterThan(0)
+  })
+
+  it('the middle seat cushion has no dark patch part and no worn material remains', () => {
+    expect(parts().some((q) => (q.mat as string) === 'rugWorn')).toBe(false)
+    expect('rugWorn' in materials).toBe(false)
+    // Every flat-coloured seat cushion part uses the one cushion material.
+    expect(parts().filter((q) => q.scale[1] === 0.14).every((q) => q.mat === 'couchCushion')).toBe(true)
+  })
+
+  it('no two couch faces are coplanar, overlapping and facing the same way (no z-fighting)', () => {
+    type Face = { axis: 0 | 1 | 2; sign: 1 | -1; at: number; lo: [number, number]; hi: [number, number]; name: string }
+    const faces: Face[] = []
+    for (const p of parts()) {
+      if (p.rot && p.rot.some((r) => Math.abs(r) > 1e-9 && Math.abs(Math.abs(r) - Math.PI / 2) > 1e-9)) continue
+      let ext: Vec3 = p.scale
+      let capsOnly: 0 | 1 | 2 | null = null
+      if (p.geo === 'cylinder' || p.geo === 'cylinderLow') {
+        // Only the two caps are flat faces; the axis is local y, turned by a quarter turn.
+        const [rx, , rz] = p.rot ?? [0, 0, 0]
+        if (rx !== 0) {
+          ext = [p.scale[0], p.scale[2], p.scale[1]]
+          capsOnly = 2
+        } else if (rz !== 0) {
+          ext = [p.scale[1], p.scale[0], p.scale[2]]
+          capsOnly = 0
+        } else {
+          capsOnly = 1
+        }
+      } else if (p.rot) continue
+      for (const axis of [0, 1, 2] as const) {
+        if (capsOnly !== null && axis !== capsOnly) continue
+        const [a, b] = [0, 1, 2].filter((i) => i !== axis)
+        for (const sign of [1, -1] as const) {
+          faces.push({
+            axis,
+            sign,
+            at: p.pos[axis] + (sign * ext[axis]) / 2,
+            lo: [p.pos[a] - ext[a] / 2, p.pos[b] - ext[b] / 2],
+            hi: [p.pos[a] + ext[a] / 2, p.pos[b] + ext[b] / 2],
+            name: `${p.geo}/${p.mat}@${p.pos.map((v) => v.toFixed(3)).join(',')}`,
+          })
+        }
+      }
+    }
+    expect(faces.length).toBeGreaterThan(30)
+    for (let i = 0; i < faces.length; i++) {
+      for (let j = i + 1; j < faces.length; j++) {
+        const f = faces[i]
+        const g = faces[j]
+        if (f.axis !== g.axis || f.sign !== g.sign || Math.abs(f.at - g.at) >= 0.001) continue
+        const ox = Math.min(f.hi[0], g.hi[0]) - Math.max(f.lo[0], g.lo[0])
+        const oy = Math.min(f.hi[1], g.hi[1]) - Math.max(f.lo[1], g.lo[1])
+        expect(ox > 1e-6 && oy > 1e-6, `${f.name} vs ${g.name}`).toBe(false)
+      }
+    }
+  })
+
+  it('stays inside its footprint, adds no collider and does not grow the triangle count', () => {
+    const tri = parts().reduce((n, p) => n + GEOMETRY_TRIANGLES[p.geo], 0)
+    const report = sceneDetailReport()
+    const obj = report.objects.find((o) => o.name === 'couch')!
+    console.info(`[21.1] couch triangles: ${tri} (before 412), total ${report.totalTriangles}, textures ${report.textureCount}, texture memory ${(report.textureMemoryBytes / 1048576).toFixed(2)} MB`)
+    expect(obj.triangles).toBe(tri)
+    expect(tri).toBeLessThanOrEqual(412)
+    expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
+    expect(COLLIDERS.length).toBe(ROOM.walls.length + 4 + ROOM.props.filter((p) => p.solid).length)
+    for (const p of parts()) {
+      if (p.rot) continue
+      expect(p.pos[0] - p.scale[0] / 2).toBeGreaterThanOrEqual(couch.box.minX - 1e-6)
+      expect(p.pos[0] + p.scale[0] / 2).toBeLessThanOrEqual(couch.box.maxX + 1e-6)
+    }
+  })
+
+  it('upholstery boxes use metric UVs: one wale-sized repeat per FABRIC_METRES_PER_REPEAT metres, cached and shared', () => {
+    const fabricParts = parts().filter((p) => p.metricFabric)
+    expect(fabricParts.length).toBeGreaterThanOrEqual(8)
+    expect(fabricParts.every((p) => p.geo === 'box' && ['couchBody', 'couchCushion', 'couchPillow'].includes(p.mat))).toBe(true)
+    const g = metricBoxGeometry(1.8, 0.2, 0.8, FABRIC_METRES_PER_REPEAT)
+    expect(metricBoxGeometry(1.8, 0.2, 0.8, FABRIC_METRES_PER_REPEAT)).toBe(g)
+    const uv = g.getAttribute('uv')
+    // Front face (+z, vertices 16..19): u spans width / repeat, v spans height / repeat; ribs stay vertical.
+    const us = [16, 17, 18, 19].map((i) => uv.getX(i))
+    const vs = [16, 17, 18, 19].map((i) => uv.getY(i))
+    expect(Math.max(...us) - Math.min(...us)).toBeCloseTo(1.8 / FABRIC_METRES_PER_REPEAT, 6)
+    expect(Math.max(...vs) - Math.min(...vs)).toBeCloseTo(0.2 / FABRIC_METRES_PER_REPEAT, 6)
+    // Wood boards keep their separate grain-aligned cache entries and count.
+    expect(fabricBoxCount()).toBeGreaterThanOrEqual(1)
+    const before = woodBoxCount()
+    woodBoxGeometry(0.5, 0.05, 0.2)
+    expect(woodBoxCount()).toBe(before + 1)
+    const spy = vi.spyOn(g, 'dispose')
+    disposeSharedResources()
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(fabricBoxCount()).toBe(0)
+    expect(() => disposeSharedResources()).not.toThrow()
+    expect(spy).toHaveBeenCalledTimes(1)
+  })
+
+  it('couchFabric is attached to every couch material with the textured hue, falls back to the flat colours, and is disposed once', () => {
+    const keys = ['couchBody', 'couchCushion', 'couchPillow'] as const
+    setCanvasFactory(null)
+    ensureSharedTextures()
+    for (const k of keys) {
+      expect(materials[k].map).toBeNull()
+      expect(`#${materials[k].color.getHexString()}`).toBe(COUCH_FABRIC_COLORS[k].flat)
+    }
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    const tex = getSharedTexture('couchFabric')!
+    expect(tex).not.toBeNull()
+    expect([tex.image.width, tex.image.height]).toEqual([256, 256])
+    expect(tex.colorSpace).toBe('srgb')
+    expect(tex.generateMipmaps).toBe(true)
+    expect(tex.minFilter).toBe(1008) // LinearMipmapLinearFilter
+    expect(tex.wrapS).toBe(1000) // RepeatWrapping
+    for (const k of keys) {
+      expect(materials[k].map).toBe(tex)
+      expect(`#${materials[k].color.getHexString()}`).toBe(COUCH_FABRIC_COLORS[k].textured)
+    }
+    expect(liveTextureCount()).toBe(TEXTURE_IDS.length)
+    const spy = vi.spyOn(tex, 'dispose')
+    disposeSharedResources()
+    expect(spy).toHaveBeenCalledTimes(1)
+    for (const k of keys) {
+      expect(materials[k].map).toBeNull()
+      expect(`#${materials[k].color.getHexString()}`).toBe(COUCH_FABRIC_COLORS[k].flat)
+    }
+    expect(() => disposeSharedResources()).not.toThrow()
+    expect(spy).toHaveBeenCalledTimes(1)
+  })
+
+  it('texture memory stays within 8 MB with couchFabric counted', () => {
+    expect(TEXTURE_IDS).toContain('couchFabric')
+    expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
+  })
+})
+
+describe('task 21.2: CRT casing texture and glass screen', () => {
+  afterEach(() => setCanvasFactory(null))
+
+  const crt = () => prop('crt-vhs')
+
+  it('the two television shells use the dedicated crtCasing material with one tile per shell width', () => {
+    const parts = crtTelevisionParts(crt().box, crt().height)
+    const shells = parts.filter((p) => p.mat === 'crtCasing')
+    expect(shells).toHaveLength(2)
+    for (const s of shells) expect(s.metricRepeat).toBeCloseTo(s.scale[0], 9)
+    // The shared `casing` material (used by other objects) is untouched and distinct.
+    expect(materials.crtCasing).not.toBe(materials.casing)
+    expect(parts.some((p) => p.mat === 'casing')).toBe(false)
+    // Real-size shells render from cached metric geometry and keep their draw-call grouping per size.
+    expect(new Set(shells.map(partGroupKey)).size).toBe(2)
+  })
+
+  it('CRT geometry is unchanged in triangle count and the whole scene stays within budget', () => {
+    const parts = crtTelevisionParts(crt().box, crt().height)
+    const tris = parts.reduce((n, p) => n + GEOMETRY_TRIANGLES[p.geo], 0)
+    const report = sceneDetailReport()
+    const crtObj = report.objects.find((o) => o.name === 'crt-television')!
+    console.info(
+      `[21.2] computed triangles ${report.totalTriangles}, crt-television ${tris} triangles / ${crtObj.drawCalls} draw calls, draw-call estimate ${report.totalDrawCalls}, ` +
+        `textures ${report.textureCount}, texture memory estimate ${(report.textureMemoryBytes / 1048576).toFixed(2)} MB (computed, not runtime-measured), lights ${M3_LIGHT_COUNT}`,
+    )
+    // 9 boxes (3 casing, 4 bezel, grille, badge bar), 1 plane, 6 low cylinders (2 knobs, LED, 3 antenna parts), unchanged by 21.2.
+    expect(tris).toBe(9 * 12 + 2 + 6 * 32)
+    expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.7 * 1048576)
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
+    expect(M3_LIGHT_COUNT).toBe(4)
+  })
+
+  it('crtScreenPlacement still equals the single television screen part (nudged 5 mm)', () => {
+    const screens = crtTelevisionParts(crt().box, crt().height).filter((p) => p.mat === 'crtScreen')
+    expect(screens).toHaveLength(1)
+    const rect = crtScreenRect(crt().box, crt().height)
+    expect([...screens[0].pos]).toEqual([...rect.position])
+    expect(crtScreenPlacement()!.position[2]).toBeCloseTo(rect.position[2] + 0.005)
+  })
+
+  it('without a canvas the casing and screen keep flat colours and no map', () => {
+    setCanvasFactory(null)
+    ensureSharedTextures()
+    expect(materials.crtCasing.map).toBeNull()
+    expect(materials.crtScreen.map).toBeNull()
+    expect(`#${materials.crtCasing.color.getHexString()}`).toBe(CRT_CASING_COLORS.flat)
+    expect(`#${materials.crtScreen.color.getHexString()}`).toBe(BASE_CRT_SCREEN_COLOR)
+    expect(getSharedTexture('crtCasing')).toBeNull()
+    expect(getSharedTexture('crtGlass')).toBeNull()
+  })
+
+  it('with a canvas both textures attach, the screen multiplier is white, and each texture is disposed exactly once', () => {
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    const casing = getSharedTexture('crtCasing')!
+    const glass = getSharedTexture('crtGlass')!
+    expect(materials.crtCasing.map).toBe(casing)
+    expect(materials.crtScreen.map).toBe(glass)
+    expect(`#${materials.crtCasing.color.getHexString()}`).toBe(CRT_CASING_COLORS.textured)
+    expect(`#${materials.crtScreen.color.getHexString()}`).toBe('#ffffff')
+    expect(casing.colorSpace).toBe('srgb')
+    expect(casing.generateMipmaps).toBe(true)
+    expect(casing.minFilter).toBe(1008) // LinearMipmapLinearFilter
+    expect(glass.generateMipmaps).toBe(false)
+    expect(glass.magFilter).toBe(1003) // NearestFilter
+    // The shared screen material is the one the Effects overlay and Memory_Shift know.
+    expect(materials.crtScreen.type).toBe('MeshBasicMaterial')
+    expect(liveTextureCount()).toBe(TEXTURE_IDS.length)
+    const spies = [casing, glass].map((t) => vi.spyOn(t, 'dispose'))
+    disposeSharedResources()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+    expect(materials.crtCasing.map).toBeNull()
+    expect(materials.crtScreen.map).toBeNull()
+    expect(`#${materials.crtCasing.color.getHexString()}`).toBe(CRT_CASING_COLORS.flat)
+    expect(`#${materials.crtScreen.color.getHexString()}`).toBe(BASE_CRT_SCREEN_COLOR)
+    expect(() => disposeSharedResources()).not.toThrow()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+    expect(liveTextureCount()).toBe(0)
+  })
+
+  it('the two new textures cost 0.33 MB and at most 0.25 MB', () => {
+    expect(textureMemoryBytes(TEXTURE_SPECS.crtCasing)).toBeLessThanOrEqual(0.34 * 1048576)
+    expect(textureMemoryBytes(TEXTURE_SPECS.crtGlass)).toBeLessThanOrEqual(0.25 * 1048576)
+    expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(7.7 * 1048576)
   })
 })

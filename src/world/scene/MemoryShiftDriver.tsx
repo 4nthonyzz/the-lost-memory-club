@@ -9,7 +9,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Color, Fog, type AmbientLight, type PointLight } from 'three'
 import { useReducedMotion } from '../controller/useReducedMotion'
 import { advanceProgress } from '../logic/palette'
-import { BASE_CRT_SCREEN_COLOR, applyShift, arcadeScreenBaseColor, type ShiftTargets } from './memoryShift'
+import { applyShift, arcadeScreenBaseColor, couchBaseColor, crtScreenBaseColor, type ShiftTargets } from './memoryShift'
 import { ensureSharedTextures, materials, overlayMaterials } from './sharedResources'
 
 export interface MemoryShiftDriverProps {
@@ -52,12 +52,16 @@ export function MemoryShiftDriver({ memoryShifted, ambientRef, pointRefs, pointB
       points,
       wall: materials.wall,
       screens: [
-        { material: materials.crtScreen, baseColor: BASE_CRT_SCREEN_COLOR },
+        { material: materials.crtScreen, baseColor: crtScreenBaseColor(materials.crtScreen.map !== null) },
         { material: materials.arcadeScreenSnake, baseColor: arcadeScreenBaseColor('snake', materials.arcadeScreenSnake.map !== null) },
         { material: materials.arcadeScreenMaze, baseColor: arcadeScreenBaseColor('maze', materials.arcadeScreenMaze.map !== null) },
         { material: materials.arcadeScreenFrequency, baseColor: arcadeScreenBaseColor('frequency', materials.arcadeScreenFrequency.map !== null) },
       ],
       overlays: overlayMaterials,
+      couch: (['couchBody', 'couchCushion', 'couchPillow'] as const).map((key) => ({
+        material: materials[key],
+        baseColor: couchBaseColor(key, materials[key].map !== null),
+      })),
     }
     applyShift(tRef.current, targetsRef.current)
     invalidate()

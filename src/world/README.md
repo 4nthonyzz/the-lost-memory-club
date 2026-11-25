@@ -13,7 +13,7 @@ Every feature below carries one of these labels.
 | **not verified** | Implemented, but no test or recorded check covers the behavior. |
 | **planned/prototype** | Not implemented, or implemented only as a stand-in. |
 
-Milestone M6, the polish pass and the spatial and visual refinement pass (media island, north-wall filing cabinets and bulletin board, wood bookcases with dense books, textured walls and rug, three arcade cabinets, ARCADE sign, dressing, re-centred console, SMPTE monitor, cables) have **no recorded browser run**. Their layout and data are verified by automated tests only; how they look and play is **not verified visually**.
+Milestone M6, the polish pass and the spatial and visual refinement pass (media island, north-wall filing cabinets and bulletin board, wood bookcases with dense books, textured walls and rug, three arcade cabinets, ARCADE sign, dressing, re-centred console, SMPTE monitor, cables) have **no recorded browser run**. Their layout and data are verified by automated tests only; how they look and play is **not verified visually**. The same holds for task 21 (couch fix, couch fabric, CRT casing and glass textures): **not verified visually**.
 
 ## Purpose and boundaries
 
@@ -114,7 +114,11 @@ Visual appearance of the M6, polish-pass, refinement-pass and three-cabinet layo
 
 ## Procedural textures
 
-23 deterministic canvas textures (`scene/proceduralTextures.ts`, `scene/sharedResources.ts`): three cabinet attract screens (`attractSnake`, `attractMaze`, `attractFrequency`, 256x256), three cabinet marquees (`marqueeSnake`, `marqueeMaze`, `marqueeFrequency`, 256x64), sign face, three posters (two ordinary, one shifted), shifted plaque, floor, wood, dark wood, crate, grille, book spine atlas, wall panel (256x256), woven rug, cork board, lamp glow, SMPTE colour bars and the timecode window. These 6 textures are new, and 4 were removed: `arcadeScreen`, `marquee`, `deck` and `outOfOrder`. Without a canvas or 2D context, materials keep flat colors. Textures are disposed on unmount, each exactly once. **verified by automated test** (`scene/proceduralTextures.test.ts`, 92 tests; `scene/modelDetail.test.ts`, 91 tests). Whether they look readable in a browser: **not verified visually** (S7 to S11 `not run`).## Asset pipeline
+26 deterministic canvas textures (`scene/proceduralTextures.ts`, `scene/sharedResources.ts`): three cabinet attract screens (`attractSnake`, `attractMaze`, `attractFrequency`, 256x256), three cabinet marquees (`marqueeSnake`, `marqueeMaze`, `marqueeFrequency`, 256x64), sign face, three posters (two ordinary, one shifted), shifted plaque, floor, wood, dark wood, crate, grille, book spine atlas, wall panel (256x256), woven rug, cork board, lamp glow, SMPTE colour bars and the timecode window, plus three added in tasks 21.1 and 21.2: `couchFabric` (256x256 woven upholstery, metric fabric UVs), `crtCasing` (256x256 charcoal casing with a generic "KV-1996" badge, metric UV, one tile across the front shell) and `crtGlass` (256x256, on the shared `crtScreen` material, which uses a white base when textured and a teal flat fallback). Earlier, 6 textures were added and 4 removed: `arcadeScreen`, `marquee`, `deck` and `outOfOrder`. The couch uses the `couchBody`, `couchCushion` and `couchPillow` materials, which take the `memoryShift` tint. The CRT casing fallback colour (no canvas) is now charcoal. Without a canvas or 2D context, materials keep flat colors. Textures are disposed on unmount, each exactly once. **verified by automated test** (`scene/proceduralTextures.test.ts`, 111 tests; `scene/modelDetail.test.ts`, 104 tests). Whether they look readable in a browser: **not verified visually** (S7 to S11 `not run`).
+
+Couch fix (task 21.1): the dark patch on the couch came from a dark "worn patch" box placed 4 mm above the middle cushion. It is removed, together with a second hidden patch. The roll caps are shortened by 4 mm to avoid coplanar faces. The pillow sits in the left seat corner; a test checks with an oriented-box (OBB) no-intersection test that it does not overlap the other couch parts. The couch has 388 triangles (was 412) and no new collider. Task 21 is **not verified visually**.
+
+## Asset pipeline
 
 - `ASSET_MANIFEST` in `assets/assetManifest.ts` is **empty**. No GLB is loaded. `public/models/` holds only `.gitkeep`.
 - `AssetModel` renders the primitive fallback immediately and keeps it when the manifest has no entry or loading fails. **verified by automated test** (`assets/assets.test.ts`, `scene/assetIntegration.test.ts`).
@@ -126,20 +130,20 @@ Dev builds only (`import.meta.env.DEV`). Run `npm run dev` and open the page wit
 
 ## Metrics
 
-Computed from declared geometry and source, **computed, not runtime-measured**. Source: `.kiro/specs/world-exploration/performance-log.md`. Figures re-checked in task 20.3 with `npx vitest run src/world/scene/modelDetail.test.ts` (91 tests passed); the console line was:
-`[18.2] computed triangles: 19152 (detail 18910 + base 242), draw-call estimate (grouped by geometry+material): 283, books 370, slipcases 136, leaning 16, per shelf shelf-a=16 draws/178 books, shelf-b=16 draws/172 books, shelf-c=16 draws/156 books, textures 23, texture memory estimate 6.67 MB`
+Computed from declared geometry and source, **computed, not runtime-measured**. Source: `.kiro/specs/world-exploration/performance-log.md`. Figures re-checked in task 21.3 with `npx vitest run src/world/scene/modelDetail.test.ts` (104 tests passed); the console line was:
+`[18.2] computed triangles: 19128 (detail 18886 + base 242), draw-call estimate (grouped by geometry+material): 286, books 370, slipcases 136, leaning 16, per shelf shelf-a=16 draws/178 books, shelf-b=16 draws/172 books, shelf-c=16 draws/156 books, textures 26, texture memory estimate 7.58 MB`
 | Metric | Value | Label |
 | --- | --- | --- |
-| Triangles | 19,152 (detail 18,910 + base 242), limit 20,000 | computed, not runtime-measured |
-| Draw-call grouping estimate | 283 | computed estimate, not `renderer.info` |
+| Triangles | 19,128 (detail 18,886 + base 242), limit 20,000 | computed, not runtime-measured |
+| Draw-call grouping estimate | about 286 | computed estimate, not `renderer.info` |
 | Books | 370 (shelf-a 178, shelf-b 172, shelf-c 156) | computed |
 | Lights | 4 (1 ambient + 3 point), limit 4 | computed from source |
-| Procedural textures | 23, about 6.668 MB estimated, limit 8 MB | computed, not runtime-measured |
+| Procedural textures | 26, about 7.58 MB estimated, limit 8 MB | computed, not runtime-measured |
 | Colliders | 28 | computed |
-| Targeting benchmark | informational timing only, no threshold; varies per run and machine (standalone run 0.569 us/call, full-suite run 1.592 us/call) | informational |
-**The triangle margin is thin:** 19,152 leaves about 850 triangles (4 percent) below the 20,000 limit. The biggest consumers (computed by summing declared objects): the three bookshelves (2,352, 2,280 and 2,088), the three cabinets (1,316 each), `console-cables` (1,088), the two filing cabinets (692 each) and the desk (672).
-Texture memory margin: 6.668 MB computed against the 8 MB limit leaves about 1.33 MB. The per-texture list (MB, computed): attractSnake 0.25, attractMaze 0.25, attractFrequency 0.25, marqueeSnake 0.06, marqueeMaze 0.06, marqueeFrequency 0.06, signFace 0.33, posterSunset 0.66, posterReel 0.66, shiftPoster 0.66, shiftPlaque 0.17, floor 0.08, wood 0.08, woodDark 0.08, crate 0.08, grille 0.08, spineAtlas 0.66, wallPanel 0.33, rugWoven 0.33, corkBoard 1.33, lampGlow 0.02, smpteBars 0.13, timecode 0.02. `corkBoard` is the largest.
-No runtime measurement was taken by the agent in task 20.3. Chrome and Edge are installed, but no automation library (Playwright or Puppeteer) is present and nothing was installed. Human sign-off steps are in `performance-log.md` section 1.1; task 15.4 stays open.Runtime frame-time targets (median and 95th percentile at 1280x720 on integrated graphics, first-render time, runtime triangles and draw calls) are **not measured**. See `.kiro/specs/world-exploration/performance-log.md`. No runtime performance figure is claimed here.
+| Targeting benchmark | informational timing only, no threshold; varies per run and machine (task 21.3 standalone run 0.451 us/call, full-suite run 1.346 us/call) | informational |
+**The triangle margin is thin:** 19,128 leaves about 870 triangles (4 percent) below the 20,000 limit. The biggest consumers (computed by summing declared objects): the three bookshelves (2,352, 2,280 and 2,088), the three cabinets (1,316 each), `console-cables` (1,088), the two filing cabinets (692 each) and the desk (672).
+**The texture margin is also thin:** 7.58 MB computed against the 8 MB limit leaves about 0.42 MB. First candidates to cut if more room is needed: `console-cables` (1,088 triangles), the book count (370 books), and `corkBoard` at 512x512 (1.33 MB), which could drop to 256x256. The per-texture list (MB, computed): attractSnake 0.25, attractMaze 0.25, attractFrequency 0.25, marqueeSnake 0.06, marqueeMaze 0.06, marqueeFrequency 0.06, signFace 0.33, posterSunset 0.66, posterReel 0.66, shiftPoster 0.66, shiftPlaque 0.17, floor 0.08, wood 0.08, woodDark 0.08, crate 0.08, grille 0.08, spineAtlas 0.66, wallPanel 0.33, rugWoven 0.33, corkBoard 1.33, lampGlow 0.02, smpteBars 0.13, timecode 0.02, couchFabric 0.33, crtCasing 0.33, crtGlass 0.25. `corkBoard` is the largest.
+No runtime measurement was taken by the agent in task 21.3. Chrome and Edge are installed, but no automation library (Playwright or Puppeteer) is present and nothing was installed. Human sign-off steps are in `performance-log.md` section 1.1; task 15.4 stays open.Runtime frame-time targets (median and 95th percentile at 1280x720 on integrated graphics, first-render time, runtime triangles and draw calls) are **not measured**. See `.kiro/specs/world-exploration/performance-log.md`. No runtime performance figure is claimed here.
 
 ## Disposal and edge-case checks
 
@@ -165,7 +169,7 @@ npm test
 npm run build
 ```
 
-Fresh `npm test` run for this README (task 20.3, run twice, same result; `npm run typecheck` and `npm run build` exit 0): **27 test files, 484 tests, all passed**. Files under `src/world/` and their counts:
+Fresh `npm test` run for this README (task 21.3, run twice, same result; `npm run typecheck` and `npm run build` exit 0): **27 test files, 519 tests, all passed**. Files under `src/world/` and their counts:
 
 | Area | Files (tests) |
 | --- | --- |
@@ -174,7 +178,7 @@ Fresh `npm test` run for this README (task 20.3, run twice, same result; `npm ru
 | Controller | `controller/useReducedMotion.test.ts` (8) |
 | Layout | `layout/roomLayout.test.ts` (31) |
 | Logic | `collision` (18), `frameStats` (5), `inputMode` (29), `inputMode.supplied` (17), `inputMode.fallback` (7), `inputState` (15), `look` (20), `movement` (15), `palette` (4), `palette.full` (13), `playerStep` (9), `targeting` (14), `targeting.bench` (1, informational) |
-| Scene | `effectsTiming` (8), `memoryShift` (10), `modelDetail` (91), `proceduralTextures` (92) |
+| Scene | `effectsTiming` (8), `memoryShift` (13), `modelDetail` (104), `proceduralTextures` (111) |
 
 Outside `src/world/`: `src/App.test.ts` (8, stubbed `WorldScene`) and `src/core/gameReducer.test.ts` (4). Counts change when tests are added. Details, the 17 correctness properties and gaps: `.kiro/specs/world-exploration/test-report.md`.
 
@@ -189,10 +193,10 @@ See `.kiro/specs/world-exploration/proposals.md`. In short: P1 implemented; P3 a
 - No browser run is recorded for M6, the polish pass, the refinement pass or the three-cabinet pass; the new layout and textures are not verified visually.
 - All three cabinets open the same App arcade panel (Snake). LAST EXIT and DEAD FREQUENCY have no game behind them.
 - Spawn gap (open item): the spawn (0, 3) is exactly 1.0 m from the desk edge and the south wall, so a 1.2 m disc around the spawn is not clear. The test asserts 0.99 m. This was not requested in the final instructions and is not fixed. The manual test log has no recorded result.
-- Runtime frame time, first-render time and runtime triangle/draw-call counts are not measured. The triangle margin below the 20,000 limit is only about 850.
+- Runtime frame time, first-render time and runtime triangle/draw-call counts are not measured. The triangle margin below the 20,000 limit is only about 870, and the texture margin below 8 MB is only about 0.42 MB.
 - No GLB assets and no Blender run. The scene uses primitives only.
 - No restored-memory viewer component exists in the repo. The HUD shows progress booleans only.
 - `reducedDistortion` (P2) is not wired, so there is no in-game reduced-distortion link.
 - When `inputEnabled` is absent, the world cannot tell when a panel closed.
-- The production bundle is a single 1,258.12 kB JS chunk (358.85 kB gzip) per `performance-log.md`; no code splitting.
+- The production bundle is a single 1,262.70 kB JS chunk (360.43 kB gzip, task 21.3 build) per `performance-log.md`; no code splitting.
 - Optional property-based tests are not implemented.
