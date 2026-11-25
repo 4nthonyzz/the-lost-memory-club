@@ -10,7 +10,19 @@
 import { ROOM } from '../layout/roomLayout'
 import type { Aabb, ArcadeGameKind } from '../worldTypes'
 import { facingFrame } from './assetPlacement'
-import { CABINET_CARD_M, CABINET_PLAIN_V, DESK_DETAIL_ASPECT, DESK_DETAIL_TILE_M, TEXTURE_IDS, VCR_TILE_ASPECT, totalTextureMemoryBytes } from './proceduralTextures'
+import {
+  BOX_FACE_FRONT,
+  CABINET_CARD_M,
+  CABINET_DETAIL_REGIONS,
+  CABINET_PLAIN_V,
+  DESK_DETAIL_ASPECT,
+  DESK_DETAIL_TILE_M,
+  TEXTURE_IDS,
+  VCR_TILE_ASPECT,
+  detailUvRect,
+  totalTextureMemoryBytes,
+  type UvRect,
+} from './proceduralTextures'
 import { SHELF_IDS, shelfContents, shelfFrameParts } from './shelfModel'
 import type { geometries, materials } from './sharedResources'
 
@@ -57,6 +69,11 @@ export interface Part {
    */
   metricPlainV?: readonly [number, number]
   /**
+   * Atlas window (task 27.1): real-size box (mesh scale 1) whose `faces` (BoxGeometry face indices, +z = 4) show the UV rectangle
+   * `rect` of cabinetAndManualDetail and whose other faces show the flat `plain` rectangle. Zero extra triangles.
+   */
+  atlas?: { rect: UvRect; faces: readonly number[]; plain: UvRect }
+  /**
    * Desk lamp role (task 23.1): `bulb` core, `inner` shade face, `sprite` (a camera-facing glow plane, drawn by Props.tsx
    * with a billboard) or the desk light `pool`. Sprite and pool use a never-drawn material while the lamp is off.
    */
@@ -64,7 +81,7 @@ export interface Part {
 }
 
 /** True when the part is rendered from a cached real-size geometry (mesh scale 1). */
-export const isRealSizePart = (p: Part): boolean => Boolean(p.metric || p.metricFabric || p.metricRepeat)
+export const isRealSizePart = (p: Part): boolean => Boolean(p.metric || p.metricFabric || p.metricRepeat || p.atlas)
 
 /** Draw-call group of a part: geometry + material, plus the board size and the UV mapping for metric parts. */
 export function partGroupKey(p: Part): string {
@@ -72,8 +89,18 @@ export function partGroupKey(p: Part): string {
   const size = p.scale.map((v) => Math.round(v * 1e4)).join(',')
   const aspect = p.metricAspect && p.metricAspect !== 1 ? `|a${p.metricAspect}` : ''
   const offset = p.metricOffset ? `|o${p.metricOffset.map((v) => Math.round(v * 1e4)).join(',')}` : ''
-  return `${p.geo}|${p.mat}|${size}${aspect}${offset}`
+  const atlas = p.atlas ? `|w${p.atlas.rect.u0.toFixed(5)},${p.atlas.rect.v0.toFixed(5)}|f${p.atlas.faces.join('.')}` : ''
+  return `${p.geo}|${p.mat}|${size}${aspect}${offset}${atlas}`
 }
+
+/**
+ * Box whose +z (front) face shows `region` of cabinetAndManualDetail and whose other faces show the flat `plain` stripe (task 27.1).
+ * The cabinet parts are built in a local frame whose front is +z, so +z is the player-facing face after the Faced group rotates it.
+ */
+const atlasFront = (mat: MaterialKey, pos: Vec3, scale: Vec3, region: 'door' | 'lip' | 'kick', plain: 'plainSteel' | 'plainDark'): Part => ({
+  ...bx(mat, pos, scale),
+  atlas: { rect: detailUvRect(CABINET_DETAIL_REGIONS[region]), faces: [BOX_FACE_FRONT], plain: detailUvRect(CABINET_DETAIL_REGIONS[plain]) },
+})
 
 /** Triangles per shared unit geometry. A test checks these against the real three.js geometries. */
 export const GEOMETRY_TRIANGLES: Readonly<Record<GeometryKey, number>> = {
@@ -794,7 +821,8 @@ export function arcadeCabinetParts(box: Aabb, height: number, game: ArcadeGameKi
     part('sphere', ball, [x, 0.17, 0.05], [0.07, 0.07, 0.07]), // ball top
   ]
   const deck: Part[] = [
-    bx('deckPlate', [0, 0, 0], [w, 0.07, 0.44]),
+    // Deck: the front lip (+z, 1.0 x 0.07 m) carries the MOVE / ACTION / 1P START legends; the top and the other faces stay plain dark.
+    atlasFront('deckPlate', [0, 0, 0], [w, 0.07, 0.44], 'lip', 'plainDark'),
     ...stick(DECK_STICK_X[0], 'btnRed'),
     ...stick(DECK_STICK_X[1], 'btnBlue'),
     // Concave-looking buttons: a coloured cap sunk into a wider, darker ring.
@@ -861,12 +889,12 @@ export function arcadeCabinetParts(box: Aabb, height: number, game: ArcadeGameKi
     ...side(1),
     ...side(-1),
     // Coin door with two glowing slots, flanking louvered speaker grilles and the kick plate.
-    bx('metal', [0, 0.48, 0.004], [0.26, 0.34, 0.012]),
+    atlasFront('cabinetPanel', [0, 0.48, 0.004], [0.26, 0.34, 0.012], 'door', 'plainSteel'),
     ...slot(-0.07),
     ...slot(0.07),
     bx('grille', [-0.3, 0.5, 0.004], [0.2, 0.3, 0.008]),
     bx('grille', [0.3, 0.5, 0.004], [0.2, 0.3, 0.008]),
-    bx('metal', [0, 0.075, 0.004], [w * 0.98, 0.13, 0.012]),
+    atlasFront('cabinetPanel', [0, 0.075, 0.004], [w * 0.98, 0.13, 0.012], 'kick', 'plainSteel'),
   ]
   return offset(local, [cx, 0, box.maxZ])
 }
@@ -1466,9 +1494,10 @@ export function declaredObjects(): Array<{ name: string; parts: Part[]; extraTri
     // Books and slipcases: one InstancedMesh per spine variant in use, all on the shared 12-triangle unit box.
     objects.push({
       name: id,
-      parts: [...shelfFrameParts(p.box, p.height), ...contents.boxParts, ...contents.manualParts],
+      parts: [...shelfFrameParts(p.box, p.height), ...contents.boxParts],
       extraTriangles: contents.instances.length * GEOMETRY_TRIANGLES.box,
-      extraDrawCalls: new Set(contents.instances.map((b) => b.variant)).size,
+      // Task 27.1: each arcade manual has its own geometry (its spine strip), so it is its own draw call, outside the variant groups.
+      extraDrawCalls: new Set(contents.instances.filter((b) => !b.manualId).map((b) => b.variant)).size + contents.instances.filter((b) => b.manualId).length,
     })
   }
   return objects

@@ -32,12 +32,25 @@ import {
   CABINET_PLAIN_V,
   CRATE_LABEL_HEADER,
   CRATE_STENCIL_TEXT,
+  CABINET_COIN_LEGEND,
+  CABINET_DECK_LEGENDS,
+  CABINET_DETAIL_HEIGHT,
+  CABINET_DETAIL_REGIONS,
+  CABINET_DETAIL_WIDTH,
+  CABINET_INSERT_LEGEND,
+  CABINET_SERIAL_TEXT,
+  MANUAL_SPINE_TITLES,
+  MANUAL_STRIP_KEYS,
+  detailUvRect,
   cabinetCardV,
   marqueeFontSize,
   marqueeTextWidth,
   type TextureId,
 } from './proceduralTextures'
 import { RecordingContext } from './recordingContext'
+
+/** Task 27.1: cabinetAndManualDetail, 256 x 128 mipmapped (estimate 174,326 bytes), on top of the older memory caps below. */
+const TASK_27_1_TEXTURE_BYTES = Math.round(256 * 128 * 4 * 1.33)
 
 const ATTRACT_IDS = ['attractSnake', 'attractMaze', 'attractFrequency'] as const
 const MARQUEE_IDS = ['marqueeSnake', 'marqueeMaze', 'marqueeFrequency'] as const
@@ -640,7 +653,7 @@ describe('task 22.1: corkBoard 256, vcrDeck and vhsShell textures', () => {
   })
 
   it('texture memory after task 22.2 is at most 7.7 MB', () => {
-    expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(7.55 * 1048576)
+    expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(7.55 * 1048576 + TASK_27_1_TEXTURE_BYTES)
   })
 })
 
@@ -735,7 +748,7 @@ describe('task 22.2: metalCabinet, and cardboard crate textures', () => {
     const mb = (id: TextureId) => textureMemoryBytes(TEXTURE_SPECS[id]) / 1048576
     expect(mb('metalCabinet')).toBeCloseTo(0.33, 2)
     expect(mb('crate')).toBeCloseTo(0.33, 2)
-    expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(7.7 * 1048576)
+    expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(7.7 * 1048576 + TASK_27_1_TEXTURE_BYTES)
     expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
   })
 })
@@ -911,11 +924,11 @@ describe('task 26.1: texture craft (redrawn in place)', () => {
   ] as const satisfies readonly TextureId[]
   const brands = /sony|panasonic|jvc|toshiba|samsung|sharp|zenith|rca|nintendo|sega|atari|blockbuster|kind rewind|maxell|fuji|memorex/i
 
-  it('keeps 31 textures, within 7.85 MB (computed), and every size is a power of two with no 128 -> 256 growth', () => {
-    expect(TEXTURE_IDS).toHaveLength(31)
+  it('keeps 32 textures, within 7.85 MB (computed), and every size is a power of two with no 128 -> 256 growth', () => {
+    expect(TEXTURE_IDS).toHaveLength(32)
     expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(7.85 * 1048576)
     expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
-    expect(totalTextureMemoryBytes() / 1048576).toBeCloseTo(7.537, 2)
+    expect(totalTextureMemoryBytes() / 1048576).toBeCloseTo(7.537 + TASK_27_1_TEXTURE_BYTES / 1048576, 2)
     for (const id of TEXTURE_IDS) expect(isPowerOfTwo(TEXTURE_SPECS[id].width) && isPowerOfTwo(TEXTURE_SPECS[id].height)).toBe(true)
   })
 
@@ -962,5 +975,237 @@ describe('task 26.1: texture craft (redrawn in place)', () => {
       const [x, y, rw, rh] = call.args as number[]
       if (rh <= 3 && y > H * 0.8) expect(x >= 0 && x + rw <= W + 1 && y + rh <= H + 1, call.args.join()).toBe(true)
     }
+  })
+})
+
+describe('task 27.1: cabinetAndManualDetail (arcade cabinet front and manual spines)', () => {
+  const ID = 'cabinetAndManualDetail' as const
+  const W = CABINET_DETAIL_WIDTH
+  const H = CABINET_DETAIL_HEIGHT
+  const brands = /sony|panasonic|jvc|toshiba|samsung|sharp|zenith|rca|nintendo|sega|atari|blockbuster|kind rewind|maxell|fuji|memorex|namco|capcom|konami/i
+
+  /** A recording context that also supports setTransform, like a real canvas. */
+  class TransformContext extends RecordingContext {
+    setTransform(a: number, b: number, c: number, d: number, e: number, f: number): void {
+      this.calls.push({ op: 'setTransform', args: [a, b, c, d, e, f] })
+    }
+  }
+  const runWithTransform = (): TransformContext => {
+    const ctx = new TransformContext()
+    drawTexture(ID, ctx)
+    return ctx
+  }
+  const textCalls = (ctx: RecordingContext) =>
+    ctx.calls.filter((c) => c.op === 'fillText').map((c) => ({ s: String(c.args[0]), x: c.args[1] as number, y: c.args[2] as number }))
+
+  it('is a 256 x 128 mipmapped, clamped, power-of-two texture with its own seed', () => {
+    expect(TEXTURE_SPECS[ID]).toMatchObject({ id: ID, width: 256, height: 128, filter: 'mipmap', wrap: 'clamp', seed: 134 })
+    expect(isPowerOfTwo(W) && isPowerOfTwo(H)).toBe(true)
+    expect(TEXTURE_IDS.filter((o) => o !== ID).every((o) => TEXTURE_SPECS[o].seed !== 134)).toBe(true)
+  })
+
+  it('costs 0.166 MB, so there are 32 textures within 7.85 MB (computed)', () => {
+    expect(textureMemoryBytes(TEXTURE_SPECS[ID])).toBe(174326)
+    expect(textureMemoryBytes(TEXTURE_SPECS[ID]) / 1048576).toBeCloseTo(0.166, 3)
+    expect(TEXTURE_IDS).toHaveLength(32)
+    expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(7.85 * 1048576)
+    expect(totalTextureMemoryBytes() / 1048576).toBeCloseTo(7.703, 3)
+  })
+
+  it('is deterministic for one seed, differs for another and never calls Math.random', () => {
+    const real = Math.random
+    Math.random = () => {
+      throw new Error('Math.random is not allowed in texture drawing')
+    }
+    try {
+      expect(run(ID).hash()).toBe(run(ID).hash())
+      expect(runWithTransform().hash()).toBe(runWithTransform().hash())
+    } finally {
+      Math.random = real
+    }
+    expect(run(ID, 135).hash()).not.toBe(run(ID).hash())
+    expect(() => drawTexture(ID, new RecordingContext())).not.toThrow()
+  })
+
+  it('keeps every rectangle, arc, path point and text anchor inside the canvas and every number finite', () => {
+    for (const ctx of [run(ID), runWithTransform()]) {
+      for (const call of ctx.calls) {
+        const a = call.args as number[]
+        for (const v of a) if (typeof v === 'number') expect(Number.isFinite(v), call.op).toBe(true)
+        if (call.op === 'fillRect' || call.op === 'strokeRect') {
+          expect(a[0] >= 0 && a[1] >= 0 && a[0] + a[2] <= W && a[1] + a[3] <= H, `${call.op} ${a.join()}`).toBe(true)
+        } else if (call.op === 'arc') {
+          expect(a[0] - a[2] >= 0 && a[0] + a[2] <= W && a[1] - a[2] >= 0 && a[1] + a[2] <= H, `arc ${a.join()}`).toBe(true)
+        } else if (call.op === 'moveTo' || call.op === 'lineTo' || call.op === 'fillText') {
+          const [x, y] = call.op === 'fillText' ? [a[1], a[2]] : [a[0], a[1]]
+          expect(x >= 0 && x <= W && y >= 0 && y <= H, `${call.op} ${a.join()}`).toBe(true)
+        }
+      }
+    }
+  })
+
+  it('prints the cabinet legends: 25 cent, INSERT COIN, MOVE, ACTION, 1P START and a serial plate', () => {
+    expect(CABINET_COIN_LEGEND).toBe('25\u00a2')
+    expect(CABINET_INSERT_LEGEND).toBe('INSERT COIN')
+    expect([...CABINET_DECK_LEGENDS]).toEqual(['MOVE', 'ACTION', '1P START'])
+    const texts = textCalls(run(ID))
+    const left = texts.filter((t) => t.x < 128).map((t) => t.s)
+    for (const s of ['25\u00a2', 'INSERT COIN', 'MOVE', 'ACTION', '1P START', 'SER. 0996-LMC']) expect(left, s).toContain(s)
+    expect(CABINET_SERIAL_TEXT).toBe('SER. 0996-LMC')
+    // Two reject buttons, so two 25 cent legends.
+    expect(left.filter((s) => s === '25\u00a2')).toHaveLength(2)
+  })
+
+  it('draws the control-deck legends inside the deck lip band, in order left to right', () => {
+    const [, y0, , y1] = CABINET_DETAIL_REGIONS.lip
+    const legends = textCalls(run(ID)).filter((t) => (CABINET_DECK_LEGENDS as readonly string[]).includes(t.s))
+    expect(legends.map((t) => t.s)).toEqual(['MOVE', 'ACTION', '1P START'])
+    for (const t of legends) expect(t.y > y0 && t.y < y1, t.s).toBe(true)
+    expect(legends[0].x).toBeLessThan(legends[1].x)
+    expect(legends[1].x).toBeLessThan(legends[2].x)
+  })
+
+  it('prints the three manual titles along the spines: whole strings with a transform, stacked letters without', () => {
+    expect([...MANUAL_SPINE_TITLES]).toEqual(['01 SNAKE.EXE', '02 LAST EXIT', '03 DEAD FREQUENCY'])
+    const withT = runWithTransform()
+    const wholes = textCalls(withT).map((t) => t.s)
+    for (const title of MANUAL_SPINE_TITLES) expect(wholes).toContain(title)
+    // Each whole title is drawn inside a save/setTransform/restore pair whose translation lies in its own strip.
+    const transforms = withT.calls.filter((c) => c.op === 'setTransform').map((c) => c.args as number[])
+    expect(transforms).toHaveLength(3)
+    transforms.forEach((t, i) => {
+      const [x0, , x1] = CABINET_DETAIL_REGIONS.strips[i]
+      expect(t[4] > x0 && t[4] < x1).toBe(true)
+      expect(t[5] > 54 && t[5] < 120).toBe(true)
+    })
+    expect(withT.calls.filter((c) => c.op === 'save')).toHaveLength(withT.calls.filter((c) => c.op === 'restore').length)
+
+    // Without setTransform the letters are stacked top to bottom on the strip axis.
+    const plain = textCalls(run(ID))
+    CABINET_DETAIL_REGIONS.strips.forEach((strip, i) => {
+      const cx = (strip[0] + strip[2]) / 2
+      const letters = plain.filter((t) => t.x === cx && t.s.length === 1)
+      expect(letters.map((t) => t.s).join('')).toBe(MANUAL_SPINE_TITLES[i].replace(/ /g, ''))
+      for (let k = 1; k < letters.length; k++) expect(letters[k].y).toBeGreaterThan(letters[k - 1].y)
+    })
+  })
+
+  it('draws the amber 89.4 MHz wave emblem on the third spine and no text outside the strips on the right half', () => {
+    const texts = textCalls(run(ID))
+    const mhz = texts.find((t) => t.s === FREQUENCY_TEXT)!
+    expect(FREQUENCY_TEXT).toBe('89.4 MHz')
+    const third = CABINET_DETAIL_REGIONS.strips[2]
+    expect(mhz.x > third[0] && mhz.x < third[2]).toBe(true)
+    for (const t of texts.filter((q) => q.x >= 128)) {
+      expect(CABINET_DETAIL_REGIONS.strips.some((s) => t.x > s[0] && t.x < s[2]), t.s).toBe(true)
+    }
+  })
+
+  it('has no brand names in any string', () => {
+    for (const s of [...run(ID).texts(), ...runWithTransform().texts()]) expect(s).not.toMatch(brands)
+  })
+
+  it('lays the regions out inside their half, without overlap, at the real aspect of the faces they map onto', () => {
+    const R = CABINET_DETAIL_REGIONS
+    const left = [R.door, R.lip, R.kick, R.plainSteel, R.plainDark]
+    for (const r of left) expect(r[0] >= 0 && r[2] <= 128 && r[1] >= 0 && r[3] <= H).toBe(true)
+    for (const r of [...R.strips, R.cover]) expect(r[0] >= 128 && r[2] <= W && r[1] >= 0 && r[3] <= H).toBe(true)
+    const all = [...left, ...R.strips, R.cover]
+    for (let i = 0; i < all.length; i++) {
+      for (let j = i + 1; j < all.length; j++) {
+        const a = all[i]
+        const b = all[j]
+        expect(a[2] <= b[0] || b[2] <= a[0] || a[3] <= b[1] || b[3] <= a[1], `${i} vs ${j}`).toBe(true)
+      }
+    }
+    const aspect = (r: readonly number[]) => (r[2] - r[0]) / (r[3] - r[1])
+    expect(aspect(R.door)).toBeCloseTo(0.26 / 0.34, 1) // coin door 0.26 x 0.34 m
+    expect(aspect(R.lip) / (1 / 0.07)).toBeCloseTo(1, 1) // deck lip 1.0 x 0.07 m
+    expect(aspect(R.kick) / (0.98 / 0.13)).toBeCloseTo(1, 1) // kick plate 0.98 x 0.13 m
+    expect(MANUAL_STRIP_KEYS).toHaveLength(3)
+    for (const s of R.strips) expect(s[2] - s[0]).toBeGreaterThanOrEqual(41)
+  })
+
+  it('maps UV windows to the same regions: inside their half, top of the canvas is v = 1', () => {
+    for (const r of [CABINET_DETAIL_REGIONS.door, CABINET_DETAIL_REGIONS.lip, CABINET_DETAIL_REGIONS.kick, CABINET_DETAIL_REGIONS.plainSteel, CABINET_DETAIL_REGIONS.plainDark]) {
+      const u = detailUvRect(r)
+      expect(u.u0).toBeGreaterThanOrEqual(0)
+      expect(u.u1).toBeLessThanOrEqual(0.5)
+      expect(u.u0).toBeLessThan(u.u1)
+      expect(u.v0).toBeLessThan(u.v1)
+    }
+    for (const r of [...CABINET_DETAIL_REGIONS.strips, CABINET_DETAIL_REGIONS.cover]) {
+      const u = detailUvRect(r)
+      expect(u.u0).toBeGreaterThanOrEqual(0.5)
+      expect(u.u1).toBeLessThanOrEqual(1)
+    }
+    // The door is the top-left region of the canvas: its window reaches v close to 1.
+    expect(detailUvRect(CABINET_DETAIL_REGIONS.door).v1).toBeCloseTo(1 - 0.5 / 128, 6)
+  })
+
+  it('keeps the spine backgrounds near neutral so the book colour still multiplies through', () => {
+    const fills = run(ID).calls.filter((c) => c.op === 'set fillStyle').map((c) => String(c.args[0]))
+    // Strip ground and cover cloth: light neutral greys (r = g = b, at least 0xc0).
+    for (const grey of ['#cfcfcf', '#d2d2d2', '#fbfbfb']) {
+      expect(fills).toContain(grey)
+      const v = parseInt(grey.slice(1, 3), 16)
+      expect(v).toBeGreaterThanOrEqual(0xc0)
+    }
+  })
+})
+
+describe('task 27.1: sharpened in place (rugWoven, wood, woodDark, spineAtlas)', () => {
+  const SHARPENED = [
+    ['rugWoven', 256, 256],
+    ['wood', 128, 128],
+    ['woodDark', 128, 128],
+    ['spineAtlas', 512, 256],
+  ] as const
+
+  it.each(SHARPENED)('%s keeps its size (%i x %i), id, mipmap filter and memory', (id, w, h) => {
+    expect(TEXTURE_SPECS[id]).toMatchObject({ id, width: w, height: h, filter: 'mipmap' })
+    expect(textureMemoryBytes(TEXTURE_SPECS[id])).toBe(Math.round(w * h * 4 * 1.33))
+  })
+
+  it.each(SHARPENED)('%s is deterministic, uses no Math.random and differs with another seed', (id) => {
+    const real = Math.random
+    Math.random = () => {
+      throw new Error('Math.random is not allowed in texture drawing')
+    }
+    try {
+      expect(run(id).hash()).toBe(run(id).hash())
+    } finally {
+      Math.random = real
+    }
+    expect(run(id, TEXTURE_SPECS[id].seed + 1).hash()).not.toBe(run(id).hash())
+  })
+
+  it('rugWoven draws crisp border threads: many 1 px dark and light ticks in the crimson border ring', () => {
+    const rects = run('rugWoven').calls.filter((c) => c.op === 'fillRect')
+    const threads = rects.filter((c) => {
+      const [, , rw, rh] = c.args as number[]
+      return rw === 1 || rh === 1
+    })
+    expect(threads.length).toBeGreaterThan(400)
+  })
+
+  it('wood and woodDark add pale grain highlights that stay inside the tile', () => {
+    for (const id of ['wood', 'woodDark'] as const) {
+      const { width: tw, height: th } = TEXTURE_SPECS[id]
+      const fills = run(id).calls
+      const lights = fills.filter((c, i) => c.op === 'fillRect' && fills[i - 1]?.args[0] === '#ffe2b0')
+      expect(lights.length, id).toBeGreaterThanOrEqual(20)
+      for (const c of lights) {
+        const [x, y, rw, rh] = c.args as number[]
+        expect(x >= 0 && y >= 0 && x + rw <= tw && y + rh <= th, `${id} ${c.args.join()}`).toBe(true)
+      }
+    }
+  })
+
+  it('spineAtlas prints each stacked title twice at full strength (crisper ink) and keeps ink light enough to tint', () => {
+    const texts = run('spineAtlas').calls.filter((c) => c.op === 'fillText').map((c) => String(c.args[0]))
+    // "ARCHIVE" stacked on cell 1 and cell 5: every letter appears at least four times (embossed copy + two ink passes, two cells).
+    expect(texts.filter((s) => s === 'A').length).toBeGreaterThanOrEqual(6)
+    for (const s of run('spineAtlas').texts()) expect(s).not.toMatch(/sony|jvc|rca|fuji/i)
   })
 })

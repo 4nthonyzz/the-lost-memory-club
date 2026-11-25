@@ -24,17 +24,22 @@ import {
 import { ROOM } from '../layout/roomLayout'
 import { ARCADE_SCREEN_BASE_COLORS, BASE_CRT_SCREEN_COLOR, BASE_WALL_COLOR, COUCH_FABRIC_COLORS, CRT_CASING_COLORS, arcadeScreenBaseColor, crtScreenBaseColor } from './memoryShift'
 import {
+  BOX_FACE_FRONT,
   FLOOR_METRES_PER_REPEAT,
   SPINE_CASE_SIDE_CELL,
   SPINE_COVER_CELL,
   SPINE_VARIANT_COUNT,
   TEXTURE_IDS,
   TEXTURE_SPECS,
+  CABINET_DETAIL_REGIONS,
+  MANUAL_STRIP_KEYS,
   VCR_CHASSIS_COLOR,
   WALL_METRES_U,
   WALL_METRES_V,
   type Ctx2D,
   type TextureFilter,
+  type UvRect,
+  detailUvRect,
   spineCellUv,
   type TextureId,
 } from './proceduralTextures'
@@ -76,6 +81,32 @@ function makeSpineGeometry(variant: number): BoxGeometry {
 }
 
 export const spineGeometries: readonly BoxGeometry[] = Array.from({ length: SPINE_VARIANT_COUNT }, (_, v) => makeSpineGeometry(v))
+
+/**
+ * Remaps the native UVs of a box (task 27.1): the faces in `faces` show the whole of `rect`, every other face shows
+ * the flat `plain` rect. The native orientation is kept (on +z, u follows +x and v follows +y), so text reads upright
+ * from the front. `g` must be a fresh BoxGeometry.
+ */
+function remapBoxUv(g: BoxGeometry, rect: UvRect, faces: readonly number[], plain: UvRect): BoxGeometry {
+  const uv = g.getAttribute('uv')
+  for (let i = 0; i < uv.count; i++) {
+    const r = faces.includes(Math.floor(i / 4)) ? rect : plain
+    uv.setXY(i, r.u0 + uv.getX(i) * (r.u1 - r.u0), r.v0 + uv.getY(i) * (r.v1 - r.v0))
+  }
+  uv.needsUpdate = true
+  return g
+}
+
+/**
+ * Unit box per arcade manual (task 27.1), in MANUAL_STRIP_KEYS order: the +z face (the spine, which faces +X toward the room on
+ * the west bookcase) shows the manual's own spine strip of cabinetAndManualDetail, every other face the plain cover-cloth stripe.
+ * Sized by instance scale like the spine variants.
+ */
+export const manualGeometries: Readonly<Record<(typeof MANUAL_STRIP_KEYS)[number], BoxGeometry>> = Object.freeze(
+  Object.fromEntries(
+    MANUAL_STRIP_KEYS.map((id, i) => [id, remapBoxUv(new BoxGeometry(1, 1, 1), detailUvRect(CABINET_DETAIL_REGIONS.strips[i]), [BOX_FACE_FRONT], detailUvRect(CABINET_DETAIL_REGIONS.cover))]),
+  ),
+) as Record<(typeof MANUAL_STRIP_KEYS)[number], BoxGeometry>
 
 const lambert = (color: string) => new MeshLambertMaterial({ color })
 
@@ -201,8 +232,10 @@ export const materials = {
   /** 24.1 banker shade: OFF is dark green glass with no emission; ON adds emissive #16a34a at 0.38 (25.1). Separate per lamp, swapped per mesh. */
   lampGreenShade: new MeshLambertMaterial({ color: '#16503a', emissive: '#16a34a', emissiveIntensity: 0 }),
   lampGreenShadeOn: new MeshLambertMaterial({ color: '#1f7a4e', emissive: '#16a34a', emissiveIntensity: 0.38 }),
-  /** 23.2: lighter cream spine band on the three arcade manuals (flat colour, no texture). */
-  manualBand: lambert('#eadfb8'),
+  /** 27.1: arcade manuals. White base multiplied by each book's instance colour; the cabinetAndManualDetail spine strips carry the printed label band that replaced the old cream band part. */
+  manualBook: lambert('#ffffff'),
+  /** 27.1: coin door and kick plate of the arcade cabinets (steel, lit like the old `metal` #777c86). The texture is the colour, so the multiplier is white; the flat grey is the no-canvas fallback. */
+  cabinetPanel: lambert('#777c86'),
   /** 24.1 table-lamp shade: OFF is a dull grey-cream with no emission; ON adds emissive #ffd27d at 0.85. */
   lampCreamShade: new MeshLambertMaterial({ color: '#a89f8a', emissive: '#ffd27d', emissiveIntensity: 0, side: DoubleSide }),
   lampCreamShadeOn: new MeshLambertMaterial({ color: '#efe3c4', emissive: '#ffd27d', emissiveIntensity: 0.85, side: DoubleSide }),
@@ -411,6 +444,27 @@ export function metricBoxGeometry(
 
 export const woodBoxGeometry = (w: number, h: number, d: number): BoxGeometry => metricBoxGeometry(w, h, d, WOOD_METRES_PER_REPEAT, true)
 
+/**
+ * Real-size box whose `faces` show a UV window of an atlas texture and whose other faces show a flat `plain` stripe (task 27.1).
+ * Used by the arcade cabinet coin door, kick plate and control deck, so the legends live only on the player-facing +z face.
+ * Cached by dimensions (0.1 mm) + window + faces, in the same cache as the metric boxes, so disposeSharedResources() disposes it once.
+ */
+export function atlasBoxGeometry(w: number, h: number, d: number, rect: UvRect, faces: readonly number[], plain: UvRect): BoxGeometry {
+  const sx = round4(w)
+  const sy = round4(h)
+  const sz = round4(d)
+  const r = (u: UvRect) => `${u.u0.toFixed(5)},${u.u1.toFixed(5)},${u.v0.toFixed(5)},${u.v1.toFixed(5)}`
+  const key = `atlas|${sx},${sy},${sz}|f${faces.join('.')}|${r(rect)}|${r(plain)}`
+  const cached = woodBoxCache.get(key)
+  if (cached) return cached
+  const g = remapBoxUv(new BoxGeometry(sx, sy, sz), rect, faces, plain)
+  woodBoxCache.set(key, g)
+  return g
+}
+
+/** Number of live cached atlas-window box geometries (tests and reports). */
+export const atlasBoxCount = (): number => [...woodBoxCache.keys()].filter((k) => k.startsWith('atlas|')).length
+
 /** Number of live cached wood geometries (tests and reports). */
 export const woodBoxCount = (): number => [...woodBoxCache.keys()].filter((k) => k.startsWith('grain|')).length
 
@@ -587,6 +641,10 @@ const TEXTURE_BINDINGS: readonly TextureBinding[] = [
   /** Slightly dimmed multiplier: the reference card stays below the main CRT's brightness. */
   { material: 'smpteScreen', texture: 'smpteBars', color: '#b8b8b8' },
   { material: 'timecode', texture: 'timecode', color: '#ffffff' },
+  /** 27.1: the cabinetAndManualDetail texture is the colour of the coin door, kick plate, control-deck lip and the three manual spines (white multiplier; books multiply it by the instance colour). */
+  { material: 'cabinetPanel', texture: 'cabinetAndManualDetail', color: '#ffffff', fallbackColor: '#777c86' },
+  { material: 'deckPlate', texture: 'cabinetAndManualDetail', color: '#ffffff', fallbackColor: '#1a1b22' },
+  { material: 'manualBook', texture: 'cabinetAndManualDetail', color: '#ffffff', fallbackColor: '#ffffff' },
 ]
 
 /**
@@ -635,6 +693,7 @@ export const SHARED_TEXTURE_IDS: readonly TextureId[] = TEXTURE_IDS
 export function disposeSharedResources(): void {
   for (const g of Object.values(geometries)) g.dispose()
   for (const g of spineGeometries) g.dispose()
+  for (const g of Object.values(manualGeometries)) g.dispose()
   for (const g of wallGeometryCache.values()) g.dispose()
   wallGeometryCache.clear()
   for (const g of woodBoxCache.values()) g.dispose()

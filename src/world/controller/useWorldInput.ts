@@ -13,6 +13,7 @@ import {
 } from '../logic/inputMode';
 import {
   EMPTY_HELD_KEYS,
+  isActionRole,
   isKeyEventAccepted,
   keyRole,
   reduceHeldKeys,
@@ -45,6 +46,8 @@ export interface UseWorldInputOptions {
   onCloseCard?: () => void;
   /** Returns true while a card is open. Read at key time. */
   isCardOpen?: () => boolean;
+  /** Called when key 1 or 2 is pressed while a card is open. Read through a ref. Never releases pointer lock. */
+  onCardPage?: (page: 1 | 2) => void;
   /** Optional external switch. Absent means unchanged default behavior. */
   inputEnabled?: boolean;
 }
@@ -79,11 +82,13 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
   const onPropInteractRef = useRef(options.onPropInteract);
   const onCloseCardRef = useRef(options.onCloseCard);
   const isCardOpenRef = useRef(options.isCardOpen);
+  const onCardPageRef = useRef(options.onCardPage);
   onInspectRef.current = options.onInspect;
   getTargetRef.current = options.getTarget;
   onPropInteractRef.current = options.onPropInteract;
   onCloseCardRef.current = options.onCloseCard;
   isCardOpenRef.current = options.isCardOpen;
+  onCardPageRef.current = options.onCardPage;
 
   const getMode = useCallback((): InputMode => stateRef.current.mode, []);
 
@@ -121,6 +126,9 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
             break;
           case 'CLOSE_CARD':
             onCloseCardRef.current?.();
+            break;
+          case 'CARD_PAGE':
+            onCardPageRef.current?.(effect.page);
             break;
           case 'RELEASE_POINTER_LOCK':
             exitLock(doc);
@@ -161,11 +169,15 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
       // Escape closes an open card. It is never prevented: the browser also uses it to release pointer lock.
       if (accepted && e.code === 'Escape') onCloseCardRef.current?.();
 
-      if (accepted && role !== null && role !== 'interact' && modeBefore !== 'inspecting') {
+      const cardOpen = isCardOpenRef.current?.() === true;
+      const isPageKey = role === 'page1' || role === 'page2';
+      // Movement and look keys are held. E and the page keys are one-shot actions and are never held.
+      if (accepted && role !== null && !isActionRole(role) && modeBefore !== 'inspecting') {
         heldKeysRef.current = reduceHeldKeys(heldKeysRef.current, { type: 'down', role });
       }
       // preventDefault only for used keys while not inspecting. Esc is never touched.
-      if (accepted && role !== null && modeBefore !== 'inspecting' && e.code !== 'Escape') {
+      // Keys 1 and 2 are claimed only while a card is open.
+      if (accepted && role !== null && modeBefore !== 'inspecting' && e.code !== 'Escape' && (!isPageKey || cardOpen)) {
         e.preventDefault();
       }
 
@@ -184,7 +196,7 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
           hasTarget,
           targetKind,
           targetPropId,
-          cardOpen: role === 'interact' ? isCardOpenRef.current?.() === true : false,
+          cardOpen: role === 'interact' || isPageKey ? cardOpen : false,
         },
         true,
       );
@@ -193,7 +205,7 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
     const onKeyUp = (e: KeyboardEvent) => {
       const role = keyRole(e.code);
       // Always release, even for keys that were not accepted, so none can stick.
-      if (role !== null && role !== 'interact') {
+      if (role !== null && !isActionRole(role)) {
         heldKeysRef.current = reduceHeldKeys(heldKeysRef.current, { type: 'up', role });
       }
       dispatch({ type: 'KEY_UP', role }, false);

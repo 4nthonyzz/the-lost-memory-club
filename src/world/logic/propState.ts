@@ -1,6 +1,6 @@
 // Pure module: world-local state of the interactable props (desk lamps and readable props).
 // Session-only: it lives in React state inside the world, is never persisted and is not part of GameState.
-import { READABLE_COUNT, isReadableId } from './archiveDocuments';
+import { READABLE_COUNT, isReadableId, type CardPage } from './archiveDocuments';
 import type { InteractionTarget, LampId, PropInteractableId, ReadableId, Vec2 } from '../worldTypes';
 
 
@@ -16,6 +16,8 @@ export interface PropState {
   message: WorldMessage | null;
   /** The readable prop whose Archive Document Card is open, or null. */
   openCard: ReadableId | null;
+  /** The visible page of the open card. Always 1 when no card is open and when a card opens. */
+  cardPage: CardPage;
   /** Distinct readable props opened this session. Not persisted. */
   read: ReadonlySet<ReadableId>;
 }
@@ -39,6 +41,7 @@ export function initialPropState(): PropState {
     lampOn: { 'desk-lamp-left': true, 'desk-lamp-right': true },
     message: null,
     openCard: null,
+    cardPage: 1,
     read: new Set<ReadableId>(),
   };
 }
@@ -54,7 +57,7 @@ export function isLampId(id: PropInteractableId): id is LampId {
  *  - a readable prop: its card opens and it counts as read.
  */
 export function reducePropInteract(s: PropState, id: PropInteractableId): PropState {
-  if (s.openCard !== null) return { ...s, openCard: null };
+  if (s.openCard !== null) return { ...s, openCard: null, cardPage: 1 };
   if (isLampId(id)) {
     const on = !s.lampOn[id];
     return {
@@ -64,12 +67,18 @@ export function reducePropInteract(s: PropState, id: PropInteractableId): PropSt
     };
   }
   const read = s.read.has(id) ? s.read : new Set<ReadableId>([...s.read, id]);
-  return { ...s, message: null, openCard: id, read };
+  return { ...s, message: null, openCard: id, cardPage: 1, read };
 }
 
 /** Closes the card (E on nothing, Esc, pointer lock lost, distance, station opened, inspecting). Same state when none is open. */
 export function reduceCloseCard(s: PropState): PropState {
-  return s.openCard === null ? s : { ...s, openCard: null };
+  return s.openCard === null ? s : { ...s, openCard: null, cardPage: 1 };
+}
+
+/** CARD_PAGE: shows page 1 or 2 of the open card. Same state when no card is open or the page is already shown. The read set is untouched. */
+export function reduceCardPage(s: PropState, page: CardPage): PropState {
+  if (s.openCard === null || s.cardPage === page) return s;
+  return { ...s, cardPage: page };
 }
 
 /** True when the player is farther than `maxDist` from the anchor of the open card's prop. */

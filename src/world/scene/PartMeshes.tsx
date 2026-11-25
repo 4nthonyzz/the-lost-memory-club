@@ -7,11 +7,13 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 import { Color, Object3D, type InstancedMesh } from 'three'
 import { instanceColour, isRealSizePart, partGroupKey, type BookInstance, type Part } from './modelDetail'
 import { FABRIC_METRES_PER_REPEAT } from './proceduralTextures'
-import { ensureSharedTextures, geometries, materials, metricBoxGeometry, spineGeometries, woodBoxGeometry } from './sharedResources'
+import { atlasBoxGeometry, ensureSharedTextures, geometries, manualGeometries, materials, metricBoxGeometry, spineGeometries, woodBoxGeometry } from './sharedResources'
 
 /** Metric wood boards use a cached real-size geometry and unit mesh scale; every other part scales the unit geometry. */
 const geometryOf = (p: Part) =>
-  p.metric
+  p.atlas
+    ? atlasBoxGeometry(p.scale[0], p.scale[1], p.scale[2], p.atlas.rect, p.atlas.faces, p.atlas.plain)
+    : p.metric
     ? woodBoxGeometry(p.scale[0], p.scale[1], p.scale[2])
     : p.metricFabric
       ? metricBoxGeometry(p.scale[0], p.scale[1], p.scale[2], FABRIC_METRES_PER_REPEAT)
@@ -61,7 +63,10 @@ function BookVariantMesh({ variant, items }: { variant: number; items: readonly 
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
     mesh.computeBoundingSphere()
   }, [items])
-  return <instancedMesh ref={ref} args={[spineGeometries[variant], materials.bookSpine, items.length]} />
+  // Task 27.1: the three arcade manuals use their own geometry (spine strip of cabinetAndManualDetail) and material.
+  const manualId = items[0]?.manualId
+  const geometry = manualId ? manualGeometries[manualId] : spineGeometries[variant]
+  return <instancedMesh ref={ref} args={[geometry, manualId ? materials.manualBook : materials.bookSpine, items.length]} />
 }
 
 /**
@@ -72,18 +77,20 @@ function BookVariantMesh({ variant, items }: { variant: number; items: readonly 
 export function BookMeshes({ instances }: { instances: readonly BookInstance[] }) {
   useMemo(ensureSharedTextures, [])
   const groups = useMemo(() => {
-    const map = new Map<number, BookInstance[]>()
+    // Ordinary books group by spine variant; every arcade manual is its own group (its own spine geometry).
+    const map = new Map<string, { variant: number; items: BookInstance[] }>()
     for (const b of instances) {
-      const list = map.get(b.variant)
-      if (list) list.push(b)
-      else map.set(b.variant, [b])
+      const key = b.manualId ? `manual:${b.manualId}` : `variant:${b.variant}`
+      const group = map.get(key)
+      if (group) group.items.push(b)
+      else map.set(key, { variant: b.variant, items: [b] })
     }
-    return [...map.entries()].sort((a, b) => a[0] - b[0])
+    return [...map.entries()].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
   }, [instances])
   return (
     <group>
-      {groups.map(([variant, items]) => (
-        <BookVariantMesh key={variant} variant={variant} items={items} />
+      {groups.map(([key, g]) => (
+        <BookVariantMesh key={key} variant={g.variant} items={g.items} />
       ))}
     </group>
   )

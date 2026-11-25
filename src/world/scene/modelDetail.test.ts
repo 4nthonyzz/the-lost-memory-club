@@ -107,11 +107,17 @@ import { ARCADE_SCREEN_BASE_COLORS, BASE_CRT_SCREEN_COLOR, BASE_WALL_COLOR, CRT_
 import { MUG_COFFEE_H, MUG_RIM_H, MUG_STAIN_H, NOTE_DX, NOTE_DZ, cablePathParts, consoleCableParts, deskParts, partGroupKey } from './modelDetail'
 import { textureMemoryBytes } from './proceduralTextures'
 import { WOOD_METRES_PER_REPEAT, fabricBoxCount, metricBoxGeometry, woodBoxCount, woodBoxGeometry } from './sharedResources'
-import { FABRIC_METRES_PER_REPEAT } from './proceduralTextures'
+import { FABRIC_METRES_PER_REPEAT, CABINET_DETAIL_REGIONS, BOX_FACE_FRONT, MANUAL_STRIP_KEYS, detailUvRect } from './proceduralTextures'
+import { atlasBoxCount, atlasBoxGeometry, manualGeometries } from './sharedResources'
 import { COUCH_FABRIC_COLORS } from './memoryShift'
 
 /** Task 26.1: the mug coffee disc and the desk stain disc, 32 triangles each (8-sided low cylinders). */
 const TASK_26_1_TRIANGLES = 64
+
+/** Task 27.1: the three cream manual band boxes (12 triangles each) are replaced by a printed band in the texture: -36 triangles. */
+const TASK_27_1_TRIANGLES = -36
+/** Task 27.1: cabinetAndManualDetail, 256 x 128 mipmapped (estimate 174,326 bytes), added on top of the older memory caps below. */
+const TASK_27_1_TEXTURE_BYTES = Math.round(256 * 128 * 4 * 1.33)
 
 const lightingSource = (
   import.meta.glob('./Lighting.tsx', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
@@ -652,7 +658,7 @@ describe('arcade manuals on the west bookcase (task 23.2)', () => {
     }
   })
 
-  it('does not overlap any neighbour on its level, and each manual has one lighter band on its spine', () => {
+  it('does not overlap any neighbour on its level (the printed label band replaced the cream band parts in task 27.1)', () => {
     for (const m of manuals) {
       const a = ext(m)
       for (const b of c.instances.filter((q) => q !== m && q.level === m.level)) {
@@ -660,23 +666,14 @@ describe('arcade manuals on the west bookcase (task 23.2)', () => {
         expect(a.maxZ <= e.minZ + 1e-9 || a.minZ >= e.maxZ - 1e-9, `${m.manualId} vs ${b.group} at z ${b.pos[2].toFixed(3)}`).toBe(true)
       }
     }
-    expect(c.manualParts).toHaveLength(3)
-    c.manualParts.forEach((band, i) => {
-      const a = ext(manuals[i])
-      expect(band.mat).toBe('manualBand')
-      expect(Math.abs(band.pos[2] - manuals[i].pos[2])).toBeLessThan(1e-9)
-      expect(band.pos[0] + band.scale[0] / 2).toBeGreaterThan(a.maxX)
-      expect(band.pos[0] + band.scale[0] / 2).toBeLessThanOrEqual(inner.maxX + 1e-9)
-      expect(band.pos[0] - band.scale[0] / 2).toBeLessThan(a.maxX)
-      expect(band.scale[2]).toBeLessThan(manuals[i].size[0])
-    })
     // Only the manual bookcase gets manuals.
     for (const id of SHELF_IDS.filter((s) => s !== MANUAL_PLACEMENT.shelfId)) {
       const q = prop(id)
       const other = shelfContents(id, q.box, q.height)
-      expect(other.manualParts).toEqual([])
       expect(other.instances.some((b) => b.group === 'manual')).toBe(false)
     }
+    // No separate band parts any more: the shelf frame and boxes contain no cream material.
+    expect(shelfFrameParts(p.box, p.height).concat(c.boxParts).some((q) => (q.mat as string) === 'manualBand')).toBe(false)
   })
 
   it('keeps the budgets: triangles < 20,000 with a Task 23 delta <= +120, 4 lights, texture memory <= 8 MB', () => {
@@ -1115,7 +1112,7 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
           `texture memory ${(report.textureMemoryBytes / 1048576).toFixed(3)} MiB`,
       )
       expect(M3_LIGHT_COUNT).toBe(4)
-      expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.55 * 1048576)
+      expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.55 * 1048576 + TASK_27_1_TEXTURE_BYTES)
       expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
     })
 
@@ -1224,9 +1221,9 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
       const report = sceneDetailReport()
       expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
       expect(report.totalTriangles - 19042).toBeLessThanOrEqual(82 + TASK_26_1_TRIANGLES) // 25.1 adds 18 (caps +16, liner +2); 25.2 adds 6 (three glow decals)
-      expect(report.totalTriangles - 19042).toBe(82 + TASK_26_1_TRIANGLES)
-      expect(report.textureCount).toBe(31)
-      expect(report.textureMemoryBytes / 1048576).toBeCloseTo(7.537, 2) // 7.521 + coneFalloff 0.016
+      expect(report.totalTriangles - 19042).toBe(82 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES)
+      expect(report.textureCount).toBe(32)
+      expect(report.textureMemoryBytes / 1048576).toBeCloseTo(7.537 + TASK_27_1_TEXTURE_BYTES / 1048576, 2) // 7.521 + coneFalloff 0.016
       expect(report.textureMemoryBytes).toBeLessThanOrEqual(8 * 1048576)
       expect(M3_LIGHT_COUNT).toBe(4)
       console.info(
@@ -1399,7 +1396,7 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
     // 21 textures after 18.3; task 20.2 removed four (arcadeScreen, marquee, outOfOrder, deck) and added six; task 21.1 added couchFabric.
     // Task 21.2 adds crtCasing and crtGlass; 22.1 adds vcrDeck and vhsShell, 22.2 adds metalCabinet (A) and deskDetail (B).
-    expect(report.textureCount).toBe(31)
+    expect(report.textureCount).toBe(32)
     for (const name of ['conduit', 'ventilation', 'cable-loops', 'corner-posts', 'wall-clock', 'desk-lamp-left', 'desk-lamp-right']) {
       expect(report.objects.map((o) => o.name)).toContain(name)
     }
@@ -1435,7 +1432,7 @@ describe('task 19.2: texture headroom and craftsmanship', () => {
     // 7.0 MB after 19.2; task 21.1 adds couchFabric (0.33 MB), so the headroom check is now 7.5 MB (budget stays 8 MB).
     // Task 21.2 adds crtCasing (0.33 MB) and crtGlass (0.25 MB): the headroom check was 7.7 MB.
     // Task 22.1 shrinks corkBoard to 256x256 (-1.00 MB) and adds vcrDeck and vhsShell (+0.25 MB): now 7.0 MB.
-    expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.7 * 1048576)
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.7 * 1048576 + TASK_27_1_TEXTURE_BYTES)
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
     expect(report.totalDrawCalls).toBeLessThan(400)
     expect(report.textureCount).toBe(TEXTURE_IDS.length)
@@ -1687,8 +1684,8 @@ describe('task 20.2: attract screen and marquee textures on the cabinets', () =>
     setCanvasFactory(() => fakeCanvas())
     ensureSharedTextures()
     // 23 after task 20.2, plus couchFabric (21.1), crtCasing and crtGlass (21.2).
-    expect(liveTextureCount()).toBe(31)
-    expect(TEXTURE_IDS).toHaveLength(31)
+    expect(liveTextureCount()).toBe(32)
+    expect(TEXTURE_IDS).toHaveLength(32)
     const total = totalTextureMemoryBytes()
     const perTexture = TEXTURE_IDS.map((id) => `${id} ${TEXTURE_SPECS[id].width}x${TEXTURE_SPECS[id].height}=${(textureMemoryBytes(TEXTURE_SPECS[id]) / 1048576).toFixed(3)}MB`)
     const report = sceneDetailReport()
@@ -1917,7 +1914,7 @@ describe('task 21.2: CRT casing texture and glass screen', () => {
     // 9 boxes (3 casing, 4 bezel, grille, badge bar), 1 plane, 6 low cylinders (2 knobs, LED, 3 antenna parts), unchanged by 21.2.
     expect(tris).toBe(9 * 12 + 2 + 6 * 32)
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
-    expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.7 * 1048576)
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.7 * 1048576 + TASK_27_1_TEXTURE_BYTES)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
     expect(M3_LIGHT_COUNT).toBe(4)
   })
@@ -1973,7 +1970,7 @@ describe('task 21.2: CRT casing texture and glass screen', () => {
   it('the two new textures cost 0.33 MB and at most 0.25 MB', () => {
     expect(textureMemoryBytes(TEXTURE_SPECS.crtCasing)).toBeLessThanOrEqual(0.34 * 1048576)
     expect(textureMemoryBytes(TEXTURE_SPECS.crtGlass)).toBeLessThanOrEqual(0.25 * 1048576)
-    expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(7.7 * 1048576)
+    expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(7.7 * 1048576 + TASK_27_1_TEXTURE_BYTES)
   })
 })
 
@@ -2038,7 +2035,7 @@ describe('task 22.1: media island, armchair and VHS shells', () => {
     // Task 23.1 replaced the two old desk lamps (470 triangles) with two new ones (352): -118.
     // Task 23.2 replaced 7 ordinary books on shelf-b (-84) with 3 manuals and 3 spine bands (+72): -12.
     // Task 24.1: two lamp cones (+48) and five ceiling bloom strips (+10) = +58.
-    expect(report.totalTriangles).toBe(19128 - 72 + 116 - 118 - 12 + 58 + 18 + 6 + TASK_26_1_TRIANGLES) // 25.1: +16 brass caps, +2 liner; 25.2: +6 floor glow decals; 26.1: +64 coffee discs
+    expect(report.totalTriangles).toBe(19128 - 72 + 116 - 118 - 12 + 58 + 18 + 6 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES) // 27.1: -36 (three cream manual band boxes) // 25.1: +16 brass caps, +2 liner; 25.2: +6 floor glow decals; 26.1: +64 coffee discs
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
   })
 
@@ -2109,15 +2106,15 @@ describe('task 22.1: media island, armchair and VHS shells', () => {
     for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
   })
 
-  it('counts: 31 textures and at most 7.7 MB (budget 8 MB), colliders unchanged', () => {
+  it('counts: 32 textures and at most 7.7 MB (budget 8 MB), colliders unchanged', () => {
     const report = sceneDetailReport()
     const perTexture = TEXTURE_IDS.map((id) => `${id} ${TEXTURE_SPECS[id].width}x${TEXTURE_SPECS[id].height}=${(textureMemoryBytes(TEXTURE_SPECS[id]) / 1048576).toFixed(3)}MB`)
     console.info(
       `[22.1] computed triangles ${report.totalTriangles}, draw-call estimate ${report.totalDrawCalls}, textures ${report.textureCount}, ` +
         `texture memory estimate ${(report.textureMemoryBytes / 1048576).toFixed(3)} MB (computed, not runtime-measured): ${perTexture.join(', ')}`,
     )
-    expect(report.textureCount).toBe(31)
-    expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.7 * 1048576)
+    expect(report.textureCount).toBe(32)
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.7 * 1048576 + TASK_27_1_TEXTURE_BYTES)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
     expect(M3_LIGHT_COUNT).toBeLessThanOrEqual(MAX_LIGHTS)
@@ -2236,8 +2233,8 @@ describe('task 22.2 (part A): metalCabinet, cardboard crate and CRT stack casing
     )
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
     expect(report.totalTriangles - 19128).toBeLessThanOrEqual(60)
-    expect(report.textureCount).toBe(31)
-    expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.55 * 1048576)
+    expect(report.textureCount).toBe(32)
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.55 * 1048576 + TASK_27_1_TEXTURE_BYTES)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
     expect(M3_LIGHT_COUNT).toBe(4)
   })
@@ -2365,7 +2362,7 @@ describe('task 22.2 (part B): desk clutter and east doorway detail', () => {
     expect(col('notebookCover')).toBe('#4a5866')
   })
 
-  it('counts: 31 textures, at most 7.5 MB (budget 8 MB), under 20,000 triangles with at most +120 over 19,056, 4 lights', () => {
+  it('counts: 32 textures, at most 7.5 MB (budget 8 MB), under 20,000 triangles with at most +120 over 19,056, 4 lights', () => {
     const report = sceneDetailReport()
     console.info(
       `[22.2B] triangles ${report.totalTriangles} (delta ${report.totalTriangles - 19056}), draw calls ${report.totalDrawCalls}, textures ${report.textureCount}, ` +
@@ -2373,9 +2370,9 @@ describe('task 22.2 (part B): desk clutter and east doorway detail', () => {
     )
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
     expect(report.totalTriangles - 19056).toBeLessThanOrEqual(120 + TASK_26_1_TRIANGLES)
-    expect(report.textureCount).toBe(31)
+    expect(report.textureCount).toBe(32)
     // Task 23.1: lampGlow 64 -> 128 px adds 0.062 MiB (7.459 -> 7.521 MiB), so the cap is 7.55 MiB.
-    expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.55 * 1048576)
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.55 * 1048576 + TASK_27_1_TEXTURE_BYTES)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
     expect(M3_LIGHT_COUNT).toBe(4)
   })
@@ -2544,20 +2541,20 @@ describe('task 25.1: lamp craft, soft cones, richer pools, notebook move', () =>
     }
   })
 
-  it('budgets: under 20,000 triangles, at most +20 over 19,100, 4 lights, 31 textures within 7.6 MB, every texture disposed once', () => {
+  it('budgets: under 20,000 triangles, at most +20 over 19,100, 4 lights, 32 textures within 7.6 MB, every texture disposed once', () => {
     const report = sceneDetailReport()
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
     expect(report.totalTriangles - 19100).toBeLessThanOrEqual(24 + TASK_26_1_TRIANGLES) // 25.2 adds 6 more
-    expect(report.totalTriangles - 19100).toBe(24 + TASK_26_1_TRIANGLES)
+    expect(report.totalTriangles - 19100).toBe(24 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES)
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(MAX_LIGHTS).toBe(4)
-    expect(report.textureCount).toBe(31)
-    expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.6 * 1048576)
+    expect(report.textureCount).toBe(32)
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.6 * 1048576 + TASK_27_1_TEXTURE_BYTES)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(8 * 1048576)
     expect(textureMemoryBytes(TEXTURE_SPECS.coneFalloff) / 1048576).toBeCloseTo(0.016, 3)
     setCanvasFactory(() => fakeCanvas())
     ensureSharedTextures()
-    expect(liveTextureCount()).toBe(31)
+    expect(liveTextureCount()).toBe(32)
     const spies = TEXTURE_IDS.map((id) => vi.spyOn(getSharedTexture(id)!, 'dispose'))
     disposeSharedResources()
     disposeSharedResources()
@@ -2626,15 +2623,15 @@ describe('task 25.2 arcade floor glow decals', () => {
     const report = sceneDetailReport()
     expect(report.objects.map((o) => o.name)).toContain('arcade-floor-glow')
     expect(report.objects.find((o) => o.name === 'arcade-floor-glow')!.triangles).toBe(6)
-    expect(report.totalTriangles).toBe(19118 + 6 + TASK_26_1_TRIANGLES)
+    expect(report.totalTriangles).toBe(19118 + 6 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES)
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
     expect(M3_LIGHT_COUNT).toBe(4)
-    expect(report.textureCount).toBe(31)
-    expect(report.textureMemoryBytes / 1048576).toBeCloseTo(7.537, 2)
+    expect(report.textureCount).toBe(32)
+    expect(report.textureMemoryBytes / 1048576).toBeCloseTo(7.537 + TASK_27_1_TEXTURE_BYTES / 1048576, 2)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(8 * 1048576)
     setCanvasFactory(() => fakeCanvas())
     ensureSharedTextures()
-    expect(liveTextureCount()).toBe(31)
+    expect(liveTextureCount()).toBe(32)
     const spies = TEXTURE_IDS.map((id) => vi.spyOn(getSharedTexture(id)!, 'dispose'))
     disposeSharedResources()
     disposeSharedResources()
@@ -2656,10 +2653,10 @@ describe('task 26.1: anisotropy, VCR chassis and mug detail', () => {
     return [0, 1, 2].every((i) => Math.min(A.hi[i], B.hi[i]) - Math.max(A.lo[i], B.lo[i]) > 1e-6)
   }
 
-  it('every shared CanvasTexture has anisotropy 4 and all 31 are disposed exactly once (twice-safe)', () => {
+  it('every shared CanvasTexture has anisotropy 4 and all 32 are disposed exactly once (twice-safe)', () => {
     setCanvasFactory(() => fakeCanvas())
     ensureSharedTextures()
-    expect(liveTextureCount()).toBe(31)
+    expect(liveTextureCount()).toBe(32)
     for (const id of TEXTURE_IDS) expect(getSharedTexture(id)!.anisotropy, id).toBe(4)
     const spies = TEXTURE_IDS.map((id) => vi.spyOn(getSharedTexture(id)!, 'dispose'))
     disposeSharedResources()
@@ -2694,12 +2691,210 @@ describe('task 26.1: anisotropy, VCR chassis and mug detail', () => {
     }
   })
 
-  it('keeps the budgets: at most 19,200 triangles (computed), 4 lights, 31 textures within 7.85 MB', () => {
+  it('keeps the budgets: at most 19,200 triangles (computed), 4 lights, 32 textures within 7.85 MB', () => {
     const report = sceneDetailReport()
     expect(report.totalTriangles).toBeLessThanOrEqual(19200)
-    expect(report.totalTriangles - 19124).toBe(TASK_26_1_TRIANGLES)
+    expect(report.totalTriangles - 19124).toBe(TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES)
     expect(M3_LIGHT_COUNT).toBe(4)
-    expect(report.textureCount).toBe(31)
+    expect(report.textureCount).toBe(32)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.85 * 1048576)
+  })
+})
+
+describe('task 27.1: cabinet front detail and manual spines (cabinetAndManualDetail)', () => {
+  afterEach(() => setCanvasFactory(null))
+  const R = CABINET_DETAIL_REGIONS
+  const cabinet = (id: (typeof ARCADE_CABINET_IDS)[number]) => {
+    const c = prop(id)
+    const frame = facingFrame(c.box, c.facing)
+    return { c, frame, parts: arcadeCabinetParts(frame.local, c.height, ARCADE_CABINET_GAMES[id]) }
+  }
+  const inRect = (u: number, v: number, r: { u0: number; u1: number; v0: number; v1: number }) =>
+    u >= r.u0 - 1e-9 && u <= r.u1 + 1e-9 && v >= r.v0 - 1e-9 && v <= r.v1 + 1e-9
+  /** Every uv of the 4 vertices of face `f`, as [u, v, x, y] with the vertex position. */
+  const faceUvs = (g: ReturnType<typeof atlasBoxGeometry>, f: number) => {
+    const uv = g.getAttribute('uv')
+    const pos = g.getAttribute('position')
+    return [0, 1, 2, 3].map((k) => [uv.getX(f * 4 + k), uv.getY(f * 4 + k), pos.getX(f * 4 + k), pos.getY(f * 4 + k)] as const)
+  }
+
+  it.each(ARCADE_CABINET_IDS)('%s: the coin door, kick plate and control deck use the texture through UV windows inside the left half', (id) => {
+    const { parts } = cabinet(id)
+    const door = parts.filter((p) => p.mat === 'cabinetPanel' && p.atlas && Math.abs(p.scale[1] - 0.34) < 1e-9)
+    const kick = parts.filter((p) => p.mat === 'cabinetPanel' && p.atlas && Math.abs(p.scale[1] - 0.13) < 1e-9)
+    const deck = parts.filter((p) => p.mat === 'deckPlate')
+    expect([door.length, kick.length, deck.length]).toEqual([1, 1, 1])
+    const expected: ReadonlyArray<readonly [Part, readonly number[]]> = [
+      [door[0], R.door],
+      [kick[0], R.kick],
+      [deck[0], R.lip],
+    ]
+    for (const [p, px] of expected) {
+      expect(p.geo).toBe('box') // existing 12-triangle box: zero new triangles
+      expect(p.atlas!.faces).toEqual([BOX_FACE_FRONT])
+      expect(p.atlas!.rect).toEqual(detailUvRect(px as never))
+      for (const r of [p.atlas!.rect, p.atlas!.plain]) {
+        expect(r.u0).toBeGreaterThanOrEqual(0)
+        expect(r.u1).toBeLessThanOrEqual(0.5)
+        expect(r.u0).toBeLessThan(r.u1)
+        expect(r.v0).toBeLessThan(r.v1)
+      }
+    }
+    expect(deck[0].atlas!.plain).toEqual(detailUvRect(R.plainDark))
+    expect(door[0].atlas!.plain).toEqual(detailUvRect(R.plainSteel))
+    // The three windows are different draw groups.
+    expect(new Set([door[0], kick[0], deck[0]].map(partGroupKey)).size).toBe(3)
+    // Nothing else of the cabinet changed: grilles, slots, molding and marquee keep their materials.
+    expect(parts.filter((p) => p.mat === 'grille')).toHaveLength(3)
+    expect(parts.filter((p) => p.mat === 'coinGlow')).toHaveLength(4)
+    expect(parts.filter((p) => p.mat === 'metal')).toHaveLength(parts.filter((p) => p.mat === 'metal' && p.geo === 'cylinderLow').length)
+  })
+
+  it.each(ARCADE_CABINET_IDS)('%s: the textured face is +z, the face the player sees (the cabinet faces -X)', (id) => {
+    const { c, frame, parts } = cabinet(id)
+    // The group rotates local +z onto the facing direction: world normal = (sin yaw, cos yaw).
+    const nx = Math.sin(frame.rotationY)
+    const nz = Math.cos(frame.rotationY)
+    expect(c.facing).toBe('-x')
+    expect(nx).toBeCloseTo(-1, 9)
+    expect(nz).toBeCloseTo(0, 9)
+    for (const p of parts.filter((q) => q.atlas)) {
+      const g = atlasBoxGeometry(p.scale[0], p.scale[1], p.scale[2], p.atlas!.rect, p.atlas!.faces, p.atlas!.plain)
+      const { rect, plain } = p.atlas!
+      // Face 4 (+z) covers the whole window, upright: the +x +y corner is the top-right of the window.
+      const front = faceUvs(g, BOX_FACE_FRONT)
+      for (const [u, v, x, y] of front) {
+        expect(u).toBeCloseTo(x > 0 ? rect.u1 : rect.u0, 9)
+        expect(v).toBeCloseTo(y > 0 ? rect.v1 : rect.v0, 9)
+      }
+      // Every other face is the flat plain stripe.
+      for (const f of [0, 1, 2, 3, 5]) for (const [u, v] of faceUvs(g, f)) expect(inRect(u, v, plain), `${p.mat} face ${f}`).toBe(true)
+      // The coin door and kick plate stand in front of the cabinet body front (local z = maxZ), facing +z.
+      if (p.mat === 'cabinetPanel') expect(p.pos[2] + p.scale[2] / 2, `${p.mat} front`).toBeGreaterThan(frame.local.maxZ)
+    }
+  })
+
+  it('caches atlas boxes by size and window, and disposes each once (twice-safe)', () => {
+    disposeSharedResources() // start from an empty cache
+    const { parts } = cabinet('arcade-snake')
+    const geos = parts.filter((p) => p.atlas).map((p) => atlasBoxGeometry(p.scale[0], p.scale[1], p.scale[2], p.atlas!.rect, p.atlas!.faces, p.atlas!.plain))
+    expect(atlasBoxCount()).toBe(3)
+    // The other cabinets have the same sizes and windows, so they share the same three geometries.
+    for (const id of ARCADE_CABINET_IDS) {
+      for (const p of cabinet(id).parts.filter((q) => q.atlas)) {
+        expect(geos).toContain(atlasBoxGeometry(p.scale[0], p.scale[1], p.scale[2], p.atlas!.rect, p.atlas!.faces, p.atlas!.plain))
+      }
+    }
+    expect(atlasBoxCount()).toBe(3)
+    const spies = geos.map((g) => vi.spyOn(g, 'dispose'))
+    disposeSharedResources()
+    disposeSharedResources()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+    expect(atlasBoxCount()).toBe(0)
+  })
+
+  it('the three manuals map their own spine strip of the right half onto the +z (spine) face, and the cover stripe onto every other face', () => {
+    const p = prop(MANUAL_PLACEMENT.shelfId)
+    const manuals = shelfContents(p.id, p.box, p.height).instances.filter((b) => b.manualId)
+    expect(manuals.map((b) => b.manualId)).toEqual([...MANUAL_STRIP_KEYS])
+    const cover = detailUvRect(R.cover)
+    manuals.forEach((b, i) => {
+      const strip = detailUvRect(R.strips[i])
+      expect(strip.u0).toBeGreaterThanOrEqual(0.5)
+      expect(strip.u1).toBeLessThanOrEqual(1)
+      const g = manualGeometries[b.manualId!]
+      for (const [u, v, x, y] of faceUvs(g, BOX_FACE_FRONT)) {
+        expect(u).toBeCloseTo(x > 0 ? strip.u1 : strip.u0, 9)
+        expect(v).toBeCloseTo(y > 0 ? strip.v1 : strip.v0, 9)
+      }
+      for (const f of [0, 1, 2, 3, 5]) for (const [u, v] of faceUvs(g, f)) expect(inRect(u, v, cover), `${b.manualId} face ${f}`).toBe(true)
+      // The instance keeps its colour, size and yaw, and the spine (+z) turns to +X, toward the room.
+      expect(b.rot[1]).toBeCloseTo(Math.PI / 2, 9)
+      expect(Math.sin(b.rot[1])).toBeCloseTo(1, 9)
+      expect(Math.cos(b.rot[1])).toBeCloseTo(0, 9)
+      expect(b.size).toEqual([...MANUAL_SIZE])
+    })
+    expect(new Set(MANUAL_STRIP_KEYS.map((k) => manualGeometries[k])).size).toBe(3)
+    // The strips do not overlap each other.
+    for (let i = 1; i < 3; i++) expect(detailUvRect(R.strips[i - 1]).u1).toBeLessThanOrEqual(detailUvRect(R.strips[i]).u0)
+  })
+
+  it('the manual geometries are disposed exactly once per disposeSharedResources()', () => {
+    const spies = MANUAL_STRIP_KEYS.map((k) => vi.spyOn(manualGeometries[k], 'dispose'))
+    disposeSharedResources()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+  })
+
+  it('no separate cream band parts remain, so the shelf objects cost 36 triangles less', () => {
+    const p = prop(MANUAL_PLACEMENT.shelfId)
+    const obj = declaredObjects().find((o) => o.name === p.id)!
+    expect(obj.parts.some((q) => (q.mat as string) === 'manualBand')).toBe(false)
+    expect(Object.keys(materials)).not.toContain('manualBand')
+    // Each manual is its own draw call (own geometry); ordinary books still group by variant.
+    const contents = shelfContents(p.id, p.box, p.height)
+    const variants = new Set(contents.instances.filter((b) => !b.manualId).map((b) => b.variant)).size
+    expect(obj.extraDrawCalls).toBe(variants + 3)
+  })
+
+  it('binds cabinetAndManualDetail to the door and kick plate, the control deck and the manual books with white multipliers; flat colours return after dispose', () => {
+    setCanvasFactory(null) // drop any texture left by an earlier test
+    expect(materials.cabinetPanel.map).toBeNull()
+    expect(`#${materials.cabinetPanel.color.getHexString()}`).toBe('#777c86')
+    expect(`#${materials.deckPlate.color.getHexString()}`).toBe('#1a1b22')
+    expect(`#${materials.manualBook.color.getHexString()}`).toBe('#ffffff')
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    const tex = getSharedTexture('cabinetAndManualDetail')!
+    expect(tex).not.toBeNull()
+    for (const m of [materials.cabinetPanel, materials.deckPlate, materials.manualBook]) {
+      expect(m.map).toBe(tex)
+      expect(m.color.getHexString()).toBe('ffffff')
+    }
+    expect(tex.anisotropy).toBe(4)
+    expect(tex.image.width).toBe(256)
+    expect(tex.image.height).toBe(128)
+    const spy = vi.spyOn(tex, 'dispose')
+    disposeSharedResources()
+    disposeSharedResources()
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(materials.cabinetPanel.map).toBeNull()
+    expect(`#${materials.cabinetPanel.color.getHexString()}`).toBe('#777c86')
+    expect(`#${materials.deckPlate.color.getHexString()}`).toBe('#1a1b22')
+    expect(`#${materials.manualBook.color.getHexString()}`).toBe('#ffffff')
+  })
+
+  it('without a canvas the texture is null and the materials keep their flat look', () => {
+    setCanvasFactory(() => null)
+    ensureSharedTextures()
+    expect(getSharedTexture('cabinetAndManualDetail')).toBeNull()
+    expect(materials.cabinetPanel.map).toBeNull()
+    expect(materials.deckPlate.map).toBeNull()
+    expect(materials.manualBook.map).toBeNull()
+  })
+
+  it('keeps the budgets: triangles at most 19,200 and not above 19,188 (delta -36), 4 lights, 32 textures, memory at most 7.85 MB', () => {
+    const report = sceneDetailReport()
+    expect(report.totalTriangles).toBeLessThanOrEqual(19200)
+    expect(report.totalTriangles - 19188).toBeLessThanOrEqual(0)
+    expect(report.totalTriangles - 19188).toBe(TASK_27_1_TRIANGLES)
+    expect(M3_LIGHT_COUNT).toBe(4)
+    expect(MAX_LIGHTS).toBe(4)
+    expect(report.textureCount).toBe(32)
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.85 * 1048576)
+    expect(totalTextureMemoryBytes() - 7.537 * 1048576).toBeCloseTo(TASK_27_1_TEXTURE_BYTES, -4)
+    expect(report.totalDrawCalls).toBeLessThan(400)
+  })
+
+  it('every one of the 32 textures has anisotropy 4 and is disposed exactly once, twice-safe', () => {
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    expect(liveTextureCount()).toBe(32)
+    expect(TEXTURE_IDS).toContain('cabinetAndManualDetail')
+    for (const id of TEXTURE_IDS) expect(getSharedTexture(id)!.anisotropy, id).toBe(4)
+    const spies = TEXTURE_IDS.map((id) => vi.spyOn(getSharedTexture(id)!, 'dispose'))
+    disposeSharedResources()
+    disposeSharedResources()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+    expect(liveTextureCount()).toBe(0)
   })
 })

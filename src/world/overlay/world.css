@@ -204,18 +204,21 @@
   pointer-events: none;
 }
 
-/* Ink #1b1710 on paper #efe6cf is about 13:1; tag #6b1d10 about 8:1; footer #4a4030 about 8:1. */
+/*
+ * Colours come from CSS custom properties set inline by the card (see src/world/logic/cardThemes.ts, where a test
+ * checks every text pair for a contrast of at least 4.5:1). The theme only changes the surface, borders and fonts.
+ * The card has no animation, so prefers-reduced-motion needs no special case.
+ */
 .world-card {
   box-sizing: border-box;
   width: 100%;
-  max-width: 560px;
+  max-width: 580px;
   max-height: min(70vh, 100%);
   overflow: auto;
-  padding: 18px 24px 14px;
-  background: #efe6cf;
-  background-image: repeating-linear-gradient(0deg, rgba(90, 70, 40, 0.05) 0, rgba(90, 70, 40, 0.05) 1px, transparent 1px, transparent 4px);
-  color: #1b1710;
-  border: 1px solid #8a7a58;
+  padding: 14px 20px 12px;
+  background-color: var(--card-bg);
+  color: var(--card-ink);
+  border: 1px solid var(--card-accent);
   border-radius: 2px;
   box-shadow: 0 0 0 4px rgba(9, 16, 30, 0.55), 0 10px 28px rgba(0, 0, 0, 0.6);
   font-family: 'Courier New', Courier, ui-monospace, monospace;
@@ -226,18 +229,36 @@
 }
 
 .world-card p,
-.world-card h2 {
+.world-card h2,
+.world-card h3 {
   margin: 0;
+}
+
+.world-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px dashed var(--card-accent);
+}
+
+.world-card-art {
+  flex: 0 0 auto;
+  width: 120px;
+  height: 40px;
+}
+
+.world-card-heading {
+  min-width: 0;
 }
 
 .world-card-tag {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.14em;
-  color: #6b1d10;
-  border-bottom: 1px dashed #8a7a58;
-  padding-bottom: 6px;
-  margin-bottom: 10px !important;
+  color: var(--card-muted);
+  margin-bottom: 2px !important;
 }
 
 .world-card-title {
@@ -245,11 +266,87 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  margin-bottom: 10px !important;
+}
+
+.world-card-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.world-pill {
+  padding: 1px 8px;
+  border: 1px solid var(--card-accent);
+  border-radius: 999px;
+  background: var(--card-pill-bg);
+  color: var(--card-pill-ink);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.world-pill-status {
+  font-weight: 700;
+  border-width: 2px;
+}
+
+.world-pill-label {
+  font-weight: 700;
+}
+
+/* Page buttons. The container ignores the pointer; the buttons accept it so they work when the pointer is not locked. */
+.world-card-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.world-card-tab {
+  pointer-events: auto;
+  cursor: pointer;
+  padding: 3px 10px;
+  border: 1px solid var(--card-accent);
+  border-radius: 2px 2px 0 0;
+  background: transparent;
+  color: var(--card-ink);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+.world-card-tab[aria-selected='true'] {
+  background: var(--card-accent);
+  color: var(--card-bg);
+  font-weight: 700;
+}
+
+.world-card-block {
+  margin-bottom: 8px;
+  padding-left: 8px;
+  border-left: 3px solid var(--card-muted);
+}
+
+.world-card-block[data-highlight='true'] {
+  padding: 4px 8px;
+  border-left: 4px solid var(--card-accent);
+  background: var(--card-hl-bg);
+  font-weight: 700;
+}
+
+.world-card-block-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--card-accent);
 }
 
 .world-card-body {
-  margin-bottom: 8px !important;
+  margin-bottom: 2px !important;
 }
 
 .world-card-status {
@@ -257,15 +354,54 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #6b1d10;
-  margin-bottom: 8px !important;
+  color: var(--card-accent);
 }
 
 .world-card-footer {
-  margin-top: 10px !important;
+  margin-top: 8px !important;
   padding-top: 6px;
-  border-top: 1px dashed #8a7a58;
+  border-top: 1px dashed var(--card-accent);
   font-size: 11px;
   letter-spacing: 0.06em;
-  color: #4a4030;
+  color: var(--card-muted);
+}
+
+/* Per-theme surfaces. Terminal themes are dark; paper themes are light. */
+.world-card[data-theme='snake'] {
+  background-image: repeating-linear-gradient(0deg, rgba(34, 197, 94, 0.07) 0, rgba(34, 197, 94, 0.07) 1px, transparent 1px, transparent 3px);
+  box-shadow: 0 0 0 4px rgba(9, 16, 30, 0.55), 0 0 18px rgba(34, 197, 94, 0.35), 0 10px 28px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 0 3px rgba(34, 197, 94, 0.5);
+}
+
+.world-card[data-theme='maze'] {
+  background-image: radial-gradient(ellipse at center, transparent 55%, rgba(244, 63, 94, 0.18) 100%);
+  box-shadow: 0 0 0 4px rgba(9, 16, 30, 0.55), 0 0 18px rgba(244, 63, 94, 0.3), 0 10px 28px rgba(0, 0, 0, 0.6);
+}
+
+.world-card[data-theme='frequency'] {
+  background-image: repeating-linear-gradient(90deg, rgba(245, 158, 11, 0.08) 0, rgba(245, 158, 11, 0.08) 1px, transparent 1px, transparent 24px),
+    repeating-linear-gradient(0deg, rgba(245, 158, 11, 0.08) 0, rgba(245, 158, 11, 0.08) 1px, transparent 1px, transparent 24px);
+  box-shadow: 0 0 0 4px rgba(9, 16, 30, 0.55), 0 0 16px rgba(245, 158, 11, 0.3), 0 10px 28px rgba(0, 0, 0, 0.6);
+}
+
+.world-card[data-theme='notebook'] {
+  background-image: repeating-linear-gradient(0deg, transparent 0, transparent 21px, rgba(30, 64, 175, 0.22) 21px, rgba(30, 64, 175, 0.22) 22px);
+  border-left-width: 6px;
+  border-left-style: double;
+}
+
+.world-card[data-theme='board'] {
+  background-image: linear-gradient(180deg, rgba(120, 80, 20, 0.14) 0, transparent 14px);
+  border-radius: 2px 14px 2px 2px;
+}
+
+.world-card[data-theme='shift'] {
+  background-image: repeating-linear-gradient(0deg, rgba(34, 211, 238, 0.07) 0, rgba(34, 211, 238, 0.07) 2px, rgba(244, 114, 182, 0.05) 2px, rgba(244, 114, 182, 0.05) 4px);
+  border-style: dashed;
+}
+
+.world-card[data-theme='notice'] {
+  background-image: repeating-linear-gradient(0deg, rgba(90, 70, 40, 0.06) 0, rgba(90, 70, 40, 0.06) 1px, transparent 1px, transparent 4px);
+  border-style: double;
+  border-width: 3px;
 }

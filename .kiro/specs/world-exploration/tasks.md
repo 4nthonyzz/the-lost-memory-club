@@ -42,6 +42,8 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 
 - Approved scope change (texture craft and mid-tone lighting), 2026-12-03: anisotropy 4 is set on every procedural `CanvasTexture` (no memory cost). Texture detail upgrades are redrawn in place (the texture count stays 31). At most one small-prop texture may grow from 128x128 to 256x256. Normal-state lighting is tuned to a mid-tone balance (ambient about 0.52 to 0.58 with both lamps on, the 0.35 floor is kept, the lamp-coupling ratios are kept). Memory_Shift, flicker and reduced motion are unchanged. Budgets: triangles at most 19,200 (below 20,000; currently 19,124 computed), at most 4 lights, texture memory at most 7.85 MB (currently 7.537 MB computed; hard limit 8 MB). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged.
 
+- Approved scope change (themed inspector and cabinet detail), 2026-12-04: one new 256x128 texture `cabinetAndManualDetail` is added (left half: coin door and control-deck legends for the three arcade cabinets; right half: three illustrated manual spines), mapped onto existing faces with zero new triangles. `rugWoven`, `wood`, `woodDark` and `spineAtlas` are sharpened in place. The Archive Document Card gains per-document themes, status pills, inline SVG header art and two pages switched with keys 1 and 2 (also clickable buttons when the pointer is not locked; while pointer-locked there is no cursor, so keys are the input), without releasing pointer lock or moving the player. E, Esc and walking more than 2.6 m away still close it. In-world status text such as "CABINET 01 // PLAYABLE" is diegetic and is accurate only once the Snake game ships in `src/arcade`. Budgets: triangles at most 19,200 (currently 19,188), at most 4 lights, texture memory at most 7.85 MB (currently 7.537 MB), texture count 32. `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged.
+
 ## Tasks
 
 ### Milestone 1: Playable 3D room (primitives only)
@@ -986,6 +988,36 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: documentation and the spec folder only.
     - _Requirements: 14.11, 14.12, 15.3, 15.6_
 
+### Cabinet detail and themed document card
+
+- [x] 27. Cabinet detail and themed document card
+  - [x] 27.1 cabinetAndManualDetail texture and in-place sharpening
+    - Files: `src/world/scene/proceduralTextures.ts`, `src/world/scene/sharedResources.ts`, `src/world/scene/modelDetail.ts`, `src/world/scene/shelfModel.ts`, `src/world/scene/PartMeshes.tsx` (only if UV mapping needs it); tests `src/world/scene/proceduralTextures.test.ts`, `src/world/scene/modelDetail.test.ts`.
+    - Add the 256x128 `cabinetAndManualDetail` texture (left half: coin door and control-deck legends for the three cabinets; right half: three illustrated manual spines), registered in `sharedResources.ts` with a flat-colour fallback and anisotropy 4. Map it onto existing faces with zero new triangles. Sharpen `rugWoven`, `wood`, `woodDark` and `spineAtlas` in place.
+    - Acceptance: texture count is 32; texture memory at most 7.85 MB (computed); triangle estimate at most 19,200; lights at most 4; textures deterministic and power-of-two; each texture disposed exactly once (twice-safe); colliders and Station anchors unchanged; Memory_Shift tinting still works.
+    - Tests: `proceduralTextures.test.ts` (determinism with a fake context, 256x128, no randomness, sharpened textures keep their sizes); `modelDetail.test.ts` (texture count 32, memory and triangle budgets, light count, disposal once and twice-safe, colliders unchanged). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 26.3.
+    - Boundary: render-only; `src/world/` only; no new dependency; no GLB; `ASSET_MANIFEST` stays empty.
+    - _Requirements: 1.3, 1.4, 1.8, 9.8, 12.5, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 27.2 Themed two-page Archive Document Card
+    - Files: `src/world/overlay/archiveDocuments.ts`, `src/world/overlay/WorldInspectorCard.tsx`, `src/world/WorldScene.tsx`, `src/world/controller/useWorldInput.ts`, `src/world/logic/inputState.ts`, `src/world/logic/inputMode.ts`, `src/world/logic/propState.ts`, `src/world/overlay/world.css`; tests `src/world/overlay/archiveDocuments.test.ts`, `src/world/logic/propState.test.ts`, `src/world/logic/inputMode.prop.test.ts`, `src/world/logic/inputState.test.ts`, `src/world/WorldScene.test.ts`.
+    - Give each document a theme, a status pill, inline SVG header art and two pages. Keys 1 and 2 switch pages while the card is open; the page buttons are also clickable when the pointer is not locked. While pointer-locked there is no cursor, so keys are the input. Page switching never releases pointer lock, never moves the player and never calls `onInspect`. E, Esc and walking more than 2.6 m away still close the card. Texts remain original placeholders for Developer 3 review; status text such as "CABINET 01 // PLAYABLE" is diegetic and accurate only once the Snake game ships in `src/arcade`.
+    - Acceptance: every document has two pages, a theme and a status pill; keys 1 and 2 are accepted only while the card is open and are ignored when focus is in an input outside the wrapper; page state resets when the card closes; the notes counter is unchanged; `StationId` stays `'vhs' | 'arcade'`; the card keeps its `role` and accessible label; no storage access; `src/App.tsx` unchanged.
+    - Tests: `archiveDocuments.test.ts` (themes, pills, two pages per document), `propState.test.ts` (page transitions, reset on close), `inputMode.prop.test.ts` and `inputState.test.ts` (keys 1 and 2 role and filtering, no mode change, no `CALL_ON_INSPECT`, no pointer-lock effect), `WorldScene.test.ts` (key and button page switching, closing on E, Esc and distance, `onInspect` not called). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 27.1.
+    - Boundary: `src/world/` only; `WorldSceneProps` and `onInspect` unchanged; no import from `src/arcade/` or `src/memories/`; the import-boundary test still passes.
+    - _Requirements: 7.5, 7.6, 7.7, 8.1, 8.6, 11.12, 11.13, 11.14, 15.1, 15.2, 15.4, 16.6, 16.7, 16.8, 16.9, 20.1, 20.2, 20.8_
+
+  - [x] 27.3 Docs, metrics and verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, lights and texture memory, each labelled "computed, not runtime-measured". Document the two-page card controls and the diegetic status text caveat. Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final geometry, texture count of 32 and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 27.2.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional. The 17 property-based test sub-tasks can be skipped for a faster MVP. Tasks 16.2 and 16.3 are marked `*` because they must not be implemented without approval.
@@ -1056,7 +1088,10 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     { "id": 53, "tasks": ["25.3"] },
     { "id": 54, "tasks": ["26.1"] },
     { "id": 55, "tasks": ["26.2"] },
-    { "id": 56, "tasks": ["26.3"] }
+    { "id": 56, "tasks": ["26.3"] },
+    { "id": 57, "tasks": ["27.1"] },
+    { "id": 58, "tasks": ["27.2"] },
+    { "id": 59, "tasks": ["27.3"] }
   ]
 }
 ```

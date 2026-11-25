@@ -8,11 +8,13 @@ import { WebglFallback } from './overlay/WebglFallback';
 import { WorldOverlay } from './overlay/WorldOverlay';
 import {
   initialPropState,
+  reduceCardPage,
   reduceCloseCard,
   reducePropInteract,
   reduceTargetChange,
   type PropState,
 } from './logic/propState';
+import type { CardPage } from './logic/archiveDocuments';
 import { INTERACTABLE_DEFS } from './layout/roomLayout';
 import type { InteractionTarget, PropInteractableId, Vec2 } from './worldTypes';
 import { Effects } from './scene/Effects';
@@ -118,6 +120,7 @@ function WorldInteractive({
     cardOpenRef.current = false;
     setPropState((s) => reduceCloseCard(s));
   }, []);
+  const onCardPage = useCallback((page: CardPage) => setPropState((s) => reduceCardPage(s, page)), []);
   const getCardAnchor = useCallback(() => cardAnchorRef.current, []);
   const isCardOpen = useCallback(() => cardOpenRef.current, []);
   const inspectStation = useCallback(
@@ -141,6 +144,7 @@ function WorldInteractive({
     onPropInteract,
     onCloseCard: closeCard,
     isCardOpen,
+    onCardPage,
     inputEnabled,
   });
   // Keep the refs in step with the committed state (the open card id is the single source).
@@ -187,7 +191,7 @@ function WorldInteractive({
           onContextRestored={clearTimer}
         />
       </WorldCanvas>
-      <WorldOverlay mode={input.mode} target={target} lampOn={propState.lampOn} message={propState.message} card={propState.openCard} notesRead={propState.read.size} canResume={inputEnabled === undefined} keyboardLookHint={input.keyboardLookHint} />
+      <WorldOverlay mode={input.mode} target={target} lampOn={propState.lampOn} message={propState.message} card={propState.openCard} cardPage={propState.cardPage} onCardPage={onCardPage} notesRead={propState.read.size} canResume={inputEnabled === undefined} keyboardLookHint={input.keyboardLookHint} />
     </div>
   );
 }

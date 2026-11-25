@@ -16,6 +16,7 @@
  *   Task 22.1: vcrDeck 256x128 mip 0.17 MB, vhsShell 128x128 mip 0.08 MB.
  *   Task 22.2: metalCabinet 256x256 mip 0.33 MB (new), crate 128x128 -> 256x256 mip 0.33 MB (+0.25 MB).
  *   Task 22.2 part B: deskDetail 128x64 mip 0.04 MB (notebook cover grain and ruled paper).
+ *   Task 27.1: cabinetAndManualDetail 256x128 mip 0.17 MB (arcade coin door, kick plate and control-deck legends; three manual spines).
  *   The total is checked against TEXTURE_MEMORY_BUDGET_BYTES in tests.
  */
 import { makeRng } from './effectsTiming'
@@ -87,6 +88,7 @@ export type TextureId =
   | 'metalCabinet'
   | 'deskDetail'
   | 'coneFalloff'
+  | 'cabinetAndManualDetail'
 
 export type TextureFilter = 'nearest' | 'mipmap' | 'linear'
 
@@ -693,6 +695,14 @@ export function drawWood(c: Ctx2D, w: number, h: number, seed: number, palette: 
     ring(c, x, y, 9, palette.grain, 1, 0.6)
     ring(c, x, y, 12, palette.grain, 1, 0.35)
   }
+  // Task 27.1: deeper grain. Pale grain highlights (short 1 px strokes inside the tile) beside darker grain cuts, balanced so the mean tone holds.
+  for (let i = 0; i < 22; i++) {
+    const y = 1 + Math.floor(rnd() * (h - 2))
+    const len = 10 + Math.floor(rnd() * 36)
+    const x = Math.floor(rnd() * (w - len))
+    rect(c, x, y, len, 1, '#ffe2b0', 0.16 + rnd() * 0.1)
+    rect(c, x + 2, y + 1 < h ? y + 1 : y, Math.max(1, len - 4), 1, palette.knot, 0.22)
+  }
 }
 
 /** Louvered speaker grille: horizontal slats with highlight and shadow lines. */
@@ -743,10 +753,13 @@ export function spineCellUv(cell: number): { u0: number; u1: number; v0: number;
 function stackedWord(c: Ctx2D, word: string, cx: number, y0: number, step: number, font: string, color: string): void {
   // Task 26.1: a light embossed copy one pixel down-right under the ink, so the printed spine title reads crisply.
   ;[...word].forEach((ch, i) => {
-    if (ch !== ' ') text(c, ch, cx + 1, y0 + i * step + 1, font, '#f4f4f4', 0.6)
+    if (ch !== ' ') text(c, ch, cx + 1, y0 + i * step + 1, font, '#ffffff', 0.8)
   })
-  ;[...word].forEach((ch, i) => {
-    if (ch !== ' ') text(c, ch, cx, y0 + i * step, font, color)
+  // Task 27.1: crisper print. The ink is drawn at full strength twice, half a pixel apart, which thickens each stroke to a solid 1 px edge.
+  ;[0, 0.5].forEach((dx) => {
+    ;[...word].forEach((ch, i) => {
+      if (ch !== ' ') text(c, ch, cx + dx, y0 + i * step, font, color)
+    })
   })
 }
 
@@ -771,7 +784,7 @@ function spineFoilAndWear(c: Ctx2D, rnd: () => number, i: number): void {
 function glyphMarks(c: Ctx2D, rnd: () => number, cx: number, y0: number, step: number, count: number, color: string): void {
   for (let i = 0; i < count; i++) {
     const w = 14 + Math.floor(rnd() * 24)
-    rect(c, cx - w / 2, y0 + i * step, w, 3, color, 0.8)
+    rect(c, cx - w / 2, y0 + i * step, w, 3, color, 0.95)
   }
 }
 
@@ -807,7 +820,7 @@ function drawSpineCell(c: Ctx2D, rnd: () => number, i: number): void {
       }
       rect(c, x0 + 8, 56, 48, 110, '#f8f8f8')
       frame(c, x0 + 8, 56, 48, 110, '#6a6a6a', 1.5)
-      stackedWord(c, 'ARCHIVE', cx, 72, 14, 'bold 12px monospace', '#3a3a3a')
+      stackedWord(c, 'ARCHIVE', cx, 72, 14, 'bold 12px monospace', '#2e2e2e')
       rect(c, x0 + 14, 182, 36, 3, '#6a6a6a')
       rect(c, x0 + 14, 192, 36, 3, '#6a6a6a')
       break
@@ -817,7 +830,7 @@ function drawSpineCell(c: Ctx2D, rnd: () => number, i: number): void {
       rect(c, x0, 0, W, 150, '#eeeeee')
       rect(c, x0, 150, W, H - 150, '#a0a0a0')
       rect(c, x0, 148, W, 4, '#5e5e5e')
-      stackedWord(c, 'VOL. 3', cx, 30, 22, 'bold 16px monospace', '#444444')
+      stackedWord(c, 'VOL. 3', cx, 30, 22, 'bold 16px monospace', '#2e2e2e')
       glyphMarks(c, rnd, cx, 172, 14, 4, '#3c3c3c')
       rect(c, x0 + 22, 236, 20, 8, '#f2f2f2')
       break
@@ -828,7 +841,7 @@ function drawSpineCell(c: Ctx2D, rnd: () => number, i: number): void {
       rect(c, x0, 0, W, 14, '#6e6e6e')
       rect(c, x0 + 6, 22, 52, 200, '#fafafa')
       frame(c, x0 + 6, 22, 52, 200, '#8a8a8a', 1)
-      stackedWord(c, 'REWIND', cx, 60, 20, 'bold 15px monospace', '#3a3a3a')
+      stackedWord(c, 'REWIND', cx, 60, 20, 'bold 15px monospace', '#2e2e2e')
       glyphMarks(c, rnd, cx, 176, 10, 4, '#555555')
       rect(c, x0, 232, W, 24, '#6e6e6e')
       break
@@ -851,7 +864,7 @@ function drawSpineCell(c: Ctx2D, rnd: () => number, i: number): void {
       rect(c, x0, 20, W, 26, '#f4f4f4')
       rect(c, x0, 52, W, 8, '#707070')
       rect(c, x0, 212, W, 26, '#f4f4f4')
-      stackedWord(c, 'ARCHIVE', cx, 74, 18, 'bold 14px monospace', '#2e2e2e')
+      stackedWord(c, 'ARCHIVE', cx, 74, 18, 'bold 14px monospace', '#2c2c2c')
       glyphMarks(c, rnd, cx, 196, 6, 2, '#555555')
       break
     }
@@ -994,6 +1007,28 @@ export function drawRugWoven(c: Ctx2D, w: number, h: number, seed: number): void
     [0.5, '#8c3446'],
   ]
   for (const [m, col] of bands) rect(c, X(m), Y(m), w - 2 * X(m), h - 2 * Y(m), col)
+  // Task 27.1: crisp woven border threads in the crimson ring (0.13 m to 0.4 m): warp ticks along the long borders and weft ticks
+  // along the short ones, on a 2 px pitch, one dark and one light thread per pair.
+  const rx0 = X(0.13)
+  const rx1 = w - X(0.13)
+  const ry0 = Y(0.13)
+  const ry1 = h - Y(0.13)
+  const ix0 = X(0.4)
+  const ix1 = w - X(0.4)
+  const iy0 = Y(0.4)
+  const iy1 = h - Y(0.4)
+  for (let x = Math.ceil(rx0); x + 2 <= rx1; x += 2) {
+    for (const [ya, yb] of [[ry0, iy0], [iy1, ry1]] as const) {
+      rect(c, x, ya, 1, yb - ya, '#12101c', 0.24)
+      rect(c, x + 1, ya, 1, yb - ya, '#f0d8b0', 0.1)
+    }
+  }
+  for (let y = Math.ceil(iy0); y + 2 <= iy1; y += 2) {
+    for (const [xa, xb] of [[rx0, ix0], [ix1, rx1]] as const) {
+      rect(c, xa, y, xb - xa, 1, '#12101c', 0.24)
+      rect(c, xa, y + 1, xb - xa, 1, '#f0d8b0', 0.1)
+    }
+  }
   const diamond = (cx: number, cy: number, hw: number, hh: number, color: string, alpha = 1) =>
     triangle(c, [[cx - hw, cy], [cx, cy - hh], [cx + hw, cy], [cx, cy + hh]], color, alpha)
   // Border diamonds along the long and short edges.
@@ -1029,10 +1064,18 @@ export function drawRugWoven(c: Ctx2D, w: number, h: number, seed: number): void
     [0.32, '#d2bc82'],
     [0.2, '#24203a'],
   ]
-  for (const [s, col] of steps) diamond(cx, cy, X(0.95 * s), Y(0.58 * s), col)
+  for (const [s, col] of steps) {
+    diamond(cx, cy, X(0.95 * s), Y(0.58 * s), col)
+    // Task 27.1: a thin dark outline on every medallion step raises the pattern contrast.
+    const hw = X(0.95 * s)
+    const hh = Y(0.58 * s)
+    for (const [ax, ay, bx2, by2] of [[cx - hw, cy, cx, cy - hh], [cx, cy - hh, cx + hw, cy], [cx + hw, cy, cx, cy + hh], [cx, cy + hh, cx - hw, cy]] as const) {
+      line(c, ax, ay, bx2, by2, '#12101c', 1, 0.5)
+    }
+  }
   for (const dx of [-0.45, 0.45]) diamond(cx + X(dx), cy, X(0.09), Y(0.09), '#d2bc82')
   // Weft lines, thread noise, a worn patch and the end fringes.
-  for (let y = 0; y < h; y += 2) rect(c, 0, y, w, 1, y % 4 === 0 ? '#ffffff' : '#000000', y % 4 === 0 ? 0.04 : 0.09)
+  for (let y = 0; y < h; y += 2) rect(c, 0, y, w, 1, y % 4 === 0 ? '#ffffff' : '#000000', y % 4 === 0 ? 0.06 : 0.12)
   speckle(c, rnd, 0, 0, w, h, 380, ['#ffffff', '#000000', '#d2bc82'], 1, 0.13)
   disc(c, cx + X(0.3), cy + Y(0.2), X(0.18), '#000000', 0.06)
   for (let y = 2; y < h - 2; y += 3) {
@@ -1808,6 +1851,252 @@ export function drawConeFalloff(c: Ctx2D, w: number, h: number, _seed: number): 
   }
 }
 
+// ---------------------------------------------------------------------------------------------
+// Task 27.1: arcade cabinet front detail and arcade manual spines (one 256 x 128 texture)
+// ---------------------------------------------------------------------------------------------
+
+export const CABINET_DETAIL_WIDTH = 256
+export const CABINET_DETAIL_HEIGHT = 128
+
+/** three.js BoxGeometry face order is +x, -x, +y, -y, +z, -z (four vertices each). The +z face is the front of a cabinet part and the spine of a book. */
+export const BOX_FACE_FRONT = 4
+
+/** A pixel rectangle of the canvas: x0, y0 (inclusive) to x1, y1 (exclusive). */
+export type PxRect = readonly [number, number, number, number]
+/** A UV rectangle (canvas top is v = 1). */
+export interface UvRect {
+  u0: number
+  u1: number
+  v0: number
+  v1: number
+}
+
+/**
+ * Regions of the cabinetAndManualDetail canvas. Left half (x 0..127): the arcade cabinet front, drawn at the real size of
+ * the faces it is mapped onto (about 3.9 mm per px for the coin door, 7.8 mm per px for the rest):
+ *  - door: the 0.26 x 0.34 m coin door (front face of the door box);
+ *  - lip: the 1.0 x 0.07 m front face of the control deck (the player-facing lip, tilted with the deck);
+ *  - kick: the 0.98 x 0.13 m kick plate;
+ *  - plainSteel / plainDark: flat stripes that every other face of those boxes samples, so no legend shows on the sides.
+ * Right half (x 128..255): three manual spines, 41 px wide and 128 px tall each, plus a plain cover-cloth stripe (x 251..255).
+ */
+export const CABINET_DETAIL_REGIONS = Object.freeze({
+  door: [0, 0, 66, 86] as PxRect,
+  lip: [0, 88, 128, 97] as PxRect,
+  kick: [0, 99, 128, 116] as PxRect,
+  plainSteel: [0, 117, 128, 122] as PxRect,
+  plainDark: [0, 123, 128, 128] as PxRect,
+  cover: [251, 4, 256, 124] as PxRect,
+  strips: Object.freeze([
+    [128, 0, 169, 128] as PxRect,
+    [169, 0, 210, 128] as PxRect,
+    [210, 0, 251, 128] as PxRect,
+  ]),
+})
+
+/** Manual spine strips, left to right, and the title printed along each one. */
+export const MANUAL_STRIP_KEYS = ['manual-snake', 'manual-maze', 'manual-frequency'] as const
+export const MANUAL_SPINE_TITLES = Object.freeze(['01 SNAKE.EXE', '02 LAST EXIT', '03 DEAD FREQUENCY'] as const)
+/** Legends on the control-deck lip, left to right, and on the coin door. */
+export const CABINET_DECK_LEGENDS = Object.freeze(['MOVE', 'ACTION', '1P START'] as const)
+export const CABINET_COIN_LEGEND = '25\u00a2'
+export const CABINET_INSERT_LEGEND = 'INSERT COIN'
+export const CABINET_SERIAL_TEXT = 'SER. 0996-LMC'
+
+/** UV inset in pixels: sampling stays half a texel inside a region. */
+const CABINET_UV_INSET_PX = 0.5
+
+/** UV rectangle of a pixel region of the cabinetAndManualDetail canvas (canvas top is v = 1). */
+export function detailUvRect(px: PxRect): UvRect {
+  const i = CABINET_UV_INSET_PX
+  return {
+    u0: (px[0] + i) / CABINET_DETAIL_WIDTH,
+    u1: (px[2] - i) / CABINET_DETAIL_WIDTH,
+    v0: 1 - (px[3] - i) / CABINET_DETAIL_HEIGHT,
+    v1: 1 - (px[1] + i) / CABINET_DETAIL_HEIGHT,
+  }
+}
+
+/** Pixel x of the left half of the texture ends here: the cabinet art lives left of it, the manual spines right of it. */
+export const CABINET_DETAIL_HALF_X = 128
+
+/** Vertical text on a spine is squashed along its reading direction: the spine face is stretched about 1.5x in v (0.06 x 0.28 m on 41 x 128 px). */
+const SPINE_TEXT_SQUASH = 2 / 3
+
+/** Horizontal brushing: one faint light or dark streak per row inside the rectangle. */
+function brushed(c: Ctx2D, rnd: () => number, x: number, y: number, w: number, h: number, base: string): void {
+  rect(c, x, y, w, h, base)
+  for (let r = 0; r < h; r++) rect(c, x, y + r, w, 1, rnd() < 0.5 ? '#ffffff' : '#14161c', 0.05 + rnd() * 0.08)
+}
+
+/**
+ * Title printed along a spine, reading downward. With a transform-capable context the whole string is drawn rotated 90 degrees
+ * clockwise (and condensed to cancel the vertical stretch of the face); otherwise the letters are stacked, one per line.
+ * The text stays inside x (cx +- 8) and y0..y1.
+ */
+function spineTitle(c: Ctx2D, s: string, cx: number, y0: number, y1: number, ink: string): void {
+  const len = y1 - y0
+  const chars = [...s].length
+  if (c.setTransform) {
+    const fs = Math.max(6, Math.min(11, Math.floor(len / (SPINE_TEXT_SQUASH * MARQUEE_CHAR_WIDTH_EM * chars))))
+    c.save()
+    // x' = -y + cx, y' = squash * x + centre: text x runs down the canvas, text y runs to the left.
+    c.setTransform(0, SPINE_TEXT_SQUASH, -1, 0, cx, (y0 + y1) / 2)
+    text(c, s, 0, 0, `bold ${fs}px monospace`, ink)
+    c.restore()
+    return
+  }
+  const step = len / chars
+  const font = `bold ${Math.max(5, Math.min(9, Math.floor(step * 1.2)))}px monospace`
+  ;[...s].forEach((ch, i) => {
+    if (ch !== ' ') text(c, ch, cx, y0 + step * (i + 0.5), font, ink)
+  })
+}
+
+/** Emblem ground: a white tile (it multiplies to the book colour, so the print on it reads as a dark tone of that colour) with a thin rule. */
+function emblemGround(c: Ctx2D, x0: number, ink: string): void {
+  rect(c, x0 + 3, 8, 35, 24, '#ffffff')
+  frame(c, x0 + 3.5, 8.5, 34, 23, ink, 1, 0.8)
+}
+
+/** Green pixel serpent on a 4 px grid (8 columns x 5 rows) with a lit eye, and one dim prey pixel. */
+function snakeEmblem(c: Ctx2D, x0: number, ink: string): void {
+  const cells: ReadonlyArray<readonly [number, number]> = [[0, 3], [1, 3], [2, 3], [2, 2], [2, 1], [3, 1], [4, 1], [5, 1], [5, 2], [5, 3], [6, 3], [7, 3]]
+  const gx = x0 + 5
+  const gy = 10
+  for (const [col, row] of cells) rect(c, gx + col * 4, gy + row * 4, 3, 3, ink)
+  rect(c, gx + 7 * 4 + 1, gy + 3 * 4 + 1, 1, 1, '#ffffff')
+  rect(c, gx + 7 * 4, gy, 3, 3, ink, 0.45)
+}
+
+/** Crimson maze (square spiral walls) beside a key. */
+function mazeEmblem(c: Ctx2D, x0: number, ink: string): void {
+  frame(c, x0 + 5.5, 10.5, 19, 19, ink, 1.5)
+  const walls: ReadonlyArray<readonly [number, number, number, number]> = [[9, 10, 9, 22], [9, 22, 17, 22], [13, 14, 21, 14], [21, 14, 21, 26], [13, 18, 13, 26], [13, 26, 17, 26]]
+  for (const [ax, ay, bx2, by2] of walls) line(c, x0 + ax, ay, x0 + bx2, by2, ink, 1.5)
+  ring(c, x0 + 31, 15, 3.5, ink, 1.5)
+  line(c, x0 + 31, 18.5, x0 + 31, 29, ink, 1.5)
+  line(c, x0 + 31, 26, x0 + 35, 26, ink, 1.5)
+  line(c, x0 + 31, 29, x0 + 34, 29, ink, 1.5)
+}
+
+/** Amber radio wave over a baseline, with the tuned frequency under it. */
+function waveEmblem(c: Ctx2D, x0: number, ink: string): void {
+  line(c, x0 + 5, 18, x0 + 36, 18, ink, 1, 0.45)
+  c.globalAlpha = 1
+  c.strokeStyle = ink
+  c.lineWidth = 1.5
+  c.beginPath()
+  for (let i = 0; i <= 15; i++) {
+    const x = x0 + 5 + i * 2
+    const y = 18 + Math.sin(i * 0.95) * 6 * (1 - Math.abs(i - 7.5) / 12)
+    if (i === 0) c.moveTo(x, y)
+    else c.lineTo(x, y)
+  }
+  c.stroke()
+  text(c, FREQUENCY_TEXT, x0 + 20.5, 28, 'bold 5px monospace', ink)
+}
+
+function drawManualSpine(c: Ctx2D, i: number): void {
+  const [x0, , x1] = CABINET_DETAIL_REGIONS.strips[i]
+  const cx = (x0 + x1) / 2
+  const inks = ['#0b3d1e', '#5a0a1a', '#4a2a00'] as const
+  const ink = inks[i]
+  // Neutral light-grey cloth: the book colour multiplies it, so the cover colour still reads.
+  rect(c, x0, 0, x1 - x0, 128, '#cfcfcf')
+  rect(c, x0 + 1, 3, x1 - x0 - 2, 2, '#ffffff', 0.9)
+  rect(c, x0 + 1, 123, x1 - x0 - 2, 2, '#ffffff', 0.9)
+  rect(c, x0 + 1, 8, 1, 112, '#ffffff', 0.3)
+  rect(c, x1 - 2, 8, 1, 112, '#ffffff', 0.25)
+  emblemGround(c, x0, ink)
+  if (i === 0) snakeEmblem(c, x0, ink)
+  else if (i === 1) mazeEmblem(c, x0, ink)
+  else waveEmblem(c, x0, ink)
+  // The lighter label band that used to be a separate cream part: near white, so it multiplies to the pure book colour.
+  rect(c, x0 + 1, 34, x1 - x0 - 2, 16, '#fbfbfb')
+  rect(c, x0 + 1, 34, x1 - x0 - 2, 1, ink, 0.8)
+  rect(c, x0 + 1, 49, x1 - x0 - 2, 1, ink, 0.8)
+  text(c, 'MANUAL', cx, 42, 'bold 6px monospace', ink)
+  spineTitle(c, MANUAL_SPINE_TITLES[i], cx, 54, 120, '#14140f')
+}
+
+function drawCabinetDoor(c: Ctx2D, rnd: () => number): void {
+  brushed(c, rnd, 0, 0, 66, 86, '#8a909a')
+  // Steel frame: light top and left, dark bottom and right, then a recessed inner panel.
+  rect(c, 0, 0, 66, 2, '#d4d9e2')
+  rect(c, 0, 0, 2, 86, '#c0c6d0')
+  rect(c, 64, 0, 2, 86, '#4a4f58')
+  rect(c, 0, 84, 66, 2, '#3a3e46')
+  rect(c, 4, 4, 58, 78, '#6c727d', 0.55)
+  frame(c, 4.5, 4.5, 57, 77, '#2a2d34', 1)
+  // INSERT COIN legend plate on the strip above the 3D coin slots.
+  rect(c, 8, 6, 50, 11, '#15161b')
+  frame(c, 8.5, 6.5, 49, 10, '#b0b6c0', 1)
+  text(c, CABINET_INSERT_LEGEND, 33, 11.5, 'bold 7px monospace', '#ffc23a')
+  // Louvred speaker grille between the two slot bezels.
+  rect(c, 25, 21, 16, 24, '#0e0f13')
+  for (let y = 23; y < 44; y += 3) {
+    rect(c, 25, y, 16, 1, '#555a64')
+    rect(c, 25, y + 1, 16, 1, '#000000', 0.6)
+  }
+  frame(c, 25.5, 21.5, 15, 23, '#9aa0aa', 1, 0.7)
+  // Two glowing amber reject buttons with a coin legend under each.
+  for (const cx of [15, 51]) {
+    disc(c, cx, 64, 11, '#ffb030', 0.2)
+    disc(c, cx, 64, 8, '#2a1a00')
+    disc(c, cx, 64, 6.5, '#ff9a1a')
+    disc(c, cx, 64, 4.5, '#ffc24a')
+    disc(c, cx - 2, 62, 1.5, '#ffffff', 0.7)
+    rect(c, cx - 9, 74, 18, 8, '#15161b')
+    text(c, CABINET_COIN_LEGEND, cx, 78.5, 'bold 6px monospace', '#ffc23a')
+  }
+  text(c, 'REJECT', 33, 64, 'bold 5px monospace', '#15161b')
+}
+
+function drawDeckLip(c: Ctx2D): void {
+  rect(c, 0, 88, 128, 9, '#1a1b22')
+  rect(c, 0, 88, 128, 1, '#4a4e58')
+  rect(c, 0, 96, 128, 1, '#0a0a0e')
+  const plates: ReadonlyArray<readonly [number, number]> = [[22, 26], [64, 32], [106, 36]]
+  CABINET_DECK_LEGENDS.forEach((label, i) => {
+    const [cx, pw] = plates[i]
+    rect(c, cx - pw / 2, 89, pw, 7, '#0d0e12')
+    frame(c, cx - pw / 2 + 0.5, 89.5, pw - 1, 6, '#5a5e68', 1)
+    text(c, label, cx, 92.5, 'bold 6px monospace', '#ffc23a')
+  })
+}
+
+function drawKickPlate(c: Ctx2D, rnd: () => number): void {
+  brushed(c, rnd, 0, 99, 128, 17, '#7d838d')
+  rect(c, 0, 99, 128, 1, '#c8cdd6')
+  rect(c, 0, 115, 128, 1, '#30343c')
+  // Louvred vent block on the left, small serial plate on the right.
+  rect(c, 6, 102, 58, 11, '#0e0f13')
+  for (let y = 103; y < 112; y += 2) rect(c, 6, y, 58, 1, '#555a64')
+  rect(c, 70, 102, 52, 11, '#e4e7ec')
+  frame(c, 70.5, 102.5, 51, 10, '#6a707a', 1)
+  text(c, CABINET_SERIAL_TEXT, 96, 107.5, 'bold 5px monospace', '#22252b')
+  for (const x of [73, 119]) disc(c, x, 107.5, 1, '#7a808a')
+}
+
+/**
+ * Arcade cabinet front and manual spines, 256 x 128 (task 27.1). See CABINET_DETAIL_REGIONS for the layout. Original text only
+ * ("SER. 0996-LMC" is the club's own serial plate). Deterministic: seeded streaks, no Math.random.
+ */
+export function drawCabinetAndManualDetail(c: Ctx2D, w: number, h: number, seed: number): void {
+  if (w !== CABINET_DETAIL_WIDTH || h !== CABINET_DETAIL_HEIGHT) throw new Error('cabinet detail size is fixed')
+  const rnd = makeRng(seed)
+  rect(c, 0, 0, CABINET_DETAIL_HALF_X, h, '#1a1b22')
+  drawCabinetDoor(c, rnd)
+  drawDeckLip(c)
+  drawKickPlate(c, rnd)
+  brushed(c, rnd, 0, 117, 128, 5, '#7f858f')
+  // Right half: three manual spines and the plain cover-cloth stripe used by every other face of a book.
+  rect(c, CABINET_DETAIL_HALF_X, 0, w - CABINET_DETAIL_HALF_X, h, '#cfcfcf')
+  for (let i = 0; i < 3; i++) drawManualSpine(c, i)
+  rect(c, 251, 0, 5, 128, '#d2d2d2')
+}
+
 // Table, memory estimate
 // ---------------------------------------------------------------------------------------------
 
@@ -1843,6 +2132,7 @@ export const TEXTURE_SPECS: Readonly<Record<TextureId, TextureSpec>> = Object.fr
   metalCabinet: { id: 'metalCabinet', width: 256, height: 256, filter: 'mipmap', wrap: 'repeat', seed: 131, draw: drawMetalCabinet },
   deskDetail: { id: 'deskDetail', width: 128, height: 64, filter: 'mipmap', wrap: 'repeat', seed: 132, draw: drawDeskDetail },
   coneFalloff: { id: 'coneFalloff', width: 64, height: 64, filter: 'linear', wrap: 'clamp', seed: 133, draw: drawConeFalloff },
+  cabinetAndManualDetail: { id: 'cabinetAndManualDetail', width: CABINET_DETAIL_WIDTH, height: CABINET_DETAIL_HEIGHT, filter: 'mipmap', wrap: 'clamp', seed: 134, draw: drawCabinetAndManualDetail },
 })
 
 export const TEXTURE_IDS = Object.keys(TEXTURE_SPECS) as TextureId[]

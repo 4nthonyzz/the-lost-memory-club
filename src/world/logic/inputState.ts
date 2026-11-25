@@ -12,7 +12,9 @@ export type KeyRole =
   | 'yawRight'
   | 'pitchUp'
   | 'pitchDown'
-  | 'interact';
+  | 'interact'
+  | 'page1'
+  | 'page2';
 
 const ROLE_BY_CODE: Readonly<Record<string, KeyRole>> = {
   KeyW: 'forward',
@@ -28,7 +30,16 @@ const ROLE_BY_CODE: Readonly<Record<string, KeyRole>> = {
   KeyI: 'pitchUp',
   KeyK: 'pitchDown',
   KeyE: 'interact',
+  Digit1: 'page1',
+  Numpad1: 'page1',
+  Digit2: 'page2',
+  Numpad2: 'page2',
 };
+
+/** Roles that are one-shot actions, never held (interact and the card page keys). */
+export function isActionRole(role: KeyRole): boolean {
+  return role === 'interact' || role === 'page1' || role === 'page2';
+}
 
 /** Maps a physical key (event.code) to a role, or null when unused. */
 export function keyRole(code: string): KeyRole | null {

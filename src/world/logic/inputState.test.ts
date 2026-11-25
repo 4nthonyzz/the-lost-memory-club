@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   EMPTY_HELD_KEYS,
+  isActionRole,
   isKeyEventAccepted,
   keyRole,
   reduceHeldKeys,
@@ -27,6 +28,18 @@ describe('keyRole', () => {
     expect(keyRole('KeyI')).toBe('pitchUp');
     expect(keyRole('KeyK')).toBe('pitchDown');
     expect(keyRole('KeyE')).toBe('interact');
+  });
+
+  it('maps the digit and numpad keys 1 and 2 to the page roles (task 27.2)', () => {
+    expect(keyRole('Digit1')).toBe('page1');
+    expect(keyRole('Numpad1')).toBe('page1');
+    expect(keyRole('Digit2')).toBe('page2');
+    expect(keyRole('Numpad2')).toBe('page2');
+    expect(keyRole('Digit3')).toBeNull();
+    expect(isActionRole('page1')).toBe(true);
+    expect(isActionRole('page2')).toBe(true);
+    expect(isActionRole('interact')).toBe(true);
+    expect(isActionRole('forward')).toBe(false);
   });
 
   it('returns null for unused codes', () => {

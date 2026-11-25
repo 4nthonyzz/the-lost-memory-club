@@ -8,6 +8,7 @@ import {
   LAMP_MESSAGES,
   initialPropState,
   propPromptText,
+  reduceCardPage,
   reduceCloseCard,
   reducePropInteract,
   reduceTargetChange,
@@ -142,5 +143,50 @@ describe('prop state reducer (task 23.2, 24.2)', () => {
     expect(propPromptText('desk-notebook', on)).toBe('Press E to read: Shift Log Notebook');
     expect(propPromptText('cork-board', on)).toBe('Press E to examine: Investigation Pinboard');
     expect(propPromptText('poster-shift', on)).toBe("Press E to inspect: 'The Signal Remembers' Poster");
+  });
+});
+
+describe('card pages (task 27.2)', () => {
+  it('starts on page 1 with no card open', () => {
+    expect(initialPropState().cardPage).toBe(1);
+  });
+
+  it('CARD_PAGE does nothing while no card is open', () => {
+    const s = initialPropState();
+    expect(reduceCardPage(s, 2)).toBe(s);
+    expect(reduceCardPage(s, 1)).toBe(s);
+  });
+
+  it('switches pages while a card is open, and keeps the same state for the page already shown', () => {
+    const open = reducePropInteract(initialPropState(), 'manual-snake');
+    expect(open.cardPage).toBe(1);
+    expect(reduceCardPage(open, 1)).toBe(open);
+    const two = reduceCardPage(open, 2);
+    expect(two.cardPage).toBe(2);
+    expect(two.openCard).toBe('manual-snake');
+    expect(reduceCardPage(two, 1).cardPage).toBe(1);
+  });
+
+  it('does not change the read set or the lamps when switching pages', () => {
+    const open = reducePropInteract(initialPropState(), 'cork-board');
+    const two = reduceCardPage(open, 2);
+    expect(two.read).toBe(open.read);
+    expect(two.read.size).toBe(1);
+    expect(two.lampOn).toBe(open.lampOn);
+  });
+
+  it('opening always starts on page 1 and every way of closing resets the page', () => {
+    let s = reduceCardPage(reducePropInteract(initialPropState(), 'poster-shift'), 2);
+    s = reducePropInteract(s, 'poster-shift'); // E closes
+    expect(s.openCard).toBeNull();
+    expect(s.cardPage).toBe(1);
+    expect(reducePropInteract(s, 'poster-shift').cardPage).toBe(1);
+    const viaClose = reduceCloseCard(reduceCardPage(reducePropInteract(initialPropState(), 'desk-notebook'), 2));
+    expect(viaClose.cardPage).toBe(1);
+    expect(viaClose.openCard).toBeNull();
+    // Re-reading after page 2 starts on page 1 again.
+    const reopened = reducePropInteract(viaClose, 'desk-notebook');
+    expect(reopened.cardPage).toBe(1);
+    expect(reopened.read.size).toBe(1);
   });
 });

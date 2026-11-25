@@ -34,7 +34,7 @@ export type ModeEvent =
       targetKind?: 'station' | 'prop' | null;
       /** Id of the targeted prop when 	argetKind is 'prop'. */
       targetPropId?: PropInteractableId | null;
-      /** True while an Archive Document Card is open. E with no target then closes it. Omitted means false. */
+      /** True while an Archive Document Card is open. E with no target then closes it; 1 and 2 switch its page. Omitted means false. */
       cardOpen?: boolean;
     }
   | { type: 'KEY_UP'; role: KeyRole | null }
@@ -45,6 +45,7 @@ export type ModeEffect =
   | { type: 'CALL_ON_INSPECT' }
   | { type: 'PROP_INTERACT'; id: PropInteractableId }
   | { type: 'CLOSE_CARD' }
+  | { type: 'CARD_PAGE'; page: 1 | 2 }
   | { type: 'RELEASE_POINTER_LOCK' }
   | { type: 'REQUEST_POINTER_LOCK' }
   | { type: 'CLEAR_INPUT' }
@@ -134,6 +135,12 @@ function resume(s: ModeState, byE: boolean): ModeResult {
 
 function keyDown(s: ModeState, e: Extract<ModeEvent, { type: 'KEY_DOWN' }>): ModeResult {
   if (!e.accepted || e.repeat) return none(s);
+
+  // Keys 1 and 2 switch the page of an open card. No mode change, no pointer-lock release, no input clear.
+  if (e.role === 'page1' || e.role === 'page2') {
+    if (s.mode === 'inspecting' || !e.cardOpen) return none(s);
+    return { state: s, effects: [{ type: 'CARD_PAGE', page: e.role === 'page1' ? 1 : 2 }] };
+  }
 
   const isEnter = e.code === 'Enter';
   const isE = e.code === 'KeyE' || e.role === 'interact';

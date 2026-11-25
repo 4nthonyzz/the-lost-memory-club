@@ -244,7 +244,7 @@ describe('WorldScene interactable props (task 23.2, 24.2)', () => {
     expect(card()?.getAttribute('role')).toBe('region');
     expect(card()?.getAttribute('aria-live')).toBe('polite');
     expect(card()?.getAttribute('aria-label')).toBe('LAST EXIT Manual');
-    expect(card()?.textContent).toContain('Press E or move away to close');
+    expect(card()?.textContent).toContain('Press 1 / 2 to switch pages · E or move away to close');
     expect(card()?.textContent).toContain('Cabinet status: awaiting service');
     expect(message()?.textContent).toBe('');
     pressE(wrapper);
@@ -366,6 +366,141 @@ describe('WorldScene interactable props (task 23.2, 24.2)', () => {
     expect(onInspect).toHaveBeenCalledWith('vhs');
   });
 });
+describe('WorldScene themed two-page card (task 27.2)', () => {
+  const card = () => document.querySelector('.world-card') as HTMLElement | null;
+  const tab = (n: 1 | 2) => document.getElementById(`world-card-tab-${n}`) as HTMLElement;
+  const panelText = () => document.querySelector('[role="tabpanel"]')?.textContent ?? '';
+  const pressE = (wrapper: HTMLElement) => {
+    fireEvent.keyDown(wrapper, { code: 'KeyE', key: 'e' });
+    fireEvent.keyUp(wrapper, { code: 'KeyE', key: 'e' });
+  };
+  const open = (id: TargetId) => {
+    h.target = id;
+    const r = renderWorld();
+    pressE(r.wrapper);
+    return r;
+  };
+
+  it('opens on page 1 with the theme, tabs, status pill, spec pills and the overview blocks', () => {
+    open('manual-maze');
+    expect(card()?.getAttribute('data-theme')).toBe('maze');
+    expect(document.querySelector('[role="tablist"]')).not.toBeNull();
+    expect(tab(1).getAttribute('role')).toBe('tab');
+    expect(tab(1).textContent).toBe('[1] OVERVIEW & RULES');
+    expect(tab(2).textContent).toBe('[2] TECHNICIAN / ANOMALY LOG');
+    expect(tab(1).getAttribute('aria-selected')).toBe('true');
+    expect(tab(2).getAttribute('aria-selected')).toBe('false');
+    expect(card()?.textContent).toContain('CABINET 02 // MAINTENANCE LOCKOUT');
+    expect(card()?.querySelectorAll('.world-pill').length).toBeGreaterThanOrEqual(3);
+    expect(card()?.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    expect(panelText()).toContain('OBJECTIVE');
+    expect(panelText()).toContain('ENTITY HAZARD');
+    expect(panelText()).not.toContain('TECHNICIAN LOG');
+  });
+
+  it('sets data-theme from the document for every readable prop', () => {
+    const expected: Array<[TargetId, string]> = [
+      ['manual-snake', 'snake'],
+      ['manual-frequency', 'frequency'],
+      ['desk-notebook', 'notebook'],
+      ['cork-board', 'board'],
+      ['poster-shift', 'shift'],
+      ['poster-archive', 'notice'],
+    ];
+    for (const [id, theme] of expected) {
+      const r = open(id);
+      expect(card()?.getAttribute('data-theme')).toBe(theme);
+      r.unmount();
+    }
+  });
+
+  it('keys 1 and 2 switch pages, claim the keys only while a card is open and never touch pointer lock or onInspect', () => {
+    h.target = 'manual-snake';
+    const { wrapper, onInspect } = renderWorld();
+    // No card open: 1 and 2 do nothing and are not prevented.
+    expect(fireEvent.keyDown(wrapper, { code: 'Digit2', key: '2' })).toBe(true);
+    expect(card()).toBeNull();
+    pressE(wrapper);
+    expect(tab(1).getAttribute('aria-selected')).toBe('true');
+    expect(panelText()).toContain('OBJECTIVE');
+    expect(fireEvent.keyDown(wrapper, { code: 'Digit2', key: '2' })).toBe(false); // prevented while open
+    expect(tab(2).getAttribute('aria-selected')).toBe('true');
+    expect(tab(1).getAttribute('aria-selected')).toBe('false');
+    expect(panelText()).toContain('HIDDEN CODE');
+    expect(panelText()).not.toContain('OBJECTIVE');
+    fireEvent.keyDown(wrapper, { code: 'Digit1', key: '1' });
+    expect(tab(1).getAttribute('aria-selected')).toBe('true');
+    expect(panelText()).toContain('OBJECTIVE');
+    fireEvent.keyDown(wrapper, { code: 'Numpad2', key: '2' });
+    expect(panelText()).toContain('HIDDEN CODE');
+    fireEvent.keyDown(wrapper, { code: 'Numpad1', key: '1' });
+    expect(panelText()).toContain('OBJECTIVE');
+    expect(onInspect).not.toHaveBeenCalled();
+    expect(lockSpy).not.toHaveBeenCalled();
+    expect(document.querySelector('.world-notes .world-chip')?.textContent).toBe('NOTES READ: 1 / 7');
+  });
+
+  it('ignores 1 and 2 from a button or from outside the wrapper', () => {
+    open('manual-snake');
+    const outside = document.createElement('input');
+    document.body.append(outside);
+    fireEvent.keyDown(outside, { code: 'Digit2', key: '2' });
+    fireEvent.keyDown(tab(1), { code: 'Digit2', key: '2' });
+    expect(tab(1).getAttribute('aria-selected')).toBe('true');
+    outside.remove();
+  });
+
+  it('clicking a page button switches pages and does not request pointer lock or call onInspect', () => {
+    h.target = 'manual-frequency';
+    const { wrapper, onInspect } = renderWorld();
+    pressE(wrapper);
+    fireEvent.click(tab(2));
+    expect(tab(2).getAttribute('aria-selected')).toBe('true');
+    expect(panelText()).toContain('ENGINEERING ANOMALY');
+    expect(lockSpy).not.toHaveBeenCalled();
+    fireEvent.click(tab(1));
+    expect(tab(1).getAttribute('aria-selected')).toBe('true');
+    expect(lockSpy).not.toHaveBeenCalled();
+    expect(onInspect).not.toHaveBeenCalled();
+    // A click on the world itself still requests pointer lock.
+    fireEvent.click(wrapper);
+    expect(lockSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the document focus on the world when a page button is pressed with the mouse', () => {
+    open('manual-snake');
+    const notPrevented = fireEvent.mouseDown(tab(2));
+    expect(notPrevented).toBe(false);
+  });
+
+  it('E and Escape still close the card from page 2, and the next open starts on page 1', () => {
+    h.target = 'cork-board';
+    const { wrapper } = renderWorld();
+    pressE(wrapper);
+    fireEvent.keyDown(wrapper, { code: 'Digit2', key: '2' });
+    expect(tab(2).getAttribute('aria-selected')).toBe('true');
+    pressE(wrapper);
+    expect(card()).toBeNull();
+    pressE(wrapper);
+    expect(tab(1).getAttribute('aria-selected')).toBe('true');
+    fireEvent.keyDown(wrapper, { code: 'Digit2', key: '2' });
+    expect(fireEvent.keyDown(wrapper, { code: 'Escape', key: 'Escape' })).toBe(true);
+    expect(card()).toBeNull();
+    expect(document.querySelector('.world-notes .world-chip')?.textContent).toBe('NOTES READ: 1 / 7');
+  });
+
+  it('keeps the card non-modal and the prompts unchanged', () => {
+    h.target = 'manual-snake';
+    const { wrapper } = renderWorld();
+    pressE(wrapper);
+    expect(card()?.getAttribute('role')).toBe('region');
+    expect(card()?.closest('[aria-modal]')).toBeNull();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(wrapper.contains(card())).toBe(true);
+    expect(document.querySelector('.world-prompt')?.textContent).toBe('Press E to read: SNAKE.EXE Manual');
+  });
+});
+
 describe('WorldScene fallback (no WebGL)', () => {
   it('fallback buttons call onInspect with vhs and arcade', () => {
     setWebgl(false);

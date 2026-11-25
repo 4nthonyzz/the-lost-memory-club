@@ -104,7 +104,7 @@ export function DeskLamps({ on = {} }: { on?: Readonly<Record<string, boolean>> 
 export function Shelf({ id, box, height }: { id: string; box: Aabb; height: number }) {
   const { parts, instances } = useMemo(() => {
     const contents = shelfContents(id, box, height)
-    return { parts: [...shelfFrameParts(box, height), ...contents.boxParts, ...contents.manualParts], instances: contents.instances }
+    return { parts: [...shelfFrameParts(box, height), ...contents.boxParts], instances: contents.instances }
   }, [id, box, height])
   return (
     <group>

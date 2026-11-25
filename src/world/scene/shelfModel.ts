@@ -300,8 +300,6 @@ export interface ShelfContents {
   instances: BookInstance[]
   /** Cardboard tape boxes (plain parts, rendered with the carcass). */
   boxParts: Part[]
-  /** Lighter spine bands of the arcade manuals (plain parts). Empty except on the manual bookcase. */
-  manualParts: Part[]
 }
 
 /** The three arcade manuals (task 23.2): colour-coded cloth covers on the hardcover spine variant. */
@@ -313,16 +311,13 @@ export const MANUAL_BOOKS: Readonly<Record<ManualId, { colour: string; title: st
 /** Manual size: thickness, height, depth (slightly larger than the ordinary books). */
 export const MANUAL_SIZE = [0.06, 0.28, 0.27] as const
 const MANUAL_VARIANT = 1
-/** Spine band: height and how far it stands proud of the spine (it is also sunk 2 mm into the book). */
-const MANUAL_BAND_H = 0.035
-const MANUAL_BAND_PROUD = 0.003
 
 /**
  * Puts the three manuals into their row: every item of that level whose span along the shelf touches a
  * manual (plus a 3 mm margin) is removed, then the manual stands upright on the board with its spine at
  * the front line. Everything else keeps its seeded position.
  */
-function placeManuals(g: ShelfGeometry, frontLine: number, instances: BookInstance[], manualParts: Part[]): BookInstance[] {
+function placeManuals(g: ShelfGeometry, frontLine: number, instances: BookInstance[]): BookInstance[] {
   const lv = g.levels[MANUAL_PLACEMENT.level]
   const [t, h, d] = MANUAL_SIZE
   // The manual bookcase runs along z (west wall): world z = cz - lx * sin(yaw).
@@ -356,9 +351,6 @@ function placeManuals(g: ShelfGeometry, frontLine: number, instances: BookInstan
       rot: [0, g.yaw, 0],
       tiltDeg: 0,
     })
-    manualParts.push(
-      localPart(g, 'manualBand', lx, lv.floor + h * 0.68, frontLine + (MANUAL_BAND_PROUD - 0.002) / 2, t - 0.006, MANUAL_BAND_H, MANUAL_BAND_PROUD + 0.002),
-    )
   }
   return kept
 }
@@ -581,9 +573,8 @@ export function shelfContents(id: string, box: Aabb, height: number): ShelfConte
       if (rnd() < 0.35) cur += range(0.02, 0.12)
     }
   })
-  const manualParts: Part[] = []
   if (id === MANUAL_PLACEMENT.shelfId) {
-    return { instances: placeManuals(g, frontLine, instances, manualParts), boxParts, manualParts }
+    return { instances: placeManuals(g, frontLine, instances), boxParts }
   }
-  return { instances, boxParts, manualParts }
+  return { instances, boxParts }
 }
