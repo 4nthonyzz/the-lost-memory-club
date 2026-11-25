@@ -140,6 +140,9 @@ const CRT_STACK = prop('crt-stack', 'furniture', box(4.3, 4.9, -3.2, -2.6), 1.0,
 const CHAIR = prop('abandoned-chair', 'furniture', box(2.9, 3.5, 1.9, 2.5), 0.9, 3);
 const COUCH = prop('couch', 'furniture', box(-3.9, -2.1, 2.6, 3.4), 0.9, 3);
 
+/** Framed ARCHIVE / MEMBERS ONLY poster on the Arcade_Area north wall (visual; also the 'poster-archive' readable, task 25.2). */
+const ARCADE_POSTER = prop('poster-arcade-area', 'detail', box(7, 8, -2, -1.95), 1.0, 3, false);
+
 const DETAILS: readonly PropDef[] = Object.freeze([
   // Crates moved to the main room's south-east corner (task 20.1) so the Arcade_Area keeps 1.2 m lanes from both
   // doorways to all three cabinet anchors.
@@ -151,7 +154,7 @@ const DETAILS: readonly PropDef[] = Object.freeze([
   prop('desk-lamp-left', 'detail', box(-1.44, -1.1, 1.38, 1.52), 0.34, 3, false, undefined, { elevation: 1.0 }),
   prop('desk-lamp-right', 'detail', box(1.14, 1.4, 1.32, 1.58), 0.4, 3, false, undefined, { elevation: 1.0 }),
   prop('poster-north', 'detail', box(0.5, 1.5, -4, -3.95), 1.0, 3, false),
-  prop('poster-arcade-area', 'detail', box(7, 8, -2, -1.95), 1.0, 3, false),
+  ARCADE_POSTER,
   prop('cable-run', 'detail', box(-1, 1, -2.5, -2.45), 0.02, 3, false),
   // Archival tape boxes in three corners (visual only).
   prop('archive-boxes-nw', 'detail', box(-4.9, -4.3, -3.9, -3.4), 0.4, 3, false),
@@ -274,7 +277,7 @@ function manualDef(id: ManualId, z: number): InteractableDef {
 
 /**
  * Readable notes (task 24.2). All three are non-solid and visual only; their anchors sit on the object itself.
- *  - desk-notebook: the notepad on the reception desk (deskParts: x = desk centre - 0.95, z = desk centre + 0.1,
+ *  - desk-notebook: the notepad on the reception desk (deskParts: x = desk centre - 0.58, z = desk centre + 0.02; moved in 25.1 so the left lamp is no longer stolen by the notebook,
  *    on the desk top). The solid desk footprint is excluded from its line-of-sight test, like the lamps.
  *  - cork-board: the north-wall bulletin board between the two filing cabinets, anchored at the board centre on the wall face.
  *  - poster-shift: the Memory_Shift overlay poster (north wall, x -0.3, z -3.94; see ShiftDressing in Props.tsx). It is
@@ -287,7 +290,7 @@ function noteDefs(): InteractableDef[] {
     Object.freeze({
       id: 'desk-notebook' as const,
       kind: 'note' as const,
-      anchor: Object.freeze({ x: dx - 0.95, z: dz + 0.1 }),
+      anchor: Object.freeze({ x: dx - 0.58, z: dz + 0.02 }),
       collider: DESK.box,
       range: PROP_INTERACTION_RANGE,
       height: 1.0,
@@ -308,12 +311,26 @@ function noteDefs(): InteractableDef[] {
       height: 1.7,
       requiresShift: true,
     }),
+    // Task 25.2: the framed ARCHIVE / MEMBERS ONLY poster on the Arcade_Area north wall (prop 'poster-arcade-area', centre
+    // x 7.5, face at z -1.945). The anchor is its real position, 0.02 m into the room from the wall face (z -1.95). Always
+    // targetable (it is not a Memory_Shift overlay). Its own small box is excluded from its line-of-sight test.
+    Object.freeze({
+      id: 'poster-archive' as const,
+      kind: 'note' as const,
+      anchor: Object.freeze({
+        x: (ARCADE_POSTER.box.minX + ARCADE_POSTER.box.maxX) / 2,
+        z: ARCADE_POSTER.box.maxZ + 0.02,
+      }),
+      collider: ARCADE_POSTER.box,
+      range: PROP_INTERACTION_RANGE,
+      height: 1.7,
+    }),
   ];
 }
 
 /**
- * World-local interactable props (eight): the two desk lamps, the three manuals, then the desk notebook, the cork
- * board and the Memory_Shift poster. Not Stations, not Colliders.
+ * World-local interactable props (nine): the two desk lamps, the three manuals, then the desk notebook, the cork
+ * board, the Memory_Shift poster and the Arcade_Area Club Archive Notice. Not Stations, not Colliders.
  */
 export const INTERACTABLE_DEFS: readonly InteractableDef[] = Object.freeze([
   lampDef('desk-lamp-left'),

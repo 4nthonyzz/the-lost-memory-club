@@ -103,7 +103,7 @@ import {
   wallGeometry,
 } from './sharedResources'
 import { ARCADE_SCREEN_BASE_COLORS, BASE_CRT_SCREEN_COLOR, BASE_WALL_COLOR, CRT_CASING_COLORS } from './memoryShift'
-import { cablePathParts, consoleCableParts, deskParts, partGroupKey } from './modelDetail'
+import { NOTE_DX, NOTE_DZ, cablePathParts, consoleCableParts, deskParts, partGroupKey } from './modelDetail'
 import { textureMemoryBytes } from './proceduralTextures'
 import { WOOD_METRES_PER_REPEAT, fabricBoxCount, metricBoxGeometry, woodBoxCount, woodBoxGeometry } from './sharedResources'
 import { FABRIC_METRES_PER_REPEAT } from './proceduralTextures'
@@ -695,7 +695,7 @@ describe('arcade manuals on the west bookcase (task 23.2)', () => {
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(8 * 1048576)
     // Eight interactables, none of them solid or adding geometry (the notes reuse existing parts).
-    expect(INTERACTABLE_DEFS).toHaveLength(8)
+    expect(INTERACTABLE_DEFS).toHaveLength(9) // 25.2 adds the Club Archive Notice
     console.info(`[24.2] triangles ${report.totalTriangles} (delta from 19042 ${report.totalTriangles - TASK_24_BASELINE}), texture memory ${(report.textureMemoryBytes / 1048576).toFixed(3)} MiB`)
   })
 })
@@ -1034,7 +1034,7 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
         expect(m.depthWrite).toBe(false)
         expect(m.blending).toBe(2) // AdditiveBlending
       }
-      expect(materials.lampPool.opacity).toBeLessThanOrEqual(0.4)
+      expect(materials.lampPool.opacity).toBeCloseTo(0.42, 5) // raised from 0.32 in 25.1
       // A lamp's state is independent: left on / right off gives different material sets for the two lamps.
       expect(lampParts('desk-lamp-left', true).find((p) => p.lampRole === 'sprite')!.mat).not.toBe(
         lampParts('desk-lamp-right', false).find((p) => p.lampRole === 'sprite')!.mat,
@@ -1137,7 +1137,7 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
         expect(m.depthWrite).toBe(false)
         expect(m.transparent).toBe(true)
         expect(m.side).toBe(2) // DoubleSide
-        expect(m.opacity).toBeCloseTo(0.14, 5)
+        expect(m.opacity).toBeCloseTo(0.2, 5) // 25.1: raised from 0.14 to compensate for the coneFalloff map
       }
       expect(materials.lampConeBanker.color.getHexString()).not.toBe(materials.lampConeTable.color.getHexString())
     })
@@ -1168,8 +1168,8 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
     })
 
     it('task 24.1: ON shades are emissive with the exact colours and intensities, OFF shades are dark with emissiveIntensity 0', () => {
-      expect(materials.lampGreenShadeOn.emissive.getHexString()).toBe('22c55e')
-      expect(materials.lampGreenShadeOn.emissiveIntensity).toBe(0.75)
+      expect(materials.lampGreenShadeOn.emissive.getHexString()).toBe('16a34a') // 25.1: was #22c55e at 0.75
+      expect(materials.lampGreenShadeOn.emissiveIntensity).toBe(0.38)
       expect(materials.lampCreamShadeOn.emissive.getHexString()).toBe('ffd27d')
       expect(materials.lampCreamShadeOn.emissiveIntensity).toBe(0.85)
       expect(materials.lampGreenShade.emissiveIntensity).toBe(0)
@@ -1219,10 +1219,10 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
     it('task 24.1: budgets hold (triangles delta from 19,042 at most +70, 4 lights, same texture count and memory) and textures dispose once', () => {
       const report = sceneDetailReport()
       expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
-      expect(report.totalTriangles - 19042).toBeLessThanOrEqual(70)
-      expect(report.totalTriangles - 19042).toBe(58)
-      expect(report.textureCount).toBe(30)
-      expect(report.textureMemoryBytes / 1048576).toBeCloseTo(7.521, 2)
+      expect(report.totalTriangles - 19042).toBeLessThanOrEqual(82) // 25.1 adds 18 (caps +16, liner +2); 25.2 adds 6 (three glow decals)
+      expect(report.totalTriangles - 19042).toBe(82)
+      expect(report.textureCount).toBe(31)
+      expect(report.textureMemoryBytes / 1048576).toBeCloseTo(7.537, 2) // 7.521 + coneFalloff 0.016
       expect(report.textureMemoryBytes).toBeLessThanOrEqual(8 * 1048576)
       expect(M3_LIGHT_COUNT).toBe(4)
       console.info(
@@ -1395,7 +1395,7 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
     // 21 textures after 18.3; task 20.2 removed four (arcadeScreen, marquee, outOfOrder, deck) and added six; task 21.1 added couchFabric.
     // Task 21.2 adds crtCasing and crtGlass; 22.1 adds vcrDeck and vhsShell, 22.2 adds metalCabinet (A) and deskDetail (B).
-    expect(report.textureCount).toBe(30)
+    expect(report.textureCount).toBe(31)
     for (const name of ['conduit', 'ventilation', 'cable-loops', 'corner-posts', 'wall-clock', 'desk-lamp-left', 'desk-lamp-right']) {
       expect(report.objects.map((o) => o.name)).toContain(name)
     }
@@ -1683,8 +1683,8 @@ describe('task 20.2: attract screen and marquee textures on the cabinets', () =>
     setCanvasFactory(() => fakeCanvas())
     ensureSharedTextures()
     // 23 after task 20.2, plus couchFabric (21.1), crtCasing and crtGlass (21.2).
-    expect(liveTextureCount()).toBe(30)
-    expect(TEXTURE_IDS).toHaveLength(30)
+    expect(liveTextureCount()).toBe(31)
+    expect(TEXTURE_IDS).toHaveLength(31)
     const total = totalTextureMemoryBytes()
     const perTexture = TEXTURE_IDS.map((id) => `${id} ${TEXTURE_SPECS[id].width}x${TEXTURE_SPECS[id].height}=${(textureMemoryBytes(TEXTURE_SPECS[id]) / 1048576).toFixed(3)}MB`)
     const report = sceneDetailReport()
@@ -2034,7 +2034,7 @@ describe('task 22.1: media island, armchair and VHS shells', () => {
     // Task 23.1 replaced the two old desk lamps (470 triangles) with two new ones (352): -118.
     // Task 23.2 replaced 7 ordinary books on shelf-b (-84) with 3 manuals and 3 spine bands (+72): -12.
     // Task 24.1: two lamp cones (+48) and five ceiling bloom strips (+10) = +58.
-    expect(report.totalTriangles).toBe(19128 - 72 + 116 - 118 - 12 + 58)
+    expect(report.totalTriangles).toBe(19128 - 72 + 116 - 118 - 12 + 58 + 18 + 6) // 25.1: +16 brass caps, +2 liner; 25.2: +6 floor glow decals
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
   })
 
@@ -2105,14 +2105,14 @@ describe('task 22.1: media island, armchair and VHS shells', () => {
     for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
   })
 
-  it('counts: 30 textures and at most 7.7 MB (budget 8 MB), colliders unchanged', () => {
+  it('counts: 31 textures and at most 7.7 MB (budget 8 MB), colliders unchanged', () => {
     const report = sceneDetailReport()
     const perTexture = TEXTURE_IDS.map((id) => `${id} ${TEXTURE_SPECS[id].width}x${TEXTURE_SPECS[id].height}=${(textureMemoryBytes(TEXTURE_SPECS[id]) / 1048576).toFixed(3)}MB`)
     console.info(
       `[22.1] computed triangles ${report.totalTriangles}, draw-call estimate ${report.totalDrawCalls}, textures ${report.textureCount}, ` +
         `texture memory estimate ${(report.textureMemoryBytes / 1048576).toFixed(3)} MB (computed, not runtime-measured): ${perTexture.join(', ')}`,
     )
-    expect(report.textureCount).toBe(30)
+    expect(report.textureCount).toBe(31)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.7 * 1048576)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
@@ -2232,7 +2232,7 @@ describe('task 22.2 (part A): metalCabinet, cardboard crate and CRT stack casing
     )
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
     expect(report.totalTriangles - 19128).toBeLessThanOrEqual(60)
-    expect(report.textureCount).toBe(30)
+    expect(report.textureCount).toBe(31)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.55 * 1048576)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
     expect(M3_LIGHT_COUNT).toBe(4)
@@ -2361,7 +2361,7 @@ describe('task 22.2 (part B): desk clutter and east doorway detail', () => {
     expect(col('notebookCover')).toBe('#4a5866')
   })
 
-  it('counts: 30 textures, at most 7.5 MB (budget 8 MB), under 20,000 triangles with at most +120 over 19,056, 4 lights', () => {
+  it('counts: 31 textures, at most 7.5 MB (budget 8 MB), under 20,000 triangles with at most +120 over 19,056, 4 lights', () => {
     const report = sceneDetailReport()
     console.info(
       `[22.2B] triangles ${report.totalTriangles} (delta ${report.totalTriangles - 19056}), draw calls ${report.totalDrawCalls}, textures ${report.textureCount}, ` +
@@ -2369,10 +2369,271 @@ describe('task 22.2 (part B): desk clutter and east doorway detail', () => {
     )
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
     expect(report.totalTriangles - 19056).toBeLessThanOrEqual(120)
-    expect(report.textureCount).toBe(30)
+    expect(report.textureCount).toBe(31)
     // Task 23.1: lampGlow 64 -> 128 px adds 0.062 MiB (7.459 -> 7.521 MiB), so the cap is 7.55 MiB.
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.55 * 1048576)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
     expect(M3_LIGHT_COUNT).toBe(4)
+  })
+})
+
+describe('task 25.1: lamp craft, soft cones, richer pools, notebook move', () => {
+  afterEach(() => setCanvasFactory(null))
+  const desk = prop('reception-desk')
+  const top = desk.height
+  const lamp = (id: string, on = true) => deskLampParts(prop(id).box, id === 'desk-lamp-left' ? 'banker' : 'table', on, top)
+  const ext = (p: Part) => {
+    const size: Vec3 = p.geo === 'plane' ? [p.scale[0], p.scale[1], 0] : p.scale
+    const h = orientedHalfExtents(size, p.rot ?? [0, 0, 0])
+    return { minX: p.pos[0] - h[0], maxX: p.pos[0] + h[0], minY: p.pos[1] - h[1], maxY: p.pos[1] + h[1], minZ: p.pos[2] - h[2], maxZ: p.pos[2] + h[2] }
+  }
+  const hit = (a: ReturnType<typeof ext>, b: ReturnType<typeof ext>) =>
+    Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX) > 1e-6 &&
+    Math.min(a.maxY, b.maxY) - Math.max(a.minY, b.minY) > 1e-6 &&
+    Math.min(a.maxZ, b.maxZ) - Math.max(a.minZ, b.minZ) > 1e-6
+
+  it('both lamp cones use the coneFalloff map (additive, depthWrite false, DoubleSide), and it is disposed once, twice-safe, with a null fallback', () => {
+    setCanvasFactory(() => null)
+    ensureSharedTextures()
+    expect(getSharedTexture('coneFalloff')).toBeNull()
+    expect(materials.lampConeBanker.map).toBeNull()
+    expect(materials.lampConeTable.map).toBeNull()
+    disposeSharedResources()
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    const tex = getSharedTexture('coneFalloff')!
+    expect([tex.image.width, tex.image.height]).toEqual([64, 64])
+    expect(tex.generateMipmaps).toBe(false)
+    expect(tex.minFilter).toBe(1006) // LinearFilter
+    expect(tex.magFilter).toBe(1006)
+    expect(tex.colorSpace).toBe('srgb')
+    for (const m of [materials.lampConeBanker, materials.lampConeTable]) {
+      expect(m.map).toBe(tex)
+      expect(m.blending).toBe(2)
+      expect(m.depthWrite).toBe(false)
+      expect(m.side).toBe(2)
+      expect(m.transparent).toBe(true)
+      expect(m.opacity).toBeGreaterThanOrEqual(0.14)
+      expect(m.opacity).toBeLessThanOrEqual(0.25)
+    }
+    const spies = TEXTURE_IDS.map((id) => vi.spyOn(getSharedTexture(id)!, 'dispose'))
+    disposeSharedResources()
+    expect(() => disposeSharedResources()).not.toThrow()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+    expect(materials.lampConeBanker.map).toBeNull()
+    expect(materials.lampConeBanker.color.getHexString()).toBe('8fd65a')
+    expect(materials.lampConeTable.color.getHexString()).toBe('ffa63c')
+  })
+
+  it('cone UVs: v = 1 at the top ring (the shade rim) and v = 0 at the bottom, so canvas row 0 sits at the rim', () => {
+    const g = geometries.cone
+    const pos = g.getAttribute('position')
+    const uv = g.getAttribute('uv')
+    for (let i = 0; i < pos.count; i++) expect(uv.getY(i), 'cone vertex').toBeCloseTo(pos.getY(i) > 0 ? 1 : 0, 9)
+    // The top ring is the narrow one (rim radius 0.3 of the scale) and the lamp cone part is scaled so it meets the shade rim.
+    const radius = (i: number) => Math.hypot(pos.getX(i), pos.getZ(i))
+    for (let i = 0; i < pos.count; i++) expect(radius(i)).toBeCloseTo(pos.getY(i) > 0 ? 0.3 : 0.5, 6)
+    const tex = (() => {
+      setCanvasFactory(() => fakeCanvas())
+      return getSharedTexture('coneFalloff')!
+    })()
+    expect(tex.flipY).toBe(true) // canvas row 0 is the v = 1 edge
+  })
+
+  it('the banker lamp has two brass end caps (+16 triangles) at the hood ends, inside its footprint', () => {
+    const left = lamp('desk-lamp-left')
+    const caps = left.filter((p) => p.geo === 'collar')
+    expect(caps).toHaveLength(2)
+    expect(caps.every((p) => p.mat === 'brass')).toBe(true)
+    expect(caps.reduce((n, p) => n + GEOMETRY_TRIANGLES[p.geo], 0)).toBe(16)
+    const hood = left.filter((p) => p.lampRole === 'shade').map(ext)
+    const hoodMinX = Math.min(...hood.map((e) => e.minX))
+    const hoodMaxX = Math.max(...hood.map((e) => e.maxX))
+    const xs = caps.map((p) => p.pos[0]).sort((a, b) => a - b)
+    expect(xs[0]).toBeLessThan(hoodMinX + 0.03)
+    expect(xs[1]).toBeGreaterThan(hoodMaxX - 0.03)
+    for (const p of caps) {
+      const e = ext(p)
+      const b = prop('desk-lamp-left').box
+      expect(e.minX >= b.minX - 1e-6 && e.maxX <= b.maxX + 1e-6 && e.minZ >= b.minZ - 1e-6 && e.maxZ <= b.maxZ + 1e-6).toBe(true)
+      expect(e.minY).toBeGreaterThanOrEqual(top)
+    }
+    expect(lamp('desk-lamp-right').some((p) => p.geo === 'collar')).toBe(false)
+    // The cap triangle count of the whole banker lamp grows by exactly 18 over 24.1 (caps 16 + liner 2).
+    expect(left.reduce((n, p) => n + GEOMETRY_TRIANGLES[p.geo], 0) - lamp('desk-lamp-right').reduce((n, p) => n + GEOMETRY_TRIANGLES[p.geo], 0)).toBeDefined()
+  })
+
+  it('the banker hood has a warm-white inner liner: lit #fff1cc basic material when ON, a dark separate material when OFF', () => {
+    const on = lamp('desk-lamp-left', true).filter((p) => p.lampRole === 'liner')
+    const off = lamp('desk-lamp-left', false).filter((p) => p.lampRole === 'liner')
+    expect(on).toHaveLength(1)
+    expect(off).toHaveLength(1)
+    expect(on[0].mat).toBe('lampLinerOn')
+    expect(off[0].mat).toBe('lampLinerOff')
+    expect(materials.lampLinerOn.type).toBe('MeshBasicMaterial')
+    expect(materials.lampLinerOn.color.getHexString()).toBe('fff1cc')
+    expect(materials.lampLinerOff.type).toBe('MeshLambertMaterial')
+    const lum = (c: { r: number; g: number; b: number }) => c.r + c.g + c.b
+    expect(lum(materials.lampLinerOff.color)).toBeLessThan(lum(materials.lampLinerOn.color) / 4)
+    // It sits under the hood roof (below the roof, above the bulb centre) and faces down.
+    const roof = lamp('desk-lamp-left').find((p) => p.lampRole === 'shade')!
+    expect(on[0].pos[1]).toBeLessThan(roof.pos[1])
+    expect(on[0].rot).toEqual([Math.PI / 2, 0, 0])
+    expect(lamp('desk-lamp-right').some((p) => p.lampRole === 'liner')).toBe(false)
+  })
+
+  it('green ON shade is #16a34a at 0.38, OFF is 0, the cream ON shade is unchanged', () => {
+    expect(materials.lampGreenShadeOn.emissive.getHexString()).toBe('16a34a')
+    expect(materials.lampGreenShadeOn.emissiveIntensity).toBe(0.38)
+    expect(materials.lampGreenShade.emissiveIntensity).toBe(0)
+    expect(materials.lampCreamShadeOn.emissive.getHexString()).toBe('ffd27d')
+    expect(materials.lampCreamShadeOn.emissiveIntensity).toBe(0.85)
+    expect(materials.lampCreamShade.emissiveIntensity).toBe(0)
+  })
+
+  it('both desk pools have opacity 0.42, stay additive without depth writes, 2 mm above and inside the desk top', () => {
+    for (const m of [materials.lampPool, materials.lampPoolBanker]) {
+      expect(m.opacity).toBeCloseTo(0.42, 9)
+      expect(m.blending).toBe(2)
+      expect(m.depthWrite).toBe(false)
+      expect([m.polygonOffset, m.polygonOffsetFactor, m.polygonOffsetUnits]).toEqual([true, -2, -2])
+    }
+    for (const id of ['desk-lamp-left', 'desk-lamp-right']) {
+      const pool = lamp(id).find((p) => p.lampRole === 'pool')!
+      const half = pool.scale[0] / 2
+      expect(pool.pos[1] - top).toBeCloseTo(0.002, 9)
+      expect(pool.pos[0] - half).toBeGreaterThanOrEqual(desk.box.minX - 1e-9)
+      expect(pool.pos[0] + half).toBeLessThanOrEqual(desk.box.maxX + 1e-9)
+      expect(pool.pos[2] - half).toBeGreaterThanOrEqual(desk.box.minZ - 1e-9)
+      expect(pool.pos[2] + half).toBeLessThanOrEqual(desk.box.maxZ + 1e-9)
+    }
+  })
+
+  it('the notepad is centred on the new desk-notebook anchor, inside the desk top, outside the lamp bases and overlapping no desk part', () => {
+    const anchor = INTERACTABLE_DEFS.find((d) => d.id === 'desk-notebook')!.anchor
+    const cx = (desk.box.minX + desk.box.maxX) / 2
+    const cz = (desk.box.minZ + desk.box.maxZ) / 2
+    expect([cx + NOTE_DX, cz + NOTE_DZ]).toEqual([anchor.x, anchor.z])
+    expect(anchor.x).toBeCloseTo(-0.58, 9)
+    expect(anchor.z).toBeCloseTo(1.62, 9)
+    const parts = deskParts(desk.box, desk.height)
+    const noteParts = parts.filter((p) => p.mat === 'notebookCover' || p.mat === 'paper')
+    expect(noteParts).toHaveLength(2)
+    for (const p of noteParts) {
+      expect(p.pos[0]).toBeCloseTo(anchor.x, 9)
+      expect(p.pos[2]).toBeCloseTo(anchor.z, 9)
+    }
+    const spiral = parts.find((p) => p.mat === 'metal' && p.geo === 'box' && p.scale[0] === 0.15)!
+    const noteBoxes = [...noteParts, spiral].map(ext)
+    for (const e of noteBoxes) {
+      expect(e.minX >= desk.box.minX && e.maxX <= desk.box.maxX && e.minZ >= desk.box.minZ && e.maxZ <= desk.box.maxZ).toBe(true)
+      expect(e.minY).toBeGreaterThanOrEqual(top - 1e-9)
+    }
+    // Not overlapping any other desk part that stands on the desk top (the desk body and slab are below or around it).
+    const others = parts.filter((p) => !noteParts.includes(p) && p !== spiral && p.pos[1] - p.scale[1] / 2 >= top - 1e-6)
+    for (const o of others) for (const e of noteBoxes) expect(hit(e, ext(o)), o.mat + "/" + o.geo).toBe(false)
+    // The pad also stays clear of both lamps' body parts.
+    for (const id of ['desk-lamp-left', 'desk-lamp-right']) {
+      for (const p of lamp(id).filter((q) => q.lampRole !== 'sprite' && q.lampRole !== 'cone' && q.lampRole !== 'pool')) {
+        for (const e of noteBoxes) expect(hit(e, ext(p)), id + " " + p.mat).toBe(false)
+      }
+    }
+  })
+
+  it('budgets: under 20,000 triangles, at most +20 over 19,100, 4 lights, 31 textures within 7.6 MB, every texture disposed once', () => {
+    const report = sceneDetailReport()
+    expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
+    expect(report.totalTriangles - 19100).toBeLessThanOrEqual(24) // 25.2 adds 6 more
+    expect(report.totalTriangles - 19100).toBe(24)
+    expect(M3_LIGHT_COUNT).toBe(4)
+    expect(MAX_LIGHTS).toBe(4)
+    expect(report.textureCount).toBe(31)
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.6 * 1048576)
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(8 * 1048576)
+    expect(textureMemoryBytes(TEXTURE_SPECS.coneFalloff) / 1048576).toBeCloseTo(0.016, 3)
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    expect(liveTextureCount()).toBe(31)
+    const spies = TEXTURE_IDS.map((id) => vi.spyOn(getSharedTexture(id)!, 'dispose'))
+    disposeSharedResources()
+    disposeSharedResources()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+    console.info(
+      '[25.1] triangles ' + report.totalTriangles + ' (delta ' + (report.totalTriangles - 19100) + '), textures ' + report.textureCount + ', texture memory ' + (report.textureMemoryBytes / 1048576).toFixed(3) + ' MB (computed)',
+    )
+  })
+})
+import { ARCADE_GLOW_SIZE, ARCADE_GLOW_Y, ARCADE_RUNNER_Y, arcadeFloorGlowParts } from './modelDetail'
+
+describe('task 25.2 arcade floor glow decals', () => {
+  afterEach(() => setCanvasFactory(null))
+  const COLOURS = { snake: '22c55e', maze: 'e11d48', frequency: 'f59e0b' } as const
+  const area = { minX: 5.3, maxX: 9.3, minZ: -2, maxZ: 2 }
+
+  it('has three additive 0.26 floor glows with the exact cabinet colours, no depth write and the lampGlow map', () => {
+    const parts = arcadeFloorGlowParts()
+    expect(parts.map((p) => p.mat)).toEqual(['arcadeGlowSnake', 'arcadeGlowMaze', 'arcadeGlowFrequency'])
+    const mats = [materials.arcadeGlowSnake, materials.arcadeGlowMaze, materials.arcadeGlowFrequency]
+    expect(mats.map((m) => m.color.getHexString())).toEqual([COLOURS.snake, COLOURS.maze, COLOURS.frequency])
+    for (const m of mats) {
+      expect(m.blending).toBe(2)
+      expect(m.depthWrite).toBe(false)
+      expect(m.transparent).toBe(true)
+      expect(m.opacity).toBeCloseTo(0.26, 9)
+      expect(m.polygonOffset).toBe(true)
+    }
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    for (const m of mats) expect(m.map).toBe(getSharedTexture('lampGlow'))
+  })
+
+  it('sits 0.6 m west of each arcade anchor, flat above the floor, above the runner, clear of the cables, inside the Arcade_Area and off every cabinet collider', () => {
+    const anchors = ROOM.stations.filter((s) => s.id === 'arcade').map((s) => s.anchor)
+    const parts = arcadeFloorGlowParts()
+    expect(parts).toHaveLength(3)
+    const runner = arcadeFloorParts().find((p) => p.mat === 'runner')!
+    const cableTop = Math.max(...ROOM.props.filter((p) => p.id.startsWith('arcade-cable')).map((p) => p.height))
+    parts.forEach((p, i) => {
+      expect(GEOMETRY_TRIANGLES[p.geo]).toBe(2)
+      expect(p.rot).toEqual([-Math.PI / 2, 0, 0])
+      expect(p.pos[0]).toBeCloseTo(anchors[i].x - 0.6, 9)
+      expect(p.pos[2]).toBeCloseTo(anchors[i].z, 9)
+      expect(p.pos[1]).toBe(ARCADE_GLOW_Y)
+      expect(p.pos[1]).toBeGreaterThan(0)
+      expect(p.pos[1]).not.toBe(runner.pos[1])
+      expect(p.pos[1]).toBeCloseTo(runner.pos[1] + 0.003, 9)
+      expect(runner.pos[1]).toBe(ARCADE_RUNNER_Y)
+      expect(p.pos[1]).not.toBe(cableTop)
+      const box = { minX: p.pos[0] - ARCADE_GLOW_SIZE / 2, maxX: p.pos[0] + ARCADE_GLOW_SIZE / 2, minZ: p.pos[2] - ARCADE_GLOW_SIZE / 2, maxZ: p.pos[2] + ARCADE_GLOW_SIZE / 2 }
+      expect(box.minX).toBeGreaterThanOrEqual(area.minX)
+      expect(box.maxX).toBeLessThanOrEqual(area.maxX)
+      expect(box.minZ).toBeGreaterThanOrEqual(area.minZ)
+      expect(box.maxZ).toBeLessThanOrEqual(area.maxZ)
+      for (const c of COLLIDERS) {
+        const overlaps = box.minX < c.maxX && box.maxX > c.minX && box.minZ < c.maxZ && box.maxZ > c.minZ
+        expect(overlaps, 'glow ' + i + ' overlaps a collider').toBe(false)
+      }
+    })
+    // No collider or interactable is added: the colliders stay walls + frames + solid props.
+    expect(COLLIDERS.length).toBe(ROOM.walls.length + 4 + ROOM.props.filter((p) => p.solid).length)
+  })
+
+  it('keeps the budgets: +6 triangles over 19,118, below 20,000, 4 lights, same texture memory, textures disposed once', () => {
+    const report = sceneDetailReport()
+    expect(report.objects.map((o) => o.name)).toContain('arcade-floor-glow')
+    expect(report.objects.find((o) => o.name === 'arcade-floor-glow')!.triangles).toBe(6)
+    expect(report.totalTriangles).toBe(19118 + 6)
+    expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
+    expect(M3_LIGHT_COUNT).toBe(4)
+    expect(report.textureCount).toBe(31)
+    expect(report.textureMemoryBytes / 1048576).toBeCloseTo(7.537, 2)
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(8 * 1048576)
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    expect(liveTextureCount()).toBe(31)
+    const spies = TEXTURE_IDS.map((id) => vi.spyOn(getSharedTexture(id)!, 'dispose'))
+    disposeSharedResources()
+    disposeSharedResources()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
   })
 })

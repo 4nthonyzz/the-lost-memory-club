@@ -72,7 +72,8 @@ describe('determinism', () => {
     expect(b.log).toEqual(a.log)
     expect(b.hash()).toBe(a.hash())
     // lampGlow (task 23.1) is a pure radial gradient with no random input, so its seed changes nothing.
-    if (id === 'lampGlow') expect(run(id, TEXTURE_SPECS[id].seed + 1).hash()).toBe(a.hash())
+    // coneFalloff (task 25.1) is a pure row-by-row gradient with no random input, so its seed changes nothing either.
+    if (id === 'lampGlow' || id === 'coneFalloff') expect(run(id, TEXTURE_SPECS[id].seed + 1).hash()).toBe(a.hash())
     else expect(run(id, TEXTURE_SPECS[id].seed + 1).hash()).not.toBe(a.hash())
   })
 
@@ -829,5 +830,76 @@ describe('task 23.1: lampGlow radial falloff', () => {
     const delta = textureMemoryBytes(TEXTURE_SPECS.lampGlow) - textureMemoryBytes({ width: 64, height: 64, filter: 'mipmap' })
     expect(delta).toBeGreaterThan(0.06e6)
     expect(delta).toBeLessThan(0.07e6)
+  })
+})
+
+describe('task 25.1: coneFalloff texture', () => {
+  const calls = () => run('coneFalloff').calls
+  const alphaOf = (color: string) => Number(/rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*([\d.]+)\)/.exec(color)![1])
+  /** Per row: the recorded gradient stops (position, alpha) followed by the fillRect that paints it. */
+  const rows = () => {
+    const out: Array<{ y: number; stops: Array<{ o: number; a: number }> }> = []
+    let stops: Array<{ o: number; a: number }> = []
+    for (const c of calls()) {
+      if (c.op === 'createLinearGradient') stops = []
+      else if (c.op === 'addColorStop') stops.push({ o: c.args[0] as number, a: alphaOf(String(c.args[1])) })
+      else if (c.op === 'fillRect') out.push({ y: (c.args as number[])[1], stops })
+    }
+    return out
+  }
+  const centre = (r: { stops: Array<{ o: number; a: number }> }) => r.stops.find((s) => s.o === 0.5)!.a
+
+  it('is 64 x 64, linear without mipmaps, clamped, with a unique seed and about 0.016 MB', () => {
+    expect(TEXTURE_SPECS.coneFalloff).toMatchObject({ id: 'coneFalloff', width: 64, height: 64, filter: 'linear', wrap: 'clamp', seed: 133 })
+    expect(TEXTURE_IDS.filter((o) => o !== 'coneFalloff').every((o) => TEXTURE_SPECS[o].seed !== 133)).toBe(true)
+    expect(textureMemoryBytes(TEXTURE_SPECS.coneFalloff)).toBe(64 * 64 * 4)
+    expect(textureMemoryBytes(TEXTURE_SPECS.coneFalloff) / 1048576).toBeCloseTo(0.016, 3)
+  })
+
+  it('is deterministic and ignores the seed (no random input)', () => {
+    expect(run('coneFalloff').hash()).toBe(run('coneFalloff').hash())
+    expect(run('coneFalloff', 7).hash()).toBe(run('coneFalloff', 8).hash())
+  })
+
+  it('paints one full-width row at a time, in bounds', () => {
+    const r = rows()
+    expect(r).toHaveLength(64)
+    r.forEach((row, i) => expect(row.y).toBe(i))
+    for (const c of calls().filter((q) => q.op === 'fillRect')) expect(c.args).toEqual([0, (c.args as number[])[1], 64, 1])
+  })
+
+  it('has a warm translucent core at the top row (alpha > 0 in the centre)', () => {
+    const top = rows()[0]
+    expect(centre(top)).toBeGreaterThan(0.5)
+    expect(centre(top)).toBeLessThanOrEqual(1)
+    const colour = String(calls().find((c) => c.op === 'addColorStop')!.args[1])
+    const [r, g, b] = /rgba\((\d+),(\d+),(\d+)/.exec(colour)!.slice(1).map(Number)
+    expect(r).toBeGreaterThan(b) // warm
+    expect(g).toBeGreaterThan(b)
+  })
+
+  it('fades smoothly and monotonically down the rows to exactly 0 well before the bottom (by 85 % of the height)', () => {
+    const r = rows()
+    const alphas = r.map(centre)
+    for (let i = 1; i < alphas.length; i++) expect(alphas[i]).toBeLessThanOrEqual(alphas[i - 1] + 1e-9)
+    // Smooth: no step bigger than 12 % of the top alpha between neighbouring rows.
+    for (let i = 1; i < alphas.length; i++) expect(alphas[i - 1] - alphas[i]).toBeLessThan(alphas[0] * 0.12)
+    for (let i = Math.ceil(64 * 0.85); i < 64; i++) expect(alphas[i], 'row ' + i).toBe(0)
+    expect(alphas[Math.floor(64 * 0.85) - 1]).toBe(0)
+  })
+
+  it('tapers to alpha 0 at the left and right edges on every row, symmetrically', () => {
+    for (const row of rows()) {
+      const first = row.stops[0]
+      const last = row.stops[row.stops.length - 1]
+      expect([first.o, first.a, last.o, last.a]).toEqual([0, 0, 1, 0])
+      const mid = row.stops.length - 1
+      for (let i = 0; i <= mid; i++) expect(row.stops[i].a).toBeCloseTo(row.stops[mid - i].a, 4)
+      expect(row.stops[1].a).toBeLessThan(centre(row) * 0.5 + 1e-9)
+    }
+  })
+
+  it('contains no text and no brand names', () => {
+    expect(run('coneFalloff').texts()).toEqual([])
   })
 })

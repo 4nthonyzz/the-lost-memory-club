@@ -38,6 +38,8 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 
 - Approved scope change (lighting and clue inspector), 2026-12-01: no new three.js lights are added (`M3_LIGHT_COUNT` stays 4). Lamp light is produced by emissive shades, additive volumetric cones, additive desk pools and glow sprites. West-light and ambient intensity are modulated by the number of lamps ON, as a multiplier applied on top of the existing Memory_Shift and flicker values (never overwriting them), and the ambient floor is kept. Ceiling fixtures get additive bloom strips. A world-owned Archive Document Card overlay (`WorldInspectorCard`) opens for readable props. It is non-blocking (no `onInspect`, no input suspension) and closes on E, Esc or when the player walks more than 2.6 m away. A session-only "NOTES READ: X / 6" counter is shown (no storage). There are eight world interactables: two lamps, three manuals, the desk notebook, the cork board and the "THE SIGNAL REMEMBERS" poster (targetable only while visible, if it is the Memory_Shift overlay poster). New lore texts are original placeholder writing, for review by the story owner (Developer 3). `StationId` and `onInspect` are unchanged. Budgets: fewer than 20,000 triangles (currently 19,042 computed; task 24 adds at most +100), at most 4 lights, texture memory at most 8 MB (7.521 MB computed; `lampGlow` is upgraded in place). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json` and `tools/blender/` stay unchanged.
 
+- Approved scope change (lamp craft and arcade glow), 2026-12-02: `desk-notebook` moves to about anchor (-0.58, 1.62) so the left lamp is no longer stolen by the notebook when targeting. A new 64x64 `coneFalloff` texture (0.016 MB) gives soft lamp cones. The banker's lamp gets brass end caps (+16 triangles) and a warm inner liner. The ON green shade emissive is `#16a34a` at 0.38, and desk pools use opacity about 0.42. Three additive floor-glow decals in front of the arcade cabinets reuse `lampGlow` (+6 triangles, no new light). The arcade room ARCHIVE poster becomes the 7th readable document (prompt "Press E to read: Club Archive Notice", counter "NOTES READ: X / 7", anchor at the poster's real position). Budgets: fewer than 20,000 triangles (currently 19,100 computed), at most 4 lights, texture memory at most 8 MB (7.521 MB computed). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged. Earlier wording of "X / 6" in task 24.2 is superseded by this bullet.
+
 ## Tasks
 
 ### Milestone 1: Playable 3D room (primitives only)
@@ -922,6 +924,36 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: documentation and the spec folder only.
     - _Requirements: 14.11, 14.12, 15.3, 15.6_
 
+### Lamp craft, arcade glow and final polish
+
+- [x] 25. Lamp craft, arcade glow and final polish
+  - [x] 25.1 Notebook targeting fix, banker's lamp craft, soft cones and richer pools
+    - Files: `src/world/layout/roomLayout.ts`, `src/world/scene/modelDetail.ts`, `src/world/scene/Props.tsx`, `src/world/scene/proceduralTextures.ts`, `src/world/scene/sharedResources.ts`; tests `src/world/logic/targeting.test.ts`, `src/world/scene/modelDetail.test.ts`, `src/world/scene/proceduralTextures.test.ts`.
+    - Move `desk-notebook` to about anchor (-0.58, 1.62). Add banker's lamp brass end caps (+16 triangles) and a warm inner liner. Set the ON green shade emissive to `#16a34a` at 0.38 and desk pool opacity to about 0.42. Add a 64x64 `coneFalloff` `CanvasTexture` (0.016 MB) for soft lamp cones, registered in `sharedResources.ts` with a flat-colour fallback and disposed exactly once.
+    - Acceptance: standing in front of the left lamp targets the lamp, not the notebook; the notebook is still targetable from its own position; triangle estimate below 20,000; lights at most 4; texture memory at most 8 MB; colliders and Station anchors unchanged; Memory_Shift tinting still works.
+    - Tests: `targeting.test.ts` (left lamp wins from its front position, notebook reachable), `modelDetail.test.ts` (brass caps triangle delta, emissive value, pool opacity, budgets, disposal once and twice-safe), `proceduralTextures.test.ts` (determinism with a fake context, 64x64, no randomness). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 24.3.
+    - Boundary: `src/world/` only; no new dependency; no GLB; `ASSET_MANIFEST` stays empty; `StationId` and `onInspect` unchanged.
+    - _Requirements: 1.3, 1.4, 1.8, 7.1, 7.2, 7.3, 9.1, 9.2, 9.8, 12.5, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 25.2 Arcade floor glow and Club Archive Notice
+    - Files: `src/world/scene/modelDetail.ts`, `src/world/scene/Props.tsx`, `src/world/layout/roomLayout.ts`, `src/world/overlay/archiveDocuments.ts`, `src/world/overlay/NotesCounter.tsx`, `src/world/logic/propState.ts` (only if the count is defined there); tests `src/world/logic/targeting.test.ts`, `src/world/overlay/archiveDocuments.test.ts`, `src/world/scene/modelDetail.test.ts`, `src/world/WorldScene.test.ts`, `src/world/logic/propState.test.ts`.
+    - Add three additive floor-glow decals in front of the arcade cabinets reusing `lampGlow` (+6 triangles, no new light). Make the arcade room ARCHIVE poster the 7th readable document with prompt "Press E to read: Club Archive Notice" and anchor at the poster's real position. The counter reads "NOTES READ: X / 7".
+    - Acceptance: the poster is targetable within range and cone; E opens the card without calling `onInspect` or changing the input mode; the counter increments once per unique document and shows "/ 7"; triangle estimate below 20,000; lights at most 4; texture memory unchanged; colliders unchanged; `StationId` stays `'vhs' | 'arcade'`.
+    - Tests: `targeting.test.ts` (poster in range, boundary), `archiveDocuments.test.ts` (7 documents, new title and prompt), `propState.test.ts` (counter of 7, uniqueness), `modelDetail.test.ts` (decal triangle delta, no new light, budgets), `WorldScene.test.ts` (card opens, counter text, `onInspect` not called). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 25.1.
+    - Boundary: `src/world/` only; `WorldSceneProps` and `onInspect` unchanged; no storage access; no import from `src/arcade/` or `src/memories/`.
+    - _Requirements: 1.3, 1.4, 7.1, 7.2, 7.3, 7.5, 7.6, 7.7, 8.1, 8.6, 9.8, 14.4, 14.5, 15.1, 15.2, 15.4, 16.6, 16.7, 16.8, 16.9, 20.1, 20.2, 20.8_
+
+  - [x] 25.3 Docs, metrics, verification and PR summary
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, lights and texture memory, each labelled "computed, not runtime-measured", and write a short PR summary. Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final geometry, the "X / 7" counter and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 25.2.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional. The 17 property-based test sub-tasks can be skipped for a faster MVP. Tasks 16.2 and 16.3 are marked `*` because they must not be implemented without approval.
@@ -986,7 +1018,10 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     { "id": 47, "tasks": ["23.3"] },
     { "id": 48, "tasks": ["24.1"] },
     { "id": 49, "tasks": ["24.2"] },
-    { "id": 50, "tasks": ["24.3"] }
+    { "id": 50, "tasks": ["24.3"] },
+    { "id": 51, "tasks": ["25.1"] },
+    { "id": 52, "tasks": ["25.2"] },
+    { "id": 53, "tasks": ["25.3"] }
   ]
 }
 ```

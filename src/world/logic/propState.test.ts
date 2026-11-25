@@ -4,6 +4,7 @@ import type { PropInteractableId, ReadableId } from '../worldTypes';
 import { READABLE_IDS } from './archiveDocuments';
 import {
   CARD_CLOSE_DISTANCE,
+  READABLE_TOTAL,
   LAMP_MESSAGES,
   initialPropState,
   propPromptText,
@@ -93,7 +94,16 @@ describe('prop state reducer (task 23.2, 24.2)', () => {
     expect(press(['desk-lamp-left', 'desk-lamp-right']).read.size).toBe(0);
     let all = initialPropState();
     for (const id of READABLE_IDS) all = reduceCloseCard(reducePropInteract(all, id));
-    expect(all.read.size).toBe(6);
+    expect(all.read.size).toBe(7);
+  });
+
+  it('25.2: opening the Club Archive Notice marks it read and the total is the document count (7)', () => {
+    const s = reducePropInteract(initialPropState(), 'poster-archive');
+    expect(s.openCard).toBe('poster-archive');
+    expect(s.read.has('poster-archive')).toBe(true);
+    expect(READABLE_TOTAL).toBe(7);
+    expect(READABLE_TOTAL).toBe(READABLE_IDS.length);
+    expect(propPromptText('poster-archive', initialPropState().lampOn)).toBe('Press E to read: Club Archive Notice');
   });
 
   it('shouldCloseCard is true only beyond 2.6 m from the anchor', () => {

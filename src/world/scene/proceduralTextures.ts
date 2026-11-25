@@ -86,14 +86,15 @@ export type TextureId =
   | 'vhsShell'
   | 'metalCabinet'
   | 'deskDetail'
+  | 'coneFalloff'
 
-export type TextureFilter = 'nearest' | 'mipmap'
+export type TextureFilter = 'nearest' | 'mipmap' | 'linear'
 
 export interface TextureSpec {
   id: TextureId
   width: number
   height: number
-  /** `nearest` = pixel art, no mipmaps. `mipmap` = linear with mipmaps. */
+  /** `nearest` = pixel art, no mipmaps. `mipmap` = linear with mipmaps. `linear` = smooth, no mipmaps (task 25.1 coneFalloff). */
   filter: TextureFilter
   wrap: 'clamp' | 'repeat'
   seed: number
@@ -1614,6 +1615,49 @@ export function drawDeskDetail(c: Ctx2D, w: number, h: number, seed: number): vo
   for (let y = DESK_DETAIL_EDGE_ROW; y < h; y++) rect(c, cell, y, cell, 1, y % 2 ? '#bfb698' : '#f4eedb')
 }
 
+// ---------------------------------------------------------------------------------------------
+// Task 25.1: soft lamp cone falloff
+// ---------------------------------------------------------------------------------------------
+
+/** Alpha at the centre of the top row (the shade rim end of the cone). */
+export const CONE_FALLOFF_TOP_ALPHA = 0.9
+/** Rows (as a fraction of the height) over which the alpha fades from the top value to exactly 0. */
+export const CONE_FALLOFF_FADE_END = 0.75
+/** Horizontal taper: gradient stops (position across the width, share of the row alpha). Symmetric, 0 at both edges. */
+export const CONE_FALLOFF_SIDE_STOPS: ReadonlyArray<readonly [number, number]> = [
+  [0, 0],
+  [0.12, 0.18],
+  [0.28, 0.62],
+  [0.5, 1],
+  [0.72, 0.62],
+  [0.88, 0.18],
+  [1, 0],
+]
+
+/** Vertical alpha profile: smoothstep from CONE_FALLOFF_TOP_ALPHA at row 0 down to 0 at CONE_FALLOFF_FADE_END of the height. */
+export function coneFalloffRowAlpha(y: number, h: number): number {
+  const t = Math.min(1, Math.max(0, y / (h * CONE_FALLOFF_FADE_END)))
+  return CONE_FALLOFF_TOP_ALPHA * (1 - t * t * (3 - 2 * t))
+}
+
+/**
+ * Soft light-cone falloff, 64 x 64 RGBA, fully deterministic (no random input). Canvas row 0 is the top of the
+ * cone (the shade rim end; the cone geometry maps v = 1 to its top and the texture is flipped, see modelDetail.ts):
+ * a warm translucent core that fades smoothly to alpha 0 at 75 % of the height, and tapers to 0 at the left and
+ * right edges, so the cone has no hard side edge. One horizontal gradient per row.
+ */
+export function drawConeFalloff(c: Ctx2D, w: number, h: number, _seed: number): void {
+  c.clearRect(0, 0, w, h)
+  c.globalAlpha = 1
+  for (let y = 0; y < h; y++) {
+    const a = coneFalloffRowAlpha(y, h)
+    const g = c.createLinearGradient(0, 0, w, 0)
+    for (const [o, k] of CONE_FALLOFF_SIDE_STOPS) g.addColorStop(o, `rgba(255,236,196,${(a * k).toFixed(4)})`)
+    c.fillStyle = g
+    c.fillRect(0, y, w, 1)
+  }
+}
+
 // Table, memory estimate
 // ---------------------------------------------------------------------------------------------
 
@@ -1648,6 +1692,7 @@ export const TEXTURE_SPECS: Readonly<Record<TextureId, TextureSpec>> = Object.fr
   vhsShell: { id: 'vhsShell', width: 128, height: 128, filter: 'mipmap', wrap: 'clamp', seed: 130, draw: drawVhsShell },
   metalCabinet: { id: 'metalCabinet', width: 256, height: 256, filter: 'mipmap', wrap: 'repeat', seed: 131, draw: drawMetalCabinet },
   deskDetail: { id: 'deskDetail', width: 128, height: 64, filter: 'mipmap', wrap: 'repeat', seed: 132, draw: drawDeskDetail },
+  coneFalloff: { id: 'coneFalloff', width: 64, height: 64, filter: 'linear', wrap: 'clamp', seed: 133, draw: drawConeFalloff },
 })
 
 export const TEXTURE_IDS = Object.keys(TEXTURE_SPECS) as TextureId[]

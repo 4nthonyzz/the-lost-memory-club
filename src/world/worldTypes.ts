@@ -48,8 +48,8 @@ export interface StationDef {
 export type LampId = 'desk-lamp-left' | 'desk-lamp-right';
 export type ManualId = 'manual-snake' | 'manual-maze' | 'manual-frequency';
 /** Readable world props that are not manuals: the desk notebook, the cork board and the Memory_Shift poster. */
-export type NoteId = 'desk-notebook' | 'cork-board' | 'poster-shift';
-/** Props that open the Archive Document Card (six in total). */
+export type NoteId = 'desk-notebook' | 'cork-board' | 'poster-shift' | 'poster-archive';
+/** Props that open the Archive Document Card (seven in total; `poster-archive` is the Arcade_Area Club Archive Notice, task 25.2). */
 export type ReadableId = ManualId | NoteId;
 export type PropInteractableId = LampId | ReadableId;
 

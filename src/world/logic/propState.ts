@@ -1,7 +1,8 @@
 // Pure module: world-local state of the interactable props (desk lamps and readable props).
 // Session-only: it lives in React state inside the world, is never persisted and is not part of GameState.
-import { isReadableId } from './archiveDocuments';
+import { READABLE_COUNT, isReadableId } from './archiveDocuments';
 import type { InteractionTarget, LampId, PropInteractableId, ReadableId, Vec2 } from '../worldTypes';
+
 
 export interface WorldMessage {
   text: string;
@@ -31,7 +32,7 @@ export const LAMP_MESSAGES: Readonly<Record<LampId, { on: string; off: string }>
 export const CARD_CLOSE_DISTANCE = 2.6;
 
 /** Total number of readable props, the denominator of the notes counter. */
-export const READABLE_TOTAL = 6;
+export const READABLE_TOTAL = READABLE_COUNT;
 
 export function initialPropState(): PropState {
   return {
@@ -100,5 +101,7 @@ export function propPromptText(id: PropInteractableId, lampOn: Readonly<Record<L
       return 'Press E to examine: Investigation Pinboard';
     case 'poster-shift':
       return "Press E to inspect: 'The Signal Remembers' Poster";
+    case 'poster-archive':
+      return 'Press E to read: Club Archive Notice';
   }
 }

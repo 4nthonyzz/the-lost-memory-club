@@ -5,7 +5,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 // The target source is controllable. usePlayerRig is mocked so no R3F frame loop is needed.
 // A Station id or a world-local prop id; the mock wraps it in the combined target type (task 23.2).
-type TargetId = 'vhs' | 'arcade' | 'desk-lamp-left' | 'desk-lamp-right' | 'manual-snake' | 'manual-maze' | 'manual-frequency' | 'desk-notebook' | 'cork-board' | 'poster-shift';
+type TargetId = 'vhs' | 'arcade' | 'desk-lamp-left' | 'desk-lamp-right' | 'manual-snake' | 'manual-maze' | 'manual-frequency' | 'desk-notebook' | 'cork-board' | 'poster-shift' | 'poster-archive';
 const h = vi.hoisted(() => ({
   target: null as TargetId | null,
   setTarget: null as ((id: TargetId | null) => void) | null,
@@ -313,24 +313,35 @@ describe('WorldScene interactable props (task 23.2, 24.2)', () => {
   it('the notes counter goes 0, 1, unchanged on a re-read, 2 and hides while inspecting', () => {
     h.target = 'manual-snake';
     const { wrapper } = renderWorld();
-    expect(counter()).toBe('NOTES READ: 0 / 6');
-    expect(document.querySelector('.world-notes')?.getAttribute('aria-label')).toBe('Notes read: 0 of 6');
+    expect(counter()).toBe('NOTES READ: 0 / 7');
+    expect(document.querySelector('.world-notes')?.getAttribute('aria-label')).toBe('Notes read: 0 of 7');
     pressE(wrapper); // open
-    expect(counter()).toBe('NOTES READ: 1 / 6');
+    expect(counter()).toBe('NOTES READ: 1 / 7');
     pressE(wrapper); // close
     pressE(wrapper); // re-read
-    expect(counter()).toBe('NOTES READ: 1 / 6');
+    expect(counter()).toBe('NOTES READ: 1 / 7');
     pressE(wrapper); // close
     act(() => h.setTarget!('manual-maze'));
     pressE(wrapper);
-    expect(counter()).toBe('NOTES READ: 2 / 6');
+    expect(counter()).toBe('NOTES READ: 2 / 7');
     pressE(wrapper); // close
     act(() => h.setTarget!('desk-lamp-left'));
     pressE(wrapper);
-    expect(counter()).toBe('NOTES READ: 2 / 6'); // lamps do not count
+    expect(counter()).toBe('NOTES READ: 2 / 7'); // lamps do not count
     act(() => h.setTarget!('vhs'));
     pressE(wrapper);
     expect(counter()).toBeNull();
+  });
+
+  it('25.2: E on the Club Archive Notice opens its card without onInspect and the counter shows / 7', () => {
+    h.target = 'poster-archive';
+    const { wrapper, onInspect } = renderWorld();
+    expect(prompt()).toBe('Press E to read: Club Archive Notice');
+    expect(counter()).toBe('NOTES READ: 0 / 7');
+    pressE(wrapper);
+    expect(cardTitle()).toBe('Club Archive Notice');
+    expect(counter()).toBe('NOTES READ: 1 / 7');
+    expect(onInspect).not.toHaveBeenCalled();
   });
 
   it('shows the prompts of the new readable props', () => {

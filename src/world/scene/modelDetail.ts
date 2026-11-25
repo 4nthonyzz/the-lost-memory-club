@@ -60,7 +60,7 @@ export interface Part {
    * Desk lamp role (task 23.1): `bulb` core, `inner` shade face, `sprite` (a camera-facing glow plane, drawn by Props.tsx
    * with a billboard) or the desk light `pool`. Sprite and pool use a never-drawn material while the lamp is off.
    */
-  lampRole?: 'bulb' | 'inner' | 'sprite' | 'pool' | 'cone' | 'shade'
+  lampRole?: 'bulb' | 'inner' | 'sprite' | 'pool' | 'cone' | 'shade' | 'liner'
 }
 
 /** True when the part is rendered from a cached real-size geometry (mesh scale 1). */
@@ -83,6 +83,7 @@ export const GEOMETRY_TRIANGLES: Readonly<Record<GeometryKey, number>> = {
   cylinderLow: 32, // 8 radial segments: 16 side + 16 caps
   sphere: 80, // 8 x 6 segments
   cone: 24, // open truncated cone, 12 radial segments, no caps
+  collar: 8, // open square tube (4 radial segments, no caps): the banker's lamp brass end caps (25.1)
 }
 
 export const SCENE_TRIANGLE_BUDGET = 20000
@@ -643,11 +644,11 @@ export function deskLampPlacement(id: string): { box: Aabb; top: number } {
  * and sprite); the unlit set is dark, and the cone, pool and sprite use the never-drawn `lampGlowOff`
  * (`visible: false`). Each lamp has its own shade, cone and pool materials, so one lamp never mutates the other's.
  */
-type LampMaterialSet = Record<NonNullable<Part['lampRole']>, MaterialKey>
+type LampMaterialSet = Record<Exclude<NonNullable<Part['lampRole']>, 'liner'>, MaterialKey> & { liner?: MaterialKey }
 export const LAMP_MATERIALS = {
   banker: {
-    on: { bulb: 'bulb', inner: 'lampInnerOn', sprite: 'lampHalo', pool: 'lampPoolBanker', cone: 'lampConeBanker', shade: 'lampGreenShadeOn' },
-    off: { bulb: 'lampBulbOff', inner: 'lampInnerOff', sprite: 'lampGlowOff', pool: 'lampGlowOff', cone: 'lampGlowOff', shade: 'lampGreenShade' },
+    on: { bulb: 'bulb', inner: 'lampInnerOn', sprite: 'lampHalo', pool: 'lampPoolBanker', cone: 'lampConeBanker', shade: 'lampGreenShadeOn', liner: 'lampLinerOn' },
+    off: { bulb: 'lampBulbOff', inner: 'lampInnerOff', sprite: 'lampGlowOff', pool: 'lampGlowOff', cone: 'lampGlowOff', shade: 'lampGreenShade', liner: 'lampLinerOff' },
   },
   table: {
     on: { bulb: 'bulb', inner: 'lampInnerOn', sprite: 'lampHalo', pool: 'lampPool', cone: 'lampConeTable', shade: 'lampCreamShadeOn' },
@@ -678,6 +679,9 @@ export function lampPoolPlacement(desk: Aabb, x: number, z: number): { cx: numbe
 /**
  * Open light cone from the shade rim down to the desk top, built on the shared 12-sided open `cone` geometry
  * (24 triangles; top radius 0.3 and bottom radius 0.5 of the scale). `rimRadius` is the cone radius at the rim.
+ * UV orientation (25.1): CylinderGeometry maps v = 1 to the top ring (the shade rim) and v = 0 to the bottom, and a
+ * CanvasTexture is flipped (flipY), so canvas row 0 of coneFalloff lands at the rim and the fade runs down to the desk.
+ * No UV flip is needed.
  */
 function lampCone(mat: MaterialKey, x: number, z: number, top: number, rimY: number, rimRadius: number): Part {
   const floorY = top + LAMP_CONE_FLOOR_GAP
@@ -704,6 +708,10 @@ export function deskLampParts(box: Aabb, kind: DeskLampKind, on = true, top: num
       role(bx(m.shade, [sx, top + 0.272, cz - 0.059], [0.22, 0.05, 0.012]), 'shade'),
       role(bx(m.shade, [sx, top + 0.272, cz + 0.059], [0.22, 0.05, 0.012]), 'shade'),
       role(part('plane', m.inner, [sx, top + 0.2965, cz], [0.2, 0.105, 1], [HALF_PI, 0, 0]), 'inner'),
+      // 25.1: warm-white liner just under the hood roof (lit #fff1cc when ON, dark when OFF; swapped per mesh).
+      role(part('plane', LAMP_MATERIALS.banker[on ? 'on' : 'off'].liner, [sx, top + 0.2955, cz], [0.17, 0.085, 1], [HALF_PI, 0, 0]), 'liner'),
+      // 25.1: two brass end caps (8 triangles each): open square collars sleeved around the hood ends (axis along x).
+      ...[-1, 1].map((s) => part('collar', 'brass', [sx + s * 0.1, top + 0.285, cz], [0.085, 0.024, 0.14], [0, 0, HALF_PI])),
       role(part('sphere', m.bulb, [sx, top + 0.262, cz], [0.045, 0.045, 0.045]), 'bulb'),
       role(part('plane', m.sprite, [sx, top + 0.27, cz], [0.42, 0.42, 1]), 'sprite'),
       // Cone from the shade skirt bottom (0.247 m up), 0.108 m rim radius, spreading to 0.18 m at the desk.
@@ -1047,6 +1055,26 @@ export function arcadeFloorParts(): Part[] {
   return parts
 }
 
+/** Task 25.2: floor glow decal size (m, square), distance west of each cabinet anchor, and heights. */
+export const ARCADE_GLOW_SIZE = 0.9
+export const ARCADE_GLOW_OFFSET_X = 0.6
+/** Above the runner decal (y 0.011) so the maze glow is not hidden, and well above the floor. */
+export const ARCADE_GLOW_Y = 0.014
+export const ARCADE_RUNNER_Y = 0.011
+const ARCADE_GLOW_MATERIALS = { snake: 'arcadeGlowSnake', maze: 'arcadeGlowMaze', frequency: 'arcadeGlowFrequency' } as const satisfies Record<ArcadeGameKind, MaterialKey>
+
+/**
+ * Three subtle additive floor glows (2 triangles each, no light, no collider) west of the cabinet fronts, tinted with
+ * each cabinet colour. Positions derive from the arcade Station anchors. Static: Memory_Shift and reduced motion do not change them.
+ */
+export function arcadeFloorGlowParts(): Part[] {
+  return ROOM.stations
+    .filter((s) => s.id === 'arcade' && s.arcadeGame)
+    .map((s) =>
+      part('plane', ARCADE_GLOW_MATERIALS[s.arcadeGame!], [s.anchor.x - ARCADE_GLOW_OFFSET_X, ARCADE_GLOW_Y, s.anchor.z], [ARCADE_GLOW_SIZE, ARCADE_GLOW_SIZE, 1], [-HALF_PI, 0, 0]),
+    )
+}
+
 // ---------------------------------------------------------------------------------------------
 // Bookcases: carcass parts, books and slipcases live in shelfModel.ts (task 18.2)
 // ---------------------------------------------------------------------------------------------
@@ -1188,6 +1216,12 @@ export const MUG_BODY_H = 0.089
 export const MUG_RIM_H = 0.006
 export const NOTE_COVER_H = 0.006
 export const NOTE_PAGE_H = 0.01
+/**
+ * Notepad centre relative to the desk centre (task 25.1). Matches the desk-notebook anchor in roomLayout.ts. The guest book (rug part)
+ * moved 0.12 m toward the back so the rotated pad (footprint about 0.2 x 0.24 m) does not overlap it; the pencil moved with the pad.
+ */
+export const NOTE_DX = -0.58
+export const NOTE_DZ = 0.02
 
 /** Reception desk (front on the +z side; the two lamps are `deskLampParts`): panelled front, drawers, bell, book and archive box. */
 export function deskParts(box: Aabb, height: number): Part[] {
@@ -1208,8 +1242,8 @@ export function deskParts(box: Aabb, height: number): Part[] {
     // Service bell and guest book.
     part('cylinderLow', 'metal', [cx + 0.1, top + 0.01, cz + 0.15], [0.1, 0.02, 0.1]),
     part('sphere', 'metal', [cx + 0.1, top + 0.03, cz + 0.15], [0.07, 0.04, 0.07]),
-    bx('rug', [cx - 0.6, top + 0.015, cz - 0.1], [0.28, 0.03, 0.2]),
-    bx('tapeLabel', [cx - 0.6, top + 0.032, cz - 0.1], [0.25, 0.004, 0.17]),
+    bx('rug', [cx - 0.6, top + 0.015, cz - 0.22], [0.28, 0.03, 0.2]),
+    bx('tapeLabel', [cx - 0.6, top + 0.032, cz - 0.22], [0.25, 0.004, 0.17]),
     // Archive box with upright tapes.
     { ...bx('crate', [cx + 0.5, top + 0.1, cz], [0.4, 0.2, 0.3]), metricRepeat: 0.4 },
     bx('crateSlat', [cx + 0.5, top + 0.2, cz + 0.14], [0.42, 0.02, 0.02]),
@@ -1225,18 +1259,18 @@ export function deskParts(box: Aabb, height: number): Part[] {
     // Notepad (task 22.2 part B): a grain-textured cover under a ruled page block (deskDetail cells), both rotated 0.25 rad;
     // the spiral strip rests on the page along its top edge. One tile of deskDetail spans DESK_DETAIL_TILE_M metres.
     {
-      ...bx('notebookCover', [cx - 0.95, top + NOTE_COVER_H / 2, cz + 0.1], [0.15, NOTE_COVER_H, 0.21], [0, 0.25, 0]),
+      ...bx('notebookCover', [cx + NOTE_DX, top + NOTE_COVER_H / 2, cz + NOTE_DZ], [0.15, NOTE_COVER_H, 0.21], [0, 0.25, 0]),
       metricRepeat: DESK_DETAIL_TILE_M,
       metricAspect: DESK_DETAIL_ASPECT,
     },
     {
-      ...bx('paper', [cx - 0.95, top + NOTE_COVER_H + NOTE_PAGE_H / 2, cz + 0.1], [0.14, NOTE_PAGE_H, 0.2], [0, 0.25, 0]),
+      ...bx('paper', [cx + NOTE_DX, top + NOTE_COVER_H + NOTE_PAGE_H / 2, cz + NOTE_DZ], [0.14, NOTE_PAGE_H, 0.2], [0, 0.25, 0]),
       metricRepeat: DESK_DETAIL_TILE_M,
       metricAspect: DESK_DETAIL_ASPECT,
       metricOffset: [DESK_DETAIL_TILE_M / 2, 0],
     },
-    bx('metal', [cx - 0.95 - 0.0243, top + NOTE_COVER_H + NOTE_PAGE_H + 0.003, cz + 0.1 - 0.095], [0.15, 0.006, 0.008], [0, 0.25, 0]),
-    part('cylinderLow', 'spineC', [cx - 0.7, top + 0.006, cz + 0.2], [0.01, 0.16, 0.01], [0, 0.5, HALF_PI]),
+    bx('metal', [cx + NOTE_DX - 0.0243, top + NOTE_COVER_H + NOTE_PAGE_H + 0.003, cz + NOTE_DZ - 0.095], [0.15, 0.006, 0.008], [0, 0.25, 0]),
+    part('cylinderLow', 'spineC', [cx + NOTE_DX + 0.25, top + 0.006, cz + NOTE_DZ + 0.2], [0.01, 0.16, 0.01], [0, 0.5, HALF_PI]),
     tape('tapeBlack', [cx + 0.75, top + 0.015, cz + 0.2], [0.19, 0.03, 0.1], [0, -0.5, 0]),
     // Two loose tapes with labels.
     tape('tapeBlack', [cx - 0.2, top + 0.015, cz + 0.05], [0.19, 0.03, 0.1]),
@@ -1408,6 +1442,7 @@ export function declaredObjects(): Array<{ name: string; parts: Part[]; extraTri
     { name: 'crt-stack', parts: crtStackParts(facingFrame(stack.box, stack.facing).local, stack.height) },
     { name: 'arcade-sign', parts: arcadeSignParts() },
     { name: 'arcade-floor', parts: arcadeFloorParts() },
+    { name: 'arcade-floor-glow', parts: arcadeFloorGlowParts() },
     { name: 'posters', parts: posterParts() },
     { name: 'desk', parts: deskParts(prop('reception-desk').box, prop('reception-desk').height) },
     { name: 'armchair', parts: armchairParts(prop('abandoned-chair').box) },

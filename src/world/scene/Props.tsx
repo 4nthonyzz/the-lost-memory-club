@@ -8,6 +8,7 @@ import type { Aabb } from '../worldTypes'
 import {
   ARCHIVE_BOX_IDS,
   archiveBoxParts,
+  arcadeFloorGlowParts,
   arcadeFloorParts,
   armchairParts,
   couchParts,
@@ -205,12 +206,18 @@ function CrtStack({ box, height }: { box: Aabb; height: number }) {
 function ArcadeAreaDressing() {
   const stack = propById('crt-stack')
   const floor = useMemo(arcadeFloorParts, [])
+  // Task 25.2: static additive floor glows. Without the glow texture they would be flat tinted squares, so they are skipped.
+  const glows = useMemo(() => {
+    ensureSharedTextures()
+    return hasSharedTexture('lampGlow') ? arcadeFloorGlowParts() : []
+  }, [])
   return (
     <group>
       <Faced box={stack.box} facing={stack.facing}>
         {(local) => <CrtStack box={local} height={stack.height} />}
       </Faced>
       <PartMeshes parts={floor} />
+      <PartMeshes parts={glows} />
     </group>
   )
 }

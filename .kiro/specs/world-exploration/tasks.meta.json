@@ -1291,6 +1291,49 @@
         "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
         "timestamp": 1795626171121
       }
+    ],
+    "25.1 Notebook targeting fix, banker's lamp craft, soft cones and richer pools": [
+      {
+        "executionId": "f575a57e-68d2-4992-bde5-0ed06f5d592e",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795627493877
+      },
+      {
+        "executionId": "f575a57e-68d2-4992-bde5-0ed06f5d592e",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795628066383
+      }
+    ],
+    "25.2 Arcade floor glow and Club Archive Notice": [
+      {
+        "executionId": "f575a57e-68d2-4992-bde5-0ed06f5d592e",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795628067255
+      },
+      {
+        "executionId": "f575a57e-68d2-4992-bde5-0ed06f5d592e",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795628397722
+      }
+    ],
+    "25.3 Docs, metrics, verification and PR summary": [
+      {
+        "executionId": "f575a57e-68d2-4992-bde5-0ed06f5d592e",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795628398556
+      },
+      {
+        "executionId": "f575a57e-68d2-4992-bde5-0ed06f5d592e",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795628838996
+      }
+    ],
+    "25. Lamp craft, arcade glow and final polish": [
+      {
+        "executionId": "f575a57e-68d2-4992-bde5-0ed06f5d592e",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795628839220
+      }
     ]
   }
 }

@@ -166,7 +166,7 @@ describe('room layout interactables (task 23.2)', () => {
   const propId = (t: ReturnType<typeof pick>) => (t?.type === 'prop' ? t.prop.id : null);
   const stationId = (t: ReturnType<typeof pick>) => (t?.type === 'station' ? t.station.id : null);
 
-  it('declares eight interactables (two lamps, three manuals, notebook, cork board, poster), range 2.2, never Stations', () => {
+  it('declares nine interactables (two lamps, three manuals, notebook, cork board, shift poster, archive notice), range 2.2, never Stations', () => {
     expect(INTERACTABLE_DEFS.map((d) => d.id)).toEqual([
       'desk-lamp-left',
       'desk-lamp-right',
@@ -176,6 +176,7 @@ describe('room layout interactables (task 23.2)', () => {
       'desk-notebook',
       'cork-board',
       'poster-shift',
+      'poster-archive',
     ]);
     expect(INTERACTABLE_DEFS.filter((d) => d.requiresShift).map((d) => d.id)).toEqual(['poster-shift']);
     for (const d of INTERACTABLE_DEFS) {
@@ -213,8 +214,9 @@ describe('room layout interactables (task 23.2)', () => {
   it('keeps the existing station positions selecting their stations', () => {
     expect(stationId(pick({ x: 0, z: -0.5 }, 0))).toBe('vhs');
     expect(stationId(pick({ x: 0, z: 0.4 }, 0))).toBe('vhs');
-    // In front of the console looking back toward the desk: the lamps are more than 2.2 m away.
-    expect(pick({ x: 0, z: -0.5 }, Math.PI)).toBeNull();
+    // In front of the console looking back toward the desk: the lamps are more than 2.2 m away. The notebook (moved to (-0.58, 1.62) in 25.1)
+    // is just inside the 2.2 m range from the console front (2.198 m), so it is the only target there.
+    expect(propId(pick({ x: 0, z: -0.5 }, Math.PI))).toBe('desk-notebook');
     expect(pick({ x: 0, z: -1.0 }, Math.PI)).toBeNull();
     for (const z of [-1.2, 0, 1.2]) {
       const t = pick({ x: 7.2, z }, -Math.PI / 2);
@@ -232,7 +234,7 @@ describe('readable notes in the room layout (task 24.2)', () => {
   const def = (id: string) => INTERACTABLE_DEFS.find((d) => d.id === id)!;
 
   it('places the anchors on the notebook, the bulletin board and the shift poster', () => {
-    expect(def('desk-notebook').anchor).toEqual({ x: expect.closeTo(-0.95, 9), z: expect.closeTo(1.7, 9) });
+    expect(def('desk-notebook').anchor).toEqual({ x: expect.closeTo(-0.58, 9), z: expect.closeTo(1.62, 9) });
     expect(def('cork-board').anchor.x).toBeCloseTo(-2.25, 9);
     expect(def('cork-board').anchor.z).toBe(-3.95);
     expect(def('poster-shift').anchor).toEqual({ x: -0.3, z: -3.94 });
@@ -248,6 +250,27 @@ describe('readable notes in the room layout (task 24.2)', () => {
     const a = def(id).anchor;
     expect(Math.hypot(a.x - pos.x, a.z - pos.z)).toBeLessThanOrEqual(2.2);
     expect(label(pick(pos, yaw, shifted))).toBe(id);
+  });
+
+  it('25.1: the notebook no longer steals the left lamp from the front or the back of the desk', () => {
+    // South of the desk (yaw 0 looks toward -z) near x -1.3, and a cell on the old notebook line (x -0.95).
+    for (const pos of [{ x: -1.3, z: 2.6 }, { x: -1.5, z: 2.6 }, { x: -1.3, z: 2.4 }]) {
+      expect(reachable(pos.x, pos.z), `${pos.x},${pos.z}`).toBe(true);
+      expect(label(pick(pos, 0))).toBe('desk-lamp-left');
+    }
+    // North of the desk looking south (yaw PI), also near x -1.3.
+    const north = { x: -1.3, z: 0.6 };
+    expect(reachable(north.x, north.z)).toBe(true);
+    expect(label(pick(north, Math.PI))).toBe('desk-lamp-left');
+    // The old notebook anchor (-0.95, 1.7) is no longer the anchor.
+    expect(def('desk-notebook').anchor).not.toEqual({ x: -0.95, z: 1.7 });
+  });
+
+  it('25.1: aiming at the notebook from in front of it selects the notebook', () => {
+    const pos = { x: -0.6, z: 2.6 };
+    expect(reachable(pos.x, pos.z)).toBe(true);
+    expect(label(pick(pos, 0))).toBe('desk-notebook');
+    expect(def('desk-notebook').anchor).toEqual({ x: expect.closeTo(-0.58, 9), z: expect.closeTo(1.62, 9) });
   });
 
   it('the poster is targetable only while the room is shifted', () => {
@@ -279,5 +302,55 @@ describe('readable notes in the room layout (task 24.2)', () => {
         }
       }
     }
+  });
+});
+
+describe('Club Archive Notice in the Arcade_Area (task 25.2)', () => {
+  const cells = reachableCells(ROOM.start);
+  const reachable = (x: number, z: number) => cells.some((c) => Math.abs(c.x - x) < 1e-6 && Math.abs(c.z - z) < 1e-6);
+  const pick = (pos: { x: number; z: number }, yaw: number, shifted = false) =>
+    selectInteractionTargetAll(pos, yaw, STATION_DEFS, INTERACTABLE_DEFS, COLLIDERS, undefined, shifted);
+  const label = (t: ReturnType<typeof pick>) => (t === null ? null : t.type === 'prop' ? t.prop.id : `station:${t.station.id}`);
+  const def = INTERACTABLE_DEFS.find((d) => d.id === 'poster-archive')!;
+
+  it('is anchored at the real position of the poster-arcade-area prop, 0.02 m into the room, and is not a Memory_Shift overlay', () => {
+    const poster = ROOM.props.find((p) => p.id === 'poster-arcade-area')!;
+    expect(def.anchor.x).toBeCloseTo((poster.box.minX + poster.box.maxX) / 2, 9);
+    expect(def.anchor.z).toBeCloseTo(poster.box.maxZ + 0.02, 9);
+    expect(def.collider).toEqual(poster.box);
+    expect(def.kind).toBe('note');
+    expect(def.range).toBe(2.2);
+    expect(def.requiresShift).toBeUndefined();
+    expect(poster.solid).toBe(false);
+  });
+
+  it.each([
+    [{ x: 7.5, z: -0.5 }, 0],
+    [{ x: 7.5, z: -0.2 }, 0],
+    [{ x: 6.8, z: -0.4 }, -0.4],
+  ] as const)('is selected from the reachable cell %j within 2.2 m, shifted or not', (pos, yaw) => {
+    expect(reachable(pos.x, pos.z)).toBe(true);
+    expect(Math.hypot(def.anchor.x - pos.x, def.anchor.z - pos.z)).toBeLessThanOrEqual(2.2);
+    expect(label(pick(pos, yaw, false))).toBe('poster-archive');
+    expect(label(pick(pos, yaw, true))).toBe('poster-archive');
+  });
+
+  it('is not selected beyond 2.2 m', () => {
+    // (6, 0.6) is 2.94 m from the notice; aim straight at it.
+    expect(reachable(6, 0.6)).toBe(true);
+    expect(label(pick({ x: 6, z: 0.6 }, -0.53))).toBeNull();
+  });
+
+  it('does not steal the arcade stations from the cells in front of the cabinets, nor the vhs station and the lamps', () => {
+    for (const z of [-1.2, 0, 1.2]) {
+      expect(reachable(7.2, z)).toBe(true);
+      for (const shifted of [false, true]) {
+        const t = pick({ x: 7.2, z }, -Math.PI / 2, shifted);
+        expect(t?.type === 'station' ? t.station.anchor.z : null).toBeCloseTo(z);
+      }
+    }
+    expect(label(pick({ x: 0, z: -0.5 }, 0))).toBe('station:vhs');
+    expect(label(pick({ x: -1.3, z: 0.6 }, Math.PI))).toBe('desk-lamp-left');
+    expect(label(pick({ x: 1.3, z: 2.6 }, 0))).toBe('desk-lamp-right');
   });
 });

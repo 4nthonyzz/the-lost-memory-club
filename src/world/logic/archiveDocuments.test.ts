@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { ARCHIVE_DOCUMENTS, ARCHIVE_FOOTER_HINT, READABLE_IDS } from './archiveDocuments';
+import { ARCHIVE_DOCUMENTS, ARCHIVE_FOOTER_HINT, READABLE_COUNT, READABLE_IDS } from './archiveDocuments';
 
 describe('archive documents (task 24.2)', () => {
-  it('has exactly the six readable props with the exact tags and titles', () => {
-    expect([...READABLE_IDS]).toEqual(['manual-snake', 'manual-maze', 'manual-frequency', 'desk-notebook', 'cork-board', 'poster-shift']);
+  it('has exactly the seven readable props with the exact tags and titles', () => {
+    expect([...READABLE_IDS]).toEqual(['manual-snake', 'manual-maze', 'manual-frequency', 'desk-notebook', 'cork-board', 'poster-shift', 'poster-archive']);
     expect(Object.keys(ARCHIVE_DOCUMENTS).sort()).toEqual([...READABLE_IDS].sort());
     const pairs = READABLE_IDS.map((id) => [ARCHIVE_DOCUMENTS[id].tag, ARCHIVE_DOCUMENTS[id].title]);
     expect(pairs).toEqual([
@@ -13,6 +13,7 @@ describe('archive documents (task 24.2)', () => {
       ['TECHNICIAN LOG // NOV 1996', 'Shift Log Notebook'],
       ['EVIDENCE BOARD // INCIDENT REPORT', 'Investigation Pinboard'],
       ['ARCHIVE NOTICE // SIGNAL', 'The Signal Remembers'],
+      ['CLUB NOTICE // MEMBERS ARCHIVE', 'Club Archive Notice'],
     ]);
   });
 
@@ -41,6 +42,17 @@ describe('archive documents (task 24.2)', () => {
     expect(ARCHIVE_DOCUMENTS['manual-maze'].statusLine).toBe('Cabinet status: awaiting service');
     expect(ARCHIVE_DOCUMENTS['manual-frequency'].statusLine).toBe('Cabinet status: awaiting service');
     expect(ARCHIVE_DOCUMENTS['manual-snake'].statusLine).toBeUndefined();
+  });
+
+  it('25.2: has seven entries, the Club Archive Notice has the exact tag and title and no status line', () => {
+    expect(READABLE_IDS).toHaveLength(7);
+    expect(READABLE_COUNT).toBe(7);
+    expect(Object.keys(ARCHIVE_DOCUMENTS)).toHaveLength(7);
+    const d = ARCHIVE_DOCUMENTS['poster-archive'];
+    expect(d.tag).toBe('CLUB NOTICE // MEMBERS ARCHIVE');
+    expect(d.title).toBe('Club Archive Notice');
+    expect(d.statusLine).toBeUndefined();
+    expect(ARCHIVE_FOOTER_HINT).toBe('Press E or move away to close');
   });
 
   it('includes the required lore hooks', () => {

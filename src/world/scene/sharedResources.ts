@@ -51,6 +51,8 @@ export const geometries = {
   sphere: new SphereGeometry(0.5, 8, 6),
   /** Open-ended truncated cone (task 23.1): bottom diameter 1, top diameter 0.6, 12 sides, no caps. Table-lamp shade. */
   cone: new CylinderGeometry(0.3, 0.5, 1, 12, 1, true),
+  /** Open square tube (task 25.1): 4 radial segments turned 45 degrees at radius sqrt(1/2), so the section is exactly 1 x 1 (scale = real size). 8 triangles. */
+  collar: new CylinderGeometry(Math.SQRT1_2, Math.SQRT1_2, 1, 4, 1, true, Math.PI / 4),
 }
 
 /**
@@ -79,6 +81,20 @@ const lambert = (color: string) => new MeshLambertMaterial({ color })
 /** Hidden by default (opacity 0, invisible); the Memory_Shift driver fades them in. Visual only. */
 const overlay = (color: string) =>
   new MeshBasicMaterial({ color, transparent: true, opacity: 0, visible: false, depthWrite: false })
+
+/** Task 25.2: additive floor glow, opacity 0.26, no depth write, pulled toward the camera by a polygon offset. */
+export const ARCADE_GLOW_OPACITY = 0.26
+const arcadeGlowMaterial = (color: string) =>
+  new MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity: ARCADE_GLOW_OPACITY,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  })
 
 export const materials = {
   floor: lambert('#3a3340'),
@@ -178,9 +194,9 @@ export const materials = {
    * swapped per mesh, so one lamp's state never touches the other (`bulb` above is the lit bulb core).
    */
   brass: lambert('#a8802f'),
-  /** 24.1 banker shade: OFF is dark green glass with no emission; ON adds emissive #22c55e at 0.75. Separate per lamp, swapped per mesh. */
-  lampGreenShade: new MeshLambertMaterial({ color: '#16503a', emissive: '#22c55e', emissiveIntensity: 0 }),
-  lampGreenShadeOn: new MeshLambertMaterial({ color: '#1f7a4e', emissive: '#22c55e', emissiveIntensity: 0.75 }),
+  /** 24.1 banker shade: OFF is dark green glass with no emission; ON adds emissive #16a34a at 0.38 (25.1). Separate per lamp, swapped per mesh. */
+  lampGreenShade: new MeshLambertMaterial({ color: '#16503a', emissive: '#16a34a', emissiveIntensity: 0 }),
+  lampGreenShadeOn: new MeshLambertMaterial({ color: '#1f7a4e', emissive: '#16a34a', emissiveIntensity: 0.38 }),
   /** 23.2: lighter cream spine band on the three arcade manuals (flat colour, no texture). */
   manualBand: lambert('#eadfb8'),
   /** 24.1 table-lamp shade: OFF is a dull grey-cream with no emission; ON adds emissive #ffd27d at 0.85. */
@@ -193,7 +209,7 @@ export const materials = {
   lampPool: new MeshBasicMaterial({
     color: '#ffa63c',
     transparent: true,
-    opacity: 0.32,
+    opacity: 0.42,
     blending: AdditiveBlending,
     depthWrite: false,
     polygonOffset: true,
@@ -204,7 +220,7 @@ export const materials = {
   lampPoolBanker: new MeshBasicMaterial({
     color: '#a6d65a',
     transparent: true,
-    opacity: 0.32,
+    opacity: 0.42,
     blending: AdditiveBlending,
     depthWrite: false,
     polygonOffset: true,
@@ -215,7 +231,7 @@ export const materials = {
   lampConeBanker: new MeshBasicMaterial({
     color: '#8fd65a',
     transparent: true,
-    opacity: 0.14,
+    opacity: 0.2,
     blending: AdditiveBlending,
     depthWrite: false,
     side: DoubleSide,
@@ -223,7 +239,7 @@ export const materials = {
   lampConeTable: new MeshBasicMaterial({
     color: '#ffa63c',
     transparent: true,
-    opacity: 0.14,
+    opacity: 0.2,
     blending: AdditiveBlending,
     depthWrite: false,
     side: DoubleSide,
@@ -238,7 +254,14 @@ export const materials = {
     side: DoubleSide,
     fog: false,
   }),
+  /** 25.2 arcade floor glow decals (one per cabinet): subtle additive lampGlow tinted with the cabinet colour. Static, no collider. */
+  arcadeGlowSnake: arcadeGlowMaterial('#22c55e'),
+  arcadeGlowMaze: arcadeGlowMaterial('#e11d48'),
+  arcadeGlowFrequency: arcadeGlowMaterial('#f59e0b'),
   /** Swapped in for the glow sprite and the pool when a lamp is off: never drawn. */
+  /** 25.1 banker hood liner: warm-white inner bulb glow on the underside of the green hood (separate lit/unlit pair). */
+  lampLinerOn: new MeshBasicMaterial({ color: '#fff1cc', side: DoubleSide }),
+  lampLinerOff: new MeshLambertMaterial({ color: '#1c1b18', side: DoubleSide }),
   lampGlowOff: new MeshBasicMaterial({ transparent: true, opacity: 0, visible: false, depthWrite: false }),
   /** Camera-facing glow sprite of a lit lamp: additive lampGlow. */
   lampHalo: new MeshBasicMaterial({
@@ -441,7 +464,12 @@ export function createCanvasTexture(
   draw(ctx, width, height)
   const tex = new CanvasTexture(canvas as unknown as HTMLCanvasElement)
   tex.colorSpace = SRGBColorSpace
-  if ((options.filter ?? 'mipmap') === 'nearest') {
+  if (options.filter === 'linear') {
+    // Smooth, no mipmaps (task 25.1): soft gradients such as the lamp cone falloff.
+    tex.generateMipmaps = false
+    tex.minFilter = LinearFilter
+    tex.magFilter = LinearFilter
+  } else if ((options.filter ?? 'mipmap') === 'nearest') {
     tex.generateMipmaps = false
     tex.minFilter = NearestFilter
     tex.magFilter = NearestFilter
@@ -537,10 +565,15 @@ const TEXTURE_BINDINGS: readonly TextureBinding[] = [
   { material: 'cork', texture: 'corkBoard', color: '#ffffff' },
   { material: 'paper', texture: 'deskDetail', color: '#ffffff', fallbackColor: '#e6dfc6' },
   { material: 'notebookCover', texture: 'deskDetail', color: '#6a7888', fallbackColor: '#4a5866' },
+  { material: 'lampConeBanker', texture: 'coneFalloff', color: '#8fd65a', fallbackColor: '#8fd65a' },
+  { material: 'lampConeTable', texture: 'coneFalloff', color: '#ffa63c', fallbackColor: '#ffa63c' },
   { material: 'lampHalo', texture: 'lampGlow', color: '#ffffff' },
   { material: 'lampPool', texture: 'lampGlow', color: '#ffa63c' },
   { material: 'lampPoolBanker', texture: 'lampGlow', color: '#a6d65a' },
   { material: 'ceilingBloom', texture: 'lampGlow', color: '#cfe4ff' },
+  { material: 'arcadeGlowSnake', texture: 'lampGlow', color: '#22c55e' },
+  { material: 'arcadeGlowMaze', texture: 'lampGlow', color: '#e11d48' },
+  { material: 'arcadeGlowFrequency', texture: 'lampGlow', color: '#f59e0b' },
   /** Slightly dimmed multiplier: the reference card stays below the main CRT's brightness. */
   { material: 'smpteScreen', texture: 'smpteBars', color: '#b8b8b8' },
   { material: 'timecode', texture: 'timecode', color: '#ffffff' },
