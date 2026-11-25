@@ -5,9 +5,12 @@ import {
   PAGE_LABELS,
   READABLE_COUNT,
   READABLE_IDS,
+  BOOK_SIDE_BY_SIDE_MIN_PX,
   archiveDocumentText,
+  isBookDocument,
+  isStackedLayout,
 } from './archiveDocuments';
-import { CARD_PALETTES, contrastRatio } from './cardThemes';
+import { BOOK_PALETTES, CARD_PALETTES, contrastRatio } from './cardThemes';
 
 /** Raw source of the data module, read as text (no @types/node available). */
 const rawSource = (
@@ -134,6 +137,42 @@ describe('archive documents (task 24.2, 27.2)', () => {
       ];
       for (const [name, a, b] of pairs) {
         expect(contrastRatio(a, b), `${d.theme} ${name}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+});
+
+describe('open-book manuals (task 29.1)', () => {
+  it('flags the three manuals as book documents and the four room clues as not', () => {
+    for (const id of ['manual-snake', 'manual-maze', 'manual-frequency'] as const) {
+      expect(isBookDocument(ARCHIVE_DOCUMENTS[id]), id).toBe(true);
+    }
+    for (const id of ['desk-notebook', 'cork-board', 'poster-shift', 'poster-archive'] as const) {
+      expect(isBookDocument(ARCHIVE_DOCUMENTS[id]), id).toBe(false);
+    }
+  });
+
+  it('isStackedLayout stacks below the breakpoint and treats an unknown width as wide', () => {
+    expect(isStackedLayout(BOOK_SIDE_BY_SIDE_MIN_PX - 1)).toBe(true);
+    expect(isStackedLayout(BOOK_SIDE_BY_SIDE_MIN_PX)).toBe(false);
+    expect(isStackedLayout(1200)).toBe(false);
+    expect(isStackedLayout(0)).toBe(false);
+    expect(isStackedLayout(null)).toBe(false);
+    expect(isStackedLayout(undefined)).toBe(false);
+  });
+
+  it('keeps text contrast of at least 4.5:1 on the book page paper', () => {
+    for (const theme of ['snake', 'maze', 'frequency'] as const) {
+      const p = BOOK_PALETTES[theme];
+      const pairs: Array<[string, string, string]> = [
+        ['ink/page', p.pageInk, p.pageBg],
+        ['muted/page', p.pageMuted, p.pageBg],
+        ['accentInk/page', p.pageAccentInk, p.pageBg],
+        ['ink/highlight', p.pageInk, p.pageHlBg],
+        ['accentInk/highlight', p.pageAccentInk, p.pageHlBg],
+      ];
+      for (const [name, a, b] of pairs) {
+        expect(contrastRatio(a, b), `${theme} ${name}`).toBeGreaterThanOrEqual(4.5);
       }
     }
   });

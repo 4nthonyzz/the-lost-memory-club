@@ -49,6 +49,23 @@ import {
   type TextureId,
 } from './proceduralTextures'
 import { RecordingContext } from './recordingContext'
+import {
+  ATTRACT_FRAME_DRAWERS,
+  ATTRACT_PULSE_SEC,
+  ATTRACT_SEEDS,
+  MAZE_ANOMALY_LOOP,
+  MAZE_SURVIVOR_LOOP,
+  SNAKE_BODY_LENGTH,
+  SNAKE_PATH,
+  SNAKE_STEP_SEC,
+  attractPulseLevel,
+  drawAttractFrequencyFrame,
+  drawAttractMazeFrame,
+  drawAttractSnakeFrame,
+  frequencyMarkerMhz,
+  mazeActorsAt,
+  snakeStateAt,
+} from './proceduralTextures'
 
 /** Task 27.1: cabinetAndManualDetail, 256 x 128 mipmapped (estimate 174,326 bytes), on top of the older memory caps below. */
 const TASK_27_1_TEXTURE_BYTES = Math.round(256 * 128 * 4 * 1.33)
@@ -1224,5 +1241,137 @@ describe('task 27.1: sharpened in place (rugWoven, wood, woodDark, spineAtlas)',
     // "ARCHIVE" stacked on cell 1 and cell 5: every letter appears at least four times (embossed copy + two ink passes, two cells).
     expect(texts.filter((s) => s === 'A').length).toBeGreaterThanOrEqual(6)
     for (const s of run('spineAtlas').texts()) expect(s).not.toMatch(/sony|jvc|rca|fuji/i)
+  })
+})
+
+describe('task 29.2: animated attract screens (pure frame renderers)', () => {
+  const FRAMES = {
+    attractSnake: drawAttractSnakeFrame,
+    attractMaze: drawAttractMazeFrame,
+    attractFrequency: drawAttractFrequencyFrame,
+  } as const
+  const TITLES: Record<(typeof ATTRACT_IDS)[number], string[]> = {
+    attractSnake: ['SNAKE.EXE', 'PRESS E', 'INSERT 25¢'],
+    attractMaze: ['LAST EXIT'],
+    attractFrequency: ['DEAD FREQUENCY', '89.4 MHz'],
+  }
+  const frameLog = (id: (typeof ATTRACT_IDS)[number], t: number): RecordingContext => {
+    const ctx = new RecordingContext()
+    FRAMES[id](ctx, 256, 256, t)
+    return ctx
+  }
+  const SAMPLE_TIMES = Array.from({ length: 80 }, (_, i) => i * 0.37)
+
+  it('elapsedSec 0 gives exactly the static draw sequence, and the seeds match the specs', () => {
+    expect(ATTRACT_SEEDS).toEqual({ snake: 101, maze: 102, frequency: 122 })
+    expect(TEXTURE_SPECS.attractSnake.seed).toBe(ATTRACT_SEEDS.snake)
+    expect(TEXTURE_SPECS.attractMaze.seed).toBe(ATTRACT_SEEDS.maze)
+    expect(TEXTURE_SPECS.attractFrequency.seed).toBe(ATTRACT_SEEDS.frequency)
+    for (const id of ATTRACT_IDS) expect(frameLog(id, 0).log).toEqual(run(id).log)
+  })
+
+  it('frames at different times differ, the same time is deterministic, and the drawers map matches', () => {
+    for (const id of ATTRACT_IDS) {
+      expect(frameLog(id, 1.3).hash(), id).toBe(frameLog(id, 1.3).hash())
+      expect(frameLog(id, 1.3).hash(), id).not.toBe(frameLog(id, 0).hash())
+      expect(frameLog(id, 1.3).hash(), id).not.toBe(frameLog(id, 2.6).hash())
+      const ctx = new RecordingContext()
+      ATTRACT_FRAME_DRAWERS[id](ctx, 256, 256, 1.3)
+      expect(ctx.hash()).toBe(frameLog(id, 1.3).hash())
+    }
+  })
+
+  it('keeps every draw coordinate inside the canvas and keeps the titles on every sampled frame', () => {
+    for (const id of ATTRACT_IDS) {
+      for (const t of SAMPLE_TIMES) {
+        const ctx = frameLog(id, t)
+        for (const call of ctx.calls) {
+          if (!['fillRect', 'strokeRect', 'moveTo', 'lineTo', 'arc', 'fillText'].includes(call.op)) continue
+          const nums = (call.op === 'fillText' ? call.args.slice(1) : call.args.slice(0, 2)) as number[]
+          expect(nums[0] >= 0 && nums[0] <= 256 && nums[1] >= 0 && nums[1] <= 256, `${id} t=${t} ${call.op} ${nums}`).toBe(true)
+        }
+        expect(ctx.texts(), `${id} t=${t}`).toEqual(expect.arrayContaining(TITLES[id]))
+      }
+    }
+  })
+
+  it('the frame functions use no Math.random, Date or performance clock', () => {
+    const sources = import.meta.glob('./proceduralTextures.ts', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
+    const src = sources['./proceduralTextures.ts']
+    const start = src.indexOf('// Task 29.2: animated attract screens')
+    const end = src.indexOf('export interface MarqueePalette')
+    expect(start).toBeGreaterThan(0)
+    expect(end).toBeGreaterThan(start)
+    const code = src
+      .slice(start, end)
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '')
+    expect(code.match(/Math\.random|\bDate\b|performance\.now/)).toBeNull()
+  })
+
+  it('snake: the head advances one path cell per step, turns corners, reaches each fragment, and the fragment then respawns', () => {
+    expect(SNAKE_PATH.length).toBe(34)
+    const heads = new Set<string>()
+    let turns = 0
+    for (let i = 0; i < 80; i++) {
+      const s = snakeStateAt(i * SNAKE_STEP_SEC)
+      heads.add(String(s.head))
+      const d = [s.next[0] - s.head[0], s.next[1] - s.head[1]]
+      expect(Math.abs(d[0]) + Math.abs(d[1])).toBe(1)
+      const prev = snakeStateAt((i - 1) * SNAKE_STEP_SEC)
+      if (i > 0 && (s.next[0] - s.head[0] !== s.head[0] - prev.head[0] || s.next[1] - s.head[1] !== s.head[1] - prev.head[1])) turns++
+    }
+    expect(heads.size).toBe(SNAKE_PATH.length)
+    expect(turns).toBeGreaterThanOrEqual(6)
+    // Just before collection the head chases the fragment. At the collection step it stands on it, then the fragment moves on.
+    let previousFragment = snakeStateAt(0).fragment
+    for (let k = 0; k < 5; k++) {
+      const collectStep = 12 + 11 * k
+      const before = snakeStateAt((collectStep - 0.5) * SNAKE_STEP_SEC)
+      const at = snakeStateAt(collectStep * SNAKE_STEP_SEC)
+      expect(before.fragment).toEqual(previousFragment)
+      expect(at.head).toEqual(before.fragment)
+      expect(at.collected).toBe(k + 1)
+      expect(at.collectedCell).toEqual(before.fragment)
+      expect(at.fragment).not.toEqual(before.fragment)
+      previousFragment = at.fragment
+    }
+    expect(SNAKE_BODY_LENGTH + 1).toBeLessThan(SNAKE_PATH.length)
+  })
+
+  it('snake: the collection pulse is soft (a single bump of at most 1 s, 0 elsewhere) and draws a small ring only while it lasts', () => {
+    expect(attractPulseLevel(0)).toBe(0)
+    expect(attractPulseLevel(2.9)).toBe(0)
+    expect(attractPulseLevel(3 + ATTRACT_PULSE_SEC / 2)).toBeCloseTo(1, 5)
+    expect(attractPulseLevel(3 + ATTRACT_PULSE_SEC + 0.01)).toBe(0)
+    const rings = (t: number) => frameLog('attractSnake', t).calls.filter((c) => c.op === 'arc' && (c.args[2] as number) > 6).length
+    expect(rings(3.5)).toBeGreaterThan(rings(5))
+  })
+
+  it('maze: survivor and anomaly move along their loops and stay inside the screen; the survivor passes the three photos', () => {
+    const a0 = mazeActorsAt(0)
+    const a1 = mazeActorsAt(2)
+    expect(a1.survivor).not.toEqual(a0.survivor)
+    expect(a1.anomaly).not.toEqual(a0.anomaly)
+    const onLoop = (p: readonly [number, number], loop: readonly (readonly [number, number])[]) =>
+      loop.some((a, i) => {
+        const b = loop[(i + 1) % loop.length]
+        return p[0] >= Math.min(a[0], b[0]) - 1e-6 && p[0] <= Math.max(a[0], b[0]) + 1e-6 && p[1] >= Math.min(a[1], b[1]) - 1e-6 && p[1] <= Math.max(a[1], b[1]) + 1e-6
+      })
+    for (const t of SAMPLE_TIMES) {
+      const a = mazeActorsAt(t)
+      expect(onLoop(a.survivor, MAZE_SURVIVOR_LOOP), `survivor ${t}`).toBe(true)
+      expect(onLoop(a.anomaly, MAZE_ANOMALY_LOOP), `anomaly ${t}`).toBe(true)
+    }
+    for (const photo of [[31, 82], [210, 137], [75, 187]] as const) expect(MAZE_SURVIVOR_LOOP.some((p) => p[0] === photo[0] && p[1] === photo[1])).toBe(true)
+  })
+
+  it('frequency: the tuning marker sweeps over the dial and the waveform scrolls', () => {
+    expect(frequencyMarkerMhz(0)).toBe(88)
+    expect(frequencyMarkerMhz(5)).toBe(108)
+    expect(frequencyMarkerMhz(10)).toBe(88)
+    expect(frequencyMarkerMhz(2.5)).toBeGreaterThan(88)
+    const strokes = (t: number) => frameLog('attractFrequency', t).calls.filter((c) => c.op === 'lineTo').map((c) => c.args.join(','))
+    expect(strokes(0.5)).not.toEqual(strokes(0))
   })
 })

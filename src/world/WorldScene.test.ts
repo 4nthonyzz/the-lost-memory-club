@@ -371,7 +371,9 @@ describe('WorldScene interactable props (task 23.2, 24.2)', () => {
 describe('WorldScene themed two-page card (task 27.2)', () => {
   const card = () => document.querySelector('.world-card') as HTMLElement | null;
   const tab = (n: 1 | 2) => document.getElementById(`world-card-tab-${n}`) as HTMLElement;
-  const panelText = () => document.querySelector('[role="tabpanel"]')?.textContent ?? '';
+  // The active page of a book card (aria-current), or the single panel of the other layouts.
+  const panelText = () =>
+    (document.querySelector('[role="tabpanel"][aria-current="page"]') ?? document.querySelector('[role="tabpanel"]'))?.textContent ?? '';
   const pressE = (wrapper: HTMLElement) => {
     fireEvent.keyDown(wrapper, { code: 'KeyE', key: 'e' });
     fireEvent.keyUp(wrapper, { code: 'KeyE', key: 'e' });
@@ -624,7 +626,7 @@ describe('WorldScene scrollable card (task 28.1)', () => {
   });
 
   it('scrollTop resets on a page switch and when another document opens', () => {
-    const { wrapper, el } = open('manual-snake');
+    const { wrapper, el } = open('cork-board');
     wheel(200);
     expect(el.scrollTop).toBe(200);
     fireEvent.keyDown(wrapper, { code: 'Digit2', key: '2' });
@@ -663,5 +665,190 @@ describe('WorldScene scrollable card (task 28.1)', () => {
     h.setTarget!(null as never);
     pressE(wrapper);
     expect(card()).toBeNull();
+  });
+});
+
+describe('WorldScene open-book manuals (task 29.1)', () => {
+  const card = () => document.querySelector('.world-card') as HTMLElement | null;
+  const page = (n: 1 | 2) => document.getElementById(`world-card-page-${n}`) as HTMLElement;
+  const tab = (n: 1 | 2) => document.getElementById(`world-card-tab-${n}`) as HTMLElement;
+  const pressE = (wrapper: HTMLElement) => {
+    fireEvent.keyDown(wrapper, { code: 'KeyE', key: 'e' });
+    fireEvent.keyUp(wrapper, { code: 'KeyE', key: 'e' });
+  };
+  const open = (id: TargetId = 'manual-snake') => {
+    h.target = id;
+    const r = renderWorld();
+    pressE(r.wrapper);
+    return r;
+  };
+  const makeScrollable = (el: HTMLElement) => {
+    let top = 0;
+    Object.defineProperty(el, 'scrollTop', { configurable: true, get: () => top, set: (v: number) => { top = Math.max(0, v); } });
+    Object.defineProperty(el, 'clientHeight', { configurable: true, get: () => 300 });
+    return el;
+  };
+  const wheel = (deltaY: number) => {
+    const e = new WheelEvent('wheel', { deltaY, cancelable: true });
+    window.dispatchEvent(e);
+    return e;
+  };
+
+  it('opens as a two-page book with headings, page numbers, stamp and the manual theme', () => {
+    open('manual-snake');
+    expect(card()?.getAttribute('data-layout')).toBe('book');
+    expect(card()?.classList.contains('world-card--book')).toBe(true);
+    expect(card()?.getAttribute('data-theme')).toBe('snake');
+    expect(page(1).textContent).toContain('PAGE 01 // OVERVIEW & RULES');
+    expect(page(1).textContent).toContain('OBJECTIVE');
+    expect(page(1).textContent).toContain('P. 01');
+    expect(page(2).textContent).toContain('PAGE 02 // TECHNICIAN / ANOMALY LOG');
+    expect(page(2).textContent).toContain('HIDDEN CODE');
+    expect(page(2).textContent).toContain('P. 02');
+    const stamp = card()!.querySelector('.world-book-stamp');
+    expect(stamp?.textContent).toBe('LOST MEMORY CLUB // ARCHIVE COPY');
+    expect(stamp?.getAttribute('aria-hidden')).toBe('true');
+    expect(card()!.querySelector('.world-book-spine')?.getAttribute('aria-hidden')).toBe('true');
+    expect(card()!.textContent).toContain('Press 1 / 2 to switch pages');
+  });
+
+  it('page 1 is active at open: aria-selected tab, aria-current page and one ribbon; accessible tab structure', () => {
+    open('manual-snake');
+    expect(tab(1).getAttribute('aria-selected')).toBe('true');
+    expect(tab(2).getAttribute('aria-selected')).toBe('false');
+    expect(tab(1).getAttribute('aria-controls')).toBe('world-card-page-1');
+    expect(tab(2).getAttribute('aria-controls')).toBe('world-card-page-2');
+    for (const n of [1, 2] as const) {
+      expect(page(n).getAttribute('role')).toBe('tabpanel');
+      expect(page(n).getAttribute('aria-labelledby')).toBe(`world-card-tab-${n}`);
+    }
+    expect(page(1).getAttribute('aria-current')).toBe('page');
+    expect(page(2).hasAttribute('aria-current')).toBe(false);
+    expect(card()!.querySelectorAll('.world-book-ribbon')).toHaveLength(1);
+    expect(page(1).querySelector('.world-book-ribbon')).not.toBeNull();
+    expect(document.querySelector('[role="tablist"]')).not.toBeNull();
+  });
+
+  it('Digit2 makes page 2 active without hiding page 1; Digit1 returns', () => {
+    const { wrapper } = open('manual-snake');
+    fireEvent.keyDown(wrapper, { code: 'Digit2', key: '2' });
+    expect(tab(2).getAttribute('aria-selected')).toBe('true');
+    expect(page(2).getAttribute('aria-current')).toBe('page');
+    expect(page(1).hasAttribute('aria-current')).toBe(false);
+    expect(page(2).querySelector('.world-book-ribbon')).not.toBeNull();
+    expect(page(1).querySelector('.world-book-ribbon')).toBeNull();
+    expect(page(1).hasAttribute('hidden')).toBe(false);
+    expect(page(1).textContent).toContain('OBJECTIVE');
+    fireEvent.keyDown(wrapper, { code: 'Digit1', key: '1' });
+    expect(page(1).getAttribute('aria-current')).toBe('page');
+  });
+
+  it('clicking a page (not a button) makes it active, keeps focus on the world and never requests pointer lock', () => {
+    open('manual-snake');
+    const body = page(2).querySelector('.world-card-body') as HTMLElement;
+    expect(fireEvent.mouseDown(body)).toBe(false); // default prevented: focus stays on the wrapper
+    fireEvent.click(body);
+    expect(page(2).getAttribute('aria-current')).toBe('page');
+    expect(tab(2).getAttribute('aria-selected')).toBe('true');
+    fireEvent.click(page(1));
+    expect(page(1).getAttribute('aria-current')).toBe('page');
+    expect(lockSpy).not.toHaveBeenCalled();
+  });
+
+  it('wheel and ArrowDown still scroll the card and do not move the player', () => {
+    const { wrapper } = open('manual-snake');
+    const el = makeScrollable(card()!);
+    expect(wheel(120).defaultPrevented).toBe(true);
+    expect(el.scrollTop).toBe(120);
+    expect(fireEvent.keyDown(wrapper, { code: 'ArrowDown', key: 'ArrowDown' })).toBe(false);
+    expect(el.scrollTop).toBe(168);
+    expect([...(h.heldKeysRef?.current.roles ?? [])]).not.toContain('backward');
+  });
+
+  it('a page switch does not reset scrollTop in the side-by-side layout, but a new document does', () => {
+    const { wrapper } = open('manual-snake');
+    const el = makeScrollable(card()!);
+    wheel(200);
+    fireEvent.keyDown(wrapper, { code: 'Digit2', key: '2' });
+    expect(el.scrollTop).toBe(200);
+  });
+
+  describe('stacked layout', () => {
+    const OriginalRO = globalThis.ResizeObserver;
+    let roCallback: ((entries: unknown[]) => void) | null = null;
+    beforeEach(() => {
+      roCallback = null;
+      vi.stubGlobal(
+        'ResizeObserver',
+        class {
+          constructor(cb: (entries: unknown[]) => void) {
+            roCallback = cb;
+          }
+          observe() {}
+          unobserve() {}
+          disconnect() {}
+        },
+      );
+    });
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      if (OriginalRO) globalThis.ResizeObserver = OriginalRO;
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    });
+
+    it('scrolls the chosen page into view when the card is narrow, and not when it is wide', () => {
+      const scrollIntoView = vi.fn();
+      (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView = scrollIntoView;
+      const { wrapper } = open('manual-snake');
+      expect(roCallback).not.toBeNull();
+      act(() => roCallback!([{ contentRect: { width: 900 } }]));
+      fireEvent.keyDown(wrapper, { code: 'Digit2', key: '2' });
+      expect(scrollIntoView).not.toHaveBeenCalled();
+      act(() => roCallback!([{ contentRect: { width: 500 } }]));
+      fireEvent.keyDown(wrapper, { code: 'Digit1', key: '1' });
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' });
+      fireEvent.click(tab(2));
+      expect(scrollIntoView).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not throw when scrollIntoView is missing', () => {
+      const { wrapper } = open('manual-snake');
+      act(() => roCallback!([{ contentRect: { width: 400 } }]));
+      expect(() => fireEvent.keyDown(wrapper, { code: 'Digit2', key: '2' })).not.toThrow();
+      expect(tab(2).getAttribute('aria-selected')).toBe('true');
+    });
+  });
+
+  it('maze and frequency use the book layout; the four room clues do not', () => {
+    for (const id of ['manual-maze', 'manual-frequency'] as const) {
+      const r = open(id);
+      expect(card()?.getAttribute('data-layout')).toBe('book');
+      r.unmount();
+    }
+    for (const id of ['desk-notebook', 'cork-board', 'poster-shift', 'poster-archive'] as const) {
+      const r = open(id);
+      expect(card()?.getAttribute('data-layout')).toBeNull();
+      expect(card()?.querySelector('.world-book')).toBeNull();
+      expect(document.querySelectorAll('[role="tabpanel"]')).toHaveLength(1);
+      r.unmount();
+    }
+  });
+
+  it('E and Escape still close a book card', () => {
+    const { wrapper } = open('manual-maze');
+    pressE(wrapper);
+    expect(card()).toBeNull();
+    pressE(wrapper);
+    expect(card()).not.toBeNull();
+    expect(fireEvent.keyDown(wrapper, { code: 'Escape', key: 'Escape' })).toBe(true);
+    expect(card()).toBeNull();
+  });
+
+  it('removes the wheel listener on unmount', () => {
+    const remove = vi.spyOn(window, 'removeEventListener');
+    const { unmount } = open('manual-snake');
+    unmount();
+    expect(remove.mock.calls.filter((c) => c[0] === 'wheel')).toHaveLength(1);
   });
 });

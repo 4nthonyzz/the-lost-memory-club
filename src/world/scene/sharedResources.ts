@@ -24,6 +24,8 @@ import {
 import { ROOM } from '../layout/roomLayout'
 import { ARCADE_SCREEN_BASE_COLORS, BASE_CRT_SCREEN_COLOR, BASE_WALL_COLOR, COUCH_FABRIC_COLORS, CRT_CASING_COLORS, arcadeScreenBaseColor, crtScreenBaseColor } from './memoryShift'
 import {
+  ATTRACT_FRAME_DRAWERS,
+  ATTRACT_TEXTURE_IDS,
   BOX_FACE_FRONT,
   FLOOR_METRES_PER_REPEAT,
   SPINE_CASE_SIDE_CELL,
@@ -488,7 +490,7 @@ export const woodBoxCount = (): number => [...woodBoxCache.keys()].filter((k) =>
 export const fabricBoxCount = (): number => [...woodBoxCache.keys()].filter((k) => k.startsWith('plain|')).length
 
 // ---------------------------------------------------------------------------------------------
-// Procedural canvas textures (task 15.7, 18.3, 19.2). Deterministic, drawn once, never redrawn per frame.
+// Procedural canvas textures (task 15.7, 18.3, 19.2). Deterministic and drawn once, except the three attract screens, which are redrawn in place at most 12 times per second (task 29.2, updateAnimatedAttractTextures).
 // Budget: 30 textures (see proceduralTextures.ts for the estimate), limit 8 MB.
 // ---------------------------------------------------------------------------------------------
 
@@ -564,8 +566,28 @@ export function createCanvasTexture(
   tex.wrapT = wrap
   if (options.repeat) tex.repeat.set(options.repeat[0], options.repeat[1])
   tex.needsUpdate = true
+  surfaces.set(tex, { ctx, width, height })
   registry.push(tex)
   return tex
+}
+
+/** The canvas context and size each texture was drawn with, kept so an attract screen can be redrawn in place (task 29.2). */
+const surfaces = new WeakMap<CanvasTexture, { ctx: Ctx2D; width: number; height: number }>()
+
+/**
+ * Redraws the three attract screen canvases in place at `elapsedSec` and flags their textures for upload (task 29.2).
+ * Reuses the canvas and context each texture was created with: no canvas, texture or material is created here.
+ * A no-op for a texture that does not exist (no canvas support, or after disposeSharedResources()).
+ */
+export function updateAnimatedAttractTextures(elapsedSec: number): void {
+  for (const id of ATTRACT_TEXTURE_IDS) {
+    const tex = cache.get(id)
+    const surface = tex ? surfaces.get(tex) : undefined
+    if (!tex || !surface) continue
+    surface.ctx.clearRect(0, 0, surface.width, surface.height)
+    ATTRACT_FRAME_DRAWERS[id](surface.ctx, surface.width, surface.height, elapsedSec)
+    tex.needsUpdate = true
+  }
 }
 
 function repeatFor(id: TextureId): readonly [number, number] | undefined {

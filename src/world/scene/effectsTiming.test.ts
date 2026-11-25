@@ -11,6 +11,65 @@ import {
   type DustBounds,
 } from './effectsTiming'
 
+import { attractPulseLevel } from './proceduralTextures'
+import { ATTRACT_MAX_HZ, INITIAL_ATTRACT_CLOCK, stepAttractClock, type AttractClock } from './effectsTiming'
+
+describe('task 29.2: attract screen clock and pulse', () => {
+  function run(fps: number, seconds: number, active: boolean, reduced: boolean, start: AttractClock = INITIAL_ATTRACT_CLOCK) {
+    let clock = start
+    const redrawTimes: number[] = []
+    for (let i = 0; i < fps * seconds; i++) {
+      const r = stepAttractClock(clock, 1 / fps, active, reduced)
+      clock = r.clock
+      if (r.redraw) redrawTimes.push(i / fps)
+    }
+    return { clock, redrawTimes }
+  }
+
+  it.each([60, 144])('redraws at most 12 and at least 10 times per second at %i fps', (fps) => {
+    const { redrawTimes } = run(fps, 10, true, false)
+    expect(ATTRACT_MAX_HZ).toBe(12)
+    for (let s = 0; s < 10; s++) {
+      const n = redrawTimes.filter((t) => t >= s && t < s + 1).length
+      expect(n, `second ${s}`).toBeLessThanOrEqual(12)
+      expect(n, `second ${s}`).toBeGreaterThanOrEqual(10)
+    }
+  })
+
+  it('reduced motion never redraws from the initial static frame and keeps the clock at 0', () => {
+    const r = run(60, 5, true, true)
+    expect(r.redrawTimes.length).toBe(0)
+    expect(r.clock.elapsed).toBe(0)
+  })
+
+  it('reduced motion turning on mid-run redraws once at elapsed 0, then stays still', () => {
+    const running = run(60, 2, true, false).clock
+    expect(running.elapsed).toBeGreaterThan(1.9)
+    expect(running.staticShown).toBe(false)
+    const r = run(60, 3, true, true, running)
+    expect(r.redrawTimes).toEqual([0])
+    expect(r.clock).toEqual({ elapsed: 0, accumulator: 0, staticShown: true })
+  })
+
+  it('inactive: no redraw and the clock does not advance, and it resumes where it stopped', () => {
+    const running = run(60, 1, true, false).clock
+    const paused = run(60, 4, false, false, running)
+    expect(paused.redrawTimes.length).toBe(0)
+    expect(paused.clock).toEqual(running)
+    const resumed = run(60, 1, true, false, paused.clock)
+    expect(resumed.clock.elapsed).toBeCloseTo(running.elapsed + 1, 5)
+  })
+
+  it('the collection pulse changes luminance direction at most 3 times in every rolling second', () => {
+    const rate = 240
+    const samples = Array.from({ length: rate * 40 }, (_, i) => attractPulseLevel(i / rate))
+    expect(Math.max(...samples)).toBeGreaterThan(0.99)
+    for (let start = 0; start + rate <= samples.length; start += 12) {
+      expect(countDirectionChanges(samples.slice(start, start + rate + 1)), `window at ${start / rate}s`).toBeLessThanOrEqual(3)
+    }
+  })
+})
+
 function countUpdates(fps: number, seconds: number, reduced = false): number {
   const dt = 1 / fps
   let acc = 0

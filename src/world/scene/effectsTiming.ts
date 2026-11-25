@@ -37,6 +37,46 @@ export function shouldUpdateNoise(
   return { update: true, accumulator: acc % interval }
 }
 
+/** Attract screen redraw cap (updates per second): the same 12 Hz as the static noise. */
+export const ATTRACT_MAX_HZ = NOISE_MAX_HZ
+
+export interface AttractClock {
+  /** Animation clock in seconds. It only advances while the effects are active and motion is allowed. */
+  elapsed: number
+  /** Throttle accumulator in seconds. */
+  accumulator: number
+  /** True while the canvases show the elapsed = 0 static frame. */
+  staticShown: boolean
+}
+
+export const INITIAL_ATTRACT_CLOCK: AttractClock = Object.freeze({ elapsed: 0, accumulator: 0, staticShown: true })
+
+export interface AttractStep {
+  clock: AttractClock
+  /** True when the three attract canvases must be redrawn at `clock.elapsed`. */
+  redraw: boolean
+}
+
+/**
+ * Attract screen clock and throttle (task 29.2). Inactive (inspecting): nothing changes, so the animation resumes where it
+ * stopped. Reduced motion: the clock returns to 0 and the screens are redrawn once at the static frame, then never again.
+ * Otherwise the clock advances by the capped frame step and a redraw is requested at most ATTRACT_MAX_HZ times per second.
+ */
+export function stepAttractClock(clock: AttractClock, dt: number, active: boolean, reducedMotion: boolean): AttractStep {
+  if (!active) return { clock, redraw: false }
+  if (reducedMotion) {
+    if (clock.staticShown) return { clock, redraw: false }
+    return { clock: { elapsed: 0, accumulator: 0, staticShown: true }, redraw: true }
+  }
+  const step = Number.isFinite(dt) && dt > 0 ? Math.min(dt, MAX_DT_SEC) : 0
+  const elapsed = clock.elapsed + step
+  const throttle = shouldUpdateNoise(clock.accumulator, step, ATTRACT_MAX_HZ, false)
+  return {
+    clock: { elapsed, accumulator: throttle.accumulator, staticShown: throttle.update ? false : clock.staticShown },
+    redraw: throttle.update,
+  }
+}
+
 /** Multiplier on the screen glow overlay opacity: 0.5 Hz, constant 1 under reduced motion. */
 export function glowFactor(timeSec: number, reducedMotion: boolean): number {
   if (reducedMotion || !Number.isFinite(timeSec)) return 1

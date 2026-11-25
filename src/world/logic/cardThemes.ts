@@ -26,6 +26,26 @@ export const CARD_PALETTES: Readonly<Record<DocTheme, CardPalette>> = Object.fre
   notice: { bg: '#e9e4d0', ink: '#1c1917', muted: '#44403c', pillBg: '#d6cfb4', pillInk: '#3b2a14', hlBg: '#f3ecc0' },
 });
 
+/** Printed-paper colours of the open-book pages (manual themes only). */
+export interface BookPalette {
+  /** Paper tint. */
+  pageBg: string;
+  /** Body text on the paper. */
+  pageInk: string;
+  /** Secondary text (page numbers) on the paper. */
+  pageMuted: string;
+  /** Highlighted block background on the paper. */
+  pageHlBg: string;
+  /** Darkened accent used for text (block titles, status line) on the paper and on highlighted blocks. */
+  pageAccentInk: string;
+}
+
+export const BOOK_PALETTES: Readonly<Record<'snake' | 'maze' | 'frequency', BookPalette>> = Object.freeze({
+  snake: { pageBg: '#e8f1e4', pageInk: '#10220f', pageMuted: '#3b4f38', pageHlBg: '#cfe8c6', pageAccentInk: '#166534' },
+  maze: { pageBg: '#f3e6e6', pageInk: '#2a0a12', pageMuted: '#5a3a40', pageHlBg: '#f1cfd5', pageAccentInk: '#9f1239' },
+  frequency: { pageBg: '#f6ecd2', pageInk: '#2b1d03', pageMuted: '#5c4513', pageHlBg: '#f2dfa6', pageAccentInk: '#92400e' },
+});
+
 function channel(v: number): number {
   const c = v / 255;
   return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);

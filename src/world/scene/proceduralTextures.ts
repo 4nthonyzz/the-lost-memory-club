@@ -257,48 +257,208 @@ function cornerBrackets(c: Ctx2D, w: number, h: number, inset: number, len: numb
   }
 }
 
-/** Phosphor-green CRT Snake: a serpent built from VHS-tape segments on a dark grid, with a faint shadow serpent. */
-export function drawAttractSnake(c: Ctx2D, w: number, h: number, seed: number): void {
+// ---------------------------------------------------------------------------------------------
+// Task 29.2: animated attract screens. Every screen is a pure function of `elapsedSec` (no Math.random, no Date):
+// the static parts use a fixed seed and all motion comes from the elapsed time. `elapsedSec = 0` is the static frame
+// that the TEXTURE_SPECS draw functions (drawAttractSnake, drawAttractMaze, drawAttractFrequency) render.
+// ---------------------------------------------------------------------------------------------
+
+export type AttractTextureId = 'attractSnake' | 'attractMaze' | 'attractFrequency'
+
+/** Fixed seeds of the static parts (grid speckle). They equal the TEXTURE_SPECS seeds. */
+export const ATTRACT_SEEDS = Object.freeze({ snake: 101, maze: 102, frequency: 122 })
+
+type Pt = readonly [number, number]
+
+const finiteTime = (t: number): number => (Number.isFinite(t) && t > 0 ? t : 0)
+const fract = (v: number): number => v - Math.floor(v)
+
+/** Position at `distance` along a closed polyline loop (wraps around). */
+export function loopPoint(points: readonly Pt[], distance: number): Pt {
+  let total = 0
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i]
+    const b = points[(i + 1) % points.length]
+    total += Math.hypot(b[0] - a[0], b[1] - a[1])
+  }
+  let d = ((distance % total) + total) % total
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i]
+    const b = points[(i + 1) % points.length]
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1])
+    if (d <= len) {
+      const f = len > 0 ? d / len : 0
+      return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]
+    }
+    d -= len
+  }
+  return points[0]
+}
+
+/** Deterministic integer hash to [0, 1). */
+function hash01(n: number): number {
+  let x = Math.imul((n | 0) ^ 0x9e3779b9, 0x85ebca6b)
+  x ^= x >>> 13
+  x = Math.imul(x, 0xc2b2ae35)
+  x ^= x >>> 16
+  return (x >>> 0) / 4294967296
+}
+
+// ---- SNAKE.EXE ----
+
+const SNAKE_CELL = 16
+/** Corner cells (column, row) of the closed loop the tape serpent follows. It turns at every corner. */
+const SNAKE_WAYPOINTS: readonly Pt[] = [[2, 6], [13, 6], [13, 9], [6, 9], [6, 12], [2, 12]]
+
+function expandLoop(corners: readonly Pt[]): Pt[] {
+  const cells: Pt[] = []
+  for (let i = 0; i < corners.length; i++) {
+    const a = corners[i]
+    const b = corners[(i + 1) % corners.length]
+    const n = Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1])
+    const dx = Math.sign(b[0] - a[0])
+    const dy = Math.sign(b[1] - a[1])
+    for (let k = 0; k < n; k++) cells.push([a[0] + dx * k, a[1] + dy * k])
+  }
+  return cells
+}
+
+/** Every cell of the loop, in travel order (34 cells). */
+export const SNAKE_PATH: readonly Pt[] = Object.freeze(expandLoop(SNAKE_WAYPOINTS))
+/** The serpent moves one cell per step. */
+export const SNAKE_STEP_SEC = 0.25
+/** Body segments behind the head. */
+export const SNAKE_BODY_LENGTH = 11
+/** Step at which the head first reaches a fragment, and the number of path cells between successive fragments. */
+export const SNAKE_FIRST_FRAGMENT_STEP = 12
+export const SNAKE_FRAGMENT_SPACING = 11
+/** Length of the soft collection pulse. Collections are 11 steps (2.75 s) apart, so pulses never overlap. */
+export const ATTRACT_PULSE_SEC = 1
+
+const pathCell = (index: number): Pt => SNAKE_PATH[((index % SNAKE_PATH.length) + SNAKE_PATH.length) % SNAKE_PATH.length]
+
+export interface SnakeState {
+  /** Steps taken so far. */
+  step: number
+  head: Pt
+  /** Cell of the head's next move, for the facing direction. */
+  next: Pt
+  /** Cell of the fragment the head is chasing. */
+  fragment: Pt
+  /** Number of fragments collected so far. */
+  collected: number
+  /** Cell where the last fragment was collected (null before the first). */
+  collectedCell: Pt | null
+  /** Seconds since the last collection (Infinity before the first). */
+  pulseAge: number
+}
+
+/** Deterministic snake state at `elapsedSec`. When the head reaches the fragment, the fragment respawns 11 cells further along the path. */
+export function snakeStateAt(elapsedSec: number): SnakeState {
+  const e = finiteTime(elapsedSec)
+  const step = Math.floor(e / SNAKE_STEP_SEC)
+  const collected = step >= SNAKE_FIRST_FRAGMENT_STEP ? Math.floor((step - SNAKE_FIRST_FRAGMENT_STEP) / SNAKE_FRAGMENT_SPACING) + 1 : 0
+  const fragmentStep = SNAKE_FIRST_FRAGMENT_STEP + SNAKE_FRAGMENT_SPACING * collected
+  const lastStep = SNAKE_FIRST_FRAGMENT_STEP + SNAKE_FRAGMENT_SPACING * (collected - 1)
+  return {
+    step,
+    head: pathCell(step),
+    next: pathCell(step + 1),
+    fragment: pathCell(fragmentStep),
+    collected,
+    collectedCell: collected > 0 ? pathCell(lastStep) : null,
+    pulseAge: collected > 0 ? e - lastStep * SNAKE_STEP_SEC : Infinity,
+  }
+}
+
+/**
+ * Soft collection pulse in 0..1: one sin^2 bump lasting ATTRACT_PULSE_SEC after each fragment collection, 0 otherwise.
+ * Pulses are 2.75 s apart, so the luminance changes direction at most twice per 2.75 s (limit: 3 per second, Requirement 10).
+ */
+export function attractPulseLevel(elapsedSec: number): number {
+  const age = snakeStateAt(elapsedSec).pulseAge
+  if (!(age >= 0 && age < ATTRACT_PULSE_SEC)) return 0
+  return Math.sin((Math.PI * age) / ATTRACT_PULSE_SEC) ** 2
+}
+
+/** Phosphor-green CRT Snake: a VHS-tape serpent walks a looping path, turning corners, toward a glowing tape fragment. */
+export function drawAttractSnakeFrame(c: Ctx2D, w: number, h: number, elapsedSec: number, seed: number = ATTRACT_SEEDS.snake): void {
   const rnd = makeRng(seed)
+  const e = finiteTime(elapsedSec)
+  const s = snakeStateAt(e)
+  const pulse = attractPulseLevel(e)
   vertical(c, w, h, [[0, '#020a05'], [1, '#04140a']])
   // Dark play grid.
   for (let k = 16; k < w; k += 16) {
     rect(c, k, 0, 1, h, '#0e4a2a', 0.35)
     rect(c, 0, k, w, 1, '#0e4a2a', 0.35)
   }
-  const route = (i: number) => ({ x: 22 + i * 17, y: 150 + Math.sin(i * 0.8) * 24 })
-  // Shadow serpent: larger, offset, very faint, behind the real one.
-  for (let i = 0; i < 12; i++) {
-    const p = route(i)
-    rect(c, p.x - 6, p.y - 26 + (i % 2) * 3, 22, 16, '#0f6a3a', 0.18)
+  const cellX = (cx: number) => cx * SNAKE_CELL
+  const cellY = (cy: number) => cy * SNAKE_CELL
+  // Shadow serpent: very faint, trailing far behind the real one.
+  for (let i = 0; i < 6; i++) {
+    const p = pathCell(s.step - SNAKE_BODY_LENGTH - 6 - i)
+    rect(c, cellX(p[0]) - 2, cellY(p[1]) - 3 + (i % 2) * 2, 20, 18, '#0f6a3a', 0.18)
   }
-  // The serpent: tape segments (cassette body, label strip, two reel dots) and a head.
-  for (let i = 0; i < 11; i++) {
-    const p = route(i)
-    const y = p.y + Math.floor(rnd() * 2)
-    rect(c, p.x, y, 16, 11, '#1f9c52')
-    frame(c, p.x, y, 16, 11, '#7dffb0', 1)
-    rect(c, p.x + 3, y + 1, 10, 3, '#b8ffd2', 0.8)
-    disc(c, p.x + 4.5, y + 7, 2, '#02140a')
-    disc(c, p.x + 11.5, y + 7, 2, '#02140a')
+  // Tape fragment: a glowing cassette label. Its glow lifts softly during the collection pulse.
+  const fx = cellX(s.fragment[0])
+  const fy = cellY(s.fragment[1])
+  disc(c, fx + 8, fy + 8, 9, '#ff5a6a', 0.22 + 0.3 * pulse)
+  rect(c, fx + 4, fy + 4, 8, 8, '#ff5a6a')
+  rect(c, fx + 6, fy + 6, 4, 2, '#ffd0d6')
+  // Collection: a brightness lift and one small expanding ring on the cell where the last fragment was taken.
+  if (s.collectedCell && s.pulseAge < ATTRACT_PULSE_SEC) {
+    const cx = cellX(s.collectedCell[0]) + 8
+    const cy = cellY(s.collectedCell[1]) + 8
+    disc(c, cx, cy, 9, '#b8ffd2', 0.3 * pulse)
+    ring(c, cx, cy, 6 + 10 * (s.pulseAge / ATTRACT_PULSE_SEC), '#b8ffd2', 1, 0.6 * (1 - s.pulseAge / ATTRACT_PULSE_SEC))
   }
-  const head = route(11)
-  rect(c, head.x, head.y - 2, 18, 15, '#c8ffe0')
-  rect(c, head.x + 11, head.y + 1, 3, 3, '#ff3a4a')
-  rect(c, head.x + 11, head.y + 7, 3, 3, '#ff3a4a')
-  // Prey: a lone tape label.
-  rect(c, 58, 205, 9, 9, '#ff5a6a')
+  // The serpent: tape segments (cassette body, label strip, two reel dots), tail first, then the head.
+  for (let i = SNAKE_BODY_LENGTH; i >= 1; i--) {
+    const p = pathCell(s.step - i)
+    const x = cellX(p[0])
+    const y = cellY(p[1])
+    rect(c, x + 1, y + 2, 14, 12, '#1f9c52')
+    frame(c, x + 1, y + 2, 14, 12, '#7dffb0', 1)
+    rect(c, x + 3, y + 3, 10, 3, '#b8ffd2', 0.8)
+    disc(c, x + 5, y + 10, 2, '#02140a')
+    disc(c, x + 11, y + 10, 2, '#02140a')
+  }
+  const hx = cellX(s.head[0])
+  const hy = cellY(s.head[1])
+  rect(c, hx, hy + 1, 16, 14, '#c8ffe0')
+  const dx = s.next[0] - s.head[0]
+  const dy = s.next[1] - s.head[1]
+  if (dy === 0) {
+    const ex = dx >= 0 ? hx + 10 : hx + 3
+    rect(c, ex, hy + 3, 3, 3, '#ff3a4a')
+    rect(c, ex, hy + 9, 3, 3, '#ff3a4a')
+  } else {
+    const ey = dy >= 0 ? hy + 10 : hy + 3
+    rect(c, hx + 3, ey, 3, 3, '#ff3a4a')
+    rect(c, hx + 10, ey, 3, 3, '#ff3a4a')
+  }
   text(c, 'SNAKE.EXE', w / 2 + 2, 37, 'bold 28px monospace', '#0a5a30')
   text(c, 'SNAKE.EXE', w / 2, 35, 'bold 28px monospace', '#7dffc0')
   text(c, 'PRESS E', w / 2, 72, 'bold 16px monospace', '#c8ffe4')
   text(c, 'INSERT 25¢', w / 2, 236, 'bold 12px monospace', '#3fbf8a', 0.9)
-  // Phosphor dot grid.
-  for (let y = 3; y < h; y += 8) for (let x = 3; x < w; x += 8) rect(c, x, y, 1, 1, '#2fa874', 0.2)
+  // Phosphor dot grid (one style assignment for the whole grid).
+  c.globalAlpha = 0.2
+  c.fillStyle = '#2fa874'
+  for (let y = 3; y < h; y += 8) for (let x = 3; x < w; x += 8) c.fillRect(x, y, 1, 1)
+  c.globalAlpha = 1
   speckle(c, rnd, 0, 0, w, h, 50, ['#2fa874', '#7dffc0', '#0a3a28'], 2, 0.25)
   cornerBrackets(c, w, h, 6, 14, '#7dffc0')
   scanlines(c, w, h, 2, 0.3)
   vignette(c, w, h, 40, 0.68)
 }
+
+/** Static frame (elapsedSec = 0), used by the texture spec. */
+export function drawAttractSnake(c: Ctx2D, w: number, h: number, seed: number): void {
+  drawAttractSnakeFrame(c, w, h, 0, seed)
+}
+
+// ---- LAST EXIT ----
 
 /** Vanishing point of the maze corridor and the corridor depth steps (0 = near edge, 1 = vanishing rectangle). */
 const MAZE_OUTER = { l: 6, r: 250, t: 6, b: 250 } as const
@@ -306,9 +466,43 @@ const MAZE_INNER = { l: 104, r: 152, t: 88, b: 150 } as const
 const MAZE_DEPTHS = [0, 0.3, 0.5, 0.65, 0.76, 0.84, 0.9] as const
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 
-/** Dark labyrinth in one-point perspective, three glowing photo fragments and a lurking silhouette at the far end. */
-export function drawAttractMaze(c: Ctx2D, w: number, h: number, seed: number): void {
+/** Corridor loop of the survivor (screen px). It passes through the three photo fragments: their centres (31,82), (210,137) and (75,187) are waypoints. */
+export const MAZE_SURVIVOR_LOOP: readonly Pt[] = Object.freeze([[31, 82], [31, 187], [75, 187], [75, 222], [210, 222], [210, 137], [150, 137], [150, 82]] as Pt[])
+/** A separate, smaller loop patrolled by the red shadow anomaly. */
+export const MAZE_ANOMALY_LOOP: readonly Pt[] = Object.freeze([[110, 160], [190, 160], [190, 200], [110, 200]] as Pt[])
+export const MAZE_SURVIVOR_SPEED = 40
+export const MAZE_ANOMALY_SPEED = 28
+/** Glow pulse of the photo fragments: a 0.5 Hz sinusoid is one bright-dark cycle per 2 s (2 direction changes per 2 s). */
+export const MAZE_PHOTO_PULSE_HZ = 0.5
+
+export interface MazeActors {
+  survivor: Pt
+  anomaly: Pt
+}
+
+/** Deterministic survivor and anomaly positions at `elapsedSec`. */
+export function mazeActorsAt(elapsedSec: number): MazeActors {
+  const e = finiteTime(elapsedSec)
+  return { survivor: loopPoint(MAZE_SURVIVOR_LOOP, e * MAZE_SURVIVOR_SPEED), anomaly: loopPoint(MAZE_ANOMALY_LOOP, e * MAZE_ANOMALY_SPEED) }
+}
+
+/** Gold glow level (0..1) of photo fragment `index`: a smooth sinusoid, phase shifted per photo. */
+export function mazePhotoPulse(elapsedSec: number, index: number): number {
+  return 0.5 + 0.5 * Math.sin(2 * Math.PI * MAZE_PHOTO_PULSE_HZ * finiteTime(elapsedSec) + index * 2.1)
+}
+
+function corridorStrips(c: Ctx2D, loop: readonly Pt[], color: string, alpha: number): void {
+  for (let i = 0; i < loop.length; i++) {
+    const a = loop[i]
+    const b = loop[(i + 1) % loop.length]
+    rect(c, Math.min(a[0], b[0]) - 4, Math.min(a[1], b[1]) - 4, Math.abs(b[0] - a[0]) + 8, Math.abs(b[1] - a[1]) + 8, color, alpha)
+  }
+}
+
+/** Dark labyrinth: a survivor dot walks the corridors toward three pulsing gold photographs while a red shadow patrols its own loop. */
+export function drawAttractMazeFrame(c: Ctx2D, w: number, h: number, elapsedSec: number, seed: number = ATTRACT_SEEDS.maze): void {
   const rnd = makeRng(seed)
+  const e = finiteTime(elapsedSec)
   rect(c, 0, 0, w, h, '#06020c')
   const level = (k: number) => {
     const f = MAZE_DEPTHS[k]
@@ -346,13 +540,24 @@ export function drawAttractMaze(c: Ctx2D, w: number, h: number, seed: number): v
   ring(c, 128, 107, 6, '#8a3ad0', 1, 0.55)
   line(c, 120, 114, 115, 156, '#c8203c', 1, 0.45)
   line(c, 136, 114, 141, 156, '#c8203c', 1, 0.45)
-  // Three glowing photo fragments: light frame, dark inner photo area.
-  for (const [x, y, fw, fh] of [[16, 70, 30, 24], [196, 120, 28, 34], [62, 176, 26, 22]] as const) {
-    rect(c, x - 3, y - 3, fw + 6, fh + 6, '#ff9ac0', 0.16)
+  // Faint corridor strips under the actors: the survivor's loop (violet) and the anomaly's loop (red).
+  corridorStrips(c, MAZE_SURVIVOR_LOOP, '#8a3ad0', 0.14)
+  corridorStrips(c, MAZE_ANOMALY_LOOP, '#c8203c', 0.16)
+  // Three photo fragments: pulsing gold glow, light frame, dark inner photo area.
+  for (const [i, [x, y, fw, fh]] of ([[16, 70, 30, 24], [196, 120, 28, 34], [62, 176, 26, 22]] as const).entries()) {
+    rect(c, x - 3, y - 3, fw + 6, fh + 6, '#ffd24a', 0.1 + 0.22 * mazePhotoPulse(e, i))
     rect(c, x, y, fw, fh, '#f0d8e8')
     rect(c, x + 3, y + 3, fw - 6, fh - 6, '#1c0616')
     rect(c, x + fw / 2 - 2, y + 6, 4, 5, '#7a2a5a', 0.8)
   }
+  // Actors: the survivor (warm dot with a halo) and the red shadow anomaly.
+  const actors = mazeActorsAt(e)
+  disc(c, actors.survivor[0], actors.survivor[1], 6, '#ffd24a', 0.3)
+  disc(c, actors.survivor[0], actors.survivor[1], 3.5, '#fff2c0')
+  disc(c, actors.anomaly[0], actors.anomaly[1], 8, '#000000', 0.85)
+  ring(c, actors.anomaly[0], actors.anomaly[1], 8, '#ff2a3a', 1.5, 0.8)
+  rect(c, actors.anomaly[0] - 4, actors.anomaly[1] - 2, 2, 2, '#ff2a3a')
+  rect(c, actors.anomaly[0] + 2, actors.anomaly[1] - 2, 2, 2, '#ff2a3a')
   text(c, 'LAST EXIT', w / 2 + 2, 26, 'bold 26px monospace', '#5a0f8a')
   text(c, 'LAST EXIT', w / 2, 24, 'bold 26px monospace', '#ff4a6a')
   speckle(c, rnd, 0, 0, w, h, 50, ['#c8203c', '#8a3ad0', '#000000'], 2, 0.22)
@@ -361,15 +566,32 @@ export function drawAttractMaze(c: Ctx2D, w: number, h: number, seed: number): v
   vignette(c, w, h, 44, 0.68)
 }
 
+/** Static frame (elapsedSec = 0), used by the texture spec. */
+export function drawAttractMaze(c: Ctx2D, w: number, h: number, seed: number): void {
+  drawAttractMazeFrame(c, w, h, 0, seed)
+}
+
+// ---- DEAD FREQUENCY ----
+
 /** Dial scale of the frequency screen, in MHz, and the station it is tuned to. */
 export const FREQUENCY_TEXT = '89.4 MHz'
 const DIAL_MIN_MHZ = 88
 const DIAL_MAX_MHZ = 108
 const DIAL_STATION_MHZ = 89.4
+/** The scanning tuning marker sweeps the whole dial and back in this many seconds. */
+export const FREQUENCY_SWEEP_SEC = 10
 
-/** Retro radio oscilloscope: grid, a bright waveform that breaks into noise, a tuning dial with a needle. */
-export function drawAttractFrequency(c: Ctx2D, w: number, h: number, seed: number): void {
+/** Scanning marker position on the dial in MHz (triangle wave between 88 and 108). */
+export function frequencyMarkerMhz(elapsedSec: number): number {
+  const phase = fract(finiteTime(elapsedSec) / FREQUENCY_SWEEP_SEC)
+  const tri = phase < 0.5 ? phase * 2 : 2 - phase * 2
+  return DIAL_MIN_MHZ + (DIAL_MAX_MHZ - DIAL_MIN_MHZ) * tri
+}
+
+/** Retro radio oscilloscope: a live amber waveform scrolls over the grid with modulated spikes, and a marker scans the dial. */
+export function drawAttractFrequencyFrame(c: Ctx2D, w: number, h: number, elapsedSec: number, seed: number = ATTRACT_SEEDS.frequency): void {
   const rnd = makeRng(seed)
+  const e = finiteTime(elapsedSec)
   vertical(c, w, h, [[0, '#031210'], [1, '#02100e']])
   // Oscilloscope panel with a 8 x 6 graticule.
   const sx = 16
@@ -381,15 +603,24 @@ export function drawAttractFrequency(c: Ctx2D, w: number, h: number, seed: numbe
   for (let j = 1; j < 6; j++) line(c, sx, sy + (j * sh) / 6, sx + sw, sy + (j * sh) / 6, '#1fa8a0', 1, 0.28)
   line(c, sx, sy + sh / 2, sx + sw, sy + sh / 2, '#2ad8d0', 1, 0.5)
   frame(c, sx, sy, sw, sh, '#2ad8d0', 2)
-  // Waveform: a clean sine on the left that tears into noise on the right. Drawn twice for a soft glow.
+  // Waveform: a sine that scrolls left with a slowly modulated amplitude and tears into noise on the right.
+  // Three narrow signal spikes drift across it. Drawn twice for a soft glow.
   const mid = sy + sh / 2
+  const tick = Math.floor(e * 8)
+  const amp = 34 * (1 + 0.2 * Math.sin(e * 1.3))
   const pts: Array<[number, number]> = []
-  for (let x = sx + 4; x <= sx + sw - 4; x += 4) {
+  for (let x = sx + 4, i = 0; x <= sx + sw - 4; x += 4, i++) {
     const u = (x - sx) / sw
-    const clean = Math.sin(u * 22) * 34
-    const noise = (rnd() - 0.5) * 2 * 40
+    const clean = Math.sin(u * 22 - e * 7) * amp
+    const noise = (hash01(i * 31 + tick * 977) - 0.5) * 2 * 40
     const mix = u < 0.5 ? 0 : Math.min(1, (u - 0.5) / 0.25)
-    pts.push([x, mid - (clean * (1 - mix) + noise * mix)])
+    let spike = 0
+    for (let j = 0; j < 3; j++) {
+      const bump = Math.max(0, 1 - Math.abs(u - fract(0.15 + j * 0.33 + e * 0.06)) / 0.035)
+      spike += bump * (j % 2 === 0 ? 1 : -1) * (30 + 16 * Math.sin(e * 2 + j))
+    }
+    const y = mid - (clean * (1 - mix) + noise * mix + spike)
+    pts.push([x, Math.min(sy + sh - 4, Math.max(sy + 4, y))])
   }
   for (const [lw, alpha, col] of [[5, 0.25, '#ff9a1a'], [2, 1, '#ffc23a']] as const) {
     c.globalAlpha = alpha
@@ -414,6 +645,9 @@ export function drawAttractFrequency(c: Ctx2D, w: number, h: number, seed: numbe
   const nx = dialX(DIAL_STATION_MHZ)
   line(c, nx, 178, nx, 210, '#ff3a3a', 2)
   disc(c, nx, 210, 2, '#ff3a3a')
+  const mx = dialX(frequencyMarkerMhz(e))
+  line(c, mx, 184, mx, 206, '#fff2c0', 1, 0.8)
+  triangle(c, [[mx - 3, 215], [mx + 3, 215], [mx, 208]], '#fff2c0', 0.9)
   text(c, FREQUENCY_TEXT, w / 2, 228, 'bold 18px monospace', '#ffc23a')
   text(c, 'DEAD FREQUENCY', w / 2 + 2, 22, 'bold 20px monospace', '#0a5a58')
   text(c, 'DEAD FREQUENCY', w / 2, 20, 'bold 20px monospace', '#2ad8d0')
@@ -422,6 +656,19 @@ export function drawAttractFrequency(c: Ctx2D, w: number, h: number, seed: numbe
   scanlines(c, w, h, 2, 0.32)
   vignette(c, w, h, 40, 0.68)
 }
+
+/** Static frame (elapsedSec = 0), used by the texture spec. */
+export function drawAttractFrequency(c: Ctx2D, w: number, h: number, seed: number): void {
+  drawAttractFrequencyFrame(c, w, h, 0, seed)
+}
+
+/** Time-stepped renderers of the three attract textures (task 29.2), redrawn in place by sharedResources. */
+export const ATTRACT_TEXTURE_IDS: readonly AttractTextureId[] = Object.freeze(['attractSnake', 'attractMaze', 'attractFrequency'] as AttractTextureId[])
+export const ATTRACT_FRAME_DRAWERS: Readonly<Record<AttractTextureId, (c: Ctx2D, w: number, h: number, elapsedSec: number) => void>> = Object.freeze({
+  attractSnake: (c, w, h, t) => drawAttractSnakeFrame(c, w, h, t),
+  attractMaze: (c, w, h, t) => drawAttractMazeFrame(c, w, h, t),
+  attractFrequency: (c, w, h, t) => drawAttractFrequencyFrame(c, w, h, t),
+})
 
 export interface MarqueePalette {
   /** Outer trim gradient: edge colour and centre colour. */

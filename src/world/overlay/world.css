@@ -424,3 +424,184 @@
   border-style: double;
   border-width: 3px;
 }
+
+/*
+ * Open-book manual layout (data-layout='book'; the three manual themes). Same card component and scroll container.
+ * Both pages are always rendered. Wide: two columns. Narrow: stacked. The switch is a container query on the card
+ * (content width >= 640px, BOOK_SIDE_BY_SIDE_MIN_PX in archiveDocuments.ts), with a viewport media query fallback
+ * for browsers without container queries. The page paper colours are the --page-* custom properties set by the card
+ * (see BOOK_PALETTES in cardThemes.ts, where a test checks every text pair for a contrast of at least 4.5:1).
+ */
+.world-card--book {
+  max-width: 980px;
+  container-type: inline-size;
+  container-name: worldcard;
+}
+
+.world-book {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.world-book-page {
+  --card-ink: var(--page-ink);
+  --card-muted: var(--page-muted);
+  --card-hl-bg: var(--page-hl-bg);
+  position: relative;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 12px 18px 30px 22px;
+  color: var(--page-ink);
+  text-shadow: none;
+  cursor: pointer;
+  background-color: var(--page-bg);
+  /* Faint printed ruled lines. */
+  background-image: repeating-linear-gradient(0deg, transparent 0, transparent 21px, rgba(0, 0, 0, 0.07) 21px, rgba(0, 0, 0, 0.07) 22px);
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  transition: box-shadow 160ms ease-out;
+}
+
+.world-book-page[data-active='true'] {
+  box-shadow: inset 0 0 0 2px var(--card-accent), 0 0 10px rgba(255, 255, 255, 0.18);
+}
+
+.world-book-page-title {
+  margin-bottom: 8px !important;
+  padding-bottom: 4px;
+  border-bottom: 2px solid var(--page-accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--page-accent);
+}
+
+.world-book-page .world-card-block-title,
+.world-book-page .world-card-status {
+  color: var(--page-accent);
+}
+
+.world-book-page .world-card-block {
+  border-left-color: var(--page-muted);
+}
+
+.world-book-page .world-card-block[data-highlight='true'] {
+  border-left-color: var(--page-accent);
+}
+
+.world-book-pageno {
+  position: absolute;
+  bottom: 8px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--page-muted);
+}
+
+/* Bookmark ribbon in the accent colour, hanging from the top edge of the active page. */
+.world-book-ribbon {
+  position: absolute;
+  top: -2px;
+  right: 14px;
+  width: 14px;
+  height: 36px;
+  background: var(--card-accent);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
+  pointer-events: none;
+}
+
+/* Stitched centre spine: dashed stitch line with the page-fold shading. Hidden when the pages are stacked. */
+.world-book-spine {
+  display: none;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 36px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent 0, rgba(0, 0, 0, 0.22) 50%, transparent 100%);
+}
+
+.world-book-spine::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 50%;
+  border-left: 2px dashed var(--card-accent);
+  transform: translateX(-1px);
+  opacity: 0.85;
+}
+
+/* Rotated archive imprint. Decorative and aria-hidden. */
+.world-book-stamp {
+  position: absolute;
+  right: 22px;
+  bottom: 26px;
+  padding: 2px 8px;
+  border: 2px solid var(--page-accent);
+  border-radius: 3px;
+  color: var(--page-accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  opacity: 0.72;
+  transform: rotate(-7deg);
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.world-book-footer {
+  margin-top: 0 !important;
+  margin-bottom: 4px !important;
+}
+
+@container worldcard (min-width: 640px) {
+  .world-book {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .world-book-spine {
+    display: block;
+  }
+
+  .world-book-page:first-of-type {
+    padding-right: 26px;
+    background-image: linear-gradient(90deg, transparent 88%, rgba(0, 0, 0, 0.16) 100%),
+      repeating-linear-gradient(0deg, transparent 0, transparent 21px, rgba(0, 0, 0, 0.07) 21px, rgba(0, 0, 0, 0.07) 22px);
+  }
+
+  .world-book-page:nth-of-type(2) {
+    padding-left: 30px;
+    background-image: linear-gradient(270deg, transparent 88%, rgba(0, 0, 0, 0.16) 100%),
+      repeating-linear-gradient(0deg, transparent 0, transparent 21px, rgba(0, 0, 0, 0.07) 21px, rgba(0, 0, 0, 0.07) 22px);
+  }
+}
+
+/* Fallback for browsers without container queries. */
+@supports not (container-type: inline-size) {
+  @media (min-width: 760px) {
+    .world-book {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 0;
+    }
+
+    .world-book-spine {
+      display: block;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .world-book-page {
+    transition: none;
+  }
+}

@@ -1,12 +1,18 @@
-import { useEffect, useLayoutEffect, useRef, type CSSProperties, type MouseEvent, type ReactElement } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactElement } from 'react';
 import {
   ARCHIVE_DOCUMENTS,
   ARCHIVE_FOOTER_HINT,
+  BOOK_PAGE_HEADINGS,
+  BOOK_PAGE_NUMBERS,
+  BOOK_STAMP_TEXT,
   PAGE_LABELS,
+  isBookDocument,
+  isStackedLayout,
   type CardPage,
+  type DocBlock,
   type DocTheme,
 } from '../logic/archiveDocuments';
-import { CARD_PALETTES } from '../logic/cardThemes';
+import { BOOK_PALETTES, CARD_PALETTES } from '../logic/cardThemes';
 import type { ReadableId } from '../worldTypes';
 
 export interface WorldInspectorCardProps {
@@ -142,6 +148,14 @@ const LINE_PX = 16;
 /** Mounted only while a card is open, so its listeners exist only then. */
 function OpenCard({ id, page, onPage }: { id: ReadableId; page: CardPage; onPage?: (page: CardPage) => void }) {
   const cardRef = useRef<HTMLElement | null>(null);
+  const doc = ARCHIVE_DOCUMENTS[id];
+  const isBook = isBookDocument(doc);
+  // Measured content width of the card (book layout only). Unknown (null) counts as wide.
+  const [cardWidth, setCardWidth] = useState<number | null>(null);
+  const stackedRef = useRef(false);
+  stackedRef.current = isBook && isStackedLayout(cardWidth);
+  const onPageRef = useRef(onPage);
+  onPageRef.current = onPage;
   // Wheel scrolls the card, also while the pointer is locked (the wheel is still delivered). Not passive so the page never scrolls.
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {
@@ -160,7 +174,15 @@ function OpenCard({ id, page, onPage }: { id: ReadableId; page: CardPage; onPage
     const el = cardRef.current;
     if (!el) return undefined;
     const stop = (e: Event) => {
-      if ((e.target as Element | null)?.closest?.('button')) return;
+      const target = e.target as Element | null;
+      if (target?.closest?.('button')) return;
+      // Book pages are not buttons, so their React handlers would never run once propagation stops here: handle them
+      // natively. A press keeps keyboard focus on the world wrapper; a click makes the page the active one.
+      const pageEl = target?.closest?.('[data-book-page]') as HTMLElement | null | undefined;
+      if (pageEl) {
+        if (e.type === 'mousedown') e.preventDefault();
+        else if (e.type === 'click') onPageRef.current?.(pageEl.dataset.bookPage === '2' ? 2 : 1);
+      }
       e.stopPropagation();
     };
     el.addEventListener('mousedown', stop);
@@ -170,12 +192,39 @@ function OpenCard({ id, page, onPage }: { id: ReadableId; page: CardPage; onPage
       el.removeEventListener('click', stop);
     };
   }, []);
-  // A new document or page always starts at the top.
+  // Measure the card width for the book layout. Guarded for environments without ResizeObserver (jsdom).
   useLayoutEffect(() => {
-    if (cardRef.current) cardRef.current.scrollTop = 0;
-  }, [id, page]);
+    const el = cardRef.current;
+    if (!isBook || !el) return undefined;
+    const initial = el.clientWidth;
+    if (initial > 0) setCardWidth(initial);
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect?.width;
+      if (typeof w === 'number') setCardWidth(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isBook]);
+  // A new document always starts at the top. A page switch resets the scroll, except in the book layout: both pages are
+  // visible side by side (nothing to do), and when stacked the chosen page is scrolled into view.
+  const seenRef = useRef<{ id: ReadableId; page: CardPage } | null>(null);
+  useLayoutEffect(() => {
+    const el = cardRef.current;
+    const seen = seenRef.current;
+    seenRef.current = { id, page };
+    if (!el) return;
+    if (seen === null || seen.id !== id || !isBook) {
+      el.scrollTop = 0;
+      return;
+    }
+    if (seen.page === page || !stackedRef.current) return;
+    const pageEl = el.querySelector<HTMLElement>(`[data-book-page="${page}"]`);
+    if (!pageEl) return;
+    if (typeof pageEl.scrollIntoView === 'function') pageEl.scrollIntoView({ block: 'start' });
+    else el.scrollTop = pageEl.offsetTop;
+  }, [id, page, isBook]);
 
-  const doc = ARCHIVE_DOCUMENTS[id];
   const palette = CARD_PALETTES[doc.theme];
   const active = doc.pages[page - 1];
   const Art = ART[doc.theme];
@@ -188,13 +237,34 @@ function OpenCard({ id, page, onPage }: { id: ReadableId; page: CardPage; onPage
     '--card-hl-bg': palette.hlBg,
     '--card-accent': doc.accent,
   } as CSSProperties;
+  if (isBook && (doc.theme === 'snake' || doc.theme === 'maze' || doc.theme === 'frequency')) {
+    const bp = BOOK_PALETTES[doc.theme];
+    Object.assign(style, {
+      '--page-bg': bp.pageBg,
+      '--page-ink': bp.pageInk,
+      '--page-muted': bp.pageMuted,
+      '--page-hl-bg': bp.pageHlBg,
+      '--page-accent': bp.pageAccentInk,
+    });
+  }
+  const renderBlocks = (blocks: readonly DocBlock[]) =>
+    blocks.map((b) => (
+      <div className="world-card-block" key={b.heading} data-highlight={b.highlight ? 'true' : undefined}>
+        <h3 className="world-card-block-title">{b.heading}</h3>
+        {b.lines.map((line) => (
+          <p className="world-card-body" key={line}>
+            {line}
+          </p>
+        ))}
+      </div>
+    ));
   // Keep keyboard focus on the world wrapper when a page button is clicked, so E and 1 / 2 keep working.
   const keepFocus = (e: MouseEvent) => e.preventDefault();
 
   return (
     <div className="world-card-region">
       <section
-        className="world-card"
+        className={isBook ? 'world-card world-card--book' : 'world-card'}
         ref={cardRef}
         data-world-card="true"
         role="region"
@@ -202,6 +272,7 @@ function OpenCard({ id, page, onPage }: { id: ReadableId; page: CardPage; onPage
         aria-live="polite"
         data-card-id={doc.id}
         data-theme={doc.theme}
+        data-layout={isBook ? 'book' : undefined}
         style={style}
       >
         <header className="world-card-head">
@@ -228,7 +299,7 @@ function OpenCard({ id, page, onPage }: { id: ReadableId; page: CardPage; onPage
               id={`world-card-tab-${n}`}
               className="world-card-tab"
               aria-selected={page === n}
-              aria-controls="world-card-panel"
+              aria-controls={isBook ? `world-card-page-${n}` : 'world-card-panel'}
               tabIndex={-1}
               onMouseDown={keepFocus}
               onClick={() => onPage?.(n)}
@@ -237,20 +308,43 @@ function OpenCard({ id, page, onPage }: { id: ReadableId; page: CardPage; onPage
             </button>
           ))}
         </div>
-        <div className="world-card-panel" role="tabpanel" id="world-card-panel" aria-labelledby={`world-card-tab-${page}`}>
-          {active.blocks.map((b) => (
-            <div className="world-card-block" key={b.heading} data-highlight={b.highlight ? 'true' : undefined}>
-              <h3 className="world-card-block-title">{b.heading}</h3>
-              {b.lines.map((line) => (
-                <p className="world-card-body" key={line}>
-                  {line}
-                </p>
+        {isBook ? (
+          <>
+            <p className="world-card-footer world-book-footer">{ARCHIVE_FOOTER_HINT}</p>
+            <div className="world-book">
+              {([1, 2] as const).map((n) => (
+                <article
+                  key={n}
+                  className="world-book-page"
+                  role="tabpanel"
+                  id={`world-card-page-${n}`}
+                  aria-labelledby={`world-card-tab-${n}`}
+                  aria-current={page === n ? 'page' : undefined}
+                  data-book-page={n}
+                  data-active={page === n ? 'true' : 'false'}
+                >
+                  {page === n ? <span className="world-book-ribbon" aria-hidden="true" /> : null}
+                  <h3 className="world-book-page-title">{BOOK_PAGE_HEADINGS[n - 1]}</h3>
+                  {renderBlocks(doc.pages[n - 1].blocks)}
+                  {n === 2 && doc.statusLine ? <p className="world-card-status">{doc.statusLine}</p> : null}
+                  <p className="world-book-pageno">{BOOK_PAGE_NUMBERS[n - 1]}</p>
+                </article>
               ))}
+              <div className="world-book-spine" aria-hidden="true" />
+              <div className="world-book-stamp" aria-hidden="true">
+                {BOOK_STAMP_TEXT}
+              </div>
             </div>
-          ))}
-          {doc.statusLine ? <p className="world-card-status">{doc.statusLine}</p> : null}
-        </div>
-        <p className="world-card-footer">{ARCHIVE_FOOTER_HINT}</p>
+          </>
+        ) : (
+          <>
+            <div className="world-card-panel" role="tabpanel" id="world-card-panel" aria-labelledby={`world-card-tab-${page}`}>
+              {renderBlocks(active.blocks)}
+              {doc.statusLine ? <p className="world-card-status">{doc.statusLine}</p> : null}
+            </div>
+            <p className="world-card-footer">{ARCHIVE_FOOTER_HINT}</p>
+          </>
+        )}
       </section>
     </div>
   );

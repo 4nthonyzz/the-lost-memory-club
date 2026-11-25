@@ -65,6 +65,33 @@ export const READABLE_IDS: readonly ReadableId[] = Object.freeze([
 /** Number of readable documents: the denominator of the notes counter. */
 export const READABLE_COUNT = READABLE_IDS.length;
 
+/** Manual documents render as an open two-page book; the four room clues keep their single-page tabbed layout. */
+const BOOK_THEMES: readonly DocTheme[] = ['snake', 'maze', 'frequency'];
+
+export function isBookDocument(doc: Pick<ArchiveDocument, 'theme'>): boolean {
+  return BOOK_THEMES.includes(doc.theme);
+}
+
+/** Printed page headings of the open-book layout (page 1 left, page 2 right). */
+export const BOOK_PAGE_HEADINGS: readonly [string, string] = ['PAGE 01 // OVERVIEW & RULES', 'PAGE 02 // TECHNICIAN / ANOMALY LOG'];
+
+/** Printed page numbers of the open-book layout. */
+export const BOOK_PAGE_NUMBERS: readonly [string, string] = ['P. 01', 'P. 02'];
+
+/** Decorative archive imprint stamped on the book. */
+export const BOOK_STAMP_TEXT = 'LOST MEMORY CLUB // ARCHIVE COPY';
+
+/**
+ * Minimum content width (CSS px) of the card at which the two pages sit side by side. The stylesheet uses the same
+ * value in its container query (and a viewport media query as fallback); keep both in step.
+ */
+export const BOOK_SIDE_BY_SIDE_MIN_PX = 640;
+
+/** True when the book pages are stacked for a card of the given content width. An unknown width counts as wide. */
+export function isStackedLayout(width: number | null | undefined): boolean {
+  return typeof width === 'number' && width > 0 && width < BOOK_SIDE_BY_SIDE_MIN_PX;
+}
+
 export function isReadableId(id: string): id is ReadableId {
   return (READABLE_IDS as readonly string[]).includes(id);
 }

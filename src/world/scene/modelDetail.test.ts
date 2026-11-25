@@ -3082,3 +3082,92 @@ describe('task 28.2: protruding manual volumes with spine and cover art', () => 
     expect(texSpy).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('task 29.2: animated attract screens in the shared resources', () => {
+  afterEach(() => setCanvasFactory(null))
+
+  const ATTRACT = ['attractSnake', 'attractMaze', 'attractFrequency'] as const
+
+  it('redraws only the three attract canvases in place, flags only their textures, and creates no canvas', async () => {
+    const { updateAnimatedAttractTextures } = await import('./sharedResources')
+    const canvases: ReturnType<typeof fakeCanvas>[] = []
+    const factory = vi.fn(() => {
+      const c = fakeCanvas()
+      canvases.push(c)
+      return c
+    })
+    setCanvasFactory(factory)
+    ensureSharedTextures()
+    expect(factory).toHaveBeenCalledTimes(TEXTURE_IDS.length)
+    const textures = new Map(TEXTURE_IDS.map((id) => [id, getSharedTexture(id)!]))
+    const versions = new Map(TEXTURE_IDS.map((id) => [id, textures.get(id)!.version]))
+    const callCounts = canvases.map((c) => c.ctx.calls.length)
+    const colorBefore = ATTRACT.map((id) => (id === 'attractSnake' ? materials.arcadeScreenSnake : id === 'attractMaze' ? materials.arcadeScreenMaze : materials.arcadeScreenFrequency).color.getHexString())
+
+    updateAnimatedAttractTextures(1.5)
+    updateAnimatedAttractTextures(3.1)
+
+    expect(factory).toHaveBeenCalledTimes(TEXTURE_IDS.length)
+    expect(liveTextureCount()).toBe(TEXTURE_IDS.length)
+    for (const id of TEXTURE_IDS) {
+      const tex = textures.get(id)!
+      expect(getSharedTexture(id), id).toBe(tex)
+      const expected = (ATTRACT as readonly string[]).includes(id) ? 2 : 0
+      expect(tex.version - versions.get(id)!, id).toBe(expected)
+    }
+    TEXTURE_IDS.forEach((id, i) => {
+      const grew = canvases[i].ctx.calls.length > callCounts[i]
+      expect(grew, id).toBe((ATTRACT as readonly string[]).includes(id))
+      if (grew) expect(canvases[i].ctx.calls.filter((c) => c.op === 'clearRect').length, id).toBe(2)
+    })
+    // The material colour (Memory_Shift tint) is not touched by a redraw.
+    expect(ATTRACT.map((id) => (id === 'attractSnake' ? materials.arcadeScreenSnake : id === 'attractMaze' ? materials.arcadeScreenMaze : materials.arcadeScreenFrequency).color.getHexString())).toEqual(colorBefore)
+    expect(materials.arcadeScreenSnake.map).toBe(textures.get('attractSnake'))
+  })
+
+  it('is a no-op without a canvas and after dispose', async () => {
+    const { updateAnimatedAttractTextures } = await import('./sharedResources')
+    setCanvasFactory(null)
+    expect(() => updateAnimatedAttractTextures(1)).not.toThrow()
+    expect(liveTextureCount()).toBe(0)
+    const canvases: ReturnType<typeof fakeCanvas>[] = []
+    setCanvasFactory(() => {
+      const c = fakeCanvas()
+      canvases.push(c)
+      return c
+    })
+    ensureSharedTextures()
+    disposeSharedResources()
+    const counts = canvases.map((c) => c.ctx.calls.length)
+    expect(() => updateAnimatedAttractTextures(2)).not.toThrow()
+    expect(canvases.map((c) => c.ctx.calls.length)).toEqual(counts)
+    expect(liveTextureCount()).toBe(0)
+  })
+
+  it('keeps the budgets: 32 textures, 7.703 MiB, 19,116 triangles, 4 lights, and every texture disposed exactly once', async () => {
+    const { updateAnimatedAttractTextures } = await import('./sharedResources')
+    const report = sceneDetailReport()
+    expect(report.textureCount).toBe(32)
+    expect(report.textureMemoryBytes / 1048576).toBeCloseTo(7.703, 3)
+    expect(report.totalTriangles).toBe(19116)
+    expect(report.totalTriangles).toBeLessThanOrEqual(19200)
+    expect(M3_LIGHT_COUNT).toBe(4)
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    updateAnimatedAttractTextures(0.5)
+    const spies = TEXTURE_IDS.map((id) => vi.spyOn(getSharedTexture(id)!, 'dispose'))
+    disposeSharedResources()
+    disposeSharedResources()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+  })
+
+  it('the maze photo glow pulse keeps at most 3 direction changes per rolling second', async () => {
+    const { mazePhotoPulse } = await import('./proceduralTextures')
+    const { countDirectionChanges } = await import('../logic/palette')
+    const rate = 240
+    for (const i of [0, 1, 2]) {
+      const samples = Array.from({ length: rate * 20 }, (_, k) => mazePhotoPulse(k / rate, i))
+      for (let s = 0; s + rate <= samples.length; s += 24) expect(countDirectionChanges(samples.slice(s, s + rate + 1))).toBeLessThanOrEqual(3)
+    }
+  })
+})

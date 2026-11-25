@@ -46,6 +46,8 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 
 - Approved scope change (scrollable card and protruding manuals), 2026-12-05: the Archive Document Card scrolls with the mouse wheel (window `wheel` listener, `passive: false`, attached only while a card is open, also while pointer-locked) and with ArrowUp / ArrowDown / PageUp / PageDown. While a card is open, ArrowUp / ArrowDown scroll the card and do not move the player (W / S still move). The card becomes `pointer-events: auto` with a styled scrollbar so it can be dragged when the cursor is visible. Clicks and mousedown inside the card never request pointer lock: the world click handler ignores targets inside the card, because React `stopPropagation` alone does not stop the native wrapper listener. `scrollTop` resets on open and on page switch. The three manuals protrude 0.08 m toward +X as 0.31 x 0.085 x 0.29 m volumes with anchors at x -4.52, z 1.4 / 1.8 / 2.2, showing spine art and cover art on the exposed side faces using the right half of `cabinetAndManualDetail` (redrawn in place, 0 bytes). Budgets: triangles at most 19,200 (currently 19,152; 0 extra), at most 4 lights, texture memory at most 7.85 MB (currently 7.703 MiB; 0 extra). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged.
 
+- Approved scope change (open-book manuals and animated attract screens), 2026-12-06: the three manual cards render as an open two-page book (both pages side by side on wide viewports, stacked on narrow ones). Keys 1 and 2 and clicks select and highlight a page, and scroll it into view when stacked. Wheel, arrow keys, page keys and the scrollbar keep working. The four room clues keep their own layouts. The three attract screens are animated in place by redrawing the existing `attractSnake`, `attractMaze` and `attractFrequency` canvases at most 12 times per second from the existing `Effects` `useFrame` (no timers, no new textures). Animation stops while inspecting and is static under reduced motion. `elapsedSec = 0` reproduces the static frame. Any collection flash is a soft pulse that keeps luminance changes at or below 3 per second (Requirement 10). Budgets: triangles at most 19,200 (currently 19,116), at most 4 lights, 32 textures, texture memory at most 7.85 MB (currently 7.703 MiB). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged.
+
 ## Tasks
 
 ### Milestone 1: Playable 3D room (primitives only)
@@ -1050,6 +1052,36 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: documentation and the spec folder only.
     - _Requirements: 14.11, 14.12, 15.3, 15.6_
 
+### Open-book manuals and animated attract screens
+
+- [x] 29. Open-book manuals and animated attract screens
+  - [x] 29.1 Open two-page book layout for the manual cards
+    - Files: `src/world/overlay/WorldInspectorCard.tsx`, `src/world/overlay/world.css`, `src/world/overlay/archiveDocuments.ts` (if needed), `src/world/WorldScene.tsx` (if needed), `src/world/overlay/cardThemes.ts` (if needed); tests `src/world/WorldScene.test.ts`, `src/world/overlay/archiveDocuments.test.ts`.
+    - The three manual cards render as an open book with both pages side by side on wide viewports and stacked on narrow ones. Keys 1 and 2 and clicks select and highlight a page, and scroll it into view when stacked. Wheel, ArrowUp / ArrowDown, PageUp / PageDown and the scrollbar keep working. The four room clues keep their own layouts. Texts stay as they are.
+    - Acceptance: both pages of a manual are visible at once on wide viewports; stacked on narrow ones; the selected page is highlighted; the selected page scrolls into view when stacked; scrolling inputs still work; room clues are unchanged; no `onInspect` call, no mode change, no pointer-lock change; clicks inside the card never request pointer lock.
+    - Tests: `WorldScene.test.ts` (manual shows two pages, key 1 and 2 and click select and highlight, room clue layout unchanged, no `onInspect`), `archiveDocuments.test.ts` (each manual has two pages). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 28.3.
+    - Boundary: `src/world/` only; `WorldSceneProps` and `onInspect` unchanged; no storage access; no import from `src/arcade/` or `src/memories/`.
+    - _Requirements: 7.5, 7.6, 7.7, 8.1, 11.12, 11.13, 11.14, 15.1, 15.2, 15.4, 20.2, 20.8_
+
+  - [x] 29.2 Animated attract screens
+    - Files: `src/world/scene/proceduralTextures.ts`, `src/world/scene/sharedResources.ts`, `src/world/scene/Effects.tsx`, `src/world/scene/effectsTiming.ts`; tests `src/world/scene/proceduralTextures.test.ts`, `src/world/scene/effectsTiming.test.ts`, `src/world/scene/modelDetail.test.ts`.
+    - Redraw the existing `attractSnake`, `attractMaze` and `attractFrequency` canvases in place, at most 12 times per second, from the existing `Effects` `useFrame`. No timers and no new textures. Animation stops while inspecting and is static under reduced motion. `elapsedSec = 0` reproduces the static frame. Any collection flash is a soft pulse that keeps luminance changes at or below 3 per second.
+    - Acceptance: redraw rate at most 12 per second; no timer; texture count stays 32; texture memory at most 7.85 MB (computed); triangle estimate at most 19,200; lights at most 4; animation off while inspecting and under reduced motion; `elapsedSec = 0` matches the static frame; textures deterministic for a given `elapsedSec`; each texture disposed exactly once (twice-safe); Memory_Shift tinting still works.
+    - Tests: `proceduralTextures.test.ts` (determinism with a fake context for fixed `elapsedSec`, `elapsedSec = 0` equals static frame, sizes unchanged), `effectsTiming.test.ts` (12 per second cap, stop while inspecting, static under reduced motion, flash luminance changes at most 3 per second), `modelDetail.test.ts` (texture count 32, memory, triangle and light budgets, disposal). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 29.1.
+    - Boundary: render-only; `src/world/` only; no new dependency; no GLB; `ASSET_MANIFEST` stays empty.
+    - _Requirements: 9.8, 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 14.2, 14.4, 14.5, 14.6, 14.7_
+
+  - [x] 29.3 Docs, metrics and verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, lights and texture memory, each labelled "computed, not runtime-measured". Document the open-book manual cards and the animated attract screens. Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final geometry and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 29.2.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional. The 17 property-based test sub-tasks can be skipped for a faster MVP. Tasks 16.2 and 16.3 are marked `*` because they must not be implemented without approval.
@@ -1126,7 +1158,10 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     { "id": 59, "tasks": ["27.3"] },
     { "id": 60, "tasks": ["28.1"] },
     { "id": 61, "tasks": ["28.2"] },
-    { "id": 62, "tasks": ["28.3"] }
+    { "id": 62, "tasks": ["28.3"] },
+    { "id": 63, "tasks": ["29.1"] },
+    { "id": 64, "tasks": ["29.2"] },
+    { "id": 65, "tasks": ["29.3"] }
   ]
 }
 ```

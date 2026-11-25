@@ -32,9 +32,13 @@ import {
   initDust,
   makeRng,
   shouldUpdateNoise,
+  stepAttractClock,
   stepDust,
+  INITIAL_ATTRACT_CLOCK,
+  type AttractClock,
   type DustBounds,
 } from './effectsTiming'
+import { updateAnimatedAttractTextures } from './sharedResources'
 
 /** Name given to the CRT point light in Lighting.tsx. */
 export const CRT_LIGHT_NAME = 'crt-light'
@@ -139,6 +143,7 @@ export function Effects({ active = true }: EffectsProps) {
 
   const timeRef = useRef(0)
   const noiseAccRef = useRef(0)
+  const attractRef = useRef<AttractClock>(INITIAL_ATTRACT_CLOCK)
   const lightRef = useRef<PointLight | null>(null)
   /** Base intensity as last set by the Memory_Shift driver, and the value Effects last wrote. */
   const baseRef = useRef(0)
@@ -193,6 +198,15 @@ export function Effects({ active = true }: EffectsProps) {
     }
 
     noise.material.opacity = NOISE_BASE_OPACITY * glowFactor(t, reduced)
+
+    // Animated attract screens (task 29.2): redrawn in place at most 12 times per second, paused while inactive (this
+    // callback returns early), and returned once to the elapsed = 0 static frame under reduced motion.
+    const attract = stepAttractClock(attractRef.current, step, true, reduced)
+    attractRef.current = attract.clock
+    if (attract.redraw) {
+      updateAnimatedAttractTextures(attract.clock.elapsed)
+      if (reduced) invalidate()
+    }
 
     if (reduced) return
 
