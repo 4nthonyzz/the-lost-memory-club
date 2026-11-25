@@ -3,6 +3,57 @@ import type { Language } from './preferences';
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 export type JournalEntryKind = 'memory' | 'clue' | 'archive' | 'truth';
 
+export interface ShellStrings {
+  eyebrow: string;
+  title: string;
+  subheading: string;
+  buildPill: string;
+  sceneHeading: string;
+  renderOnline: string;
+  footer: string;
+  notices: {
+    intro: string;
+    crtConnected: string;
+    arcadeConnected: string;
+    arcadeLocked: string;
+    arcadeLogged: string;
+    demoArcadeWon: string;
+    tapeCollected: string;
+    archiveLoaded: string;
+    endingLocked: string;
+    reset: string;
+  };
+  progress: {
+    eyebrow: string;
+    heading: string;
+    tape: string;
+    clue: string;
+    arcade: string;
+    ending: string;
+    yes: string;
+    no: string;
+    reset: string;
+    openEnding: string;
+  };
+  deck: {
+    eyebrow: string;
+    title: string;
+    collect: string;
+    load: string;
+    loaded: string;
+    archiveLocked: string;
+    archiveOpen: string;
+    emptyDeck: string;
+    close: string;
+  };
+  next: {
+    eyebrow: string;
+    text: string;
+  };
+}
+
+export type ShellNotice = keyof ShellStrings['notices'];
+
 export interface UiStrings {
   journal: {
     title: string;
@@ -36,6 +87,7 @@ export interface UiStrings {
     reducedDistortionHint: string;
     mute: string;
   };
+  shell: ShellStrings;
 }
 
 const EN: UiStrings = {
@@ -76,6 +128,54 @@ const EN: UiStrings = {
     reducedDistortionHint: 'Turns off flashing, shaking and sudden glitches.',
     mute: 'Mute audio',
   },
+  shell: {
+    eyebrow: 'ARCHIVE 09 / EST. 1996',
+    title: 'THE LOST MEMORY CLUB',
+    subheading: 'Some memories should stay forgotten.',
+    buildPill: 'PROTOTYPE BUILD \u00b7 NOT THE FINAL GAME',
+    sceneHeading: 'ARCHIVE FLOOR \u00b7 PROTOTYPE',
+    renderOnline: 'RENDER ONLINE',
+    footer: 'KIROWEEN 2026 \u00b7 ORIGINAL PROTOTYPE \u00b7 NO THIRD-PARTY ASSETS INCLUDED',
+    notices: {
+      intro: 'Click the CRT television to open the VHS deck.',
+      crtConnected: 'CRT STATION CONNECTED',
+      arcadeConnected: 'ARCADE STATION CONNECTED',
+      arcadeLocked: 'ARCADE LOCKED \u00b7 Recover the VHS clue first.',
+      arcadeLogged: 'Arcade start logged. Gameplay is still in development.',
+      demoArcadeWon: 'Demo: arcade victory recorded.',
+      tapeCollected: 'Tape collected. Load it in the deck and play it.',
+      archiveLoaded: 'Archive 09 restored. Its tape is now in the deck.',
+      endingLocked: 'Restore Archive 09 before opening the ending.',
+      reset: 'Development save reset.',
+    },
+    progress: {
+      eyebrow: 'FIELD NOTES',
+      heading: 'Prototype Progress',
+      tape: 'VHS collected',
+      clue: 'Clue discovered',
+      arcade: 'Arcade completed',
+      ending: 'Ending unlocked',
+      yes: 'YES',
+      no: 'NO',
+      reset: 'Reset local prototype state',
+      openEnding: 'Open the ending',
+    },
+    deck: {
+      eyebrow: 'ARCHIVE / MODULE 03',
+      title: 'VHS deck',
+      collect: 'Collect tape',
+      load: 'Load tape',
+      loaded: 'Loaded',
+      archiveLocked: 'Locked: win the arcade to restore Archive 09.',
+      archiveOpen: 'Load Archive 09',
+      emptyDeck: 'Load a tape to start playback.',
+      close: 'Close deck',
+    },
+    next: {
+      eyebrow: 'WHAT COMES NEXT?',
+      text: 'Open the CRT to find the first tape. Pause on the strange frame and tune the tracking to uncover the clue that unlocks the arcade.',
+    },
+  },
 };
 
 const ES: UiStrings = {
@@ -115,6 +215,54 @@ const ES: UiStrings = {
     reducedDistortion: 'Distorsi\u00f3n reducida',
     reducedDistortionHint: 'Desactiva destellos, temblores y fallos bruscos.',
     mute: 'Silenciar audio',
+  },
+  shell: {
+    eyebrow: 'ARCHIVO 09 / EST. 1996',
+    title: 'EL CLUB DE LA MEMORIA PERDIDA',
+    subheading: 'Algunos recuerdos deber\u00edan quedar olvidados.',
+    buildPill: 'VERSI\u00d3N PROTOTIPO \u00b7 NO ES EL JUEGO FINAL',
+    sceneHeading: 'SUELO DEL ARCHIVO \u00b7 PROTOTIPO',
+    renderOnline: 'RENDER ACTIVO',
+    footer: 'KIROWEEN 2026 \u00b7 PROTOTIPO ORIGINAL \u00b7 SIN ASSETS DE TERCEROS',
+    notices: {
+      intro: 'Haz clic en la televisi\u00f3n CRT para abrir la platina VHS.',
+      crtConnected: 'ESTACI\u00d3N CRT CONECTADA',
+      arcadeConnected: 'ESTACI\u00d3N RECREATIVA CONECTADA',
+      arcadeLocked: 'RECREATIVA BLOQUEADA \u00b7 Recupera antes la pista VHS.',
+      arcadeLogged: 'Inicio de la recreativa registrado. El juego a\u00fan est\u00e1 en desarrollo.',
+      demoArcadeWon: 'Demo: victoria en la recreativa registrada.',
+      tapeCollected: 'Cinta recogida. C\u00e1rgala en la platina y rep\u00f3drala.',
+      archiveLoaded: 'Archivo 09 restaurado. Su cinta ya est\u00e1 en la platina.',
+      endingLocked: 'Restaura el Archivo 09 antes de abrir el final.',
+      reset: 'Guardado de desarrollo reiniciado.',
+    },
+    progress: {
+      eyebrow: 'NOTAS DE CAMPO',
+      heading: 'Progreso del prototipo',
+      tape: 'VHS recogido',
+      clue: 'Pista descubierta',
+      arcade: 'Recreativa completada',
+      ending: 'Final desbloqueado',
+      yes: 'S\u00cd',
+      no: 'NO',
+      reset: 'Reiniciar estado local del prototipo',
+      openEnding: 'Abrir el final',
+    },
+    deck: {
+      eyebrow: 'ARCHIVO / M\u00d3DULO 03',
+      title: 'Platina VHS',
+      collect: 'Recoger cinta',
+      load: 'Cargar cinta',
+      loaded: 'Cargada',
+      archiveLocked: 'Bloqueado: gana la recreativa para restaurar el Archivo 09.',
+      archiveOpen: 'Cargar Archivo 09',
+      emptyDeck: 'Carga una cinta para empezar la reproducci\u00f3n.',
+      close: 'Cerrar platina',
+    },
+    next: {
+      eyebrow: '\u00bfQU\u00c9 SIGUE?',
+      text: 'Abre la CRT para encontrar la primera cinta. Pausa en el fotograma extra\u00f1o y ajusta el tracking para descubrir la pista que desbloquea la recreativa.',
+    },
   },
 };
 

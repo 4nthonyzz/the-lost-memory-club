@@ -8,11 +8,12 @@ Status legend: **tested** = covered by Vitest, **prototype** = implemented and t
 | Story catalog, evaluator, EN/ES text, journal model | `fragments/` | tested |
 | Subtitles, keyboard mapping, visual parameters | `subtitles.ts`, `keyboardControls.ts`, `vhsVisuals.ts` | tested |
 | Procedural audio (gain and filter rules) | `audio/vhsAudio.ts` | pure rules tested, Web Audio graph is prototype |
-| CRT/VHS player (Canvas 2D + CSS) | `VhsPlayer.tsx`, `VhsPlayer.css`, `vhsRenderer.ts` | prototype |
+| CRT/VHS player (Canvas 2D + CSS) | `VhsPlayer.tsx`, `VhsPlayer.css`, `vhsRenderer.ts` | wired into `App.tsx`; not yet checked in a browser |
+| Session flags and demo gates | `session.ts` | tested |
 
 ## Integration contract
 
-`VhsPlayer` is controlled by props: `tape`, `language`, `reducedDistortion`, `muted`, `onClueDetected`, `onClose`. The App shell maps each `ClueDetection` to a core `GameEvent` (`VHS_CLUE_FOUND`) and decides which tape to load. The player never writes to LocalStorage.
+`VhsPlayer` is controlled by props: `tape`, `language`, `reducedDistortion`, `muted`, `onClueDetected`, `onClose`. `App.tsx` maps each `ClueDetection` to a core `GameEvent` (`VHS_CLUE_FOUND`) through `clueEventFor`, except archive-09 perfect tracking, which `App` keeps as session state through `recordPerfectTracking`. Loading Archive 09 dispatches `MEMORY_RESTORED` once the arcade is won. The player never writes to LocalStorage.
 
 `buildJournalModel(gameState, extraProgress, language)` returns plain data for the journal, the club atmosphere and the unlocked endings. Its shapes match the view models in `src/ui/viewModels.ts` structurally, so the App shell can pass them straight to the UI components. This module does not import from `src/ui/`.
 

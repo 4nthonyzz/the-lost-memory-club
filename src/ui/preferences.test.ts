@@ -51,6 +51,11 @@ describe('interface strings', () => {
         ...Object.values(strings.save),
         ...Object.values(strings.settings),
         ...Object.values(strings.endings),
+        ...Object.values(strings.shell.notices),
+        ...Object.values(strings.shell.progress),
+        ...Object.values(strings.shell.deck),
+        strings.shell.title,
+        strings.shell.next.text,
         strings.journal.title,
         strings.journal.progress(1, 8),
       ];

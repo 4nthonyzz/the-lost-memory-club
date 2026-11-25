@@ -32,6 +32,18 @@ h2 { font-size: 19px; margin-bottom: 14px; }
 .panel-buttons { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .success-note { color: #9cddc7 !important; font-weight: 700; }
 .fineprint { font-size: 10px !important; color: #9297ab !important; margin-top: 15px; }
+.scene-frame { position: relative; }
+.save-row { display: flex; margin-top: 12px; }
+.tape-shelf { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 10px; }
+.tape-shelf__item { display: flex; justify-content: space-between; align-items: center; gap: 12px; border: 1px solid #36394b; border-radius: 8px; padding: 10px 12px; }
+.tape-shelf__title { font-size: 12px; color: #dfe3ee; }
+.tape-shelf__locked { font-size: 11px; color: #9297ab; text-align: right; }
+.dev-panel { border: 1px dashed #8a6a3a; display: grid; gap: 12px; }
+.dev-panel .eyebrow { color: #f2c28b; margin-bottom: 0; }
+.dev-panel__secrets { display: grid; gap: 8px; border: 1px solid #36394b; border-radius: 8px; padding: 10px 12px; margin: 0; font-size: 12px; color: #d6dbe9; }
+.dev-panel__check { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
+.dev-panel__check input { margin-top: 3px; }
 footer { color: #6c7385; font-size: 10px; text-align: center; padding: 28px 0; letter-spacing: .13em; }
+.journal-slot { margin-top: 18px; }
 @media(max-width: 850px) { .content-grid { grid-template-columns: 1fr; }.site-header { flex-wrap: wrap; }.world-wrapper { height: 360px; } }
 @media(max-width: 500px) { .app-shell { width: calc(100% - 24px); padding-top: 25px; }.build-pill { white-space: normal; }.section-heading { gap: 8px; } }
