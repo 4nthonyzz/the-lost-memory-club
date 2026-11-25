@@ -1,0 +1,137 @@
+/* Overlay styles. All elements live inside .world-wrapper (position: relative). */
+.world-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+/* #f2f5fa on rgba(9,16,30,.92) is well above 4.5:1 */
+.world-chip {
+  display: inline-block;
+  background: rgba(9, 16, 30, 0.92);
+  color: #f2f5fa;
+  border: 1px solid #4a5570;
+  border-radius: 6px;
+  padding: 8px 12px;
+  line-height: 1.4;
+}
+
+.world-prompt-region {
+  position: absolute;
+  left: 50%;
+  bottom: 22%;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+}
+
+.world-crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: #f2f5fa;
+  box-shadow: 0 0 0 1px #09101e;
+  pointer-events: none;
+}
+
+.world-capture,
+.world-panel-notice {
+  position: absolute;
+  left: 50%;
+  top: 14px;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  text-align: center;
+  pointer-events: none;
+}
+
+.world-controls {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  max-width: calc(100% - 24px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.world-controls-body[hidden] {
+  display: none;
+}
+
+.world-controls-body ul {
+  margin: 0 0 6px;
+  padding-left: 16px;
+}
+
+.world-controls-body p {
+  margin: 0;
+}
+
+.world-button {
+  pointer-events: auto;
+  cursor: pointer;
+  font: inherit;
+  background: #09101e;
+  color: #f2f5fa;
+  border: 1px solid #7f8bab;
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.world-button:hover {
+  background: #1b2742;
+}
+
+.world-button:focus-visible {
+  outline: 3px solid #ffd866;
+  outline-offset: 2px;
+}
+
+.world-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  text-align: center;
+  background: #09101e;
+  color: #f2f5fa;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.world-fallback p {
+  max-width: 460px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.world-fallback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+.world-keyboard-look {
+  position: absolute;
+  left: 50%;
+  top: 72px;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  text-align: center;
+  pointer-events: none;
+}

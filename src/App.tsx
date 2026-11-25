@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import { ArcadePanel } from './arcade/ArcadePanel';
 import { MEMORY_ID, SAVE_KEY, SNAKE_GAME_ID, type StationId } from './core/contracts';
 import { gameReducer, loadGameState, saveGameState } from './core/gameReducer';
@@ -74,18 +74,28 @@ export function App() {
   const [state, dispatch] = useReducer(gameReducer, undefined, loadGameState);
   const [preferences, updatePreferences] = usePreferences();
   const [session, setSession] = useState<SessionProgress>(EMPTY_SESSION);
-  const [panel, setPanel] = useState<Panel>(null);
+  const [station, setStation] = useState<Panel>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [deckTape, setDeckTape] = useState<TapeDefinition | null>(null);
   const [notice, setNotice] = useState<ShellNotice>('intro');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const shellRef = useRef<HTMLElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const wasOpen = useRef(false);
 
   const { language, reducedDistortion, muted } = preferences;
   const shell = getUiStrings(language).shell;
+  const stationOpen = station !== null;
   const clueFound = isClueFound(state);
   const arcadeDone = canOpenArchive(state);
   const archiveRestored = isArchiveRestored(state);
   const journal = buildJournalModel(state, progressFor(session), language);
-  const yesNo = (value: boolean) => (value ? shell.progress.yes : shell.progress.no);
+  const progress: Array<[string, boolean]> = [
+    ['TAPE', state.collectedTapes.includes(SUMMER_TAPE.id)],
+    ['CLUE', clueFound],
+    ['ARCADE', arcadeDone],
+    ['ENDING', state.endingUnlocked],
+  ];
 
   useEffect(() => {
     setSaveStatus('saving');
@@ -93,23 +103,49 @@ export function App() {
     setSaveStatus(resolveSaveStatus(JSON.stringify(state), () => window.localStorage.getItem(SAVE_KEY)));
   }, [state]);
 
-  function openPanel(station: StationId) {
-    if (station === 'arcade' && !clueFound) {
+  useEffect(() => {
+    if (!stationOpen) return undefined;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      closePanel();
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [stationOpen]);
+
+  useEffect(() => {
+    if (stationOpen) {
+      const first = dialogRef.current?.querySelector<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      (first ?? dialogRef.current)?.focus();
+    } else if (wasOpen.current) {
+      shellRef.current?.querySelector<HTMLElement>('.world-wrapper')?.focus();
+    }
+    wasOpen.current = stationOpen;
+  }, [stationOpen, station]);
+
+  function closePanel() {
+    setStation(null);
+    setDeckTape(null);
+  }
+
+  function interact(nextStation: StationId) {
+    if (nextStation === 'arcade' && !clueFound) {
       setNotice('arcadeLocked');
       return;
     }
-    setPanel(station);
-    setNotice(station === 'vhs' ? 'crtConnected' : 'arcadeConnected');
-  }
-
-  function closePanel() {
-    setPanel(null);
-    setDeckTape(null);
+    setStation(nextStation);
+    setNotice(nextStation === 'vhs' ? 'crtConnected' : 'arcadeConnected');
   }
 
   function collectTape() {
     dispatch({ type: 'TAPE_COLLECTED', tapeId: SUMMER_TAPE.id });
     setNotice('tapeCollected');
+  }
+
+  function inspectLabelClue() {
+    dispatch(clueEventFor({ tapeId: SUMMER_TAPE.id, clueId: ACTS[0]!.clueId }));
+    setNotice('clueConfirmed');
   }
 
   function loadSummerTape() {
@@ -145,7 +181,7 @@ export function App() {
       setNotice('endingLocked');
       return;
     }
-    setPanel('ending');
+    setStation('ending');
   }
 
   function reset() {
@@ -157,151 +193,115 @@ export function App() {
     dispatch({ type: 'RESET_DEMO' });
     setSession(EMPTY_SESSION);
     setDeckTape(null);
-    setPanel(null);
+    setStation(null);
+    setDrawerOpen(false);
     setNotice('reset');
   }
 
+  const dialogTitle = station === 'vhs' ? shell.deck.title : station === 'arcade' ? 'Arcade station' : shell.progress.openEnding;
+
   return (
-    <main className="app-shell">
-      <header className="site-header">
-        <div>
-          <p className="eyebrow">{shell.eyebrow}</p>
-          <h1>{shell.title}</h1>
-          <p className="subheading">{shell.subheading}</p>
-        </div>
-        <span className="build-pill">{shell.buildPill}</span>
-      </header>
+    <main className="game-shell" ref={shellRef}>
+      <WorldScene inputEnabled={!stationOpen} onInspect={interact} memoryShifted={arcadeDone} />
+      <CrtCorruptionOverlay level={journal.atmosphere.distortion} reducedDistortion={reducedDistortion} />
 
-      <div className="content-grid">
-        <section className="scene-card">
-          <div className="section-heading">
-            <span>{shell.sceneHeading}</span>
-            <span className="online-dot">{`\u25cf ${shell.renderOnline}`}</span>
-          </div>
-          <div className="scene-frame">
-            <WorldScene onInspect={openPanel} memoryShifted={arcadeDone} />
-            <CrtCorruptionOverlay level={journal.atmosphere.distortion} reducedDistortion={reducedDistortion} />
-          </div>
-          <div className="scene-status" role="status">
-            {shell.notices[notice]}
-          </div>
-        </section>
-
-        <aside className="side-column">
-          <div className="info-card">
-            <p className="eyebrow">{shell.progress.eyebrow}</p>
-            <h2>{shell.progress.heading}</h2>
-            <div className="metric">
-              <span>{shell.progress.tape}</span>
-              <strong>{yesNo(state.collectedTapes.includes(SUMMER_TAPE.id))}</strong>
-            </div>
-            <div className="metric">
-              <span>{shell.progress.clue}</span>
-              <strong>{yesNo(clueFound)}</strong>
-            </div>
-            <div className="metric">
-              <span>{shell.progress.arcade}</span>
-              <strong>{yesNo(arcadeDone)}</strong>
-            </div>
-            <div className="metric">
-              <span>{shell.progress.ending}</span>
-              <strong>{yesNo(state.endingUnlocked)}</strong>
-            </div>
-            <div className="save-row">
-              <SaveIndicator status={saveStatus} language={language} />
-            </div>
-            <button type="button" className="secondary reset" onClick={openEnding}>
-              {shell.progress.openEnding}
-            </button>
-            <button type="button" className="secondary reset" onClick={reset}>
-              {shell.progress.reset}
-            </button>
-          </div>
-
-          {panel === 'vhs' && (
-            <section className="station-panel" aria-label={shell.deck.title}>
-              <p className="eyebrow">{shell.deck.eyebrow}</p>
-              <h2>{shell.deck.title}</h2>
-              <ul className="tape-shelf">
-                <li className="tape-shelf__item">
-                  <span className="tape-shelf__title">{tapeTitle(SUMMER_TAPE.id, language)}</span>
-                  {canLoadSummerTape(state) ? (
-                    <button type="button" className="secondary" disabled={deckTape?.id === SUMMER_TAPE.id} onClick={loadSummerTape}>
-                      {deckTape?.id === SUMMER_TAPE.id ? shell.deck.loaded : shell.deck.load}
-                    </button>
-                  ) : (
-                    <button type="button" onClick={collectTape}>
-                      {shell.deck.collect}
-                    </button>
-                  )}
-                </li>
-                <li className="tape-shelf__item">
-                  <span className="tape-shelf__title">{tapeTitle(ARCHIVE_TAPE.id, language)}</span>
-                  {arcadeDone ? (
-                    <button type="button" className="secondary" onClick={loadArchive}>
-                      {shell.deck.archiveOpen}
-                    </button>
-                  ) : (
-                    <span className="tape-shelf__locked">{shell.deck.archiveLocked}</span>
-                  )}
-                </li>
-              </ul>
-
-              {deckTape ? (
-                <VhsPlayer
-                  key={deckTape.id}
-                  tape={deckTape}
-                  language={language}
-                  reducedDistortion={reducedDistortion}
-                  muted={muted}
-                  onMutedChange={(value) => updatePreferences({ muted: value })}
-                  onClueDetected={handleDetection}
-                  onClose={closePanel}
-                />
-              ) : (
-                <p className="fineprint">{shell.deck.emptyDeck}</p>
-              )}
-              <div className="panel-buttons">
-                <button type="button" className="secondary" onClick={closePanel}>
-                  {shell.deck.close}
-                </button>
-              </div>
-            </section>
-          )}
-
-          {panel === 'arcade' && <ArcadePanel onStart={startArcade} onClose={closePanel} />}
-
-          {panel === 'ending' && archiveRestored && (
-            <EndingScreen language={language} reducedDistortion={reducedDistortion} endings={journal.endings} onRestart={closePanel} />
-          )}
-
+      <div className="hud-progress" aria-label="Prototype progress">
+        <span className="hud-tag">PROTOTYPE</span>
+        <ul>
+          {progress.map(([label, done]) => (
+            <li key={label} className={done ? 'done' : undefined}>
+              {label} {done ? '\u2713' : '\u00b7'}
+              <span className="sr-only">{done ? ' done' : ' pending'}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="hud-status" role="status">{shell.notices[notice]}</div>
+      <div className="hud-drawer">
+        <button type="button" className="secondary" aria-expanded={drawerOpen} aria-controls="hud-drawer-body" onClick={() => setDrawerOpen((open) => !open)}>
+          {drawerOpen ? 'Close menu' : 'Menu'}
+        </button>
+        <div id="hud-drawer-body" className="hud-drawer-body" hidden={!drawerOpen}>
+          <p>Move: W A S D or arrows. Look: mouse or I J K L. Interact: E. Esc releases the mouse or closes a station.</p>
+          <SaveIndicator status={saveStatus} language={language} />
           <AccessibilitySettings preferences={preferences} onChange={updatePreferences} />
-
-          {panel === null && (
-            <div className="info-card instructions">
-              <p className="eyebrow">{shell.next.eyebrow}</p>
-              <p>{shell.next.text}</p>
-            </div>
-          )}
-
-          {import.meta.env.DEV && (
-            <DemoControls
-              clueFound={clueFound}
-              arcadeDone={arcadeDone}
-              session={session}
-              onWinArcade={simulateArcadeWin}
-              onToggleSecret={(secretId) => setSession((current) => toggleMinigameSecret(current, secretId))}
-              onResetSession={() => setSession(EMPTY_SESSION)}
-            />
-          )}
-        </aside>
+          <button type="button" className="secondary" onClick={openEnding}>{shell.progress.openEnding}</button>
+          <button type="button" className="secondary" onClick={reset}>{shell.progress.reset}</button>
+          <MemoryJournal language={language} entries={journal.entries} totalEntries={journal.totalEntries} atmosphere={journal.atmosphere} />
+        </div>
       </div>
 
-      <div className="journal-slot">
-        <MemoryJournal language={language} entries={journal.entries} totalEntries={journal.totalEntries} atmosphere={journal.atmosphere} />
-      </div>
+      {stationOpen && (
+        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closePanel(); }}>
+          <div className="modal-dialog" role="dialog" aria-modal="true" aria-label={dialogTitle} ref={dialogRef} tabIndex={-1}>
+            {station === 'vhs' && (
+              <section className="station-panel" aria-label={shell.deck.title}>
+                <p className="eyebrow">{shell.deck.eyebrow}</p>
+                <h2>{shell.deck.title}</h2>
+                <ul className="tape-shelf">
+                  <li className="tape-shelf__item">
+                    <span className="tape-shelf__title">{tapeTitle(SUMMER_TAPE.id, language)}</span>
+                    {canLoadSummerTape(state) ? (
+                      <>
+                        <button type="button" className="secondary" disabled={deckTape?.id === SUMMER_TAPE.id} onClick={loadSummerTape}>
+                          {deckTape?.id === SUMMER_TAPE.id ? shell.deck.loaded : shell.deck.load}
+                        </button>
+                        {!clueFound && !deckTape && (
+                          <button type="button" className="secondary" onClick={inspectLabelClue}>{shell.deck.inspect}</button>
+                        )}
+                      </>
+                    ) : (
+                      <button type="button" onClick={collectTape}>{shell.deck.collect}</button>
+                    )}
+                  </li>
+                  <li className="tape-shelf__item">
+                    <span className="tape-shelf__title">{tapeTitle(ARCHIVE_TAPE.id, language)}</span>
+                    {arcadeDone ? (
+                      <button type="button" className="secondary" onClick={loadArchive}>{shell.deck.archiveOpen}</button>
+                    ) : (
+                      <span className="tape-shelf__locked">{shell.deck.archiveLocked}</span>
+                    )}
+                  </li>
+                </ul>
+                {deckTape ? (
+                  <VhsPlayer
+                    key={deckTape.id}
+                    tape={deckTape}
+                    language={language}
+                    reducedDistortion={reducedDistortion}
+                    muted={muted}
+                    onMutedChange={(value) => updatePreferences({ muted: value })}
+                    onClueDetected={handleDetection}
+                    onClose={closePanel}
+                  />
+                ) : (
+                  <p className="fineprint">{shell.deck.emptyDeck}</p>
+                )}
+                <div className="panel-buttons">
+                  <button type="button" className="secondary" onClick={closePanel}>{shell.deck.close}</button>
+                </div>
+              </section>
+            )}
+            {station === 'arcade' && <ArcadePanel onStart={startArcade} onClose={closePanel} />}
+            {station === 'ending' && archiveRestored && (
+              <EndingScreen language={language} reducedDistortion={reducedDistortion} endings={journal.endings} onRestart={closePanel} />
+            )}
+          </div>
+        </div>
+      )}
 
-      <footer>{shell.footer}</footer>
+      {import.meta.env.DEV && (
+        <div className="dev-drawer">
+          <DemoControls
+            clueFound={clueFound}
+            arcadeDone={arcadeDone}
+            session={session}
+            onWinArcade={simulateArcadeWin}
+            onToggleSecret={(secretId) => setSession((current) => toggleMinigameSecret(current, secretId))}
+            onResetSession={() => setSession(EMPTY_SESSION)}
+          />
+        </div>
+      )}
     </main>
   );
 }
