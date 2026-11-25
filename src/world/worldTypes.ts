@@ -43,3 +43,30 @@ export interface StationDef {
   /** Direction the front face (and the anchor) points toward. Omitted means '+z'. */
   facing?: Facing;
 }
+
+/** Ids of the world-only interactable props. They never use StationId and never reach onInspect. */
+export type LampId = 'desk-lamp-left' | 'desk-lamp-right';
+export type ManualId = 'manual-snake' | 'manual-maze' | 'manual-frequency';
+export type PropInteractableId = LampId | ManualId;
+
+/** A world-local interactable prop (a lamp or an arcade manual book). Layout data only. */
+export interface InteractableDef {
+  id: PropInteractableId;
+  kind: 'lamp' | 'manual';
+  /** Point used for distance and cone tests. */
+  anchor: Vec2;
+  /**
+   * The footprint of the object this prop sits on or in (desk or bookcase). It is excluded from the
+   * line-of-sight test for this prop only, so a prop on a solid object stays targetable. Optional.
+   */
+  collider?: Aabb;
+  /** Maximum player-to-anchor distance, in metres. */
+  range: number;
+  /** Height of the interaction point above the floor, in metres. Informational. */
+  height?: number;
+}
+
+/** Combined result of world targeting: a Station or a world-local prop. */
+export type InteractionTarget =
+  | { type: 'station'; station: StationDef }
+  | { type: 'prop'; prop: InteractableDef };

@@ -464,3 +464,25 @@ describe('roomLayout', () => {
     expect(b.maxZ).toBeLessThanOrEqual(prop('arcade-frequency').box.minZ);
   });
 });
+
+describe('desk lamps (task 23.1)', () => {
+  it('has the left banker lamp and the right table lamp as non-solid props on the reception desk', () => {
+    const desk = prop('reception-desk');
+    const left = prop('desk-lamp-left');
+    const right = prop('desk-lamp-right');
+    expect(left).toBeDefined();
+    expect(right).toBeDefined();
+    for (const lamp of [left, right]) {
+      expect(lamp.solid).toBe(false);
+      expect(lamp.box.minX).toBeGreaterThanOrEqual(desk.box.minX);
+      expect(lamp.box.maxX).toBeLessThanOrEqual(desk.box.maxX);
+      expect(lamp.box.minZ).toBeGreaterThanOrEqual(desk.box.minZ);
+      expect(lamp.box.maxZ).toBeLessThanOrEqual(desk.box.maxZ);
+      expect(COLLIDERS).not.toContain(lamp.box);
+      expect(COLLIDERS.some((c) => c.minX === lamp.box.minX && c.maxX === lamp.box.maxX && c.minZ === lamp.box.minZ && c.maxZ === lamp.box.maxZ)).toBe(false);
+    }
+    expect(left.box.maxX).toBeLessThan(right.box.minX);
+    expect(left.box.maxX).toBeLessThan(0);
+    expect(right.box.minX).toBeGreaterThan(0);
+  });
+});

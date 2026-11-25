@@ -56,6 +56,11 @@ export interface Part {
    * the sides, top and thin strips of a cabinet never show cards or seams. Used by the filing cabinets.
    */
   metricPlainV?: readonly [number, number]
+  /**
+   * Desk lamp role (task 23.1): `bulb` core, `inner` shade face, `sprite` (a camera-facing glow plane, drawn by Props.tsx
+   * with a billboard) or the desk light `pool`. Sprite and pool use a never-drawn material while the lamp is off.
+   */
+  lampRole?: 'bulb' | 'inner' | 'sprite' | 'pool'
 }
 
 /** True when the part is rendered from a cached real-size geometry (mesh scale 1). */
@@ -77,6 +82,7 @@ export const GEOMETRY_TRIANGLES: Readonly<Record<GeometryKey, number>> = {
   cylinder: 48, // 12 radial segments: 24 side + 24 caps
   cylinderLow: 32, // 8 radial segments: 16 side + 16 caps
   sphere: 80, // 8 x 6 segments
+  cone: 24, // open truncated cone, 12 radial segments, no caps
 }
 
 export const SCENE_TRIANGLE_BUDGET = 20000
@@ -612,33 +618,62 @@ export function wallClockParts(): Part[] {
 }
 
 /**
- * Warm desk lamp on the east end of the reception desk. The layout has no separate south-east desk, so the
- * lamp stands on the desk's east end (the existing lamp is at the west end). The shade is an emissive basic
- * material: there is no light source, the halo comes from `deskLampGlowParts`.
+ * Desk lamps (task 23.1): a green-shaded banker's lamp and a cream-shaded table lamp on the reception desk top.
+ * Positions come from the layout props `desk-lamp-left` / `desk-lamp-right` (each box is the lamp footprint).
+ * Nothing here is a light: the lit look is an emissive bulb core, a warm inner shade face, a camera-facing glow
+ * sprite and a light-pool decal on the desk. Lit and unlit states are different shared materials, swapped per part,
+ * so one lamp's state never changes the other's.
  */
-export function deskLampPosition() {
-  const desk = layoutProp('reception-desk')
-  return { x: desk.box.maxX - 0.25, z: (desk.box.minZ + desk.box.maxZ) / 2, top: desk.height }
+export type DeskLampKind = 'banker' | 'table'
+export const DESK_LAMPS: ReadonlyArray<{ readonly id: string; readonly kind: DeskLampKind }> = [
+  { id: 'desk-lamp-left', kind: 'banker' },
+  { id: 'desk-lamp-right', kind: 'table' },
+]
+/** The pool decal floats this far above the desk top (2 mm), with a polygon offset on its material. */
+export const LAMP_POOL_LIFT = 0.002
+
+/** Layout footprint and desk-top height of a lamp, from the layout. */
+export function deskLampPlacement(id: string): { box: Aabb; top: number } {
+  const lamp = layoutProp(id)
+  return { box: lamp.box, top: layoutProp('reception-desk').height }
 }
 
-export function deskLampParts(): Part[] {
-  const { x, z, top } = deskLampPosition()
-  return [
-    part('cylinder', 'metal', [x, top + 0.015, z], [0.18, 0.03, 0.18]),
-    part('cylinderLow', 'metal', [x - 0.02, top + 0.16, z], [0.02, 0.26, 0.02], [0, 0, 0.15]),
-    part('cylinder', 'lampEmissive', [x - 0.07, top + 0.33, z], [0.2, 0.12, 0.2]),
-    part('cylinder', 'metal', [x - 0.07, top + 0.395, z], [0.08, 0.012, 0.08]),
-    part('sphere', 'bulb', [x - 0.07, top + 0.28, z], [0.07, 0.07, 0.07]),
-  ]
-}
+/** Materials per lamp state: the lit set is emissive, the unlit set is dark and never drawn for sprite and pool. */
+export const LAMP_MATERIALS = {
+  on: { bulb: 'bulb', inner: 'lampInnerOn', sprite: 'lampHalo', pool: 'lampPool' },
+  off: { bulb: 'lampBulbOff', inner: 'lampInnerOff', sprite: 'lampGlowOff', pool: 'lampGlowOff' },
+} as const satisfies Record<'on' | 'off', Record<NonNullable<Part['lampRole']>, MaterialKey>>
 
-/** Faint additive glow: two crossed vertical planes at the shade and a pool on the desk top. No light. */
-export function deskLampGlowParts(): Part[] {
-  const { x, z, top } = deskLampPosition()
+export function deskLampParts(box: Aabb, kind: DeskLampKind, on = true, top: number = layoutProp('reception-desk').height): Part[] {
+  const { cx, cz } = centre(box)
+  const m = LAMP_MATERIALS[on ? 'on' : 'off']
+  const role = (p: Part, lampRole: NonNullable<Part['lampRole']>): Part => ({ ...p, lampRole })
+  if (kind === 'banker') {
+    // Shade centre: the shade sits west of the base so the whole lamp stays inside the footprint.
+    const sx = cx - 0.04
+    return [
+      part('cylinderLow', 'brass', [cx + 0.11, top + 0.01, cz], [0.12, 0.02, 0.12]),
+      bx('brass', [cx + 0.11, top + 0.16, cz], [0.02, 0.28, 0.02]),
+      bx('brass', [cx + 0.07, top + 0.3, cz], [0.1, 0.014, 0.014]),
+      // Low horizontal green glass shade: a roof plus two long side skirts, open at the ends and underneath.
+      bx('lampGreenShade', [sx, top + 0.31, cz], [0.22, 0.025, 0.13]),
+      bx('lampGreenShade', [sx, top + 0.272, cz - 0.059], [0.22, 0.05, 0.012]),
+      bx('lampGreenShade', [sx, top + 0.272, cz + 0.059], [0.22, 0.05, 0.012]),
+      role(part('plane', m.inner, [sx, top + 0.2965, cz], [0.2, 0.105, 1], [HALF_PI, 0, 0]), 'inner'),
+      role(part('sphere', m.bulb, [sx, top + 0.262, cz], [0.045, 0.045, 0.045]), 'bulb'),
+      role(part('plane', m.sprite, [sx, top + 0.27, cz], [0.42, 0.42, 1]), 'sprite'),
+      role(part('plane', m.pool, [sx, top + LAMP_POOL_LIFT, cz], [0.36, 0.36, 1], [-HALF_PI, 0, 0]), 'pool'),
+    ]
+  }
   return [
-    part('plane', 'lampHalo', [x - 0.07, top + 0.3, z], [0.6, 0.6, 1]),
-    part('plane', 'lampHalo', [x - 0.07, top + 0.3, z], [0.6, 0.6, 1], [0, HALF_PI, 0]),
-    part('plane', 'lampHalo', [x - 0.07, top + 0.006, z], [0.55, 0.55, 1], [-HALF_PI, 0, 0]),
+    part('cylinderLow', 'brass', [cx, top + 0.012, cz], [0.15, 0.024, 0.15]),
+    part('cylinderLow', 'brass', [cx, top + 0.12, cz], [0.045, 0.2, 0.045]),
+    // Conical cream shade, open at both ends.
+    part('cone', 'lampCreamShade', [cx, top + 0.3, cz], [0.24, 0.16, 0.24]),
+    role(part('plane', m.inner, [cx, top + 0.372, cz], [0.13, 0.13, 1], [HALF_PI, 0, 0]), 'inner'),
+    role(part('sphere', m.bulb, [cx, top + 0.27, cz], [0.05, 0.05, 0.05]), 'bulb'),
+    role(part('plane', m.sprite, [cx, top + 0.3, cz], [0.45, 0.45, 1]), 'sprite'),
+    role(part('plane', m.pool, [cx, top + LAMP_POOL_LIFT, cz], [0.38, 0.38, 1], [-HALF_PI, 0, 0]), 'pool'),
   ]
 }
 
@@ -1105,11 +1140,10 @@ export const MUG_RIM_H = 0.006
 export const NOTE_COVER_H = 0.006
 export const NOTE_PAGE_H = 0.01
 
-/** Reception desk (front on the +z side): panelled front, drawers, lamp, bell, book and archive box. */
+/** Reception desk (front on the +z side; the two lamps are `deskLampParts`): panelled front, drawers, bell, book and archive box. */
 export function deskParts(box: Aabb, height: number): Part[] {
   const { cx, cz, w, d } = centre(box)
   const top = height
-  const lampX = box.minX + 0.3
   const f = box.maxZ
   return [
     wd('woodDark', [cx, (height - 0.06) / 2, cz], [w, height - 0.06, d]),
@@ -1122,11 +1156,6 @@ export function deskParts(box: Aabb, height: number): Part[] {
     bx('metal', [cx - 1.0, 0.7, f + 0.018], [0.14, 0.02, 0.02]),
     bx('metal', [cx - 1.0, 0.4, f + 0.018], [0.14, 0.02, 0.02]),
     bx('metal', [cx + 0.8, 0.5, f + 0.018], [0.02, 0.14, 0.02]),
-    // Lamp: base, leaning stem, shade and bulb.
-    part('cylinder', 'metal', [lampX, top + 0.015, cz], [0.16, 0.03, 0.16]),
-    part('cylinderLow', 'metal', [lampX - 0.037, top + 0.175, cz], [0.025, 0.3, 0.025], [0, 0, 0.25]),
-    part('cylinder', 'lampShade', [lampX - 0.074, top + 0.36, cz], [0.22, 0.12, 0.22]),
-    part('sphere', 'bulb', [lampX - 0.074, top + 0.29, cz], [0.08, 0.08, 0.08]),
     // Service bell and guest book.
     part('cylinderLow', 'metal', [cx + 0.1, top + 0.01, cz + 0.15], [0.1, 0.02, 0.1]),
     part('sphere', 'metal', [cx + 0.1, top + 0.03, cz + 0.15], [0.07, 0.04, 0.07]),
@@ -1316,8 +1345,7 @@ export function declaredObjects(): Array<{ name: string; parts: Part[]; extraTri
     { name: 'cable-loops', parts: cableLoopsParts() },
     { name: 'corner-posts', parts: cornerPostParts() },
     { name: 'wall-clock', parts: wallClockParts() },
-    { name: 'desk-lamp', parts: deskLampParts() },
-    { name: 'desk-lamp-glow', parts: deskLampGlowParts() },
+    ...DESK_LAMPS.map(({ id, kind }) => ({ name: id, parts: deskLampParts(prop(id).box, kind, true, prop('reception-desk').height) })),
     { name: 'bulletin-board', parts: bulletinBoardParts() },
     ...ARCHIVE_BOX_IDS.map((id) => ({ name: id, parts: archiveBoxParts(prop(id).box, prop(id).height) })),
     ...ARCADE_CABINET_IDS.map((id) => {
@@ -1343,7 +1371,7 @@ export function declaredObjects(): Array<{ name: string; parts: Part[]; extraTri
     // Books and slipcases: one InstancedMesh per spine variant in use, all on the shared 12-triangle unit box.
     objects.push({
       name: id,
-      parts: [...shelfFrameParts(p.box, p.height), ...contents.boxParts],
+      parts: [...shelfFrameParts(p.box, p.height), ...contents.boxParts, ...contents.manualParts],
       extraTriangles: contents.instances.length * GEOMETRY_TRIANGLES.box,
       extraDrawCalls: new Set(contents.instances.map((b) => b.variant)).size,
     })

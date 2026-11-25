@@ -4,16 +4,15 @@
 // Mouse and keyboard look (I/J/K/L) both apply in any lock state; frozen while inspecting.
 import { useCallback, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import type { StationId } from '../../core/contracts';
 import { relocateToValid } from '../logic/collision';
 import { EYE_HEIGHT, PLAYER_RADIUS } from '../logic/constants';
 import type { HeldKeys } from '../logic/inputState';
 import type { InputMode } from '../logic/inputMode';
 import type { Look } from '../logic/look';
 import { stepPlayer } from '../logic/playerStep';
-import { selectInteractionTarget } from '../logic/targeting';
-import { COLLIDERS, ROOM, STATION_DEFS } from '../layout/roomLayout';
-import type { Vec2 } from '../worldTypes';
+import { selectInteractionTargetAll } from '../logic/targeting';
+import { COLLIDERS, INTERACTABLE_DEFS, ROOM, STATION_DEFS } from '../layout/roomLayout';
+import type { InteractionTarget, Vec2 } from '../worldTypes';
 import type { MouseDelta } from './usePointerLock';
 
 export interface UsePlayerRigOptions {
@@ -21,12 +20,21 @@ export interface UsePlayerRigOptions {
   consumeMouseDelta: () => MouseDelta;
   getMode: () => InputMode;
   /** Called only when the interaction target changes. */
-  onTargetChange?: (target: StationId | null) => void;
+  onTargetChange?: (target: InteractionTarget | null) => void;
 }
 
 export interface PlayerRig {
   /** Latest interaction target. Pass to useWorldInput's `getTarget`. */
-  getTarget: () => StationId | null;
+  getTarget: () => InteractionTarget | null;
+}
+
+/** Targets are equal when they refer to the same Station entry or the same prop entry. */
+function sameTarget(a: InteractionTarget | null, b: InteractionTarget | null): boolean {
+  if (a === b) return true;
+  if (a === null || b === null) return false;
+  if (a.type === 'station' && b.type === 'station') return a.station === b.station;
+  if (a.type === 'prop' && b.type === 'prop') return a.prop === b.prop;
+  return false;
 }
 
 export function usePlayerRig(options: UsePlayerRigOptions): PlayerRig {
@@ -38,9 +46,9 @@ export function usePlayerRig(options: UsePlayerRigOptions): PlayerRig {
     posRef.current = relocateToValid(ROOM.start, PLAYER_RADIUS, COLLIDERS, ROOM.bounds, ROOM.start);
   }
   const lookRef = useRef<Look>({ yaw: ROOM.startYaw, pitch: 0 });
-  const targetRef = useRef<StationId | null>(null);
+  const targetRef = useRef<InteractionTarget | null>(null);
 
-  const getTarget = useCallback((): StationId | null => targetRef.current, []);
+  const getTarget = useCallback((): InteractionTarget | null => targetRef.current, []);
 
   useFrame((state, delta) => {
     const { heldKeysRef, consumeMouseDelta, getMode, onTargetChange } = optionsRef.current;
@@ -63,8 +71,8 @@ export function usePlayerRig(options: UsePlayerRigOptions): PlayerRig {
       posRef.current = pos;
       lookRef.current = step.look;
 
-      const target = selectInteractionTarget(pos, lookRef.current.yaw, STATION_DEFS, COLLIDERS);
-      if (target !== targetRef.current) {
+      const target = selectInteractionTargetAll(pos, lookRef.current.yaw, STATION_DEFS, INTERACTABLE_DEFS, COLLIDERS);
+      if (!sameTarget(target, targetRef.current)) {
         targetRef.current = target;
         onTargetChange?.(target);
       }

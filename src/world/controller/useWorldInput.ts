@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import type { StationId } from '../../core/contracts';
+import type { InteractionTarget, PropInteractableId } from '../worldTypes';
 import {
   initialModeState,
   reduceMode,
@@ -34,7 +35,9 @@ export interface UseWorldInputOptions {
   /** Latest onInspect callback. Read through a ref, never re-registers listeners. */
   onInspect: (id: StationId) => void;
   /** Returns the current interaction target, or null. Read at key time. */
-  getTarget: () => StationId | null;
+  getTarget: () => InteractionTarget | null;
+  /** Called when E is pressed on a world-local prop (lamp or manual). Read through a ref. Never calls onInspect. */
+  onPropInteract?: (id: PropInteractableId) => void;
   /** Optional external switch. Absent means unchanged default behavior. */
   inputEnabled?: boolean;
 }
@@ -66,8 +69,10 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
   // Latest callbacks, read at event time.
   const onInspectRef = useRef(options.onInspect);
   const getTargetRef = useRef(options.getTarget);
+  const onPropInteractRef = useRef(options.onPropInteract);
   onInspectRef.current = options.onInspect;
   getTargetRef.current = options.getTarget;
+  onPropInteractRef.current = options.onPropInteract;
 
   const getMode = useCallback((): InputMode => stateRef.current.mode, []);
 
@@ -97,9 +102,12 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
         switch (effect.type) {
           case 'CALL_ON_INSPECT': {
             const target = getTargetRef.current();
-            if (target !== null) onInspectRef.current(target);
+            if (target !== null && target.type === 'station') onInspectRef.current(target.station.id);
             break;
           }
+          case 'PROP_INTERACT':
+            onPropInteractRef.current?.(effect.id);
+            break;
           case 'RELEASE_POINTER_LOCK':
             exitLock(doc);
             break;
@@ -145,10 +153,13 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
         e.preventDefault();
       }
 
-      const hasTarget = role === 'interact' && getTargetRef.current() !== null;
+      const current = role === 'interact' ? getTargetRef.current() : null;
+      const hasTarget = current !== null;
+      const targetKind = current === null ? null : current.type;
+      const targetPropId = current !== null && current.type === 'prop' ? current.prop.id : null;
       // keydown is a valid activation gesture (Enter or E on the capture overlay).
       dispatch(
-        { type: 'KEY_DOWN', role, code: e.code, repeat: e.repeat, accepted, hasTarget },
+        { type: 'KEY_DOWN', role, code: e.code, repeat: e.repeat, accepted, hasTarget, targetKind, targetPropId },
         true,
       );
     };

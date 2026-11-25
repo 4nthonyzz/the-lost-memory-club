@@ -1,6 +1,6 @@
 # World Exploration: App.tsx Integration Notes
 
-Originally documentation only (task 9.9). Updated by tasks 13.5, 15.5, 19.3 and 20.3. Related: `proposals.md`, `performance-log.md`, `manual-test-log.md`, `test-report.md`, `src/world/README.md`.
+Originally documentation only (task 9.9). Updated by tasks 13.5, 15.5, 19.3, 20.3 and 23.3. Related: `proposals.md`, `performance-log.md`, `manual-test-log.md`, `test-report.md`, `src/world/README.md`.
 
 ## Status
 
@@ -27,9 +27,9 @@ Final `WorldSceneProps`: `onInspect(station: StationId)`, `memoryShifted: boolea
 | App passes the prop, dialogs, Escape, focus return, status messages | verified by automated test with a stubbed `WorldScene`: `src/App.test.ts` (8 tests) |
 | M1 to M5 in a browser | verified manually by the project owner per the owner's report; no recorded log (every row of `manual-test-log.md` is `not run`) |
 | End-to-end sequences (a) and (b) below in a real browser, HUD layout on small or short viewports | not verified (no recorded result) |
-| M6, the polish pass (tasks 18.1 to 18.3) and the refinement pass (tasks 19.1 to 19.2: re-centred media console, new lighting, SMPTE monitor, timecode, cables) and the three-cabinet arcade pass (tasks 20.1 and 20.2) and the task 21 couch fix, couch fabric, CRT casing and CRT glass textures and the task 22 detail pass (VCR deck face, armchair, VHS shells, metal filing cabinets, cardboard crates, desk detail, doorway trim) in a browser | not verified visually (no browser run recorded). Layout data and budgets are verified by `src/world/layout/roomLayout.test.ts` (31 tests) and `src/world/scene/modelDetail.test.ts` (123 tests) |
+| M6, the polish pass (tasks 18.1 to 18.3) and the refinement pass (tasks 19.1 to 19.2: re-centred media console, new lighting, SMPTE monitor, timecode, cables) and the three-cabinet arcade pass (tasks 20.1 and 20.2) and the task 21 couch fix, couch fabric, CRT casing and CRT glass textures and the task 22 detail pass (VCR deck face, armchair, VHS shells, metal filing cabinets, cardboard crates, desk detail, doorway trim) and the task 23 lamps, manuals and world message in a browser | not verified visually (no browser run recorded). Layout data and budgets are verified by `src/world/layout/roomLayout.test.ts` (32 tests) and `src/world/scene/modelDetail.test.ts` (131 tests) |
 
-Fresh `npm test` at the time of task 22.3: 27 files, 572 tests, all passed (run twice, same result). `npm run typecheck` and `npm run build` exited 0.
+Fresh `npm test` at the time of task 23.3: 29 files, 619 tests, all passed (run twice, same result). `npm run typecheck` and `npm run build` exited 0.
 
 ## Arcade area (M6, three cabinets from tasks 20.1 and 20.2)
 
@@ -54,22 +54,36 @@ Open item: the spawn (0, 3) is exactly 1.0 m from the desk edge (z 2.0) and from
 
 ## HUD and status wording
 
-- The world never shows lock messages. Its prompts are neutral and fixed: `Press E to inspect the CRT television` and `Press E to use the arcade cabinet`.
+- The world never shows lock messages. Its station prompts are neutral and fixed: `Press E to inspect the CRT television` and `Press E to use the arcade cabinet`.
 - The world `aria-label` says that station messages, including why a station cannot be used yet, appear in the status line at the bottom of the screen.
 - App owns the status line. After E at the locked arcade it shows `ARCADE LOCKED · Recover the VHS clue first.` After a successful request it shows `CRT STATION CONNECTED` or `ARCADE STATION CONNECTED`.
 - The wording is verified by `WorldScene.test.ts` (world side) and `App.test.ts` (App side). How it looks in a browser is not verified.
 
+## Interactable props and the world message (task 23, no App change)
+
+Task 23 adds five world-local interactable props: `desk-lamp-left`, `desk-lamp-right`, `manual-snake`, `manual-maze` and `manual-frequency` (world-only type `PropInteractableId`). **No App change is needed and none was made.**
+
+- `StationId` in `src/core/contracts.ts` is unchanged. `WorldSceneProps` is unchanged. `onInspect` is still called only for stations (`vhs`, `arcade`). A prop press produces a `PROP_INTERACT` effect inside the world: it never calls `onInspect`, never releases pointer lock and never suspends input. Code path: `controller/useWorldInput.ts` (`CALL_ON_INSPECT` branch checks `target.type === 'station'`); tests: `logic/inputMode.prop.test.ts` and `WorldScene.test.ts` ("lamp prompt toggles after E, onInspect is not called, and the world message shows the lamp text").
+- Combined targeting is `selectInteractionTargetAll`: stations 2.0 m, props 2.2 m, same view cone and line of sight, nearest wins, stations first on ties.
+- **Lamp state is session-only.** It lives in React state in `WorldScene`, is not stored anywhere (no LocalStorage) and is not part of `GameState`. Both lamps start ON and reset on reload.
+- **Messages use a world-owned line, not the App status line.** `WorldSceneProps` has no status callback and `src/App.tsx` is unchanged, so prop messages appear in the `WorldMessage` overlay inside the world wrapper (`role="status"`, `aria-live="polite"`), just above the interaction prompt. They do not appear in the App HUD status line. A message clears when the target changes. There is no timer.
+- Prompts: `Press E to turn off desk lamp` / `Press E to turn on desk lamp`, `Press E to read: SNAKE.EXE Manual`, `Press E to read: LAST EXIT Manual`, `Press E to read: DEAD FREQUENCY Manual`.
+- Messages: `Desk lamp turned off.`, `Desk lamp turned on.`, and one manual text each for SNAKE.EXE, LAST EXIT and DEAD FREQUENCY (exact wording in `src/world/README.md`, "Interactable props").
+- **The LAST EXIT and DEAD FREQUENCY manual texts describe gameplay that does not exist in `src/arcade/`.** They are in-world lore only. Only Snake exists, and every cabinet still opens the same App arcade panel.
+- Scene: two desk lamps (green banker's lamp left, cream table lamp right) with ON/OFF visuals and **no added light** (still 4 lights); `lampGlow` is 128x128; three manual books stand on `shelf-b` level 2 (y 1.117..1.397, spines at x -4.635, z 1.4 / 1.8 / 2.2; emerald, crimson, amber with a cream band; anchors at x -4.6) and 7 ordinary books were removed from that row.
+- Task 23 is **not verified visually**.
+
 ## Computed metrics
 
-Computed from declared geometry and source, computed, not runtime-measured. Source: `performance-log.md`, re-checked in task 22.3 with `npx vitest run src/world/scene/modelDetail.test.ts` (123 tests passed).
+Computed from declared geometry and source, computed, not runtime-measured. Source: `performance-log.md`, re-checked in task 23.3 with `npx vitest run src/world/scene/modelDetail.test.ts` (131 tests passed).
 
-- Triangles: 19,172 (detail 18,930 + base 242), limit 20,000. The margin is thin: about 830 triangles (4 percent). The biggest consumers are the three bookshelves (2,352 + 2,280 + 2,088) and the three cabinets (1,316 each).
-- Draw-call grouping estimate: about 319 (not `renderer.info`).
-- Lights: 4 (1 ambient + 3 point: `crt-light`, `west-light`, `arcade-light`), limit 4.
-- Procedural textures: 30, 7.459 MB estimate, limit 8 MB. The margin is also thin: about 0.54 MB. New in task 21: `couchFabric` 0.33, `crtCasing` 0.33, `crtGlass` 0.25 MB. New in task 22: `vcrDeck` 0.17, `vhsShell` 0.08, `metalCabinet` 0.33, `deskDetail` 0.04 MB; `crate` grew to 256x256 (0.33 MB) and `corkBoard` shrank to 256x256 (0.33 MB, 1.00 MB freed). The largest are the three posters and `spineAtlas` (0.66 MB each). First candidates to cut if room is needed: `console-cables` (1,088 triangles), the book count, and the three 0.66 MB posters or `spineAtlas`. Per-texture list: `performance-log.md` section 2.1.
+- Triangles: 19,042 (detail 18,800 + base 242), limit 20,000 (task 23 delta -130 from 19,172). The margin is thin: 958 triangles (about 5 percent). The biggest consumers are the three bookshelves (2,352 + 2,280 + 2,088) and the three cabinets (1,316 each).
+- Draw-call grouping estimate: about 325 (not `renderer.info`).
+- Lights: 4 (1 ambient + 3 point: `crt-light`, `west-light`, `arcade-light`), limit 4. Task 23 added none.
+- Procedural textures: 30, 7.521 MB estimate, limit 8 MB (task 23: `lampGlow` 64x64 to 128x128, +0.062 MB). The margin is also thin: about 0.48 MB. New in task 21: `couchFabric` 0.33, `crtCasing` 0.33, `crtGlass` 0.25 MB. New in task 22: `vcrDeck` 0.17, `vhsShell` 0.08, `metalCabinet` 0.33, `deskDetail` 0.04 MB; `crate` grew to 256x256 (0.33 MB) and `corkBoard` shrank to 256x256 (0.33 MB, 1.00 MB freed). The largest are the three posters and `spineAtlas` (0.66 MB each). First candidates to cut if room is needed: `console-cables` (1,088 triangles), the book count, and the three 0.66 MB posters or `spineAtlas`. Per-texture list: `performance-log.md` section 2.1.
 - Colliders: 28 (the task 21 couch change adds none).
-- Targeting benchmark: informational timing only, varies per run (0.963 us/call standalone, 1.544 us/call in the full-suite run of task 22.3).
-All figures above are computed, not runtime-measured. Runtime frame time was measured once by the project owner (dev build, `?worldPerf=1` sampler, 60 s walkthrough): median 16.70 ms, p95 18.60 ms, 10,378 triangles and 151 draw calls in the last rendered frame. Hardware, browser, OS, resolution and date were not provided, so the Reference_Hardware targets cannot be confirmed. First-render time is not measured. See `performance-log.md` section 4.
+- Targeting benchmark: informational timing only, varies per run (1.025 us/call standalone, 1.790 us/call in the full-suite run of task 23.3; it times station targeting, not the combined targeting).
+All figures above are computed, not runtime-measured. Runtime frame time was measured once by the project owner **before Task 23, and it has not been repeated** (dev build, `?worldPerf=1` sampler, 60 s walkthrough): median 16.70 ms, p95 18.60 ms, 10,378 triangles and 151 draw calls in the last rendered frame. Hardware, browser, OS, resolution and date were not provided, so the Reference_Hardware targets cannot be confirmed. First-render time is not measured. See `performance-log.md` section 4.
 
 ## Couch and CRT surface changes (tasks 21.1 and 21.2)
 - Couch: the dark patch came from a dark "worn patch" box 4 mm above the middle cushion. It is removed, with a second hidden patch. Roll caps are 4 mm shorter to avoid coplanar faces. The pillow is in the left seat corner, checked by an oriented-box no-intersection test. The couch has 388 triangles (was 412). It uses the new `couchFabric` texture and the `couchBody`, `couchCushion` and `couchPillow` materials with metric fabric UVs, tinted by `memoryShift`.
@@ -93,9 +107,9 @@ World-internal render changes only (computed, not runtime-measured; **not verifi
 
 - No restored-memory viewer component exists in the repo. No story content was invented. The HUD shows progress booleans only.
 - Browser verification is missing for M6, the three-cabinet arcade pass and the end-to-end App behavior listed above.
-- LAST EXIT and DEAD FREQUENCY have no game behind them; all three cabinets open the same App arcade panel (Snake).
+- LAST EXIT and DEAD FREQUENCY have no game behind them; all three cabinets open the same App arcade panel (Snake). Their manual texts on `shelf-b` are in-world lore for gameplay that does not exist.
 - P2 is pending. P5, P6 and P7 are pending (see `proposals.md`).
-- Runtime performance was measured once by the project owner (dev build, hardware not provided): median 16.70 ms, p95 18.60 ms (see `performance-log.md` section 4). The agent took no measurement. First-render time and the Reference_Hardware confirmation are still open.
+- Runtime performance was measured once by the project owner before Task 23 and not repeated (dev build, hardware not provided): median 16.70 ms, p95 18.60 ms (see `performance-log.md` section 4). The agent took no measurement. First-render time and the Reference_Hardware confirmation are still open.
 
 ## Backward compatibility
 
@@ -105,7 +119,7 @@ World-internal render changes only (computed, not runtime-measured; **not verifi
 ## Ownership rules
 
 - `App.tsx` remains the source of truth for panel-open state (`station`) and unlock state (`hasClue`).
-- The world never reads `GameState` and does not know whether the arcade is locked. It always calls `onInspect` for the targeted station.
+- The world never reads `GameState` and does not know whether the arcade is locked. It always calls `onInspect` for the targeted station. Props (lamps, manuals) are handled inside the world and never call `onInspect`.
 - The world never requests pointer lock automatically. Pointer lock is requested only from a user gesture (canvas click, or Enter/E while the capture overlay is shown).
 
 ## Sequences

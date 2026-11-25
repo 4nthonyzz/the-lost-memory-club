@@ -24,17 +24,21 @@ vi.mock('@react-three/fiber', () => {
 });
 vi.mock('./controller/usePlayerRig', async () => {
   const { useEffect } = await import('react');
+  const { STATION_DEFS } = await import('./layout/roomLayout');
+  // The rig reports the combined target type (task 23.2); these tests only use Stations.
+  const wrap = (id: 'vhs' | 'arcade' | null) =>
+    id === null ? null : { type: 'station' as const, station: STATION_DEFS.find((s) => s.id === id)! };
   return {
     usePlayerRig: (opts: {
-      onTargetChange: (t: 'vhs' | 'arcade' | null) => void;
+      onTargetChange: (t: ReturnType<typeof wrap>) => void;
       heldKeysRef: { current: { roles: ReadonlySet<string> } };
     }) => {
       h.heldKeysRef = opts.heldKeysRef;
       useEffect(() => {
-        opts.onTargetChange(h.target);
+        opts.onTargetChange(wrap(h.target));
         // eslint-disable-next-line react-hooks/exhaustive-deps
       }, []);
-      return { getTarget: () => h.target };
+      return { getTarget: () => wrap(h.target) };
     },
   };
 });

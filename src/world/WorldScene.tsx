@@ -6,6 +6,13 @@ import { usePlayerRig } from './controller/usePlayerRig';
 import { useWorldInput, type WorldInput } from './controller/useWorldInput';
 import { WebglFallback } from './overlay/WebglFallback';
 import { WorldOverlay } from './overlay/WorldOverlay';
+import {
+  initialPropState,
+  reducePropInteract,
+  reduceTargetChange,
+  type PropState,
+} from './logic/propState';
+import type { InteractionTarget, PropInteractableId } from './worldTypes';
 import { Effects } from './scene/Effects';
 import { Lighting } from './scene/Lighting';
 import { Props } from './scene/Props';
@@ -47,8 +54,8 @@ function PlayerRigHost({
   onContextRestored,
 }: {
   input: WorldInput;
-  getTargetRef: { current: () => StationId | null };
-  onTargetChange: (target: StationId | null) => void;
+  getTargetRef: { current: () => InteractionTarget | null };
+  onTargetChange: (target: InteractionTarget | null) => void;
   onContextLost: () => void;
   onContextRestored: () => void;
 }) {
@@ -84,12 +91,19 @@ function WorldInteractive({
   onFail,
 }: WorldSceneProps & { onFail: () => void }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const getTargetRef = useRef<() => StationId | null>(() => null);
-  const [target, setTarget] = useState<StationId | null>(null);
+  const getTargetRef = useRef<() => InteractionTarget | null>(() => null);
+  const [target, setTarget] = useState<InteractionTarget | null>(null);
+  // World-local prop state: lamp on/off and the latest prop message. Session-only, never persisted.
+  const [propState, setPropState] = useState<PropState>(initialPropState);
+  const onPropInteract = useCallback((id: PropInteractableId) => setPropState((s) => reducePropInteract(s, id)), []);
+  const onTargetChange = useCallback((t: InteractionTarget | null) => {
+    setTarget(t);
+    setPropState((s) => reduceTargetChange(s, t));
+  }, []);
   const restoreTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const getTarget = useCallback(() => getTargetRef.current(), []);
-  const input = useWorldInput({ wrapperRef, onInspect, getTarget, inputEnabled });
+  const input = useWorldInput({ wrapperRef, onInspect, getTarget, onPropInteract, inputEnabled });
 
   const clearTimer = useCallback(() => {
     if (restoreTimer.current !== null) {
@@ -109,19 +123,19 @@ function WorldInteractive({
       <WorldCanvas frameloop={input.mode === 'inspecting' ? 'demand' : 'always'}>
         <Lighting memoryShifted={memoryShifted} />
         <Room />
-        <Props />
+        <Props lampOn={propState.lampOn} />
         <Stations />
         <Effects active={input.mode !== 'inspecting'} />
         <FrameSamplerHost />
         <PlayerRigHost
           input={input}
           getTargetRef={getTargetRef}
-          onTargetChange={setTarget}
+          onTargetChange={onTargetChange}
           onContextLost={handleContextLost}
           onContextRestored={clearTimer}
         />
       </WorldCanvas>
-      <WorldOverlay mode={input.mode} target={target} canResume={inputEnabled === undefined} keyboardLookHint={input.keyboardLookHint} />
+      <WorldOverlay mode={input.mode} target={target} lampOn={propState.lampOn} message={propState.message} canResume={inputEnabled === undefined} keyboardLookHint={input.keyboardLookHint} />
     </div>
   );
 }

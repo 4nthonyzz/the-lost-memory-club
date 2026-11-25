@@ -34,6 +34,8 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 
 - Approved scope change (cohesive prop textures), 2026-11-29: `corkBoard` shrinks to 256x256. New deterministic textures are allowed: `vcrDeck` (256x128), `vhsShell` (128x128) and `metalCabinet` (256x256). `crate` is upgraded to 256x256. Small desk-clutter detail (notebook, mug) and recessed door-panel detail are allowed. The reference monitor uses the `crtCasing` look. The armchair uses `couchFabric` with metric fabric UVs and a slate/teal hue. Every new texture is registered in `sharedResources.ts` and disposed exactly once (`disposeSharedResources()` is twice-safe), with a flat-colour fallback. `memoryShift` tints the new fabric and casing materials over t = 0..1, with t = 0 exact. Budgets stay: fewer than 20,000 triangles (currently 19,128 computed, so geometry changes must be near zero), at most 4 lights, texture memory at most 8 MB (target at most 7.7 MB). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json` and `tools/blender/` stay unchanged. No real trademarks are used.
 
+- Approved scope change (interactive props), 2026-11-30: world-local interactable props (two desk lamps and three arcade manual books on the west bookcase) are added. They do NOT use `StationId` and never call `onInspect`; `StationId` stays `'vhs' | 'arcade'`. Pressing E on a prop is handled inside the world (lamp on/off state is session-only, not persisted, not GameState) and does not suspend world input. Because `WorldSceneProps` has no status callback and `App.tsx` is unchanged, prop messages are shown in a world-owned message line inside the world wrapper (near the interaction prompt, `role="status"`, never covering the App HUD status line); this supersedes the earlier wording "status bar". The reception desk currently has one lamp: a second lamp is added (left green-shaded banker's lamp, right cream-shaded table lamp). Lighting stays `M3_LIGHT_COUNT = 4` (lamp light is emissive meshes, a glow sprite and a desk light-pool decal only). The manual texts describe LAST EXIT and DEAD FREQUENCY gameplay that is not implemented in `src/arcade`: they are in-world lore. Budgets: fewer than 20,000 triangles (currently 19,172 computed; new geometry at most +120), at most 4 lights, texture memory at most 8 MB (`lampGlow` upgraded in place). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json` and `tools/blender/` stay unchanged.
+
 ## Tasks
 
 ### Milestone 1: Playable 3D room (primitives only)
@@ -856,6 +858,38 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: documentation and the spec folder only.
     - _Requirements: 14.11, 14.12, 15.3, 15.6_
 
+### Interactive desk lamps and arcade manuals
+
+- [x] 23. Interactive desk lamps and arcade manuals
+  - [x] 23.1 Lamp glow upgrade and second desk lamp
+    - Files: `src/world/scene/proceduralTextures.ts`, `src/world/scene/modelDetail.ts`, `src/world/scene/Props.tsx`, `src/world/scene/sharedResources.ts`, `src/world/layout/roomLayout.ts`, `src/world/scene/proceduralTextures.test.ts`, `src/world/scene/modelDetail.test.ts`, `src/world/layout/roomLayout.test.ts`.
+    - Upgrade `lampGlow` in place to 128x128 with a multi-stop warm radial falloff, a filament core and no hard edge. Add `desk-lamp-left` (green-shaded banker's lamp) and `desk-lamp-right` (cream-shaded table lamp) to the layout as non-solid visual props on the reception desk, replacing the single existing lamp. Each lamp has a bulb core, inner shade glow, a glow sprite and a desk light-pool decal. An `on` flag per lamp drives lit versus unlit materials. No new light is added.
+    - Acceptance: both lamps render lit and unlit; new geometry at most +120 triangles; triangle estimate below 20,000; lights at most 4 (`M3_LIGHT_COUNT` stays 4); texture memory at most 8 MB; `lampGlow` disposed exactly once; colliders unchanged; Memory_Shift tinting still works.
+    - Tests: `proceduralTextures.test.ts` (determinism with a fake context, 128x128, no randomness); `modelDetail.test.ts` (lit and unlit materials, budgets, disposal once and twice-safe, colliders unchanged); `roomLayout.test.ts` (both lamps present and non-solid, spawn and walkways unchanged). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 22.3.
+    - Boundary: render and layout data only; `src/world/` only; no new dependency; no GLB.
+    - _Requirements: 1.3, 1.4, 1.8, 9.1, 9.2, 9.8, 12.5, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 23.2 Interactable props: lamps and manuals
+    - Files: `src/world/worldTypes.ts`, `src/world/layout/roomLayout.ts`, `src/world/logic/targeting.ts`, `src/world/logic/inputMode.ts`, `src/world/controller/useWorldInput.ts`, `src/world/controller/usePlayerRig.ts`, `src/world/WorldScene.tsx`, `src/world/overlay/InteractionPrompt.tsx`, new `src/world/overlay/WorldMessage.tsx`, `src/world/scene/Props.tsx`, `src/world/scene/shelfModel.ts` or `src/world/scene/modelDetail.ts`; tests `src/world/logic/targeting.test.ts`, the `inputMode` tests, `src/world/scene/modelDetail.test.ts`, `src/world/WorldScene.test.ts`.
+    - Add a world-local `PropDef` type (not `StationId`) for two lamps and three manual books. Targeting uses range 2.2 m and the existing cone and line-of-sight rules, and returns either a Station or a prop; the nearest eligible target wins and Stations keep working. Each prop has prompt text per prop and state (for example lamp on versus off).
+    - E on a lamp toggles its session-only `on` state (React or ref state in the world, never persisted, never GameState). E on a manual shows its message in `WorldMessage.tsx`, a `role="status"` line inside the world wrapper near the prompt that never covers the App HUD status line. Prop activation never calls `onInspect` and never enters `inspecting` or suspends input; the E repeat guard applies.
+    - Place three manual books at x about -4.2, y 1.1..1.4 on the west bookcase, with the exact message texts approved by the user (supplied with the task prompt; not defined in this plan, and no text is invented). The messages are in-world lore and do not claim that LAST EXIT or DEAD FREQUENCY gameplay exists.
+    - Acceptance: E on a prop does not call `onInspect` and does not change the mode; E at a Station still calls `onInspect` with the same `StationId`; `StationId` stays `'vhs' | 'arcade'`; lamp state resets on reload; manuals are reachable and targetable within 2.2 m; triangle estimate below 20,000; lights at most 4; shared contracts and `src/App.tsx` unchanged.
+    - Tests: `targeting.test.ts` (prop in range, at the 2.2 m boundary, nearest of Station and prop, line of sight); `inputMode` tests (prop activation emits no `CALL_ON_INSPECT` and keeps the mode); `modelDetail.test.ts` (manual book positions, budgets); `WorldScene.test.ts` (lamp toggle changes prompt text, manual shows the message, `onInspect` not called for props, Station E unchanged). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 23.1.
+    - Boundary: `src/world/` only; `WorldSceneProps` and `onInspect` unchanged; no storage access; no import from `src/arcade/` or `src/memories/`.
+    - _Requirements: 7.1, 7.2, 7.3, 7.5, 7.6, 7.7, 8.1, 8.6, 11.14, 16.6, 16.7, 16.8, 16.9, 20.1, 20.2, 20.8_
+
+  - [x] 23.3 Docs, metrics and verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, lights and texture memory, each labelled "computed, not runtime-measured". Document the world-owned message line, that lamp state is session-only, and that the manuals are in-world lore for unimplemented gameplay. Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final geometry and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 23.2.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional. The 17 property-based test sub-tasks can be skipped for a faster MVP. Tasks 16.2 and 16.3 are marked `*` because they must not be implemented without approval.
@@ -914,7 +948,10 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     { "id": 41, "tasks": ["21.3"] },
     { "id": 42, "tasks": ["22.1"] },
     { "id": 43, "tasks": ["22.2"] },
-    { "id": 44, "tasks": ["22.3"] }
+    { "id": 44, "tasks": ["22.3"] },
+    { "id": 45, "tasks": ["23.1"] },
+    { "id": 46, "tasks": ["23.2"] },
+    { "id": 47, "tasks": ["23.3"] }
   ]
 }
 ```

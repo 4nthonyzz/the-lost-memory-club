@@ -71,7 +71,9 @@ describe('determinism', () => {
     const b = run(id)
     expect(b.log).toEqual(a.log)
     expect(b.hash()).toBe(a.hash())
-    expect(run(id, TEXTURE_SPECS[id].seed + 1).hash()).not.toBe(a.hash())
+    // lampGlow (task 23.1) is a pure radial gradient with no random input, so its seed changes nothing.
+    if (id === 'lampGlow') expect(run(id, TEXTURE_SPECS[id].seed + 1).hash()).toBe(a.hash())
+    else expect(run(id, TEXTURE_SPECS[id].seed + 1).hash()).not.toBe(a.hash())
   })
 
   it('never uses Math.random', () => {
@@ -240,7 +242,7 @@ describe('wall, rug, cork board and lamp glow (task 18.3)', () => {
     expect(rug.filter((c) => c.op === 'fill').length).toBeGreaterThan(40)
     const glow = run('lampGlow')
     expect(glow.calls[0].op).toBe('clearRect')
-    expect(glow.calls.filter((c) => c.op === 'arc').length).toBeGreaterThan(10)
+    expect(glow.calls.some((c) => c.op === 'createRadialGradient')).toBe(true)
   })
 })
 
@@ -759,5 +761,57 @@ describe('task 22.2 part B: deskDetail texture', () => {
     expect(lines).toHaveLength(13)
     expect(r.some((q) => q[0] === 73 && q[2] === 1 && q[3] === 60)).toBe(true)
     for (let y = 60; y < 64; y++) expect(r.some((q) => q[0] === 64 && q[1] === y && q[2] === 64 && q[3] === 1)).toBe(true)
+  })
+})
+
+describe('task 23.1: lampGlow radial falloff', () => {
+  const recorded = () => run('lampGlow').calls
+  const stops = () => recorded().filter((c) => c.op === 'addColorStop').map((c) => ({ o: c.args[0] as number, color: String(c.args[1]) }))
+  const alphaOf = (color: string) => Number(/rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)/.exec(color)![1])
+
+  it('is 128 x 128, mipmapped, clamped, and keeps its id and seed', () => {
+    expect(TEXTURE_SPECS.lampGlow).toMatchObject({ id: 'lampGlow', width: 128, height: 128, filter: 'mipmap', wrap: 'clamp', seed: 118 })
+  })
+
+  it('is deterministic: two runs record the same calls', () => {
+    expect(run('lampGlow').hash()).toBe(run('lampGlow').hash())
+    expect(run('lampGlow').log).toEqual(run('lampGlow').log)
+  })
+
+  it('uses a radial gradient with at least 5 ordered colour stops that fade to alpha 0 before the border', () => {
+    const { width: W } = TEXTURE_SPECS.lampGlow
+    const grads = recorded().filter((c) => c.op === 'createRadialGradient')
+    expect(grads).toHaveLength(1)
+    const [cx, cy, r0, , , r1] = grads[0].args as number[]
+    expect([cx, cy, r0]).toEqual([W / 2, W / 2, 0])
+    // The gradient ends well inside the canvas, so the outermost ring and the corners are fully transparent.
+    expect(r1).toBeLessThan(W / 2)
+    const s = stops()
+    expect(s.length).toBeGreaterThanOrEqual(5)
+    expect(s.map((x) => x.o)).toEqual([...s.map((x) => x.o)].sort((a, b) => a - b))
+    expect(s[0].o).toBe(0)
+    expect(s[s.length - 1].o).toBe(1)
+    expect(alphaOf(s[s.length - 1].color)).toBe(0)
+    // Alpha never rises after the core.
+    const alphas = s.map((x) => alphaOf(x.color))
+    for (let i = 1; i < alphas.length; i++) expect(alphas[i]).toBeLessThanOrEqual(alphas[i - 1])
+    // Warm falloff: the first stop is a near-white core.
+    expect(alphas[0]).toBe(1)
+  })
+
+  it('draws a small bright filament core at the centre', () => {
+    const { width: W } = TEXTURE_SPECS.lampGlow
+    const calls = recorded()
+    const arc = calls.find((c) => c.op === 'arc')!
+    expect(arc.args.slice(0, 2)).toEqual([W / 2, W / 2])
+    expect(arc.args[2] as number).toBeLessThan(W * 0.05)
+    const i = calls.indexOf(arc)
+    expect(calls.slice(0, i).some((c) => c.op === 'set fillStyle' && c.args[0] === '#ffffff')).toBe(true)
+  })
+
+  it('costs about 0.06 MB more than the 64 x 64 version', () => {
+    const delta = textureMemoryBytes(TEXTURE_SPECS.lampGlow) - textureMemoryBytes({ width: 64, height: 64, filter: 'mipmap' })
+    expect(delta).toBeGreaterThan(0.06e6)
+    expect(delta).toBeLessThan(0.07e6)
   })
 })

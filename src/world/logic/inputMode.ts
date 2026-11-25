@@ -1,6 +1,7 @@
 // Input mode state machine (prop absent and supplied inputEnabled).
 // Pure reducer: effects are returned as data and performed by the controller.
 // No timers, no React/three/DOM imports.
+import type { PropInteractableId } from '../worldTypes';
 import type { KeyRole } from './inputState';
 
 export type InputMode = 'capturePending' | 'active' | 'inspecting';
@@ -29,6 +30,10 @@ export type ModeEvent =
       repeat: boolean;
       accepted: boolean;
       hasTarget: boolean;
+      /** Kind of the current target. Omitted behaves as 'station' when hasTarget is true. */
+      targetKind?: 'station' | 'prop' | null;
+      /** Id of the targeted prop when 	argetKind is 'prop'. */
+      targetPropId?: PropInteractableId | null;
     }
   | { type: 'KEY_UP'; role: KeyRole | null }
   | { type: 'EXTERNAL_ENABLED'; value: boolean }
@@ -36,6 +41,7 @@ export type ModeEvent =
 
 export type ModeEffect =
   | { type: 'CALL_ON_INSPECT' }
+  | { type: 'PROP_INTERACT'; id: PropInteractableId }
   | { type: 'RELEASE_POINTER_LOCK' }
   | { type: 'REQUEST_POINTER_LOCK' }
   | { type: 'CLEAR_INPUT' }
@@ -137,6 +143,15 @@ function keyDown(s: ModeState, e: Extract<ModeEvent, { type: 'KEY_DOWN' }>): Mod
 
   if (isE) {
     if (s.eRepeatGuard) return none(s);
+    if (e.hasTarget && e.targetKind === 'prop') {
+      // A world-local prop: handled inside the world. No inspect, no pointer-lock release, no input clear,
+      // no mode change. The repeat guard keeps it to one action per key press.
+      if (!e.targetPropId) return none(s);
+      return {
+        state: { ...s, eRepeatGuard: true },
+        effects: [{ type: 'PROP_INTERACT', id: e.targetPropId }],
+      };
+    }
     if (e.hasTarget) {
       // Supplied prop: never suspend; the prop alone decides suspension.
       const mode = s.inputEnabled === undefined ? 'inspecting' : 'capturePending';

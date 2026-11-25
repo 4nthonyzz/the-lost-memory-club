@@ -1205,6 +1205,49 @@
         "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
         "timestamp": 1795618418004
       }
+    ],
+    "23.1 Lamp glow upgrade and second desk lamp": [
+      {
+        "executionId": "78a2290e-2889-4e48-80b3-9fb31adb17ed",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795618742205
+      },
+      {
+        "executionId": "78a2290e-2889-4e48-80b3-9fb31adb17ed",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795619723071
+      }
+    ],
+    "23.2 Interactable props: lamps and manuals": [
+      {
+        "executionId": "78a2290e-2889-4e48-80b3-9fb31adb17ed",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795619725547
+      },
+      {
+        "executionId": "78a2290e-2889-4e48-80b3-9fb31adb17ed",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795620566184
+      }
+    ],
+    "23.3 Docs, metrics and verification": [
+      {
+        "executionId": "78a2290e-2889-4e48-80b3-9fb31adb17ed",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795620566827
+      },
+      {
+        "executionId": "78a2290e-2889-4e48-80b3-9fb31adb17ed",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795620926466
+      }
+    ],
+    "23. Interactive desk lamps and arcade manuals": [
+      {
+        "executionId": "78a2290e-2889-4e48-80b3-9fb31adb17ed",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795620926637
+      }
     ]
   }
 }

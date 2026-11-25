@@ -3,8 +3,8 @@
  * Pure data, no three.js: modelDetail.ts re-exports everything here and counts it in the scene report.
  * Layout stays the single source of truth: the carcass is derived from the shelf footprint and height.
  */
-import { ROOM } from '../layout/roomLayout'
-import type { Aabb } from '../worldTypes'
+import { MANUAL_PLACEMENT, ROOM } from '../layout/roomLayout'
+import type { Aabb, ManualId } from '../worldTypes'
 import type { MaterialKey, Part, Vec3 } from './modelDetail'
 import { SPINE_BOOK_VARIANTS, SPINE_CASE_VARIANTS } from './proceduralTextures'
 
@@ -228,7 +228,7 @@ export function shelfFrameParts(box: Aabb, height: number): Part[] {
 // ---------------------------------------------------------------------------------------------
 
 export type BookKind = 'book' | 'slipcase'
-export type BookGroup = 'row' | 'lean' | 'stack' | 'boxed'
+export type BookGroup = 'row' | 'lean' | 'stack' | 'boxed' | 'manual'
 
 export const BOOK_HEIGHT_RANGE = [0.18, 0.3] as const
 export const BOOK_THICKNESS_RANGE = [0.02, 0.06] as const
@@ -254,9 +254,14 @@ export interface BookInstance {
   rot: Vec3
   /** Lean angle in degrees from vertical; 0 unless group is 'lean'. */
   tiltDeg: number
+  /** Fixed colour that overrides the palette (the arcade manuals, task 23.2). */
+  colour?: string
+  /** Interactable prop id of an arcade manual (group 'manual'). */
+  manualId?: ManualId
 }
 
-export const instanceColour = (b: BookInstance): string => (b.kind === 'book' ? BOOK_PALETTE[b.colorIndex] : TAPE_PALETTE[b.colorIndex])
+export const instanceColour = (b: BookInstance): string =>
+  b.colour ?? (b.kind === 'book' ? BOOK_PALETTE[b.colorIndex] : TAPE_PALETTE[b.colorIndex])
 
 /** Horizontal and vertical reach of a book (thickness t, height h) leaning by `deg` on its bottom corner. */
 export function leanFootprint(t: number, h: number, deg: number): { minU: number; maxU: number; height: number } {
@@ -295,6 +300,67 @@ export interface ShelfContents {
   instances: BookInstance[]
   /** Cardboard tape boxes (plain parts, rendered with the carcass). */
   boxParts: Part[]
+  /** Lighter spine bands of the arcade manuals (plain parts). Empty except on the manual bookcase. */
+  manualParts: Part[]
+}
+
+/** The three arcade manuals (task 23.2): colour-coded cloth covers on the hardcover spine variant. */
+export const MANUAL_BOOKS: Readonly<Record<ManualId, { colour: string; title: string }>> = {
+  'manual-snake': { colour: '#1e8a55', title: 'SNAKE.EXE' },
+  'manual-maze': { colour: '#a3192f', title: 'LAST EXIT' },
+  'manual-frequency': { colour: '#cc8a1c', title: 'DEAD FREQUENCY' },
+}
+/** Manual size: thickness, height, depth (slightly larger than the ordinary books). */
+export const MANUAL_SIZE = [0.06, 0.28, 0.27] as const
+const MANUAL_VARIANT = 1
+/** Spine band: height and how far it stands proud of the spine (it is also sunk 2 mm into the book). */
+const MANUAL_BAND_H = 0.035
+const MANUAL_BAND_PROUD = 0.003
+
+/**
+ * Puts the three manuals into their row: every item of that level whose span along the shelf touches a
+ * manual (plus a 3 mm margin) is removed, then the manual stands upright on the board with its spine at
+ * the front line. Everything else keeps its seeded position.
+ */
+function placeManuals(g: ShelfGeometry, frontLine: number, instances: BookInstance[], manualParts: Part[]): BookInstance[] {
+  const lv = g.levels[MANUAL_PLACEMENT.level]
+  const [t, h, d] = MANUAL_SIZE
+  // The manual bookcase runs along z (west wall): world z = cz - lx * sin(yaw).
+  const axis = 2
+  const s = Math.sin(g.yaw)
+  const toLocal = (b: { z: number }) => (g.cz - b.z) / s
+  let kept = instances
+  for (const m of MANUAL_PLACEMENT.books) {
+    const lx = toLocal(m)
+    const pos = shelfLocalToWorld(g, lx, 0, 0)[axis]
+    const lo = pos - t / 2 - 0.003
+    const hi = pos + t / 2 + 0.003
+    kept = kept.filter((b) => {
+      if (b.level !== MANUAL_PLACEMENT.level) return true
+      const half = orientedHalfExtents(b.size, b.rot)[axis]
+      return b.pos[axis] + half <= lo || b.pos[axis] - half >= hi
+    })
+  }
+  for (const m of MANUAL_PLACEMENT.books) {
+    const lx = toLocal(m)
+    kept.push({
+      kind: 'book',
+      group: 'manual',
+      level: MANUAL_PLACEMENT.level,
+      variant: MANUAL_VARIANT,
+      colorIndex: 0,
+      colour: MANUAL_BOOKS[m.id].colour,
+      manualId: m.id,
+      pos: shelfLocalToWorld(g, lx, lv.floor + h / 2, frontLine - d / 2),
+      size: [t, h, d],
+      rot: [0, g.yaw, 0],
+      tiltDeg: 0,
+    })
+    manualParts.push(
+      localPart(g, 'manualBand', lx, lv.floor + h * 0.68, frontLine + (MANUAL_BAND_PROUD - 0.002) / 2, t - 0.006, MANUAL_BAND_H, MANUAL_BAND_PROUD + 0.002),
+    )
+  }
+  return kept
 }
 
 const DEG = Math.PI / 180
@@ -515,5 +581,9 @@ export function shelfContents(id: string, box: Aabb, height: number): ShelfConte
       if (rnd() < 0.35) cur += range(0.02, 0.12)
     }
   })
-  return { instances, boxParts }
+  const manualParts: Part[] = []
+  if (id === MANUAL_PLACEMENT.shelfId) {
+    return { instances: placeManuals(g, frontLine, instances, manualParts), boxParts, manualParts }
+  }
+  return { instances, boxParts, manualParts }
 }

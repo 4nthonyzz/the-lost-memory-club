@@ -10,7 +10,7 @@
  */
 import { PLAYER_RADIUS } from '../logic/constants';
 import { overlapsAny } from '../logic/collision';
-import type { Aabb, ArcadeGameKind, Facing, StationDef, Vec2 } from '../worldTypes';
+import type { Aabb, ArcadeGameKind, Facing, InteractableDef, ManualId, StationDef, Vec2 } from '../worldTypes';
 
 export interface PropDef {
   id: string;
@@ -146,6 +146,10 @@ const DETAILS: readonly PropDef[] = Object.freeze([
   prop('crate-a', 'detail', box(4.3, 4.9, 3.1, 3.7), 0.6, 3),
   prop('crate-b', 'detail', box(4.3, 4.9, 2.4, 3.0), 0.5, 3),
   prop('tape-stack', 'detail', box(-0.6, -0.2, 1.4, 1.8), 0.15, 3, false),
+  // Two desk lamps on the reception desk top (task 23.1), visual only: a green-shaded banker's lamp on the
+  // left (shade offset west of its base) and a cream-shaded table lamp on the right. `elevation` is the desk top.
+  prop('desk-lamp-left', 'detail', box(-1.44, -1.1, 1.38, 1.52), 0.34, 3, false, undefined, { elevation: 1.0 }),
+  prop('desk-lamp-right', 'detail', box(1.14, 1.4, 1.32, 1.58), 0.4, 3, false, undefined, { elevation: 1.0 }),
   prop('poster-north', 'detail', box(0.5, 1.5, -4, -3.95), 1.0, 3, false),
   prop('poster-arcade-area', 'detail', box(7, 8, -2, -1.95), 1.0, 3, false),
   prop('cable-run', 'detail', box(-1, 1, -2.5, -2.45), 0.02, 3, false),
@@ -224,6 +228,56 @@ export const COLLIDERS: readonly Aabb[] = Object.freeze([
 ]);
 
 export const STATION_DEFS: readonly StationDef[] = STATIONS;
+
+/** Interaction range of a world-local prop (lamps and manuals), in metres. */
+export const PROP_INTERACTION_RANGE = 2.2;
+
+/**
+ * The three arcade manuals stand in one row on level 2 of the west bookcase `shelf-b` (board top at about
+ * y 1.12, books up to y 1.4), spines facing +x at the bookcase front. They replace ordinary books in that
+ * row and are not solid: they live inside the bookcase volume. `z` is the book centre along the wall.
+ */
+export const MANUAL_PLACEMENT = Object.freeze({
+  shelfId: 'shelf-b',
+  level: 2,
+  books: Object.freeze([
+    Object.freeze({ id: 'manual-snake' as const, z: 1.4 }),
+    Object.freeze({ id: 'manual-maze' as const, z: 1.8 }),
+    Object.freeze({ id: 'manual-frequency' as const, z: 2.2 }),
+  ]),
+});
+
+function lampDef(id: 'desk-lamp-left' | 'desk-lamp-right'): InteractableDef {
+  const b = DETAILS.find((p) => p.id === id)!.box;
+  return Object.freeze({
+    id,
+    kind: 'lamp' as const,
+    anchor: Object.freeze({ x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 }),
+    // The lamps stand on the solid desk, so its footprint must not occlude them.
+    collider: DESK.box,
+    range: PROP_INTERACTION_RANGE,
+    height: 1.2,
+  });
+}
+
+function manualDef(id: ManualId, z: number): InteractableDef {
+  return Object.freeze({
+    id,
+    kind: 'manual' as const,
+    // On the bookcase front face (x = -4.6), centred on the book.
+    anchor: Object.freeze({ x: SHELF_B.box.maxX, z }),
+    collider: SHELF_B.box,
+    range: PROP_INTERACTION_RANGE,
+    height: 1.25,
+  });
+}
+
+/** World-local interactable props: the two desk lamps, then the three manuals. Not Stations, not Colliders. */
+export const INTERACTABLE_DEFS: readonly InteractableDef[] = Object.freeze([
+  lampDef('desk-lamp-left'),
+  lampDef('desk-lamp-right'),
+  ...MANUAL_PLACEMENT.books.map((m) => manualDef(m.id, m.z)),
+]);
 /** Rough triangle estimate: 12 per box (walls, props, floor, ceiling). */
 export function estimateTriangles(): number {
   const frames = DOORS.reduce((n, d) => n + d.frames.length, 0);

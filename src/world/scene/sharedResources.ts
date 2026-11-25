@@ -49,6 +49,8 @@ export const geometries = {
   cylinderLow: new CylinderGeometry(0.5, 0.5, 1, 8),
   /** Low-segment sphere (8 x 6) of diameter 1: joystick ball, bulb, bell. */
   sphere: new SphereGeometry(0.5, 8, 6),
+  /** Open-ended truncated cone (task 23.1): bottom diameter 1, top diameter 0.6, 12 sides, no caps. Table-lamp shade. */
+  cone: new CylinderGeometry(0.3, 0.5, 1, 12, 1, true),
 }
 
 /**
@@ -100,7 +102,6 @@ export const materials = {
   tapeBlue: lambert('#2a4aa0'),
   tapeLabel: lambert('#d8d2b8'),
   cabinet: lambert('#5a1f7a'),
-  lampShade: lambert('#e8c27a'),
   /** 13.6 detail materials. All fixed colours, none reads game state. */
   casingDark: lambert('#5f5b52'),
   bezel: lambert('#0c0c10'),
@@ -172,8 +173,32 @@ export const materials = {
   /** Archival cardboard boxes and their packing tape. */
   cardboard: lambert('#a98457'),
   cardboardDark: lambert('#7e603a'),
-  /** Warm desk-lamp shade: emissive basic material (not a light). The halo is an additive glow plane. */
-  lampEmissive: new MeshBasicMaterial({ color: '#ffb255' }),
+  /**
+   * Desk lamps (task 23.1). Nothing here is a light. Lit and unlit states are separate materials that are
+   * swapped per mesh, so one lamp's state never touches the other (`bulb` above is the lit bulb core).
+   */
+  brass: lambert('#a8802f'),
+  lampGreenShade: lambert('#1f7a4e'),
+  /** 23.2: lighter cream spine band on the three arcade manuals (flat colour, no texture). */
+  manualBand: lambert('#eadfb8'),
+  lampCreamShade: new MeshLambertMaterial({ color: '#efe3c4', side: DoubleSide }),
+  lampBulbOff: lambert('#46443f'),
+  lampInnerOn: new MeshBasicMaterial({ color: '#ffc272', side: DoubleSide }),
+  lampInnerOff: new MeshLambertMaterial({ color: '#2a2824', side: DoubleSide }),
+  /** Light pool decal on the desk top: faint additive lampGlow, pulled toward the camera by a polygon offset. */
+  lampPool: new MeshBasicMaterial({
+    color: '#ffb060',
+    transparent: true,
+    opacity: 0.32,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
+  }),
+  /** Swapped in for the glow sprite and the pool when a lamp is off: never drawn. */
+  lampGlowOff: new MeshBasicMaterial({ transparent: true, opacity: 0, visible: false, depthWrite: false }),
+  /** Camera-facing glow sprite of a lit lamp: additive lampGlow. */
   lampHalo: new MeshBasicMaterial({
     color: '#ffb060',
     transparent: true,
@@ -471,6 +496,7 @@ const TEXTURE_BINDINGS: readonly TextureBinding[] = [
   { material: 'paper', texture: 'deskDetail', color: '#ffffff', fallbackColor: '#e6dfc6' },
   { material: 'notebookCover', texture: 'deskDetail', color: '#6a7888', fallbackColor: '#4a5866' },
   { material: 'lampHalo', texture: 'lampGlow', color: '#ffffff' },
+  { material: 'lampPool', texture: 'lampGlow', color: '#ffb060' },
   /** Slightly dimmed multiplier: the reference card stays below the main CRT's brightness. */
   { material: 'smpteScreen', texture: 'smpteBars', color: '#b8b8b8' },
   { material: 'timecode', texture: 'timecode', color: '#ffffff' },

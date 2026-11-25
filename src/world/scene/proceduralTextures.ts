@@ -7,7 +7,7 @@
  *   signFace     512x128 mip       0.33 MB     posterSunset 256x512 mip  0.70 MB
  *   posterReel, shiftPoster 256x512 mip 0.70 MB each     shiftPlaque 256x128 mip 0.17 MB
  *   floor, wood, woodDark, crate, grille: 128x128 mip, 0.09 MB each     spineAtlas 512x256 mip 0.67 MB (task 18.2).
- *   Task 18.3: corkBoard (512x512 mip 1.33 MB, shrunk to 256x256 mip 0.33 MB in task 22.1), rugWoven 256x256 mip 0.33 MB, lampGlow 64x64 mip 0.02 MB.
+ *   Task 18.3: corkBoard (512x512 mip 1.33 MB, shrunk to 256x256 mip 0.33 MB in task 22.1), rugWoven 256x256 mip 0.33 MB, lampGlow 64x64 mip 0.02 MB (task 23.1: 128x128 mip 0.08 MB, radial gradient).
  *   Task 19.2: wallPanel 256x256 mip 0.33 MB, smpteBars 256x128 nearest 0.13 MB, timecode 128x32 nearest 0.02 MB.
  *   Task 20.2: three attract screens 256x256 nearest 0.25 MB each and three marquees 256x64 nearest 0.06 MB each
  *   replace the old arcadeScreen, marquee, outOfOrder and deck textures.
@@ -49,6 +49,7 @@ export interface Ctx2D {
   fillText(text: string, x: number, y: number): void
   arc(x: number, y: number, r: number, start: number, end: number): void
   createLinearGradient(x0: number, y0: number, x1: number, y1: number): GradientLike
+  createRadialGradient(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number): GradientLike
   save(): void
   restore(): void
   setTransform?(a: number, b: number, c: number, d: number, e: number, f: number): void
@@ -1088,11 +1089,35 @@ export function drawCorkBoard(c: Ctx2D, w: number, h: number, seed: number): voi
   vignette(c, w, h, S(24), 0.35)
 }
 
-/** Soft warm halo for the additive lamp glow planes: concentric translucent discs on a transparent canvas. */
-export function drawLampGlow(c: Ctx2D, w: number, h: number, seed: number): void {
-  const rnd = makeRng(seed)
+/**
+ * Colour stops of the lamp glow radial gradient (task 23.1): a near-white filament core, warm tungsten amber,
+ * then a long soft falloff that reaches alpha 0 at LAMP_GLOW_RADIUS_FRACTION of the half width, so the disc has no hard edge.
+ */
+export const LAMP_GLOW_STOPS: Stops = [
+  [0, 'rgba(255,250,232,1)'],
+  [0.06, 'rgba(255,238,196,0.9)'],
+  [0.16, 'rgba(255,208,128,0.55)'],
+  [0.34, 'rgba(255,172,76,0.26)'],
+  [0.56, 'rgba(238,134,44,0.1)'],
+  [0.8, 'rgba(204,98,28,0.025)'],
+  [1, 'rgba(180,80,20,0)'],
+]
+/** Radius where the glow reaches alpha 0, as a fraction of half the canvas width (the outer ring stays clear). */
+export const LAMP_GLOW_RADIUS_FRACTION = 0.9
+
+/**
+ * Soft warm radial glow for the additive lamp sprite and desk pool: a multi-stop radial gradient from a bright
+ * filament core to transparent amber, plus a tiny solid filament dot. Fully deterministic (no random input).
+ */
+export function drawLampGlow(c: Ctx2D, w: number, h: number, _seed: number): void {
   c.clearRect(0, 0, w, h)
-  for (let r = w / 2 - 2; r > 3; r -= 2.5) disc(c, w / 2, h / 2, r, '#ffb060', 0.06 + rnd() * 0.01)
+  const g = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, (w / 2) * LAMP_GLOW_RADIUS_FRACTION)
+  for (const [o, col] of LAMP_GLOW_STOPS) g.addColorStop(o, col)
+  c.globalAlpha = 1
+  c.fillStyle = g
+  c.fillRect(0, 0, w, h)
+  // Bright filament core.
+  disc(c, w / 2, h / 2, Math.max(1.5, w * 0.018), '#ffffff', 0.95)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1611,7 +1636,7 @@ export const TEXTURE_SPECS: Readonly<Record<TextureId, TextureSpec>> = Object.fr
   wallPanel: { id: 'wallPanel', width: 256, height: 256, filter: 'mipmap', wrap: 'repeat', seed: 115, draw: drawWallPanel },
   rugWoven: { id: 'rugWoven', width: 256, height: 256, filter: 'mipmap', wrap: 'clamp', seed: 116, draw: drawRugWoven },
   corkBoard: { id: 'corkBoard', width: 256, height: 256, filter: 'mipmap', wrap: 'clamp', seed: 117, draw: drawCorkBoard },
-  lampGlow: { id: 'lampGlow', width: 64, height: 64, filter: 'mipmap', wrap: 'clamp', seed: 118, draw: drawLampGlow },
+  lampGlow: { id: 'lampGlow', width: 128, height: 128, filter: 'mipmap', wrap: 'clamp', seed: 118, draw: drawLampGlow },
   smpteBars: { id: 'smpteBars', width: 256, height: 128, filter: 'nearest', wrap: 'clamp', seed: 119, draw: drawSmpteBars },
   timecode: { id: 'timecode', width: 128, height: 32, filter: 'nearest', wrap: 'clamp', seed: 121, draw: drawTimecode },
   couchFabric: { id: 'couchFabric', width: 256, height: 256, filter: 'mipmap', wrap: 'repeat', seed: 126, draw: drawCouchFabric },

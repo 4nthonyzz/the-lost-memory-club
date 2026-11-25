@@ -1,10 +1,15 @@
 // @vitest-environment jsdom
 import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 
 // The target source is controllable. usePlayerRig is mocked so no R3F frame loop is needed.
-const h = vi.hoisted(() => ({ target: null as 'vhs' | 'arcade' | null }));
+// A Station id or a world-local prop id; the mock wraps it in the combined target type (task 23.2).
+type TargetId = 'vhs' | 'arcade' | 'desk-lamp-left' | 'desk-lamp-right' | 'manual-snake' | 'manual-maze' | 'manual-frequency';
+const h = vi.hoisted(() => ({
+  target: null as TargetId | null,
+  setTarget: null as ((id: TargetId | null) => void) | null,
+}));
 
 vi.mock('./scene/WorldCanvas', () => ({
   WorldCanvas: ({ children }: { children?: ReactNode }) =>
@@ -22,13 +27,23 @@ vi.mock('@react-three/fiber', () => {
 });
 vi.mock('./controller/usePlayerRig', async () => {
   const { useEffect } = await import('react');
+  const { INTERACTABLE_DEFS, STATION_DEFS } = await import('./layout/roomLayout');
+  const wrap = (id: TargetId | null) => {
+    if (id === null) return null;
+    if (id === 'vhs' || id === 'arcade') return { type: 'station' as const, station: STATION_DEFS.find((s) => s.id === id)! };
+    return { type: 'prop' as const, prop: INTERACTABLE_DEFS.find((d) => d.id === id)! };
+  };
   return {
-    usePlayerRig: (opts: { onTargetChange: (t: 'vhs' | 'arcade' | null) => void }) => {
+    usePlayerRig: (opts: { onTargetChange: (t: ReturnType<typeof wrap>) => void }) => {
+      h.setTarget = (id) => {
+        h.target = id;
+        opts.onTargetChange(wrap(id));
+      };
       useEffect(() => {
-        opts.onTargetChange(h.target);
+        opts.onTargetChange(wrap(h.target));
         // eslint-disable-next-line react-hooks/exhaustive-deps
       }, []);
-      return { getTarget: () => h.target };
+      return { getTarget: () => wrap(h.target) };
     },
   };
 });
@@ -181,6 +196,77 @@ describe('WorldScene feedback ownership text', () => {
     expect(text()).toBe('Press E to use the arcade cabinet');
     rerender(createElement(WorldScene, { onInspect, memoryShifted: false }));
     expect(text()).toBe('Press E to use the arcade cabinet');
+  });
+});
+
+describe('WorldScene interactable props (task 23.2)', () => {
+  const prompt = () => document.querySelector('.world-prompt')?.textContent ?? '';
+  const message = () => document.querySelector('.world-message-region');
+  const pressE = (wrapper: HTMLElement) => {
+    fireEvent.keyDown(wrapper, { code: 'KeyE', key: 'e' });
+    fireEvent.keyUp(wrapper, { code: 'KeyE', key: 'e' });
+  };
+
+  it('lamp prompt toggles after E, onInspect is not called, and the world message shows the lamp text', () => {
+    h.target = 'desk-lamp-left';
+    const { wrapper, onInspect } = renderWorld();
+    expect(prompt()).toBe('Press E to turn off desk lamp');
+    pressE(wrapper);
+    expect(prompt()).toBe('Press E to turn on desk lamp');
+    expect(message()?.textContent).toBe('Desk lamp turned off.');
+    pressE(wrapper);
+    expect(prompt()).toBe('Press E to turn off desk lamp');
+    expect(message()?.textContent).toBe('Desk lamp turned on.');
+    expect(onInspect).not.toHaveBeenCalled();
+    // No suspension: no panel notice.
+    expect(screen.queryByText(/Station request sent/)).toBeNull();
+  });
+
+  it('E on a manual shows the exact manual text in a polite status region, then clears when the target changes', () => {
+    h.target = 'manual-maze';
+    const { wrapper, onInspect } = renderWorld();
+    expect(prompt()).toBe('Press E to read: LAST EXIT Manual');
+    const region = message()!;
+    expect(region.getAttribute('role')).toBe('status');
+    expect(region.getAttribute('aria-live')).toBe('polite');
+    expect(region.textContent).toBe('');
+    pressE(wrapper);
+    expect(region.textContent).toBe(
+      'LAST EXIT \u2014 Navigate a shifting dark labyrinth, recover three lost photograph fragments, and escape before the stalker catches you.',
+    );
+    expect(onInspect).not.toHaveBeenCalled();
+    act(() => h.setTarget!('manual-snake'));
+    expect(region.textContent).toBe('');
+    expect(prompt()).toBe('Press E to read: SNAKE.EXE Manual');
+    pressE(wrapper);
+    expect(region.textContent).toBe(
+      'SNAKE.EXE \u2014 Guide a serpent of magnetic VHS tape, collect tape fragments, and evade the dark shadow serpent to uncover a secret code.',
+    );
+    act(() => h.setTarget!(null));
+    expect(region.textContent).toBe('');
+    expect(message()).toBe(region);
+  });
+
+  it('shows the DEAD FREQUENCY prompt and text', () => {
+    h.target = 'manual-frequency';
+    const { wrapper } = renderWorld();
+    expect(prompt()).toBe('Press E to read: DEAD FREQUENCY Manual');
+    pressE(wrapper);
+    expect(message()?.textContent).toBe(
+      'DEAD FREQUENCY \u2014 Listen closely to haunted radio frequencies and repeat each audio sequence to decode hidden transmissions.',
+    );
+  });
+
+  it('station prompts and inspection are unchanged after a prop interaction', () => {
+    h.target = 'desk-lamp-right';
+    const { wrapper, onInspect } = renderWorld();
+    pressE(wrapper);
+    act(() => h.setTarget!('vhs'));
+    expect(prompt()).toBe('Press E to inspect the CRT television');
+    expect(message()?.textContent).toBe('');
+    pressE(wrapper);
+    expect(onInspect).toHaveBeenCalledTimes(1);
+    expect(onInspect).toHaveBeenCalledWith('vhs');
   });
 });
 

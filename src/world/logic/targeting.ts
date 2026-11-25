@@ -3,7 +3,7 @@
 // knowledge of lock state: it only reports which Station is targeted.
 
 import type { StationId } from '../../core/contracts';
-import type { Aabb, StationDef, Vec2 } from '../worldTypes';
+import type { Aabb, InteractableDef, InteractionTarget, StationDef, Vec2 } from '../worldTypes';
 import { INTERACTION_CONE_DEG, INTERACTION_RANGE } from './constants';
 
 /** Tolerance so values exactly on a boundary stay eligible despite float error. */
@@ -108,6 +108,59 @@ export function selectInteractionStation(
     if (dist < bestDist) {
       bestDist = dist;
       best = station;
+    }
+  }
+  return best;
+}
+
+/**
+ * Combined targeting: Stations (range INTERACTION_RANGE) and world-local props (each prop's own range, 2.2 m)
+ * share the same view cone and line-of-sight rules. A target's own Collider is ignored for its own test; props
+ * without a Collider are never occluded by themselves. The nearest eligible target wins. On equal distance the
+ * earlier entry wins, and Stations come before props. Returns null when nothing qualifies.
+ */
+export function selectInteractionTargetAll(
+  pos: Vec2,
+  yaw: number,
+  stations: readonly StationDef[],
+  props: readonly InteractableDef[],
+  colliders: readonly Aabb[],
+  coneDeg: number = INTERACTION_CONE_DEG,
+): InteractionTarget | null {
+  const fx = -Math.sin(yaw);
+  const fz = -Math.cos(yaw);
+  const cosCone = Math.cos((coneDeg * Math.PI) / 180);
+
+  const distanceIfEligible = (anchor: Vec2, range: number, own: Aabb | undefined): number | null => {
+    const dx = anchor.x - pos.x;
+    const dz = anchor.z - pos.z;
+    const dist = Math.hypot(dx, dz);
+    if (!(dist <= range + EPS)) return null;
+    if (dist > EPS) {
+      const cosAngle = (fx * dx + fz * dz) / dist;
+      if (cosAngle < cosCone - EPS) return null;
+    }
+    for (const box of colliders) {
+      if (own && sameBox(box, own)) continue;
+      if (segmentIntersectsAabb(pos, anchor, box)) return null;
+    }
+    return dist;
+  };
+
+  let best: InteractionTarget | null = null;
+  let bestDist = Infinity;
+  for (const station of stations) {
+    const d = distanceIfEligible(station.anchor, INTERACTION_RANGE, station.collider);
+    if (d !== null && d < bestDist) {
+      bestDist = d;
+      best = { type: 'station', station };
+    }
+  }
+  for (const prop of props) {
+    const d = distanceIfEligible(prop.anchor, prop.range, prop.collider);
+    if (d !== null && d < bestDist) {
+      bestDist = d;
+      best = { type: 'prop', prop };
     }
   }
   return best;

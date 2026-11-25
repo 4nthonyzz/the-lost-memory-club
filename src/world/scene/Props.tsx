@@ -1,5 +1,7 @@
 /** Reception desk, bookcases with instanced books and tapes, furniture and environmental details. Sizes come from ROOM props. */
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
+import type { Mesh } from 'three'
 import { AssetModel } from '../assets/AssetModel'
 import { ROOM, type PropDef } from '../layout/roomLayout'
 import type { Aabb } from '../worldTypes'
@@ -11,9 +13,12 @@ import {
   couchParts,
   crateParts,
   crtStackParts,
-  deskLampGlowParts,
+  DESK_LAMPS,
   deskLampParts,
+  deskLampPlacement,
   deskParts,
+  type DeskLampKind,
+  type Part,
   posterParts,
   shelfFrameParts,
   shelfContents,
@@ -37,21 +42,56 @@ export function Desk({ box, height }: { box: Aabb; height: number }) {
   return <PartMeshes parts={parts} />
 }
 
+/** A flat glow plane that always faces the camera (a sprite built from the shared unit plane and shared materials). */
+function GlowSprite({ part }: { part: Part }) {
+  const ref = useRef<Mesh>(null)
+  useFrame(({ camera }) => {
+    ref.current?.quaternion.copy(camera.quaternion)
+  })
+  return (
+    <mesh
+      ref={ref}
+      geometry={geometries[part.geo]}
+      material={materials[part.mat]}
+      position={[part.pos[0], part.pos[1], part.pos[2]]}
+      scale={[part.scale[0], part.scale[1], part.scale[2]]}
+      renderOrder={2}
+    />
+  )
+}
+
 /**
- * Warm lamp on the east end of the reception desk (task 18.3): an emissive shade and bulb plus, when the
- * glow texture exists, three faint additive planes. There is no light source; the glow is only meshes.
+ * One desk lamp (task 23.1), placed from its layout entry. `on` selects the lit or unlit shared materials per
+ * mesh: lit = bulb core, warm inner shade, additive glow sprite and desk light pool; unlit = dark glass, no
+ * sprite, no pool. There is no light source; the glow is only meshes, so the two lamps never affect each other.
  */
-export function DeskLamp() {
-  const parts = useMemo(deskLampParts, [])
-  const glow = useMemo(deskLampGlowParts, [])
+export function DeskLamp({ id, kind, on = true }: { id: string; kind: DeskLampKind; on?: boolean }) {
+  const parts = useMemo(() => {
+    const { box, top } = deskLampPlacement(id)
+    return deskLampParts(box, kind, on, top)
+  }, [id, kind, on])
   const textured = useMemo(() => {
     ensureSharedTextures()
     return hasSharedTexture('lampGlow')
   }, [])
+  // Without the glow texture the additive sprite and pool would be flat blobs, so they are skipped.
+  const solid = useMemo(() => parts.filter((p) => p.lampRole !== 'sprite' && (textured || p.lampRole !== 'pool')), [parts, textured])
+  const sprite = textured ? parts.find((p) => p.lampRole === 'sprite') : undefined
   return (
     <group>
-      <PartMeshes parts={parts} />
-      {textured ? <PartMeshes parts={glow} /> : null}
+      <PartMeshes parts={solid} />
+      {sprite ? <GlowSprite part={sprite} /> : null}
+    </group>
+  )
+}
+
+/** Both desk lamps. Each lamp's `on` state comes from the world-local prop state (task 23.2). */
+export function DeskLamps({ on = {} }: { on?: Readonly<Record<string, boolean>> }) {
+  return (
+    <group>
+      {DESK_LAMPS.map(({ id, kind }) => (
+        <DeskLamp key={id} id={id} kind={kind} on={on[id] ?? true} />
+      ))}
     </group>
   )
 }
@@ -63,7 +103,7 @@ export function DeskLamp() {
 export function Shelf({ id, box, height }: { id: string; box: Aabb; height: number }) {
   const { parts, instances } = useMemo(() => {
     const contents = shelfContents(id, box, height)
-    return { parts: [...shelfFrameParts(box, height), ...contents.boxParts], instances: contents.instances }
+    return { parts: [...shelfFrameParts(box, height), ...contents.boxParts, ...contents.manualParts], instances: contents.instances }
   }, [id, box, height])
   return (
     <group>
@@ -175,7 +215,8 @@ function ArcadeAreaDressing() {
   )
 }
 
-export function Props() {
+/** `lampOn` is the world-local lamp state (task 23.2). Absent means both lamps are on. */
+export function Props({ lampOn }: { lampOn?: Readonly<Record<string, boolean>> } = {}) {
   const desk = propById('reception-desk')
   const chair = propById('abandoned-chair')
   const couch = propById('couch')
@@ -183,7 +224,7 @@ export function Props() {
     <group>
       <ShiftDressing />
       <Desk box={desk.box} height={desk.height} />
-      <DeskLamp />
+      <DeskLamps on={lampOn} />
       {(['shelf-a', 'shelf-b', 'shelf-c'] as const).map((id) => {
         const s = propById(id)
         // The shelf GLB is authored along X; assetPlacement rotates it 90 degrees for the Z-long west shelves.
