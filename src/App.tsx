@@ -21,7 +21,7 @@ import {
   type SessionProgress,
 } from './memories/session';
 import type { ClueDetection, TapeDefinition } from './memories/restoration/types';
-import { VhsPlayer } from './memories/VhsPlayer';
+import { VhsPlayerBoundary } from './memories/VhsPlayerBoundary';
 import { AccessibilitySettings } from './ui/AccessibilitySettings';
 import { CrtCorruptionOverlay } from './ui/CrtCorruptionOverlay';
 import { EndingScreen } from './ui/EndingScreen';
@@ -79,6 +79,7 @@ export function App() {
   const [deckTape, setDeckTape] = useState<TapeDefinition | null>(null);
   const [notice, setNotice] = useState<ShellNotice>('intro');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [devOpen, setDevOpen] = useState(false);
   const shellRef = useRef<HTMLElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const wasOpen = useRef(false);
@@ -264,9 +265,11 @@ export function App() {
                   </li>
                 </ul>
                 {deckTape ? (
-                  <VhsPlayer
+                  <VhsPlayerBoundary
                     key={deckTape.id}
                     tape={deckTape}
+                    inventory={arcadeDone ? [SUMMER_TAPE, ARCHIVE_TAPE] : [SUMMER_TAPE]}
+                    onSelectTape={setDeckTape}
                     language={language}
                     reducedDistortion={reducedDistortion}
                     muted={muted}
@@ -282,7 +285,7 @@ export function App() {
                 </div>
               </section>
             )}
-            {station === 'arcade' && <ArcadePanel onStart={startArcade} onClose={closePanel} />}
+            {station === 'arcade' && <ArcadePanel onStart={startArcade} onWin={(_, score) => dispatch({ type: 'ARCADE_WON', gameId: SNAKE_GAME_ID, score })} onClose={closePanel} />}
             {station === 'ending' && archiveRestored && (
               <EndingScreen language={language} reducedDistortion={reducedDistortion} endings={journal.endings} onRestart={closePanel} />
             )}
@@ -291,7 +294,11 @@ export function App() {
       )}
 
       {import.meta.env.DEV && (
-        <div className="dev-drawer">
+        <>
+          <button type="button" className="dev-toggle" aria-expanded={devOpen} onClick={() => setDevOpen((open) => !open)}>
+            {'⚙ Dev'}
+          </button>
+          {devOpen && <div className="dev-drawer">
           <DemoControls
             clueFound={clueFound}
             arcadeDone={arcadeDone}
@@ -300,7 +307,8 @@ export function App() {
             onToggleSecret={(secretId) => setSession((current) => toggleMinigameSecret(current, secretId))}
             onResetSession={() => setSession(EMPTY_SESSION)}
           />
-        </div>
+          </div>}
+        </>
       )}
     </main>
   );

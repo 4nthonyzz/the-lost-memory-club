@@ -64,6 +64,22 @@ function drawEye(ctx: CanvasRenderingContext2D, x: number, y: number, size: numb
 
 function drawArcadeScene(ctx: CanvasRenderingContext2D, t: number, reveal: number): void {
   fillRoom(ctx, '#11101f', '#2b1733');
+  const neonPulse = 0.72 + Math.sin(t * 2.4) * 0.18;
+  ctx.save();
+  ctx.shadowColor = '#ff4f91';
+  ctx.shadowBlur = 18 * neonPulse;
+  ctx.fillStyle = `rgba(255, ${Math.round(105 + neonPulse * 70)}, 145, ${neonPulse})`;
+  ctx.font = 'bold 22px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('MIDNIGHT RENTALS', 240, 48);
+  ctx.restore();
+  for (let index = 0; index < 28; index += 1) {
+    const x = (index * 83 + t * (4 + index % 3)) % SCREEN_WIDTH;
+    const y = 62 + ((index * 47) % 205);
+    const alpha = 0.15 + ((Math.sin(t * 1.7 + index) + 1) * 0.12);
+    ctx.fillStyle = `rgba(255,210,150,${alpha})`;
+    ctx.fillRect(x, y, 1 + index % 2, 1 + index % 2);
+  }
   ctx.fillStyle = '#1b1b2e';
   ctx.fillRect(190, 90, 100, 200);
   ctx.fillStyle = '#ff3b6b';
@@ -76,14 +92,23 @@ function drawArcadeScene(ctx: CanvasRenderingContext2D, t: number, reveal: numbe
   }
   ctx.fillStyle = '#2a2a44';
   ctx.fillRect(200, 190, 80, 12);
-  drawPerson(ctx, 140, 300, 140, '#07060c');
-  drawPerson(ctx, 350, 300, 150, '#07060c');
+  drawPerson(ctx, 140 + Math.sin(t * 1.5) * 5, 300, 140, '#07060c');
+  drawPerson(ctx, 350 + Math.cos(t * 1.2) * 6, 300, 150, '#07060c');
   if (reveal > 0.05) {
-    drawEye(ctx, 240, 145, 24, reveal);
-    drawEye(ctx, 150, 70, 14, reveal);
-    drawEye(ctx, 330, 80, 16, reveal);
-    drawEye(ctx, 70, 150, 12, reveal);
-    drawEye(ctx, 410, 160, 14, reveal);
+    const shadowApproach = Math.min(1, reveal * 1.35);
+    ctx.save();
+    ctx.globalAlpha = shadowApproach * 0.72;
+    ctx.fillStyle = '#020205';
+    ctx.beginPath();
+    ctx.ellipse(240, 275, 38 + shadowApproach * 32, 105 + shadowApproach * 65, 0, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+    drawEye(ctx, 225, 145, 24 * shadowApproach, shadowApproach);
+    drawEye(ctx, 255, 145, 24 * shadowApproach, shadowApproach);
+  }
+  if (reveal > 0.82) {
+    ctx.fillStyle = `rgba(255,245,210,${0.08 + Math.abs(Math.sin(t * 8)) * 0.15})`;
+    ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
   }
 }
 
@@ -196,53 +221,74 @@ export function createVhsRenderer(canvas: HTMLCanvasElement): VhsRenderer | null
   if (!context || !sceneContext || !channelContext) return null;
 
   return {
-    draw({ tapeId, time, position, mode, params }) {
-      drawScene(sceneContext, tapeId, position, params.reveal);
-
-      context.globalCompositeOperation = 'source-over';
-      context.fillStyle = '#000';
-      context.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-      const dx = (Math.random() - 0.5) * 2 * params.jitter;
-      const dy = (Math.random() - 0.5) * params.jitter;
-
-      if (params.chromatic < 0.5) {
-        context.drawImage(sceneLayer, dx, dy);
-      } else {
-        context.globalCompositeOperation = 'lighter';
-        for (const channel of CHANNELS) {
-          channelContext.globalCompositeOperation = 'source-over';
-          channelContext.drawImage(sceneLayer, 0, 0);
-          channelContext.globalCompositeOperation = 'multiply';
-          channelContext.fillStyle = channel.color;
-          channelContext.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-          context.drawImage(channelLayer, dx + channel.direction * params.chromatic, dy);
-        }
+    draw(input) {
+      try {
+        const { tapeId, mode } = input;
+        const time = Number.isFinite(input.time) ? input.time : 0;
+        const position = Number.isFinite(input.position) ? Math.max(0, input.position) : 0;
+        const params = {
+          ...input.params,
+          noise: Number.isFinite(input.params.noise) ? Math.max(0, Math.min(1, input.params.noise)) : 0,
+          jitter: Number.isFinite(input.params.jitter) ? Math.max(0, input.params.jitter) : 0,
+          chromatic: Number.isFinite(input.params.chromatic) ? Math.max(0, input.params.chromatic) : 0,
+          bandShift: Number.isFinite(input.params.bandShift) ? Math.max(0, input.params.bandShift) : 0,
+          flicker: Number.isFinite(input.params.flicker) ? Math.max(0, Math.min(1, input.params.flicker)) : 0,
+          reveal: Number.isFinite(input.params.reveal) ? Math.max(0, Math.min(1, input.params.reveal)) : 0,
+        };
+        drawScene(sceneContext, tapeId, params.reducedDistortion ? Math.floor(position * 2) / 2 : position, params.reveal);
         context.globalCompositeOperation = 'source-over';
-      }
-
-      if (params.bandShift > 0) {
-        for (let band = 0; band < 4; band += 1) {
-          const y = (time * 220 + band * 90) % SCREEN_HEIGHT;
-          const shift = Math.sin(time * 30 + band) * params.bandShift;
-          context.drawImage(canvas, 0, y, SCREEN_WIDTH, 14, shift, y, SCREEN_WIDTH, 14);
-        }
-      }
-
-      const specks = Math.floor(params.noise * 900);
-      for (let index = 0; index < specks; index += 1) {
-        const shade = Math.floor(Math.random() * 255);
-        context.fillStyle = `rgba(${shade},${shade},${shade},0.55)`;
-        context.fillRect(Math.random() * SCREEN_WIDTH, Math.random() * SCREEN_HEIGHT, 1 + Math.random() * 3, 1);
-      }
-
-      if (mode === 'paused' || mode === 'rewind' || mode === 'ffwd') {
-        context.fillStyle = 'rgba(235,235,235,0.35)';
-        context.fillRect(0, SCREEN_HEIGHT - 26 + Math.random() * 3, SCREEN_WIDTH, 2);
-      }
-
-      if (params.flicker > 0) {
-        context.fillStyle = `rgba(0,0,0,${Math.random() * params.flicker})`;
+        context.fillStyle = '#000';
         context.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+        const dx = (Math.random() - 0.5) * 2 * params.jitter;
+        const dy = (Math.random() - 0.5) * params.jitter;
+
+        if (params.chromatic < 0.5) {
+          context.drawImage(sceneLayer, dx, dy);
+        } else {
+          context.globalCompositeOperation = 'lighter';
+          for (const channel of CHANNELS) {
+            channelContext.globalCompositeOperation = 'source-over';
+            channelContext.clearRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+            channelContext.drawImage(sceneLayer, 0, 0);
+            channelContext.globalCompositeOperation = 'multiply';
+            channelContext.fillStyle = channel.color;
+            channelContext.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+            context.drawImage(channelLayer, dx + channel.direction * params.chromatic, dy);
+          }
+          context.globalCompositeOperation = 'source-over';
+        }
+
+        if (params.bandShift > 0) {
+          for (let band = 0; band < 4; band += 1) {
+            const y = Math.max(0, Math.min(SCREEN_HEIGHT - 14, (time * 220 + band * 90) % SCREEN_HEIGHT));
+            const shift = Math.sin(time * 30 + band) * params.bandShift;
+            context.drawImage(sceneLayer, 0, y, SCREEN_WIDTH, 14, shift, y, SCREEN_WIDTH, 14);
+          }
+        }
+
+        const specks = Math.floor(params.noise * 900);
+        for (let index = 0; index < specks; index += 1) {
+          const shade = Math.floor(Math.random() * 255);
+          context.fillStyle = `rgba(${shade},${shade},${shade},0.55)`;
+          context.fillRect(Math.random() * SCREEN_WIDTH, Math.random() * SCREEN_HEIGHT, 1 + Math.random() * 3, 1);
+        }
+
+        if (mode === 'paused' || mode === 'rewind' || mode === 'ffwd') {
+          context.fillStyle = 'rgba(235,235,235,0.35)';
+          context.fillRect(0, SCREEN_HEIGHT - 26 + Math.random() * 3, SCREEN_WIDTH, 2);
+        }
+
+        if (params.flicker > 0) {
+          context.fillStyle = `rgba(0,0,0,${Math.random() * params.flicker})`;
+          context.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+        }
+      } catch {
+        context.globalCompositeOperation = 'source-over';
+        context.fillStyle = '#090b12';
+        context.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+        context.fillStyle = '#c9d0e0';
+        context.font = '14px monospace';
+        context.fillText('VHS signal recovering...', 18, 28);
       }
     },
   };

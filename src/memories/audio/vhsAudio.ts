@@ -74,7 +74,7 @@ interface AudioGraph {
   chordNode: GainNode;
 }
 
-function buildGraph(): AudioGraph | null {
+function buildGraphUnsafe(): AudioGraph | null {
   if (typeof AudioContext === 'undefined') return null;
   const context = new AudioContext();
   const master = context.createGain();
@@ -121,6 +121,14 @@ function buildGraph(): AudioGraph | null {
   }
 
   return { context, master, noiseBuffer, staticFilter, staticNode, engineOscillator, engineNode, chordNode };
+}
+
+function buildGraph(): AudioGraph | null {
+  try {
+    return buildGraphUnsafe();
+  } catch {
+    return null;
+  }
 }
 
 function playThump(graph: AudioGraph, peak: number, delay: number): void {
@@ -175,10 +183,22 @@ export function createVhsAudio(): VhsAudio {
 
   return {
     async resume() {
-      graph ??= buildGraph();
-      if (!graph) return;
-      if (graph.context.state === 'suspended') await graph.context.resume();
-      if (latest) apply(latest);
+      try {
+        graph ??= buildGraph();
+        if (!graph) return;
+        if (graph.context.state === 'suspended') await graph.context.resume();
+        if (latest) apply(latest);
+      } catch {
+        const current = graph;
+        graph = null;
+        if (current) {
+          try {
+            await current.context.close();
+          } catch {
+            // Audio cleanup is best effort.
+          }
+        }
+      }
     },
     update(input) {
       latest = input;

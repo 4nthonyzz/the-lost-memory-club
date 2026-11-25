@@ -6,8 +6,9 @@
   padding: 18px;
   border: 1px solid #3a3d52;
   border-radius: 14px;
-  background: #0d0f19;
+  background: #0b0d16;
   color: #dfe3ee;
+  margin-bottom: 28px;
   outline: none;
   transition: border-color 0.6s ease;
 }
@@ -22,6 +23,11 @@
   --vhs-glow: rgba(255, 170, 70, 0.4);
   border-color: #7a5a2c;
 }
+
+.vhs-inventory { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.vhs-inventory__tab { flex: 0 0 auto; min-height: 38px; padding: 8px 12px; border: 1px solid #3f465f; border-radius: 7px; background: #111522; color: #aeb5c9; font: 700 11px ui-monospace, monospace; }
+.vhs-inventory__tab--active { border-color: var(--vhs-accent); background: rgba(145, 219, 212, .12); color: var(--vhs-accent); }
+.vhs-inventory__tab:focus-visible { outline: 3px solid #f2c376; outline-offset: 2px; }
 
 .vhs-tv {
   padding: 14px;
@@ -239,6 +245,84 @@
   font-family: ui-monospace, monospace;
   font-size: 11px;
   color: #8f95aa;
+}
+
+.vhs-timeline {
+  display: grid;
+  gap: 6px;
+  padding: 0 4px;
+}
+
+.vhs-timeline__track {
+  position: relative;
+  height: 22px;
+}
+
+.vhs-timeline__track::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 99px;
+  background: #2a2e42;
+}
+
+.vhs-timeline__zone {
+  position: absolute;
+  top: 50%;
+  height: 10px;
+  transform: translateY(-50%);
+  border-radius: 4px;
+  background: rgba(255, 190, 90, 0.35);
+  box-shadow: 0 0 10px rgba(255, 190, 90, 0.35);
+  pointer-events: none;
+}
+
+.vhs-timeline__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  background: transparent;
+  accent-color: var(--vhs-accent);
+  cursor: pointer;
+}
+
+.vhs-timeline__input:focus-visible {
+  outline: 3px solid #f2c376;
+  outline-offset: 2px;
+}
+
+.vhs-timeline__times {
+  display: flex;
+  justify-content: space-between;
+  font: 700 11px/1 ui-monospace, monospace;
+  letter-spacing: 0.08em;
+  color: #aab0c4;
+}
+
+.vhs-steps {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 14px;
+  list-style: none;
+  border: 1px solid #2d3146;
+  border-radius: 10px;
+  background: #0a0c14;
+}
+
+.vhs-step {
+  font: 700 12px/1.4 ui-monospace, monospace;
+  letter-spacing: 0.04em;
+  color: #b4b9cb;
+}
+
+.vhs-step--done {
+  color: #5fd39a;
 }
 
 .vhs-player--reduced,

@@ -144,5 +144,8 @@ export function transportReducer(state: TransportState, action: TransportAction)
       return detectClues(withTracking(state, state.tracking + action.delta));
     case 'SET_TRACKING':
       return detectClues(withTracking(state, action.value));
+    case 'SEEK':
+      if (!Number.isFinite(action.position)) return state;
+      return detectClues(withPosition(state, action.position));
   }
 }

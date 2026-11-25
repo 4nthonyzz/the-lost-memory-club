@@ -8,11 +8,14 @@ import { createTransportState, newDetections, transportReducer } from './restora
 import type { ClueDetection, TapeDefinition, TransportAction, TransportState } from './restoration/types';
 import { subtitleAt } from './subtitles';
 import { createVhsRenderer, SCREEN_HEIGHT, SCREEN_WIDTH } from './vhsRenderer';
-import { computeVisualParams, formatTimecode } from './vhsVisuals';
+import { computeVisualParams, formatClock, formatTimecode, isInAnomalyWindow, SIGNAL_THRESHOLD } from './vhsVisuals';
+import { TRANSPORT_FPS } from './restoration/types';
 import './VhsPlayer.css';
 
 export interface VhsPlayerProps {
   tape: TapeDefinition;
+  inventory?: readonly TapeDefinition[];
+  onSelectTape?: (tape: TapeDefinition) => void;
   language: Language;
   reducedDistortion: boolean;
   muted: boolean;
@@ -29,7 +32,7 @@ function createLoadedState(tape: TapeDefinition): TransportState {
   return transportReducer(createTransportState(), { type: 'LOAD_TAPE', tape });
 }
 
-export function VhsPlayer({ tape, language, reducedDistortion, muted, onMutedChange, onClueDetected, onClose }: VhsPlayerProps) {
+export function VhsPlayerContent({ tape, inventory = [tape], onSelectTape, language, reducedDistortion, muted, onMutedChange, onClueDetected, onClose }: VhsPlayerProps) {
   const strings = getPlayerStrings(language);
   const [state, dispatch] = useReducer(transportReducer, tape, createLoadedState);
   const [notice, setNotice] = useState<NoticeKind | null>(null);
@@ -45,6 +48,13 @@ export function VhsPlayer({ tape, language, reducedDistortion, muted, onMutedCha
   const params = computeVisualParams(state, reducedDistortion);
   const subtitle = subtitleAt(tape.id, state.position, language);
   const moving = state.mode === 'playing' || state.mode === 'rewind' || state.mode === 'ffwd';
+  const stepPaused = state.mode === 'paused' && isInAnomalyWindow(tape, state.position);
+  const stepTuned = state.signalQuality >= SIGNAL_THRESHOLD;
+  const anomalyZones = tape.clueWindows.map((window) => ({
+    key: window.clueId,
+    left: (window.startFrame / TRANSPORT_FPS / tape.duration) * 100,
+    width: ((window.endFrame - window.startFrame) / TRANSPORT_FPS / tape.duration) * 100,
+  }));
 
   useEffect(() => {
     stateRef.current = state;
@@ -69,19 +79,29 @@ export function VhsPlayer({ tape, language, reducedDistortion, muted, onMutedCha
   }, []);
 
   useEffect(() => {
-    audioRef.current?.update({
-      mode: state.mode,
-      signalQuality: state.signalQuality,
-      tension: tensionLevel(params.reveal, state.mode),
-      muted,
-      reducedDistortion,
-    });
+    try {
+      audioRef.current?.update({
+        mode: state.mode,
+        signalQuality: state.signalQuality,
+        tension: tensionLevel(params.reveal, state.mode),
+        muted,
+        reducedDistortion,
+      });
+    } catch {
+      audioRef.current?.dispose();
+      audioRef.current = null;
+    }
   }, [state.mode, state.signalQuality, params.reveal, muted, reducedDistortion]);
 
   useEffect(() => {
     if (previousModeRef.current === state.mode) return;
     previousModeRef.current = state.mode;
-    audioRef.current?.click();
+    try {
+      audioRef.current?.click();
+    } catch {
+      audioRef.current?.dispose();
+      audioRef.current = null;
+    }
   }, [state.mode]);
 
   useEffect(() => {
@@ -102,23 +122,39 @@ export function VhsPlayer({ tape, language, reducedDistortion, muted, onMutedCha
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const renderer = createVhsRenderer(canvas);
+    let renderer: ReturnType<typeof createVhsRenderer> = null;
+    try {
+      renderer = createVhsRenderer(canvas);
+    } catch {
+      renderer = null;
+    }
     let frameId = 0;
     let last = performance.now();
     const loop = (now: number) => {
-      const seconds = Math.min(0.1, (now - last) / 1000);
-      last = now;
-      const current = stateRef.current;
-      if (current.mode === 'playing' || current.mode === 'rewind' || current.mode === 'ffwd') {
-        dispatch({ type: 'TICK', seconds });
+      try {
+        const seconds = Math.min(0.1, Math.max(0, (now - last) / 1000));
+        last = now;
+        const current = stateRef.current;
+        if (current.mode === 'playing' || current.mode === 'rewind' || current.mode === 'ffwd') {
+          dispatch({ type: 'TICK', seconds });
+        }
+        renderer?.draw({
+          tapeId: current.tape?.id ?? '',
+          time: Number.isFinite(now) ? now / 1000 : 0,
+          position: current.position,
+          mode: current.mode,
+          params: computeVisualParams(current, reducedRef.current),
+        });
+      } catch {
+        const context = canvas.getContext('2d');
+        if (context) {
+          context.fillStyle = '#090b12';
+          context.fillRect(0, 0, canvas.width, canvas.height);
+          context.fillStyle = '#d6dbe9';
+          context.font = '14px monospace';
+          context.fillText(strings.screenLabel, 18, 28);
+        }
       }
-      renderer?.draw({
-        tapeId: current.tape?.id ?? '',
-        time: now / 1000,
-        position: current.position,
-        mode: current.mode,
-        params: computeVisualParams(current, reducedRef.current),
-      });
       frameId = requestAnimationFrame(loop);
     };
     frameId = requestAnimationFrame(loop);
@@ -126,7 +162,12 @@ export function VhsPlayer({ tape, language, reducedDistortion, muted, onMutedCha
   }, []);
 
   function wakeAudio(): void {
-    void audioRef.current?.resume();
+    try {
+      void audioRef.current?.resume();
+    } catch {
+      audioRef.current?.dispose();
+      audioRef.current = null;
+    }
   }
 
   function run(actions: TransportAction[]): void {
@@ -156,6 +197,19 @@ export function VhsPlayer({ tape, language, reducedDistortion, muted, onMutedCha
 
   return (
     <section ref={rootRef} className={rootClass} aria-label={strings.region} tabIndex={-1} onKeyDown={handleKeyDown} onPointerDown={wakeAudio}>
+      <nav className="vhs-inventory" aria-label="VHS inventory">
+        {inventory.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={item.id === tape.id ? 'vhs-inventory__tab vhs-inventory__tab--active' : 'vhs-inventory__tab'}
+            aria-current={item.id === tape.id ? 'true' : undefined}
+            onClick={() => onSelectTape?.(item)}
+          >
+            {item.id === MEMORY_ID ? 'Archive 09' : item.title}
+          </button>
+        ))}
+      </nav>
       <div className="vhs-tv">
         <div className="vhs-screen" role="img" aria-label={strings.screenLabel}>
           <canvas ref={canvasRef} width={SCREEN_WIDTH} height={SCREEN_HEIGHT} />
@@ -175,6 +229,45 @@ export function VhsPlayer({ tape, language, reducedDistortion, muted, onMutedCha
           {subtitle ?? '\u00a0'}
         </p>
       </div>
+
+      <div className="vhs-timeline">
+        <div className="vhs-timeline__track">
+          {anomalyZones.map((zone) => (
+            <span
+              key={zone.key}
+              className="vhs-timeline__zone"
+              title={strings.timelineAnomaly}
+              style={{ left: `${zone.left}%`, width: `${zone.width}%` }}
+            />
+          ))}
+          <input
+            type="range"
+            className="vhs-timeline__input"
+            min={0}
+            max={tape.duration}
+            step={0.04}
+            value={Math.min(state.position, tape.duration)}
+            aria-label={strings.timeline}
+            aria-valuetext={`${formatClock(state.position)} / ${formatClock(tape.duration)}`}
+            onChange={(event) => dispatch({ type: 'SEEK', position: Number(event.currentTarget.value) })}
+          />
+        </div>
+        <div className="vhs-timeline__times" aria-hidden="true">
+          <span>{formatClock(state.position)}</span>
+          <span>{formatClock(tape.duration)}</span>
+        </div>
+      </div>
+
+      <ol className="vhs-steps">
+        <li className={stepPaused ? 'vhs-step vhs-step--done' : 'vhs-step'}>
+          {stepPaused ? '\u2713 ' : ''}
+          {strings.stepPause}
+        </li>
+        <li className={stepTuned ? 'vhs-step vhs-step--done' : 'vhs-step'}>
+          {stepTuned ? '\u2713 ' : ''}
+          {strings.stepTune}
+        </li>
+      </ol>
 
       <div className="vhs-meters">
         <label className="vhs-meter">

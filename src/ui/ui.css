@@ -411,7 +411,9 @@
   max-width: 720px;
   margin: 0 auto;
   padding: 24px;
+  background: #0b0d16;
   color: #ece8f2;
+  isolation: isolate;
 }
 
 .ending h2 {

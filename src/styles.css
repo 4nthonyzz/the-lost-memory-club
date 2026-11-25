@@ -30,8 +30,8 @@ h2 { font-size: 19px; margin-bottom: 14px; }
 @media (max-width: 900px) { .hud-status { bottom: 56px; max-width: calc(100% - 24px); } }
 
 /* Modal layer for station overlays */
-.modal-backdrop { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(4, 6, 12, .72); }
-.modal-dialog { width: 100%; max-width: 560px; max-height: 85vh; overflow: auto; border-radius: 13px; }
+.modal-backdrop { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(4, 6, 12, .94); }
+.modal-dialog { width: 100%; max-width: 560px; max-height: 85vh; overflow: auto; border-radius: 13px; background: #0b0d16; padding-bottom: 8px; }
 .modal-dialog:focus { outline: none; }
 .modal-dialog .station-panel { max-width: 560px; max-height: 85vh; overflow: auto; }
 
@@ -41,7 +41,12 @@ h2 { font-size: 19px; margin-bottom: 14px; }
 .station-panel p:not(.eyebrow) { font-size: 12px; color: #c9cdd9; line-height: 1.6; }
 .terminal-placeholder { border: 1px dashed #576075; background: #0a1020; color: #dccfa9; padding: 23px 14px; margin: 20px 0; text-align: center; font-family: ui-monospace, monospace; font-size: 11px; letter-spacing: .07em; }
 .panel-buttons { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.success-note { color: #9cddc7 !important; font-weight: 700; }
+.arcade-challenge { display: grid; gap: 8px; margin: 18px 0; padding: 14px; border: 1px solid #46506c; border-radius: 8px; background: #080b15; color: #c9d0e0; font-size: 12px; }
+.arcade-challenge__screen { position: relative; height: 92px; overflow: hidden; border: 1px solid #25314a; background: radial-gradient(circle at 68% 38%, rgba(255, 190, 80, .65) 0 4px, transparent 5px), linear-gradient(135deg, #091d26, #15102c); }
+.arcade-challenge__memory { position: absolute; top: 29px; left: 68%; color: #ffd16b; font-size: 22px; text-shadow: 0 0 12px #ff9d3c; }
+.arcade-challenge__snake { position: absolute; top: 52px; left: 22%; color: #7ee3cc; letter-spacing: 3px; animation: arcade-snake-drift 2.6s ease-in-out infinite alternate; }
+@keyframes arcade-snake-drift { from { transform: translateX(0); } to { transform: translateX(90px); } }
+
 .fineprint { font-size: 11px !important; color: #a4a9bc !important; margin-top: 15px; }
 .save-row { display: flex; margin-top: 12px; }
 .tape-shelf { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 10px; }
@@ -53,7 +58,9 @@ h2 { font-size: 19px; margin-bottom: 14px; }
 .dev-panel__secrets { display: grid; gap: 8px; border: 1px solid #36394b; border-radius: 8px; padding: 10px 12px; margin: 0; font-size: 12px; color: #d6dbe9; }
 .dev-panel__check { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
 .dev-panel__check input { margin-top: 3px; }
-.dev-drawer { position: absolute; z-index: 6; left: 12px; bottom: 12px; width: min(360px, calc(100% - 24px)); max-height: 48vh; overflow: auto; }
-.dev-drawer .dev-panel { background: rgba(9, 16, 30, .96); }
+.dev-toggle { position: absolute; z-index: 7; right: 12px; bottom: 12px; padding: 6px 10px; border: 1px solid #4a5570; border-radius: 6px; background: rgba(9, 16, 30, .8); color: #aeb8cc; font: 700 11px ui-monospace, monospace; opacity: .72; }
+.dev-toggle:hover, .dev-toggle:focus-visible { opacity: 1; }
+.dev-drawer { position: absolute; z-index: 8; left: 12px; bottom: 12px; width: min(360px, calc(100% - 90px)); max-height: 48vh; overflow: auto; }
+.dev-drawer .dev-panel { background: rgba(9, 16, 30, .98); }
 .journal-slot { margin-top: 18px; }
 @media(max-width: 500px) { .dev-drawer { max-height: 42vh; } .hud-status { max-width: calc(100% - 24px); } }

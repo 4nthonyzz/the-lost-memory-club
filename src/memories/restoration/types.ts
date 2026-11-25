@@ -50,4 +50,5 @@ export type TransportAction =
   | { type: 'TICK'; seconds: number }
   | { type: 'STEP_FRAME'; direction: 1 | -1 }
   | { type: 'ADJUST_TRACKING'; delta: number }
-  | { type: 'SET_TRACKING'; value: number };
+  | { type: 'SET_TRACKING'; value: number }
+  | { type: 'SEEK'; position: number };
