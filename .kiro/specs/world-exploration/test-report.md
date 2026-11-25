@@ -133,7 +133,7 @@ These tests combine several modules or render components; none uses a real brows
 - Real GLB loading and parsing in a browser.
 - Blender scripts (not run by any test).
 - How procedural textures and the polish-pass and refinement-pass layout look (tests check generated data and layout numbers, not appearance). Not verified visually.
-- Performance on target hardware (`targeting.bench.test.ts` is informational and asserts nothing about speed).
+- Performance on target hardware. The project owner measured median 16.70 ms and p95 18.60 ms once on a dev build with the `?worldPerf=1` sampler (hardware not provided; see `performance-log.md` section 4); no test asserts speed, and `targeting.bench.test.ts` is informational.
 
 ## Test gaps recorded for Requirement 13.14
 

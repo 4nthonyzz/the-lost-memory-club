@@ -553,7 +553,7 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 
 ### Milestone 6: Testing and optimization
 
-- [ ] 15. Verification, measurement and documentation
+- [x] 15. Verification, measurement and documentation
   - [x] 15.1 Audit test coverage against design properties
     - Files: `.kiro/specs/world-exploration/test-report.md`.
     - Table of Properties 1 to 17 with the test file and status (present, skipped, fallback), seeds used, and any gap such as a failed `fast-check` or jsdom install. Add any missing property tests that were skipped only if the user asks for them.
@@ -583,7 +583,7 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: spec folder only.
     - _Requirements: 15.6, 15.7_
 
-  - [~] 15.4 MANUAL MEASUREMENT: record performance results
+  - [x] 15.4 MANUAL MEASUREMENT: record performance results
     - Files: `.kiro/specs/world-exploration/performance-log.md`.
     - Run `npm run build` and `npm run preview`, then record a 60-second scripted walk on the Reference_Hardware at 1280 by 720 with the dev sampler or the browser Performance panel. Record method, hardware, browser, median and 95th-percentile frame time, first-render time, triangle count, draw calls and the targeting benchmark output. Fill each target as "measured: value" or "not measured". Do not claim a target as achieved without a recorded value.
     - Agents prepare `performance-log.md` with computed static metrics (triangle count from `modelDetail` helpers, draw-call grouping estimate), clearly labelled "computed, not runtime-measured". The runtime frame-time fields stay "not measured" until the user records them. This sub-task is intentionally left unchecked until a human records values.

@@ -161,7 +161,24 @@ Computed from declared geometry and source, **computed, not runtime-measured**. 
 **The triangle margin is thin:** 19,172 leaves about 830 triangles (4 percent) below the 20,000 limit. The biggest consumers (computed by summing declared objects in task 21.3): the three bookshelves (2,352, 2,280 and 2,088), the three cabinets (1,316 each), `console-cables` (1,088), the two filing cabinets (692 each) and the desk (672); task 22 added 44 triangles in total.
 
 **The texture margin is also thin:** 7.459 MB computed against the 8 MB limit leaves about 0.54 MB. First candidates to cut if more room is needed: `console-cables` (1,088 triangles), the book count (370 books), the three 0.66 MB posters (`posterSunset`, `posterReel`, `shiftPoster`, 256x512) or `spineAtlas` (512x256, 0.66 MB), which could shrink. The per-texture list (MB, computed, not runtime-measured): attractSnake 0.25, attractMaze 0.25, attractFrequency 0.25, marqueeSnake 0.06, marqueeMaze 0.06, marqueeFrequency 0.06, signFace 0.33, posterSunset 0.66, posterReel 0.66, shiftPoster 0.66, shiftPlaque 0.17, floor 0.08, wood 0.08, woodDark 0.08, crate 0.33, grille 0.08, spineAtlas 0.66, wallPanel 0.33, rugWoven 0.33, corkBoard 0.33, lampGlow 0.02, smpteBars 0.13, timecode 0.02, couchFabric 0.33, crtCasing 0.33, crtGlass 0.25, vcrDeck 0.17, vhsShell 0.08, metalCabinet 0.33, deskDetail 0.04. The largest are the three posters and `spineAtlas` (0.66 each).
-No runtime measurement was taken by the agent in task 22.3. Chrome and Edge are installed, but no automation library (Playwright or Puppeteer) is present and nothing was installed. Human sign-off steps are in `performance-log.md` section 1.1; task 15.4 stays open. targets (median and 95th percentile at 1280x720 on integrated graphics, first-render time, runtime triangles and draw calls) are **not measured**. See `.kiro/specs/world-exploration/performance-log.md`. No runtime performance figure is claimed here.
+**Measured runtime values** (measured by the project owner, dev build, `?worldPerf=1` sampler, 60 s walkthrough across both rooms and all three arcade cabinets; raw output in `.kiro/specs/world-exploration/performance-log.md` section 4):
+
+| Metric | Measured value |
+| --- | --- |
+| Frames sampled | 3600 (the sampler ring-buffer capacity, so the most recent 3600 frames) |
+| Median frame time | 16.70 ms (about 59.9 fps) |
+| 95th-percentile frame time | 18.60 ms |
+| Renderer triangles (`renderer.info.render.triangles`) | 10,378 |
+| Draw calls (`renderer.info.render.calls`) | 151 |
+| Geometries / textures (`renderer.info.memory`) | 89 / 29 |
+
+Caveats:
+- Hardware/GPU, browser and version, OS, window resolution and date were **not provided**. The Reference_Hardware (integrated graphics at 1280x720) cannot be confirmed, so the median <= 20 ms and p95 <= 33 ms targets are met on the owner's machine only.
+- Triangles and draw calls describe the last rendered frame from one camera position, after frustum culling, with each instanced mesh counted as one call. They are not comparable one-to-one with the computed whole-scene figures above (19,172 triangles, 319 draw-call estimate, 30 declared textures); the lower measured numbers are expected.
+- Textures 29 vs 30 declared: `renderer.info.memory.textures` counts textures uploaded to the GPU so far. One declared texture may not have been uploaded yet or may be absent (likely explanation, not verified).
+- A median near 16.7 ms is consistent with a 60 Hz vsync cap, so frame time is likely limited by display refresh. The real headroom is unknown.
+- Dev build, which is slower than production.
+- First-render time and the targeting benchmark on the Reference_Hardware are **not measured**. The computed figures above remain computed, not runtime-measured.
 
 ## Disposal and edge-case checks
 
@@ -211,7 +228,7 @@ See `.kiro/specs/world-exploration/proposals.md`. In short: P1 implemented; P3 a
 - No browser run is recorded for M6, the polish pass, the refinement pass or the three-cabinet pass; the new layout and textures are not verified visually.
 - All three cabinets open the same App arcade panel (Snake). LAST EXIT and DEAD FREQUENCY have no game behind them.
 - Spawn gap (open item): the spawn (0, 3) is exactly 1.0 m from the desk edge and the south wall, so a 1.2 m disc around the spawn is not clear. The test asserts 0.99 m. This was not requested in the final instructions and is not fixed. The manual test log has no recorded result.
-- Runtime frame time, first-render time and runtime triangle/draw-call counts are not measured. The triangle margin below the 20,000 limit is only about 870, and the texture margin below 8 MB is only about 0.42 MB.
+- Frame time and renderer counts were measured once by the project owner (dev build, hardware not provided; see the Metrics section). First-render time is not measured, and the Reference_Hardware cannot be confirmed. The triangle margin below the 20,000 limit is only about 870, and the texture margin below 8 MB is only about 0.42 MB.
 - No GLB assets and no Blender run. The scene uses primitives only.
 - No restored-memory viewer component exists in the repo. The HUD shows progress booleans only.
 - `reducedDistortion` (P2) is not wired, so there is no in-game reduced-distortion link.

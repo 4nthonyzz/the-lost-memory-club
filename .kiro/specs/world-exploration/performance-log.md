@@ -1,6 +1,6 @@
 # World Exploration Performance Log (task 15.4)
 
-**Status: PREPARED, NOT MEASURED (no runtime measurement was taken by the agent in tasks 20.3, 21.3 or 22.3; task 15.4 stays open).** Section 2 holds values computed from declared geometry and a build. Section 3 shows every runtime target as "not measured". **No target counts as achieved until a human records a runtime value in section 4.** Until then, the README, submission text and demo must describe the runtime targets as planned (Requirements 14.11, 14.12).
+**Status: PARTIALLY MEASURED. The project owner recorded a dev-sampler measurement (section 4). Hardware, browser, OS, resolution and date were not provided, so the Reference_Hardware targets cannot be confirmed.** The agent took no measurement itself (tasks 20.3, 21.3, 22.3). Section 2 holds values computed from declared geometry and a build. Section 3 lists each target as computed, measured or not measured. First-render time and the targeting benchmark on the Reference_Hardware are still not measured. Describe any target without a recorded value as planned (Requirements 14.11, 14.12).
 
 ## 1. Method (human measurement)
 
@@ -34,24 +34,26 @@ pm run dev and open the printed URL with ?worldPerf=1 appended.
 4. In the console run window.__worldPerf.summary().
 5. Copy rames, medianMs, p95Ms, 	riangles, drawCalls, geometries and 	extures into section 4, fill the environment table below, and add the note that dev builds are slower than production.
 
-Task 15.4 stays open until a human records those values.
+The project owner has since followed steps 1 to 5 above (see section 4). The agent attempt above remains as history.
 
-### Environment fields (fill in)
+### Environment fields
+
+**Request: please fill in every "not provided" field below (hardware/GPU, browser and version, OS, window resolution, date, and the rest).**
 
 | Field | Value |
 | --- | --- |
-| Date | not recorded |
-| Recorded by | not recorded |
-| Hardware (CPU / GPU / RAM) | not recorded |
-| GPU type (integrated or discrete) | not recorded |
-| OS and version | not recorded |
-| Browser and version | not recorded |
-| Power mode (battery or plugged in) | not recorded |
-| Display refresh rate | not recorded |
-| Window size | not recorded (expected 1280x720) |
-| Build under test (`preview` or `dev`) | not recorded |
-| Git commit | not recorded |
-| Measurement tool | not recorded |
+| Date | not provided |
+| Recorded by | project owner |
+| Hardware (CPU / GPU / RAM) | not provided |
+| GPU type (integrated or discrete) | not provided |
+| OS and version | not provided |
+| Browser and version | not provided |
+| Power mode (battery or plugged in) | not provided |
+| Display refresh rate | not provided (the median suggests 60 Hz, not verified) |
+| Window size | not provided (Reference_Hardware expects 1280x720) |
+| Build under test (`preview` or `dev`) | dev build |
+| Git commit | not provided |
+| Measurement tool | `?worldPerf=1` dev sampler (`window.__worldPerf.summary()`) |
 
 ## 2. Computed static metrics
 **Computed from declared geometry, NOT runtime-measured.** Computed on the working-tree state at the time of task 22.3 (uncommitted changes present). Machine for these commands is unspecified (Windows, PowerShell). Nothing in this section is a frame-time or GPU measurement.
@@ -132,15 +134,15 @@ Command exit code 0 (`tsc --noEmit` and `vite build`; 98 modules transformed; bu
 **Warning:** Vite reports a chunk larger than 500 kB after minification (the single JS bundle is 1,271.74 kB). This is expected with Three.js and React Three Fiber in one chunk. It is not an error, and no code splitting was applied. The bundle size affects download and parse time, which may affect first-render time on the Reference_Hardware. `dist/` is git-ignored and was not committed.
 Related checks run for task 22.3: `npm run typecheck` exit 0; `npm test` run twice, both 27 files and 572 tests passed, exit 0 (no flakiness seen); `npm run build` exit 0.
 ## 3. Target table
-Initial targets from `requirements.md`, Requirement 14. "Computed" means derived from declared geometry or source, not measured at runtime.
+Initial targets from `requirements.md`, Requirement 14. "Computed" means derived from declared geometry or source, not measured at runtime. "Measured" values come from section 4 (project owner, dev build, `?worldPerf=1` sampler, 60 s walkthrough).
 | Target | Req. | Threshold | Status |
 | --- | --- | --- | --- |
-| Median frame time at 1280x720, integrated graphics | 14.8 | <= 20 ms | not measured |
-| 95th-percentile frame time at 1280x720, integrated graphics | 14.9 | <= 33 ms | not measured |
+| Median frame time at 1280x720, integrated graphics | 14.8 | <= 20 ms | measured: 16.70 ms, met on the owner's machine |
+| 95th-percentile frame time at 1280x720, integrated graphics | 14.9 | <= 33 ms | measured: 18.60 ms, met on the owner's machine |
 | First render after mount, excluding optional GLB downloads | 14.10 | <= 3 s | not measured |
 | Triangles in rendered scene | 14.4 | <= 20,000 | computed: 19,172 (declared geometry; margin 828; runtime `renderer.info` not measured) |
-| Triangles, runtime `renderer.info.render.triangles` | 14.4 | <= 20,000 | not measured |
-| Draw calls | n/a (reported by task 15.4) | no threshold set | computed: 319 estimate; runtime not measured |
+| Triangles, runtime `renderer.info.render.triangles` | 14.4 | <= 20,000 | measured: 10,378 in the last rendered frame from one camera position (see section 4.2; not a whole-scene count) |
+| Draw calls | n/a (reported by task 15.4) | no threshold set | computed: 319 estimate; measured: 151 in the last rendered frame (section 4.2) |
 | Simultaneous dynamic lights | 14.2 | <= 4 | computed: 4 (1 ambient + 3 point) |
 | Device pixel ratio cap | 14.1 | 1.5 | computed: `dpr={[1, 1.5]}` in source; runtime not measured |
 | Real-time shadow maps | 14.3 | disabled by default | computed: `shadows={false}` in source |
@@ -151,18 +153,39 @@ Initial targets from `requirements.md`, Requirement 14. "Computed" means derived
 | Production JS bundle | n/a | no threshold set | computed: 1,271.74 kB (363.53 kB gzip), exceeds Vite 500 kB warning |
 | Targeting benchmark | n/a | no threshold (informational) | computed: 0.569 us/call (standalone run; 1.592 us/call in the full-suite run), this machine, unspecified |
 Notes: the 5 MB GLB limit is not stated in Requirement 14 and comes from the task request; confirm the source (asset manifest or `THIRD_PARTY_ASSETS.md`) before citing it. Rows marked "no threshold set" have no target in Requirement 14.
-**No target is achieved until a runtime value is recorded in section 4.** Computed rows only show that declared geometry is within the stated limit.
-## 4. Recorded runtime results (to be filled by a human)
+**Reference_Hardware caveat:** the requirement's Reference_Hardware (integrated graphics at 1280x720) cannot be confirmed, because the hardware and window resolution were not recorded. The two frame-time rows are met on the owner's machine only. First-render time (<= 3 s) is still not measured.
+
+**No target is achieved without a recorded runtime value in section 4.** Computed rows only show that declared geometry is within the stated limit.
+## 4. Recorded runtime results
+
+Measured by the project owner, dev build, ?worldPerf=1 sampler, 60 s walkthrough across both rooms and all three arcade cabinets. The agent did not run this measurement. Hardware, browser, OS, resolution and date: not provided (see the environment table in section 1.1; please fill them in).
+
+### 4.1 Raw `window.__worldPerf.summary()` output (verbatim)
+
+```json
+{"frames":3600,"medianMs":16.69999998807907,"p95Ms":18.600000023841858,"triangles":10378,"drawCalls":151,"geometries":89,"textures":29}
+```
 
 | Field | Value |
 | --- | --- |
-| Median frame time (ms) | not measured |
-| 95th-percentile frame time (ms) | not measured |
-| Frames sampled | not measured |
+| Frames sampled | 3600 |
+| Median frame time | 16.70 ms (about 59.9 fps) |
+| 95th-percentile frame time | 18.60 ms |
+| Renderer triangles (`renderer.info.render.triangles`) | 10,378 |
+| Draw calls (`renderer.info.render.calls`) | 151 |
+| Geometries (`renderer.info.memory.geometries`) | 89 |
+| Textures (`renderer.info.memory.textures`) | 29 |
 | First-render time (s) | not measured |
-| Runtime triangles (`renderer.info`) | not measured |
-| Runtime draw calls | not measured |
-| Geometries / textures (`renderer.info.memory`) | not measured |
 | Targeting benchmark on Reference_Hardware | not measured |
-| Raw `summary()` output or trace statistics | not measured |
-| Notes (tool, deviations, throttling) | not measured |
+| Hardware, browser, OS, resolution, date | not provided |
+| Notes | dev build (slower than production); throttling and power mode not provided |
+
+### 4.2 How to read these numbers
+
+Read from `useFrameSampler.ts` and `frameStats.ts`:
+
+- **(a) Frames.** The ring buffer capacity is 3600 (`FRAME_SAMPLE_CAPACITY`). `frames: 3600` equals that capacity, so the summary covers the most recent 3600 frames, about 60 s at about 60 fps. Earlier frames of a longer walk would have been overwritten. Median and p95 are nearest-rank statistics over those samples (each sample is the frame delta in ms).
+- **(b) Triangles, draw calls, geometries, textures.** `summary()` reads `renderer.info` at the moment it is called. `triangles` and `drawCalls` are `info.render.triangles` and `info.render.calls`, which describe the last rendered frame only (three.js resets them each frame). They therefore describe one frame from one camera position, after frustum culling, with each instanced mesh counted as one draw call. They are not comparable one-to-one with the computed whole-scene figures (19,172 triangles, 319 draw-call grouping estimate, 30 declared textures). Lower numbers are expected. The computed figures stay valid as budget checks against declared geometry. Geometries (89) and textures (29) come from `info.memory`, which counts resources currently uploaded, not per frame.
+- **(c) Textures 29 vs 30 declared.** `info.memory.textures` counts textures uploaded to the GPU so far. Likely explanation, not a verified fact: one declared texture had not been uploaded yet (for example it was never visible or never used by a rendered material) or is absent. This was not investigated.
+- **(d) Frame time.** A median near 16.7 ms is consistent with a 60 Hz vsync cap. The frame time is therefore likely limited by display refresh rather than by the GPU, and the real headroom is unknown. The measurement shows the scene held about 60 fps on the owner's machine; it does not show how much faster it could run.
+- **Dev build.** Dev builds are slower than production, so these numbers are likely a lower bound on performance. This was not compared against a production build.

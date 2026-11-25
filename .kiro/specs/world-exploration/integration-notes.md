@@ -69,7 +69,7 @@ Computed from declared geometry and source, computed, not runtime-measured. Sour
 - Procedural textures: 30, 7.459 MB estimate, limit 8 MB. The margin is also thin: about 0.54 MB. New in task 21: `couchFabric` 0.33, `crtCasing` 0.33, `crtGlass` 0.25 MB. New in task 22: `vcrDeck` 0.17, `vhsShell` 0.08, `metalCabinet` 0.33, `deskDetail` 0.04 MB; `crate` grew to 256x256 (0.33 MB) and `corkBoard` shrank to 256x256 (0.33 MB, 1.00 MB freed). The largest are the three posters and `spineAtlas` (0.66 MB each). First candidates to cut if room is needed: `console-cables` (1,088 triangles), the book count, and the three 0.66 MB posters or `spineAtlas`. Per-texture list: `performance-log.md` section 2.1.
 - Colliders: 28 (the task 21 couch change adds none).
 - Targeting benchmark: informational timing only, varies per run (0.963 us/call standalone, 1.544 us/call in the full-suite run of task 22.3).
-All figures above are computed, not runtime-measured. Runtime frame-time targets are not measured; task 15.4 stays open. See `performance-log.md`. No performance claim is made.
+All figures above are computed, not runtime-measured. Runtime frame time was measured once by the project owner (dev build, `?worldPerf=1` sampler, 60 s walkthrough): median 16.70 ms, p95 18.60 ms, 10,378 triangles and 151 draw calls in the last rendered frame. Hardware, browser, OS, resolution and date were not provided, so the Reference_Hardware targets cannot be confirmed. First-render time is not measured. See `performance-log.md` section 4.
 
 ## Couch and CRT surface changes (tasks 21.1 and 21.2)
 - Couch: the dark patch came from a dark "worn patch" box 4 mm above the middle cushion. It is removed, with a second hidden patch. Roll caps are 4 mm shorter to avoid coplanar faces. The pillow is in the left seat corner, checked by an oriented-box no-intersection test. The couch has 388 triangles (was 412). It uses the new `couchFabric` texture and the `couchBody`, `couchCushion` and `couchPillow` materials with metric fabric UVs, tinted by `memoryShift`.
@@ -95,7 +95,7 @@ World-internal render changes only (computed, not runtime-measured; **not verifi
 - Browser verification is missing for M6, the three-cabinet arcade pass and the end-to-end App behavior listed above.
 - LAST EXIT and DEAD FREQUENCY have no game behind them; all three cabinets open the same App arcade panel (Snake).
 - P2 is pending. P5, P6 and P7 are pending (see `proposals.md`).
-- Runtime performance is not measured. No agent measurement was taken in task 20.3 (see `performance-log.md` section 1.1); task 15.4 awaits a human on the Reference_Hardware.
+- Runtime performance was measured once by the project owner (dev build, hardware not provided): median 16.70 ms, p95 18.60 ms (see `performance-log.md` section 4). The agent took no measurement. First-render time and the Reference_Hardware confirmation are still open.
 
 ## Backward compatibility
 
