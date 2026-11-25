@@ -36,6 +36,23 @@ export const BASE_CRT_SCREEN_COLOR = '#4fe0d0'
  */
 export const BASE_ARCADE_SCREEN_COLOR = '#ffffff'
 
+/**
+ * Flat colours of the three cabinet screens. They are the no-canvas fallback: with the attract textures
+ * attached the base is BASE_ARCADE_SCREEN_COLOR instead (see arcadeScreenBaseColor).
+ */
+export const ARCADE_SCREEN_BASE_COLORS = Object.freeze({
+  snake: '#2bd66b', // phosphor green
+  maze: '#8a3ad0', // crimson-violet CRT, violet side
+  frequency: '#f0a21e', // amber
+})
+
+export type ArcadeScreenGame = keyof typeof ARCADE_SCREEN_BASE_COLORS
+
+/** Colour the shift restores at t = 0: white when the screen shows its texture, the flat game colour otherwise. */
+export function arcadeScreenBaseColor(game: ArcadeScreenGame, textured: boolean): string {
+  return textured ? BASE_ARCADE_SCREEN_COLOR : ARCADE_SCREEN_BASE_COLORS[game]
+}
+
 /** Share of the shifted light color mixed into each point light at t = 1. */
 export const POINT_LIGHT_TINT = 0.6
 /** Point light intensity multiplier at t = 1. */

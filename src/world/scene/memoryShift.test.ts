@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { AMBIENT_INTENSITY_FLOOR, PALETTE_NORMAL, PALETTE_SHIFTED } from '../logic/palette'
 import {
+  ARCADE_SCREEN_BASE_COLORS,
   BASE_ARCADE_SCREEN_COLOR,
   BASE_CRT_SCREEN_COLOR,
   BASE_WALL_COLOR,
   applyShift,
+  arcadeScreenBaseColor,
   mixHex,
   overlayOpacity,
   overlayVisible,
@@ -29,7 +31,9 @@ function makeTargets() {
     wall: { color: new FakeColor() },
     screens: [
       { material: { color: new FakeColor() }, baseColor: BASE_CRT_SCREEN_COLOR },
-      { material: { color: new FakeColor() }, baseColor: BASE_ARCADE_SCREEN_COLOR },
+      { material: { color: new FakeColor() }, baseColor: ARCADE_SCREEN_BASE_COLORS.snake },
+      { material: { color: new FakeColor() }, baseColor: ARCADE_SCREEN_BASE_COLORS.maze },
+      { material: { color: new FakeColor() }, baseColor: ARCADE_SCREEN_BASE_COLORS.frequency },
     ],
     overlays: [{ material: { opacity: 0, visible: false }, maxOpacity: 0.9 }],
   }
@@ -44,7 +48,7 @@ function snapshot(t: ReturnType<typeof makeTargets>) {
     point: [t.points[0].light.color.hex, t.points[0].light.intensity],
     wall: t.wall.color.hex,
     crt: t.screens[0].material.color.hex,
-    arcade: t.screens[1].material.color.hex,
+    arcade: [t.screens[1].material.color.hex, t.screens[2].material.color.hex, t.screens[3].material.color.hex],
     overlay: [t.overlays[0].material.opacity, t.overlays[0].material.visible],
   }
 }
@@ -59,7 +63,7 @@ describe('applyShift', () => {
     expect(s.fog).toEqual([PALETTE_NORMAL.fogColor, PALETTE_NORMAL.fogNear, PALETTE_NORMAL.fogFar])
     expect(s.wall).toBe(BASE_WALL_COLOR)
     expect(s.crt).toBe(BASE_CRT_SCREEN_COLOR)
-    expect(s.arcade).toBe(BASE_ARCADE_SCREEN_COLOR)
+    expect(s.arcade).toEqual([ARCADE_SCREEN_BASE_COLORS.snake, ARCADE_SCREEN_BASE_COLORS.maze, ARCADE_SCREEN_BASE_COLORS.frequency])
     expect(s.point).toEqual(['#4fe0d0', 6])
     expect(s.overlay).toEqual([0, false])
   })
@@ -95,15 +99,37 @@ describe('applyShift', () => {
     expect(a.screens[1].material.color.hex).toBe(b.screens[1].material.color.hex)
   })
 
-  it('textured arcade screen: white base shows the map unmodified at t = 0 and tints at t = 1', () => {
-    expect(BASE_ARCADE_SCREEN_COLOR).toBe('#ffffff')
+  it('all three cabinet screens: authored colour at t = 0, shifted colour at t = 1, a mix in between (flat fallback)', () => {
+    const bases = Object.values(ARCADE_SCREEN_BASE_COLORS)
+    expect(new Set(bases).size).toBe(3)
     const t = makeTargets()
     applyShift(0, t)
-    expect(t.screens[1].material.color.hex).toBe('#ffffff')
+    bases.forEach((c, i) => expect(t.screens[i + 1].material.color.hex).toBe(c))
     applyShift(1, t)
-    expect(t.screens[1].material.color.hex).toBe(PALETTE_SHIFTED.screenEmissive)
+    for (const i of [1, 2, 3]) expect(t.screens[i].material.color.hex).toBe(PALETTE_SHIFTED.screenEmissive)
     applyShift(0.5, t)
-    expect(t.screens[1].material.color.hex).not.toBe('#ffffff')
+    bases.forEach((c, i) => expect(t.screens[i + 1].material.color.hex).not.toBe(c))
+    applyShift(0, t)
+    bases.forEach((c, i) => expect(t.screens[i + 1].material.color.hex).toBe(c))
+  })
+
+  it('textured screens: the base is white, so t = 0 restores it exactly and the shift still tints all three', () => {
+    expect(BASE_ARCADE_SCREEN_COLOR).toBe('#ffffff')
+    const games = ['snake', 'maze', 'frequency'] as const
+    for (const g of games) {
+      expect(arcadeScreenBaseColor(g, true)).toBe('#ffffff')
+      expect(arcadeScreenBaseColor(g, false)).toBe(ARCADE_SCREEN_BASE_COLORS[g])
+    }
+    const t = makeTargets()
+    t.screens.slice(1).forEach((s, i) => (s.baseColor = arcadeScreenBaseColor(games[i], true)))
+    applyShift(0, t)
+    for (const i of [1, 2, 3]) expect(t.screens[i].material.color.hex).toBe('#ffffff')
+    applyShift(1, t)
+    for (const i of [1, 2, 3]) expect(t.screens[i].material.color.hex).toBe(PALETTE_SHIFTED.screenEmissive)
+    applyShift(0.5, t)
+    for (const i of [1, 2, 3]) expect(t.screens[i].material.color.hex).not.toBe('#ffffff')
+    applyShift(0, t)
+    for (const i of [1, 2, 3]) expect(t.screens[i].material.color.hex).toBe('#ffffff')
   })
 
   it('textured wall: near-white multiplier at t = 0, the shifted wall tint is reached at t = 1 through the baked albedo', () => {

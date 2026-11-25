@@ -1059,6 +1059,49 @@
         "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
         "timestamp": 1795571427481
       }
+    ],
+    "20.1 Three-cabinet layout, geometry and lighting": [
+      {
+        "executionId": "a915c7be-a3bc-4605-8819-8e23f58ddea8",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795609401919
+      },
+      {
+        "executionId": "a915c7be-a3bc-4605-8819-8e23f58ddea8",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795610099344
+      }
+    ],
+    "20.2 Attract screen and marquee textures": [
+      {
+        "executionId": "a915c7be-a3bc-4605-8819-8e23f58ddea8",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795610099786
+      },
+      {
+        "executionId": "a915c7be-a3bc-4605-8819-8e23f58ddea8",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795610508675
+      }
+    ],
+    "20.3 Docs, metrics and verification": [
+      {
+        "executionId": "a915c7be-a3bc-4605-8819-8e23f58ddea8",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795610509126
+      },
+      {
+        "executionId": "a915c7be-a3bc-4605-8819-8e23f58ddea8",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795610784022
+      }
+    ],
+    "20. Three dedicated arcade cabinets": [
+      {
+        "executionId": "a915c7be-a3bc-4605-8819-8e23f58ddea8",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795610784129
+      }
     ]
   }
 }

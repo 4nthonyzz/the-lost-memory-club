@@ -4,7 +4,6 @@ import { AssetModel } from '../assets/AssetModel'
 import { ROOM, type PropDef } from '../layout/roomLayout'
 import type { Aabb } from '../worldTypes'
 import {
-  arcadeCabinetParts,
   ARCHIVE_BOX_IDS,
   archiveBoxParts,
   arcadeFloorParts,
@@ -151,29 +150,20 @@ function ShiftDressing() {
 }
 
 /**
- * Arcade_Area dressing (task 15.6): a powered-down companion cabinet, stacked CRT monitors, a floor
- * runner decal and cable runs. Solid pieces get their Colliders from the layout; nothing here is
- * interactive and nothing animates.
+ * Arcade dressing (task 15.6, updated in 20.1): stacked CRT monitors (now in the main room's north-east
+ * corner), a floor runner decal and cable runs. The three cabinets are drawn by Stations.tsx. Solid pieces get
+ * their Colliders from the layout; nothing here is interactive and nothing animates.
  */
-function PoweredDownCabinet({ box, height }: { box: Aabb; height: number }) {
-  const parts = useMemo(() => arcadeCabinetParts(box, height, false), [box, height])
-  return <PartMeshes parts={parts} />
-}
-
 function CrtStack({ box, height }: { box: Aabb; height: number }) {
   const parts = useMemo(() => crtStackParts(box, height), [box, height])
   return <PartMeshes parts={parts} />
 }
 
 function ArcadeAreaDressing() {
-  const companion = propById('arcade-companion')
   const stack = propById('crt-stack')
   const floor = useMemo(arcadeFloorParts, [])
   return (
     <group>
-      <Faced box={companion.box} facing={companion.facing}>
-        {(local) => <PoweredDownCabinet box={local} height={companion.height} />}
-      </Faced>
       <Faced box={stack.box} facing={stack.facing}>
         {(local) => <CrtStack box={local} height={stack.height} />}
       </Faced>

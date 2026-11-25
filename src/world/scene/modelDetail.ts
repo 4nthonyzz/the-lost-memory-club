@@ -8,7 +8,7 @@
  * `roomLayout.ts`. They never create or change Colliders.
  */
 import { ROOM } from '../layout/roomLayout'
-import type { Aabb } from '../worldTypes'
+import type { Aabb, ArcadeGameKind } from '../worldTypes'
 import { facingFrame } from './assetPlacement'
 import { TEXTURE_IDS, totalTextureMemoryBytes } from './proceduralTextures'
 import { SHELF_IDS, shelfContents, shelfFrameParts } from './shelfModel'
@@ -572,31 +572,48 @@ export function deskLampGlowParts(): Part[] {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Arcade cabinet (station "arcade-cabinet"; front faces +z at box.maxZ)
+// Arcade cabinets (task 20.1): stations "arcade-snake", "arcade-maze", "arcade-frequency".
+// One shared builder, parameterised per game. Front faces +z at box.maxZ in the local frame.
 // ---------------------------------------------------------------------------------------------
 
 export const ARCADE_BUTTON_MATERIALS = ['btnRed', 'btnYellow', 'btnGreen', 'btnBlue', 'btnWhite', 'btnOrange'] as const
 
-/**
- * Cabinet parts in a local frame: `box` is the footprint with its front at `box.maxZ` (+Z).
- * The arcade Station faces -X in the world, so callers pass `facingFrame(...).local` and rotate the
- * group. `powered = false` gives the dark companion cabinet: no arcadeScreen plane, no lit marquee.
- */
-export function arcadeCabinetParts(box: Aabb, height: number, powered = true): Part[] {
-  const parts = poweredCabinetParts(box, height)
-  if (powered) return parts
-  return parts.map((p) =>
-    p.mat === 'arcadeScreen'
-      ? { ...p, mat: 'outOfOrderScreen' as const }
-      : p.mat === 'marquee'
-        ? { ...p, mat: 'marqueeOff' as const }
-        : p.mat === 'coinGlow'
-          ? { ...p, mat: 'plastic' as const }
-          : p,
-  )
+/** Layout prop ids of the three cabinets, in the same order as the StationDefs, and the game each one is themed for. */
+export const ARCADE_CABINET_IDS = ['arcade-snake', 'arcade-maze', 'arcade-frequency'] as const
+export type ArcadeCabinetId = (typeof ARCADE_CABINET_IDS)[number]
+export const ARCADE_CABINET_GAMES: Readonly<Record<ArcadeCabinetId, ArcadeGameKind>> = {
+  'arcade-snake': 'snake',
+  'arcade-maze': 'maze',
+  'arcade-frequency': 'frequency',
 }
 
-function poweredCabinetParts(box: Aabb, height: number): Part[] {
+/** Per-game materials: screen face, lit marquee and the coloured side T-molding (green, crimson, amber). */
+export interface ArcadeCabinetStyle {
+  screen: MaterialKey
+  marquee: MaterialKey
+  molding: MaterialKey
+}
+export const ARCADE_CABINET_STYLES: Readonly<Record<ArcadeGameKind, ArcadeCabinetStyle>> = {
+  snake: { screen: 'arcadeScreenSnake', marquee: 'marqueeSnake', molding: 'moldingSnake' },
+  maze: { screen: 'arcadeScreenMaze', marquee: 'marqueeMaze', molding: 'moldingMaze' },
+  frequency: { screen: 'arcadeScreenFrequency', marquee: 'marqueeFrequency', molding: 'moldingFrequency' },
+}
+
+/** Control deck layout: two joysticks and three buttons per player (x across the deck, z toward the player). */
+const DECK_STICK_X = [-0.33, 0.33] as const
+const DECK_BUTTON_X = [-0.19, -0.12, -0.05, 0.05, 0.12, 0.19] as const
+const DECK_BUTTON_Z = [0.07, 0.0, 0.07, 0.07, 0.0, 0.07] as const
+
+/**
+ * Cabinet parts in a local frame: `box` is the footprint with its front at `box.maxZ` (+Z).
+ * The cabinets face -X in the world, so callers pass `facingFrame(...).local` and rotate the group.
+ *
+ * Silhouette: a stepped, sculpted side wing with coloured T-molding strips, a tilted recessed CRT bezel under a
+ * visor, an upper speaker grille bar, a tilted marquee, an angled control deck with two ball-top joysticks and
+ * six buttons (each in a dark inset ring), a coin door with two glowing '25c' slots, flanking grilles and a kick plate.
+ */
+export function arcadeCabinetParts(box: Aabb, height: number, game: ArcadeGameKind = 'snake'): Part[] {
+  const style = ARCADE_CABINET_STYLES[game]
   const { cx, w, d } = centre(box)
   const lowerH = 0.95
   const upperH = height - lowerH
@@ -607,84 +624,90 @@ function poweredCabinetParts(box: Aabb, height: number): Part[] {
   const t = 0.04
   const zc = -0.25 // front face of the upper column
 
-  const deck: Part[] = [
-    // Textured control deck: joystick and button rings are drawn on the top face (see drawDeck).
-    bx('deck', [0, 0, 0], [w, 0.07, 0.44]),
-    // Ball-top joystick.
-    part('cylinderLow', 'metal', [-0.2, 0.04, 0.02], [0.07, 0.012, 0.07]),
-    part('cylinderLow', 'metal', [-0.2, 0.1, 0.02], [0.015, 0.12, 0.015]),
-    part('sphere', 'btnRed', [-0.2, 0.17, 0.02], [0.07, 0.07, 0.07]),
-    // Six coloured buttons, two rows of three.
-    ...ARCADE_BUTTON_MATERIALS.map((m, i) =>
-      part('cylinder', m, [0.02 + (i % 3) * 0.085, 0.04, i < 3 ? -0.04 : 0.06], [0.06, 0.02, 0.06]),
-    ),
+  const stick = (x: number, ball: MaterialKey): Part[] => [
+    part('cylinderLow', 'bezel', [x, 0.041, 0.05], [0.1, 0.012, 0.1]), // dark inset ring
+    part('cylinderLow', 'metal', [x, 0.047, 0.05], [0.05, 0.012, 0.05]), // base plate
+    part('cylinderLow', 'metal', [x, 0.1, 0.05], [0.015, 0.12, 0.015]), // shaft
+    part('sphere', ball, [x, 0.17, 0.05], [0.07, 0.07, 0.07]), // ball top
   ]
-  // The marquee texture is 4:1, so the lit plane keeps that ratio.
+  const deck: Part[] = [
+    bx('deckPlate', [0, 0, 0], [w, 0.07, 0.44]),
+    ...stick(DECK_STICK_X[0], 'btnRed'),
+    ...stick(DECK_STICK_X[1], 'btnBlue'),
+    // Concave-looking buttons: a coloured cap sunk into a wider, darker ring.
+    ...ARCADE_BUTTON_MATERIALS.flatMap((m, i): Part[] => [
+      part('cylinderLow', 'bezel', [DECK_BUTTON_X[i], 0.041, DECK_BUTTON_Z[i]], [0.08, 0.012, 0.08]),
+      part('cylinder', m, [DECK_BUTTON_X[i], 0.05, DECK_BUTTON_Z[i]], [0.055, 0.02, 0.055]),
+    ]),
+  ]
+  // The marquee texture (task 20.2) is 4:1, so the lit plane keeps that ratio.
   const mw = Math.min(w * 0.9, 0.8)
   const marquee: Part[] = [
     bx('cabinet', [0, 0, 0], [w, 0.22, 0.1]),
-    // Fixed lit marquee, never changed by state.
-    part('plane', 'marquee', [0, 0, 0.051], [mw, mw / 4, 1]),
+    part('plane', style.marquee, [0, 0, 0.051], [mw, mw / 4, 1]),
+  ]
+  // Recessed CRT: the screen plane sits behind four raised bezel strips and under a visor with two cheeks. The whole
+  // assembly leans back by 0.1 rad about its centre.
+  const crt: Part[] = [
+    part('plane', style.screen, [0, 0, 0.003], [sw, sh, 1]),
+    bx('bezel', [0, sh / 2 + t / 2, 0.015], [sw + 2 * t, t, 0.03]),
+    bx('bezel', [0, -sh / 2 - t / 2, 0.015], [sw + 2 * t, t, 0.03]),
+    bx('bezel', [-sw / 2 - t / 2, 0, 0.015], [t, sh, 0.03]),
+    bx('bezel', [sw / 2 + t / 2, 0, 0.015], [t, sh, 0.03]),
+    bx('cabinet', [0, sh / 2 + t + 0.015, 0.05], [sw + 2 * t + 0.14, 0.03, 0.1]),
+    bx('cabinet', [-(sw / 2 + t + 0.035), 0, 0.04], [0.03, sh + 2 * t, 0.08]),
+    bx('cabinet', [sw / 2 + t + 0.035, 0, 0.04], [0.03, sh + 2 * t, 0.08]),
   ]
   /**
    * Sculpted side panel: a full-depth lower wing and an upper wing in three steps that taper toward the
-   * back, with the art planes on the outer faces. `th` is the wing thickness.
+   * back, framed by five coloured T-molding strips. `th` is the wing thickness.
    */
   const side = (sign: 1 | -1): Part[] => {
     const th = 0.03
     const xw = sign * (w / 2 + th / 2)
-    const xo = sign * (w / 2 + th + 0.003)
-    const xs = sign * (w / 2 + th + 0.005)
-    const rot: Vec3 = [0, sign * HALF_PI, 0]
+    const xm = sign * (w / 2 + th + 0.007)
     const stepH = upperH / 3
-    const out: Part[] = [
-      bx('cabinet', [xw, 0.5, -d / 2], [th, 0.9, d - 0.02]),
-      part('plane', 'sideArtA', [xo, 0.5, -d / 2], [d - 0.08, 0.8, 1], rot),
-      part('plane', 'sideArtB', [xs, 0.5, -d / 2], [d - 0.08, 0.1, 1], rot),
-    ]
+    const topDepth = colD - 0.15
+    const out: Part[] = [bx('cabinet', [xw, 0.5, -d / 2], [th, 0.9, d - 0.02])]
     for (let i = 0; i < 3; i++) {
       const depth = colD - 0.05 * (i + 1)
-      const zc2 = -0.25 - depth / 2
-      out.push(bx('cabinet', [xw, lowerH + stepH * (i + 0.5), zc2], [th, stepH - 0.012, depth]))
-      if (i === 1) out.push(part('plane', 'sideArtB', [xo, lowerH + stepH * 1.5, zc2], [depth - 0.08, 0.1, 1], rot))
+      out.push(bx('cabinet', [xw, lowerH + stepH * (i + 0.5), -0.25 - depth / 2], [th, stepH - 0.012, depth]))
     }
+    out.push(
+      bx(style.molding, [xm, 0.94, -d / 2], [0.014, 0.025, d - 0.02]),
+      bx(style.molding, [xm, 0.07, -d / 2], [0.014, 0.025, d - 0.02]),
+      bx(style.molding, [xm, 0.5, -0.025], [0.014, 0.88, 0.025]),
+      bx(style.molding, [xm, lowerH + upperH / 2, zc - 0.015], [0.014, upperH - 0.02, 0.025]),
+      bx(style.molding, [xm, height - 0.012, -0.25 - topDepth / 2], [0.014, 0.025, topDepth]),
+    )
     return out
   }
-  // Screen hood: a visor and two cheeks that stand proud of the bezel, so the screen sits in a recess.
-  const hood: Part[] = [
-    bx('cabinet', [0, screenY + sh / 2 + t + 0.015, zc + 0.05], [sw + 2 * t + 0.14, 0.03, 0.1]),
-    bx('cabinet', [-(sw / 2 + t + 0.035), screenY, zc + 0.04], [0.03, sh + 2 * t, 0.08]),
-    bx('cabinet', [sw / 2 + t + 0.035, screenY, zc + 0.04], [0.03, sh + 2 * t, 0.08]),
+  const slot = (x: number): Part[] => [
+    bx('bezel', [x, 0.52, 0.01], [0.06, 0.11, 0.012]),
+    bx('coinGlow', [x, 0.52, 0.017], [0.012, 0.06, 0.012]), // glowing coin slot
+    bx('coinGlow', [x, 0.45, 0.017], [0.04, 0.012, 0.012]), // lit '25c' label bar
   ]
   const local: Part[] = [
     bx('cabinet', [0, lowerH / 2, -d / 2], [w, lowerH, d]),
     bx('cabinet', [0, lowerH + upperH / 2, -(0.25 + colD / 2)], [w, upperH, colD]),
-    // Recessed CRT: raised bezel strips with the shared arcadeScreen plane behind them.
-    part('plane', 'arcadeScreen', [0, screenY, zc + 0.003], [sw, sh, 1]),
-    bx('bezel', [0, screenY + sh / 2 + t / 2, zc + 0.015], [sw + 2 * t, t, 0.03]),
-    bx('bezel', [0, screenY - sh / 2 - t / 2, zc + 0.015], [sw + 2 * t, t, 0.03]),
-    bx('bezel', [-sw / 2 - t / 2, screenY, zc + 0.015], [t, sh, 0.03]),
-    bx('bezel', [sw / 2 + t / 2, screenY, zc + 0.015], [t, sh, 0.03]),
-    ...hood,
+    ...tiltX(crt, [0, screenY, zc + 0.03], -0.1),
+    // Upper speaker grille bar between the deck and the screen.
+    bx('grille', [0, 1.075, zc + 0.012], [sw, 0.06, 0.024]),
     ...tiltX(deck, [0, 1.0, -0.22], 0.2),
     ...tiltX(marquee, [0, 1.68, -0.2], 0.25),
     ...side(1),
     ...side(-1),
-    // Coin door and kick plate.
+    // Coin door with two glowing slots, flanking louvered speaker grilles and the kick plate.
     bx('metal', [0, 0.48, 0.004], [0.26, 0.34, 0.012]),
-    bx('bezel', [-0.05, 0.56, 0.01], [0.03, 0.06, 0.012]),
-    bx('bezel', [0.05, 0.56, 0.01], [0.03, 0.06, 0.012]),
-    bx('btnYellow', [-0.07, 0.41, 0.01], [0.04, 0.04, 0.012]),
-    bx('btnYellow', [0.07, 0.41, 0.01], [0.04, 0.04, 0.012]),
-    // Coin return: a small lit slot under the coin door.
-    bx('coinGlow', [0, 0.34, 0.012], [0.09, 0.025, 0.008]),
-    // Louvered speaker grilles flanking the coin door.
+    ...slot(-0.07),
+    ...slot(0.07),
     bx('grille', [-0.3, 0.5, 0.004], [0.2, 0.3, 0.008]),
     bx('grille', [0.3, 0.5, 0.004], [0.2, 0.3, 0.008]),
     bx('metal', [0, 0.075, 0.004], [w * 0.98, 0.13, 0.012]),
   ]
   return offset(local, [cx, 0, box.maxZ])
 }
+
 
 // ---------------------------------------------------------------------------------------------
 // Arcade_Area dressing (task 15.6): CRT stack, ARCADE sign, floor runner and cable runs.
@@ -1118,8 +1141,6 @@ export function declaredObjects(): Array<{ name: string; parts: Part[]; extraTri
     return p
   }
   const crt = prop('crt-vhs')
-  const arcade = prop('arcade-cabinet')
-  const companion = prop('arcade-companion')
   const stack = prop('crt-stack')
   const objects: Array<{ name: string; parts: Part[]; extraTriangles?: number; extraDrawCalls?: number }> = [
     { name: 'crt-television', parts: crtTelevisionParts(crt.box, crt.height) },
@@ -1139,8 +1160,10 @@ export function declaredObjects(): Array<{ name: string; parts: Part[]; extraTri
     { name: 'desk-lamp-glow', parts: deskLampGlowParts() },
     { name: 'bulletin-board', parts: bulletinBoardParts() },
     ...ARCHIVE_BOX_IDS.map((id) => ({ name: id, parts: archiveBoxParts(prop(id).box, prop(id).height) })),
-    { name: 'arcade-cabinet', parts: arcadeCabinetParts(facingFrame(arcade.box, arcade.facing).local, arcade.height) },
-    { name: 'arcade-companion', parts: arcadeCabinetParts(facingFrame(companion.box, companion.facing).local, companion.height, false) },
+    ...ARCADE_CABINET_IDS.map((id) => {
+      const c = prop(id)
+      return { name: id, parts: arcadeCabinetParts(facingFrame(c.box, c.facing).local, c.height, ARCADE_CABINET_GAMES[id]) }
+    }),
     { name: 'crt-stack', parts: crtStackParts(facingFrame(stack.box, stack.facing).local, stack.height) },
     { name: 'arcade-sign', parts: arcadeSignParts() },
     { name: 'arcade-floor', parts: arcadeFloorParts() },

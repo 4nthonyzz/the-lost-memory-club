@@ -24,8 +24,18 @@ export interface MovementInput {
 /** Direction a prop or Station front face points toward. Omitted means '+z'. */
 export type Facing = '+z' | '-z' | '+x' | '-x';
 
+/**
+ * Which arcade game a cabinet is themed for. Layout and world data only: every cabinet still reports
+ * the single `'arcade'` StationId, so the world never learns which game the App opens.
+ */
+export type ArcadeGameKind = 'snake' | 'maze' | 'frequency';
+
 export interface StationDef {
   id: StationId;
+  /** Optional game theme of an arcade cabinet. Several StationDefs may share the id 'arcade'. */
+  arcadeGame?: ArcadeGameKind;
+  /** Optional human-readable cabinet name, for example 'SNAKE.EXE - The Hungry Tape'. */
+  label?: string;
   /** Point on the Station front face used for distance and cone tests. */
   anchor: Vec2;
   /** The Station's own Collider. */

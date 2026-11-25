@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Box3, Mesh, Object3D } from 'three'
 import { COLLIDERS, ROOM, STATION_DEFS } from '../layout/roomLayout'
 import { crtScreenPlacement } from './Effects'
-import { CRT_LIGHT_POSITION, M3_LIGHT_COUNT, WEST_LIGHT_POSITION } from './Lighting'
+import { ARCADE_LIGHT_DISTANCE, ARCADE_LIGHT_POSITION, CRT_LIGHT_POSITION, M3_LIGHT_COUNT, WEST_LIGHT_POSITION } from './Lighting'
 import {
   ARCHIVE_BOX_IDS,
   FILING_DRAWERS,
@@ -31,6 +31,9 @@ import {
   SHELF_SIDE_T,
   SLIPCASE_DEPTH,
   TAPE_PALETTE,
+  ARCADE_CABINET_GAMES,
+  ARCADE_CABINET_IDS,
+  ARCADE_CABINET_STYLES,
   arcadeCabinetParts,
   arcadeFloorParts,
   arcadeSignBodyParts,
@@ -88,7 +91,7 @@ import {
   spineGeometries,
   wallGeometry,
 } from './sharedResources'
-import { BASE_WALL_COLOR } from './memoryShift'
+import { ARCADE_SCREEN_BASE_COLORS, BASE_WALL_COLOR } from './memoryShift'
 import { cablePathParts, consoleCableParts, deskParts, partGroupKey } from './modelDetail'
 import { textureMemoryBytes } from './proceduralTextures'
 import { WOOD_METRES_PER_REPEAT, woodBoxCount, woodBoxGeometry } from './sharedResources'
@@ -178,13 +181,19 @@ describe('layout stays the single source of truth', () => {
 
   it('station anchors sit on the front of the station prop footprints', () => {
     const crt = prop('crt-vhs')
-    const arcade = prop('arcade-cabinet')
     expect(STATION_DEFS.find((s) => s.id === 'vhs')).toMatchObject({ anchor: { x: (crt.box.minX + crt.box.maxX) / 2, z: crt.box.maxZ }, collider: crt.box, facing: '+z' })
-    // The arcade cabinet faces west: its anchor is centred on the west face (minX).
-    expect(STATION_DEFS.find((s) => s.id === 'arcade')).toMatchObject({
-      anchor: { x: arcade.box.minX, z: (arcade.box.minZ + arcade.box.maxZ) / 2 },
-      collider: arcade.box,
-      facing: '-x',
+    // The three arcade cabinets face west: each anchor is centred on its west face (minX).
+    const arcadeDefs = STATION_DEFS.filter((s) => s.id === 'arcade')
+    expect(arcadeDefs).toHaveLength(3)
+    ARCADE_CABINET_IDS.forEach((id, i) => {
+      const cab = prop(id)
+      expect(arcadeDefs[i]).toMatchObject({
+        anchor: { x: cab.box.minX, z: (cab.box.minZ + cab.box.maxZ) / 2 },
+        collider: cab.box,
+        facing: '-x',
+        arcadeGame: ARCADE_CABINET_GAMES[id],
+      })
+      expect(cab.facing).toBe('-x')
     })
   })
 
@@ -245,20 +254,29 @@ describe('layout stays the single source of truth', () => {
       expect(p.pos[1] + p.scale[1] / 2).toBeLessThanOrEqual((board.elevation ?? 0) + board.height + 1e-6)
     }
   })
-  it('arcade screen is a single fixed arcadeScreen plane', () => {
-    const a = prop('arcade-cabinet')
-    const local = facingFrame(a.box, a.facing).local
-    expect(arcadeCabinetParts(local, a.height).filter((p) => p.mat === 'arcadeScreen')).toHaveLength(1)
-  })
-
-  it('companion cabinet is powered down: dark screen and marquee, no arcadeScreen or lit marquee', () => {
-    const c = prop('arcade-companion')
-    const parts = arcadeCabinetParts(facingFrame(c.box, c.facing).local, c.height, false)
-    expect(parts.some((p) => p.mat === 'arcadeScreen' || p.mat === 'marquee')).toBe(false)
-    expect(parts.filter((p) => p.mat === 'outOfOrderScreen')).toHaveLength(1)
-    expect(parts.some((p) => p.mat === 'screenOff')).toBe(false)
-    expect(parts.filter((p) => p.mat === 'marqueeOff')).toHaveLength(1)
-    expect(materials.screenOff.type).toBe('MeshLambertMaterial')
+  it('each arcade cabinet has exactly one screen plane and one marquee, in its own game materials', () => {
+    const screens = new Set<string>()
+    const marquees = new Set<string>()
+    const moldings = new Set<string>()
+    for (const id of ARCADE_CABINET_IDS) {
+      const a = prop(id)
+      const style = ARCADE_CABINET_STYLES[ARCADE_CABINET_GAMES[id]]
+      const parts = arcadeCabinetParts(facingFrame(a.box, a.facing).local, a.height, ARCADE_CABINET_GAMES[id])
+      expect(parts.filter((p) => p.mat === style.screen && p.geo === 'plane')).toHaveLength(1)
+      expect(parts.filter((p) => p.mat === style.marquee && p.geo === 'plane')).toHaveLength(1)
+      // The old single-cabinet and powered-down materials are gone from the scene.
+      expect(parts.some((p) => ['arcadeScreen', 'marquee', 'outOfOrderScreen', 'marqueeOff', 'screenOff'].includes(p.mat))).toBe(false)
+      screens.add(style.screen)
+      marquees.add(style.marquee)
+      moldings.add(style.molding)
+      for (const key of [style.screen, style.marquee, style.molding]) expect(materials[key].type).toBe('MeshBasicMaterial')
+    }
+    expect(screens.size).toBe(3)
+    expect(marquees.size).toBe(3)
+    expect(moldings.size).toBe(3)
+    // Flat colours of the three schemes differ (phosphor green, violet, amber).
+    const hex = (k: 'arcadeScreenSnake' | 'arcadeScreenMaze' | 'arcadeScreenFrequency') => materials[k].color.getHexString()
+    expect(new Set([hex('arcadeScreenSnake'), hex('arcadeScreenMaze'), hex('arcadeScreenFrequency')]).size).toBe(3)
   })
 
   it('ARCADE sign uses emissive basic materials, spells six letters and sits above the doors', () => {
@@ -279,7 +297,9 @@ describe('layout stays the single source of truth', () => {
 
   it('crt stack, floor runner and cables are counted and stay on their layout footprints', () => {
     const names = declaredObjects().map((o) => o.name)
-    for (const n of ['arcade-companion', 'crt-stack', 'arcade-sign', 'arcade-floor']) expect(names).toContain(n)
+    for (const n of [...ARCADE_CABINET_IDS, 'crt-stack', 'arcade-sign', 'arcade-floor']) expect(names).toContain(n)
+    expect(names).not.toContain('arcade-companion')
+    expect(names).not.toContain('arcade-cabinet')
     const stack = prop('crt-stack')
     const local = facingFrame(stack.box, stack.facing).local
     const parts = crtStackParts(local, stack.height)
@@ -294,7 +314,7 @@ describe('layout stays the single source of truth', () => {
   })
 
   it('facingFrame swaps width and depth for sideways facings and keeps the world footprint', () => {
-    const a = prop('arcade-cabinet')
+    const a = prop('arcade-maze')
     const f = facingFrame(a.box, '-x')
     expect(f.position).toEqual([(a.box.minX + a.box.maxX) / 2, 0, 0])
     expect(f.rotationY).toBeCloseTo(-Math.PI / 2)
@@ -307,13 +327,59 @@ describe('layout stays the single source of truth', () => {
     expect(wx).toBeCloseTo(a.box.minX)
   })
 
-  it('arcade cabinet has six coloured buttons, a ball-top joystick and a marquee', () => {
-    const a = prop('arcade-cabinet')
-    const parts = arcadeCabinetParts(a.box, a.height)
+  it.each(ARCADE_CABINET_IDS)('%s has dual ball-top joysticks, six concave buttons, two coin slots and T-molding', (id) => {
+    const a = prop(id)
+    const game = ARCADE_CABINET_GAMES[id]
+    const style = ARCADE_CABINET_STYLES[game]
+    const parts = arcadeCabinetParts(a.box, a.height, game)
+    // Six distinct coloured caps, each sunk into a wider dark inset ring.
     const buttons = parts.filter((p) => /^btn/.test(p.mat) && p.geo === 'cylinder')
+    expect(buttons).toHaveLength(6)
     expect(new Set(buttons.map((p) => p.mat)).size).toBe(6)
-    expect(parts.filter((p) => p.geo === 'sphere')).toHaveLength(1)
-    expect(parts.filter((p) => p.mat === 'marquee')).toHaveLength(1)
+    const rings = parts.filter((p) => p.mat === 'bezel' && p.geo === 'cylinderLow' && p.scale[0] === 0.08)
+    expect(rings).toHaveLength(6)
+    for (const b of buttons) expect(rings.some((r) => r.pos[0] === b.pos[0] && r.pos[1] < b.pos[1])).toBe(true)
+    // Two joysticks: a ball top (sphere) on a thin shaft (cylinder) on a base plate, one per player.
+    const balls = parts.filter((p) => p.geo === 'sphere')
+    expect(balls).toHaveLength(2)
+    expect(new Set(balls.map((p) => p.mat)).size).toBe(2)
+    expect(parts.filter((p) => p.geo === 'cylinderLow' && p.mat === 'metal' && p.scale[1] === 0.12)).toHaveLength(2)
+    expect(parts.filter((p) => p.geo === 'cylinderLow' && p.mat === 'metal' && p.scale[1] === 0.012)).toHaveLength(2)
+    // Two glowing coin slots, each with a lit '25c' label bar.
+    expect(parts.filter((p) => p.mat === 'coinGlow')).toHaveLength(4)
+    // Five T-molding strips per side in the game's colour, plus the tilted bezel assembly and a grille bar.
+    expect(parts.filter((p) => p.mat === style.molding)).toHaveLength(10)
+    expect(parts.filter((p) => p.mat === 'grille')).toHaveLength(3)
+    expect(parts.filter((p) => p.mat === 'deckPlate')).toHaveLength(1)
+    expect(parts.filter((p) => p.mat === style.marquee)).toHaveLength(1)
+  })
+
+  it('the three cabinets use three distinct T-molding accents: green, crimson and amber', () => {
+    const g = materials.moldingSnake.color.getHexString()
+    const c = materials.moldingMaze.color.getHexString()
+    const a = materials.moldingFrequency.color.getHexString()
+    expect(new Set([g, c, a]).size).toBe(3)
+    expect(parseInt(g.slice(2, 4), 16)).toBeGreaterThan(parseInt(g.slice(0, 2), 16))
+    expect(parseInt(c.slice(0, 2), 16)).toBeGreaterThan(parseInt(c.slice(2, 4), 16) * 3)
+    expect(parseInt(a.slice(0, 2), 16)).toBeGreaterThan(200)
+  })
+
+  it('the arcade light sits in front of the cabinets and lights all three anchors evenly (range, ratio <= 1.5)', () => {
+    expect(lightingSource).toContain('name="arcade-light"')
+    const dists = STATION_DEFS.filter((s) => s.id === 'arcade').map((s) =>
+      // Distance to the middle of each cabinet front (screen height 1.3 m).
+      Math.hypot(s.anchor.x - ARCADE_LIGHT_POSITION[0], 1.3 - ARCADE_LIGHT_POSITION[1], s.anchor.z - ARCADE_LIGHT_POSITION[2]),
+    )
+    expect(dists).toHaveLength(3)
+    // The farthest front corner (floor level, outer edge of the outer cabinets) must still be inside the light range.
+    for (const id of ARCADE_CABINET_IDS) {
+      const b = prop(id).box
+      for (const z of [b.minZ, b.maxZ]) for (const y of [0, 1.8]) {
+        expect(Math.hypot(b.minX - ARCADE_LIGHT_POSITION[0], y - ARCADE_LIGHT_POSITION[1], z - ARCADE_LIGHT_POSITION[2])).toBeLessThan(ARCADE_LIGHT_DISTANCE)
+      }
+    }
+    expect(Math.max(...dists) / Math.min(...dists)).toBeLessThanOrEqual(1.5)
+    expect(lightingSource).toContain('distance={ARCADE_LIGHT_DISTANCE}')
   })
 
   it('unrotated parts stay near their layout footprints', () => {
@@ -328,12 +394,14 @@ describe('layout stays the single source of truth', () => {
       }
     }
     const crt = prop('crt-vhs')
-    const arcade = prop('arcade-cabinet')
     check(crtTelevisionParts(crt.box, crt.height), crt.box)
     check(vcrDeckParts(crt.box), crt.box)
     // Arcade parts are built in the local frame (front toward +Z), then rotated by the group.
-    const arcadeLocal = facingFrame(arcade.box, arcade.facing).local
-    check(arcadeCabinetParts(arcadeLocal, arcade.height), arcadeLocal)
+    for (const id of ARCADE_CABINET_IDS) {
+      const arcade = prop(id)
+      const arcadeLocal = facingFrame(arcade.box, arcade.facing).local
+      check(arcadeCabinetParts(arcadeLocal, arcade.height, ARCADE_CABINET_GAMES[id]), arcadeLocal)
+    }
     check(armchairParts(prop('abandoned-chair').box), prop('abandoned-chair').box)
     check(couchParts(prop('couch').box), prop('couch').box)
     check(crateParts(prop('crate-a').box, 0.6), prop('crate-a').box)
@@ -586,7 +654,13 @@ describe('procedural textures in the shared resources', () => {
     expect(liveTextureCount()).toBe(0)
     expect(getSharedTexture('floor')).toBeNull()
     expect(materials.floor.map).toBeNull()
-    expect(materials.arcadeScreen.map).toBeNull()
+    // Screens and marquees keep their flat game colours.
+    for (const key of ['arcadeScreenSnake', 'arcadeScreenMaze', 'arcadeScreenFrequency', 'marqueeSnake', 'marqueeMaze', 'marqueeFrequency'] as const) {
+      expect(materials[key].map).toBeNull()
+    }
+    expect(materials.arcadeScreenSnake.color.getHexString()).toBe(ARCADE_SCREEN_BASE_COLORS.snake.slice(1))
+    expect(materials.arcadeScreenMaze.color.getHexString()).toBe(ARCADE_SCREEN_BASE_COLORS.maze.slice(1))
+    expect(materials.arcadeScreenFrequency.color.getHexString()).toBe(ARCADE_SCREEN_BASE_COLORS.frequency.slice(1))
     // Books fall back to flat instance colours on the white material.
     expect(materials.bookSpine.map).toBeNull()
     expect(getSharedTexture('spineAtlas')).toBeNull()
@@ -605,10 +679,10 @@ describe('procedural textures in the shared resources', () => {
       expect(t?.image.width).toBe(TEXTURE_SPECS[id].width)
       expect(t?.image.height).toBe(TEXTURE_SPECS[id].height)
     }
-    // The arcade screen stays one shared material; memoryShift only tints its colour.
-    expect(materials.arcadeScreen.map).toBe(getSharedTexture('arcadeScreen'))
-    expect(materials.arcadeScreen.color.getHexString()).toBe('ffffff')
-    expect(getSharedTexture('arcadeScreen')?.magFilter).toBe(1003) // NearestFilter
+    // Each cabinet screen is one shared material; memoryShift only tints its colour (white while textured).
+    expect(materials.arcadeScreenSnake.map).toBe(getSharedTexture('attractSnake'))
+    expect(materials.arcadeScreenSnake.color.getHexString()).toBe('ffffff')
+    expect(getSharedTexture('attractSnake')?.magFilter).toBe(1003) // NearestFilter
     expect(materials.floor.map).toBe(getSharedTexture('floor'))
     // The spine atlas multiplies each book's instance colour; the base colour stays white.
     expect(materials.bookSpine.map).toBe(getSharedTexture('spineAtlas'))
@@ -634,7 +708,9 @@ describe('procedural textures in the shared resources', () => {
     disposeSharedResources()
     for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
     expect(liveTextureCount()).toBe(0)
-    expect(materials.arcadeScreen.map).toBeNull()
+    expect(materials.arcadeScreenSnake.map).toBeNull()
+    // The flat game colour comes back when the texture goes away.
+    expect(materials.arcadeScreenSnake.color.getHexString()).toBe(ARCADE_SCREEN_BASE_COLORS.snake.slice(1))
     expect(() => disposeSharedResources()).not.toThrow()
     for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
   })
@@ -642,13 +718,13 @@ describe('procedural textures in the shared resources', () => {
   it('rebuilds fresh textures after a dispose so a remount works', () => {
     setCanvasFactory(() => fakeCanvas())
     ensureSharedTextures()
-    const before = getSharedTexture('marquee')
+    const before = getSharedTexture('marqueeSnake')
     disposeSharedResources()
     ensureSharedTextures()
-    const after = getSharedTexture('marquee')
+    const after = getSharedTexture('marqueeSnake')
     expect(after).not.toBeNull()
     expect(after).not.toBe(before)
-    expect(materials.marquee.map).toBe(after)
+    expect(materials.marqueeSnake.map).toBe(after)
     expect(liveTextureCount()).toBe(TEXTURE_IDS.length)
   })
 
@@ -661,28 +737,25 @@ describe('procedural textures in the shared resources', () => {
 })
 
 describe('silhouette refinements', () => {
-  it('arcade cabinet has a stepped side wing, a screen hood, a coin-return glow and grilles', () => {
-    const a = prop('arcade-cabinet')
-    const parts = arcadeCabinetParts(facingFrame(a.box, a.facing).local, a.height)
-    expect(parts.filter((p) => p.mat === 'coinGlow')).toHaveLength(1)
+  it('arcade cabinet has a stepped side wing, a tilted screen hood, glowing coin slots and grilles', () => {
+    const a = prop('arcade-snake')
+    const parts = arcadeCabinetParts(facingFrame(a.box, a.facing).local, a.height, 'snake')
+    expect(parts.filter((p) => p.mat === 'coinGlow')).toHaveLength(4)
     expect(parts.filter((p) => p.mat === 'grille').length).toBeGreaterThanOrEqual(2)
-    expect(parts.filter((p) => p.mat === 'deck')).toHaveLength(1)
+    expect(parts.filter((p) => p.mat === 'deckPlate')).toHaveLength(1)
     // Four wing boxes per side (one lower, three upper steps) that get shorter toward the back.
     const wings = parts.filter((p) => p.mat === 'cabinet' && p.geo === 'box' && Math.abs(p.scale[0] - 0.03) < 1e-9 && p.pos[0] > 0.5)
     expect(wings).toHaveLength(4)
     const depths = wings.slice(1).map((p) => p.scale[2])
     expect([...depths].sort((x, y) => y - x)).toEqual(depths)
     expect(new Set(depths).size).toBe(3)
-    // Hood: three cabinet boxes in front of the arcadeScreen plane.
-    const screen = parts.find((p) => p.mat === 'arcadeScreen')!
-    const hood = parts.filter((p) => p.mat === 'cabinet' && p.geo === 'box' && p.pos[2] > screen.pos[2] && p.pos[1] > 1.2 && p.pos[1] < 1.7 && !p.rot)
+    // Recessed, tilted bezel: the screen plane leans back and is surrounded by four bezel strips; a visor and two
+    // cheeks (cabinet boxes) stand in front of it.
+    const screen = parts.find((p) => p.mat === 'arcadeScreenSnake')!
+    expect(screen.rot![0]).toBeLessThan(0)
+    const hood = parts.filter((p) => p.mat === 'cabinet' && p.geo === 'box' && p.pos[2] > screen.pos[2] && p.pos[1] > 1.2 && p.pos[1] < 1.7 && p.rot && p.scale[1] <= 0.5)
     expect(hood.length).toBeGreaterThanOrEqual(3)
-  })
-
-  it('powered-down companion cabinet has no coin glow', () => {
-    const c = prop('arcade-companion')
-    const parts = arcadeCabinetParts(facingFrame(c.box, c.facing).local, c.height, false)
-    expect(parts.some((p) => p.mat === 'coinGlow')).toBe(false)
+    expect(parts.filter((p) => p.mat === 'bezel' && p.geo === 'box' && p.rot && p.rot[0] === screen.rot![0])).toHaveLength(4)
   })
 
   it('desk has a mug, a notepad and three loose tapes; chairs have rolled arms and a pillow', () => {
@@ -975,7 +1048,8 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
     )
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
-    expect(report.textureCount).toBe(21)
+    // 21 textures after 18.3; task 20.2 removed four (arcadeScreen, marquee, outOfOrder, deck) and added six.
+    expect(report.textureCount).toBe(23)
     for (const name of ['conduit', 'ventilation', 'cable-loops', 'corner-posts', 'wall-clock', 'desk-lamp', 'desk-lamp-glow']) {
       expect(report.objects.map((o) => o.name)).toContain(name)
     }
@@ -1031,19 +1105,13 @@ describe('task 19.2: texture headroom and craftsmanship', () => {
     expect(materials.crtScreen.map).toBeNull()
   })
 
-  it('the companion cabinet uses the out-of-order glass and never arcadeScreen', () => {
-    const c = prop('arcade-companion')
-    const parts = arcadeCabinetParts(facingFrame(c.box, c.facing).local, c.height, false)
-    expect(parts.filter((p) => p.mat === 'outOfOrderScreen')).toHaveLength(1)
-    expect(parts.some((p) => p.mat === 'arcadeScreen')).toBe(false)
-    setCanvasFactory(() => fakeCanvas())
-    ensureSharedTextures()
-    expect(materials.outOfOrderScreen.map).toBe(getSharedTexture('outOfOrder'))
-    expect(materials.arcadeScreen.map).toBe(getSharedTexture('arcadeScreen'))
-    expect(materials.arcadeScreen.map).not.toBe(materials.outOfOrderScreen.map)
-    // The active cabinet is unchanged.
-    const a = prop('arcade-cabinet')
-    expect(arcadeCabinetParts(facingFrame(a.box, a.facing).local, a.height).filter((p) => p.mat === 'arcadeScreen')).toHaveLength(1)
+  it('the old out-of-order glass, single arcade screen, marquee and deck materials and textures are gone', () => {
+    const removedMaterials = ['outOfOrderScreen', 'arcadeScreen', 'marquee', 'deck']
+    for (const o of declaredObjects()) {
+      expect(o.parts.some((p) => removedMaterials.includes(p.mat)), o.name).toBe(false)
+    }
+    for (const key of removedMaterials) expect(key in materials, key).toBe(false)
+    for (const id of ['outOfOrder', 'arcadeScreen', 'marquee', 'deck']) expect(TEXTURE_IDS as string[], id).not.toContain(id)
   })
 
   it('the VCR has a glowing timecode window and a metallic tape slot', () => {
@@ -1071,9 +1139,8 @@ describe('task 19.2: texture headroom and craftsmanship', () => {
   it('without a canvas the new materials keep flat colours', () => {
     setCanvasFactory(null)
     ensureSharedTextures()
-    for (const m of [materials.smpteScreen, materials.outOfOrderScreen, materials.timecode]) expect(m.map).toBeNull()
+    for (const m of [materials.smpteScreen, materials.timecode]) expect(m.map).toBeNull()
     expect(getSharedTexture('smpteBars')).toBeNull()
-    expect(getSharedTexture('outOfOrder')).toBeNull()
     expect(getSharedTexture('timecode')).toBeNull()
   })
 
@@ -1195,14 +1262,13 @@ describe('task 19.2: texture headroom and craftsmanship', () => {
   it('each new texture is created once and disposed exactly once, twice-safe', () => {
     setCanvasFactory(() => fakeCanvas())
     ensureSharedTextures()
-    const ids = ['smpteBars', 'outOfOrder', 'timecode', 'wallPanel'] as const
+    const ids = ['smpteBars', 'timecode', 'wallPanel'] as const
     const spies = ids.map((id) => vi.spyOn(getSharedTexture(id)!, 'dispose'))
     expect(materials.timecode.map).toBe(getSharedTexture('timecode'))
     expect(liveTextureCount()).toBe(TEXTURE_IDS.length)
     disposeSharedResources()
     for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
     expect(materials.smpteScreen.map).toBeNull()
-    expect(materials.outOfOrderScreen.map).toBeNull()
     expect(materials.timecode.map).toBeNull()
     expect(() => disposeSharedResources()).not.toThrow()
     for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
@@ -1212,5 +1278,85 @@ describe('task 19.2: texture headroom and craftsmanship', () => {
     expect(M3_LIGHT_COUNT).toBe(4)
     const solid = ROOM.props.filter((p) => p.solid).map((p) => p.box)
     expect(COLLIDERS).toEqual([...ROOM.walls, ...ROOM.doors.flatMap((d) => d.frames), ...solid])
+  })
+})
+
+describe('task 20.2: attract screen and marquee textures on the cabinets', () => {
+  afterEach(() => setCanvasFactory(null))
+
+  const SCREEN_TEXTURES = { snake: 'attractSnake', maze: 'attractMaze', frequency: 'attractFrequency' } as const
+  const MARQUEE_TEXTURES = { snake: 'marqueeSnake', maze: 'marqueeMaze', frequency: 'marqueeFrequency' } as const
+  const GAMES = ['snake', 'maze', 'frequency'] as const
+
+  it('with a canvas each cabinet screen and marquee material shows its own texture', () => {
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    const seen = new Set<unknown>()
+    for (const game of GAMES) {
+      const style = ARCADE_CABINET_STYLES[game]
+      const screenTex = getSharedTexture(SCREEN_TEXTURES[game])
+      const marqueeTex = getSharedTexture(MARQUEE_TEXTURES[game])
+      expect(screenTex).not.toBeNull()
+      expect(marqueeTex).not.toBeNull()
+      expect(materials[style.screen].map).toBe(screenTex)
+      expect(materials[style.marquee].map).toBe(marqueeTex)
+      // White multiplier: the art shows unmodified at t = 0.
+      expect(materials[style.screen].color.getHexString()).toBe('ffffff')
+      expect(materials[style.marquee].color.getHexString()).toBe('ffffff')
+      expect([screenTex?.image.width, screenTex?.image.height]).toEqual([256, 256])
+      expect([marqueeTex?.image.width, marqueeTex?.image.height]).toEqual([256, 64])
+      expect(screenTex?.colorSpace).toBe('srgb')
+      expect(marqueeTex?.colorSpace).toBe('srgb')
+      expect(screenTex?.generateMipmaps).toBe(false)
+      expect(screenTex?.magFilter).toBe(1003) // NearestFilter
+      seen.add(screenTex)
+      seen.add(marqueeTex)
+    }
+    expect(seen.size).toBe(6)
+  })
+
+  it('without a canvas the screens and marquees keep their flat game colours', () => {
+    setCanvasFactory(null)
+    ensureSharedTextures()
+    for (const game of GAMES) {
+      const style = ARCADE_CABINET_STYLES[game]
+      expect(materials[style.screen].map).toBeNull()
+      expect(materials[style.marquee].map).toBeNull()
+      expect(materials[style.screen].color.getHexString()).toBe(ARCADE_SCREEN_BASE_COLORS[game].slice(1))
+      expect(getSharedTexture(SCREEN_TEXTURES[game])).toBeNull()
+      expect(getSharedTexture(MARQUEE_TEXTURES[game])).toBeNull()
+    }
+  })
+
+  it('texture count and memory after the change, every texture disposed exactly once, twice-safe', () => {
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    expect(liveTextureCount()).toBe(23)
+    expect(TEXTURE_IDS).toHaveLength(23)
+    const total = totalTextureMemoryBytes()
+    const perTexture = TEXTURE_IDS.map((id) => `${id} ${TEXTURE_SPECS[id].width}x${TEXTURE_SPECS[id].height}=${(textureMemoryBytes(TEXTURE_SPECS[id]) / 1048576).toFixed(3)}MB`)
+    const report = sceneDetailReport()
+    console.info(
+      `[20.2] computed triangles ${report.totalTriangles}, draw-call estimate ${report.totalDrawCalls}, textures ${report.textureCount}, ` +
+        `texture memory estimate ${(total / 1048576).toFixed(3)} MB (computed, not runtime-measured): ${perTexture.join(', ')}`,
+    )
+    expect(total).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
+    expect(report.textureMemoryBytes).toBe(total)
+    expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
+    expect(report.totalTriangles).toBeLessThan(20000)
+    const spies = TEXTURE_IDS.map((id) => vi.spyOn(getSharedTexture(id)!, 'dispose'))
+    disposeSharedResources()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+    expect(liveTextureCount()).toBe(0)
+    expect(() => disposeSharedResources()).not.toThrow()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+  })
+
+  it('every cabinet part material is one of the per-game materials (no removed material is referenced)', () => {
+    for (const id of ARCADE_CABINET_IDS) {
+      const a = prop(id)
+      const parts = arcadeCabinetParts(facingFrame(a.box, a.facing).local, a.height, ARCADE_CABINET_GAMES[id])
+      for (const p of parts) expect(p.mat in materials, p.mat).toBe(true)
+    }
   })
 })

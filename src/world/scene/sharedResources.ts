@@ -22,7 +22,7 @@ import {
   SphereGeometry,
 } from 'three'
 import { ROOM } from '../layout/roomLayout'
-import { BASE_ARCADE_SCREEN_COLOR, BASE_CRT_SCREEN_COLOR, BASE_WALL_COLOR } from './memoryShift'
+import { ARCADE_SCREEN_BASE_COLORS, BASE_CRT_SCREEN_COLOR, BASE_WALL_COLOR, arcadeScreenBaseColor } from './memoryShift'
 import {
   FLOOR_METRES_PER_REPEAT,
   SPINE_CASE_SIDE_CELL,
@@ -101,8 +101,6 @@ export const materials = {
   casingDark: lambert('#5f5b52'),
   bezel: lambert('#0c0c10'),
   displayGreen: new MeshBasicMaterial({ color: '#2a8a5a' }),
-  /** Fixed lit arcade marquee. */
-  marquee: new MeshBasicMaterial({ color: '#f5a623' }),
   sideArtA: lambert('#d9347a'),
   sideArtB: lambert('#26b5c9'),
   btnRed: lambert('#d62a2a'),
@@ -132,7 +130,6 @@ export const materials = {
   /** 15.7: textured sign face (emissive basic material, not a light) and other new detail materials. */
   signFace: new MeshBasicMaterial({ color: '#2a0e2e' }),
   grille: lambert('#1c1d24'),
-  deck: lambert('#22232a'),
   coinGlow: new MeshBasicMaterial({ color: '#ffcf5a' }),
   mug: lambert('#b4503c'),
   paper: lambert('#e6dfc6'),
@@ -168,7 +165,19 @@ export const materials = {
   }),
   /** Screens: tinted only by the Memory_Shift blend. They never read lock state. */
   crtScreen: new MeshBasicMaterial({ color: BASE_CRT_SCREEN_COLOR }),
-  arcadeScreen: new MeshBasicMaterial({ color: BASE_ARCADE_SCREEN_COLOR }),
+  /** Per-cabinet screens: flat game colours are the no-canvas fallback; with a canvas the attract texture is attached and the base becomes white. Tinted by Memory_Shift. */
+  arcadeScreenSnake: new MeshBasicMaterial({ color: ARCADE_SCREEN_BASE_COLORS.snake }),
+  arcadeScreenMaze: new MeshBasicMaterial({ color: ARCADE_SCREEN_BASE_COLORS.maze }),
+  arcadeScreenFrequency: new MeshBasicMaterial({ color: ARCADE_SCREEN_BASE_COLORS.frequency }),
+  /** Per-cabinet lit marquees (flat colour fallback, marquee texture when a canvas exists) and coloured side T-molding. */
+  marqueeSnake: new MeshBasicMaterial({ color: '#1fa855' }),
+  marqueeMaze: new MeshBasicMaterial({ color: '#c8203c' }),
+  marqueeFrequency: new MeshBasicMaterial({ color: '#16b8d4' }),
+  moldingSnake: new MeshBasicMaterial({ color: '#22c55e' }),
+  moldingMaze: new MeshBasicMaterial({ color: '#dc143c' }),
+  moldingFrequency: new MeshBasicMaterial({ color: '#ffb000' }),
+  /** Plain dark control deck panel (the old deck texture marked a single joystick, so 3D parts carry the detail now). */
+  deckPlate: lambert('#1a1b22'),
   led: new MeshBasicMaterial({ color: '#ff4040' }),
   /**
    * 19.2: fixed-colour detail screens. None of them is tinted by Memory_Shift (that driver only owns
@@ -176,7 +185,6 @@ export const materials = {
    * Flat colours are the fallback when no canvas exists.
    */
   smpteScreen: new MeshBasicMaterial({ color: '#3c4650' }),
-  outOfOrderScreen: new MeshBasicMaterial({ color: '#050a07' }),
   timecode: new MeshBasicMaterial({ color: '#2a8a5a' }),
   /** Brushed-metal tape slot flap and frame rails on the VCR. */
   tapeSlotMetal: new MeshStandardMaterial({ color: '#9aa0aa', metalness: 0.7, roughness: 0.35 }),
@@ -363,12 +371,18 @@ interface TextureBinding {
   texture: TextureId
   /** Colour multiplier once textured. Omitted for materials whose colour the Memory_Shift driver owns. */
   color?: string
+  /** Flat colour restored when the texture is disposed (the screens switch to white while textured). */
+  fallbackColor?: string
 }
 
 /** Which texture each shared material shows. Textured materials multiply the map by `color`. */
 const TEXTURE_BINDINGS: readonly TextureBinding[] = [
-  { material: 'arcadeScreen', texture: 'arcadeScreen' },
-  { material: 'marquee', texture: 'marquee', color: '#ffffff' },
+  { material: 'arcadeScreenSnake', texture: 'attractSnake', color: arcadeScreenBaseColor('snake', true), fallbackColor: arcadeScreenBaseColor('snake', false) },
+  { material: 'arcadeScreenMaze', texture: 'attractMaze', color: arcadeScreenBaseColor('maze', true), fallbackColor: arcadeScreenBaseColor('maze', false) },
+  { material: 'arcadeScreenFrequency', texture: 'attractFrequency', color: arcadeScreenBaseColor('frequency', true), fallbackColor: arcadeScreenBaseColor('frequency', false) },
+  { material: 'marqueeSnake', texture: 'marqueeSnake', color: '#ffffff', fallbackColor: '#1fa855' },
+  { material: 'marqueeMaze', texture: 'marqueeMaze', color: '#ffffff', fallbackColor: '#c8203c' },
+  { material: 'marqueeFrequency', texture: 'marqueeFrequency', color: '#ffffff', fallbackColor: '#16b8d4' },
   { material: 'signFace', texture: 'signFace', color: '#ffffff' },
   { material: 'posterSunset', texture: 'posterSunset', color: '#ffffff' },
   { material: 'posterReel', texture: 'posterReel', color: '#ffffff' },
@@ -380,7 +394,6 @@ const TEXTURE_BINDINGS: readonly TextureBinding[] = [
   { material: 'crate', texture: 'crate', color: '#ffffff' },
   { material: 'crateSlat', texture: 'crate', color: '#b89c78' },
   { material: 'grille', texture: 'grille', color: '#ffffff' },
-  { material: 'deck', texture: 'deck', color: '#ffffff' },
   { material: 'bookSpine', texture: 'spineAtlas', color: '#ffffff' },
   /** The wall colour stays a near-white multiplier owned by Memory_Shift, so no `color` here. */
   { material: 'wall', texture: 'wallPanel' },
@@ -389,7 +402,6 @@ const TEXTURE_BINDINGS: readonly TextureBinding[] = [
   { material: 'lampHalo', texture: 'lampGlow', color: '#ffffff' },
   /** Slightly dimmed multiplier: the reference card stays below the main CRT's brightness. */
   { material: 'smpteScreen', texture: 'smpteBars', color: '#b8b8b8' },
-  { material: 'outOfOrderScreen', texture: 'outOfOrder', color: '#ffffff' },
   { material: 'timecode', texture: 'timecode', color: '#ffffff' },
 ]
 
@@ -423,6 +435,7 @@ function disposeTextures(): void {
     const mat = materials[b.material]
     if (mat.map) {
       mat.map = null
+      if (b.fallbackColor) mat.color.set(b.fallbackColor)
       mat.needsUpdate = true
     }
   }

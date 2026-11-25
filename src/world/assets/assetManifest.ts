@@ -16,7 +16,7 @@ export interface AssetEntry {
 export const MAX_TRIANGLES_PER_ASSET = 5000
 export const MAX_TRIANGLES_TOTAL = 20000
 
-/** Known layout ids that may receive a GLB: crt-vhs, arcade-cabinet, shelf-a/b/c, armchair, couch, crate. */
+/** Known layout ids that may receive a GLB: crt-vhs, arcade-snake/maze/frequency, shelf-a/b/c, armchair, couch, crate. */
 export const ASSET_MANIFEST: Readonly<Record<string, AssetEntry>> = Object.freeze({})
 
 export function getAssetEntry(

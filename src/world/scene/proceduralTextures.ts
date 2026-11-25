@@ -4,14 +4,13 @@
  * fake. The same seed always produces the same call sequence (seeded mulberry32, no Math.random).
  *
  * Texture budget (all power-of-two, estimate = width * height * 4 bytes, x 1.33 when mipmapped):
- *   arcadeScreen 512x256 nearest   0.50 MB     posterSunset 256x512 mip  0.70 MB
- *   marquee      512x128 nearest   0.25 MB     posterReel   256x512 mip  0.70 MB
- *   signFace     512x128 mip       0.33 MB     shiftPoster  256x512 mip  0.70 MB
- *   floor, wood, woodDark, crate, grille: 128x128 mip, 0.09 MB each     shiftPlaque 256x128 mip 0.17 MB
- *   deck 256x128 mip 0.17 MB     spineAtlas 512x256 mip 0.67 MB (task 18.2).
+ *   signFace     512x128 mip       0.33 MB     posterSunset 256x512 mip  0.70 MB
+ *   posterReel, shiftPoster 256x512 mip 0.70 MB each     shiftPlaque 256x128 mip 0.17 MB
+ *   floor, wood, woodDark, crate, grille: 128x128 mip, 0.09 MB each     spineAtlas 512x256 mip 0.67 MB (task 18.2).
  *   Task 18.3: corkBoard 512x512 mip 1.33 MB, rugWoven 256x256 mip 0.33 MB, lampGlow 64x64 mip 0.02 MB.
- *   Task 19.2: wallPanel shrinks from 512x512 to 256x256 mip 0.33 MB (metric UVs keep the panel size). New:
- *   smpteBars 256x128 nearest 0.13 MB, outOfOrder 256x128 mip 0.17 MB, timecode 128x32 nearest 0.02 MB.
+ *   Task 19.2: wallPanel 256x256 mip 0.33 MB, smpteBars 256x128 nearest 0.13 MB, timecode 128x32 nearest 0.02 MB.
+ *   Task 20.2: three attract screens 256x256 nearest 0.25 MB each and three marquees 256x64 nearest 0.06 MB each
+ *   replace the old arcadeScreen, marquee, outOfOrder and deck textures.
  *   The total is checked against TEXTURE_MEMORY_BUDGET_BYTES in tests.
  */
 import { makeRng } from './effectsTiming'
@@ -51,8 +50,12 @@ export interface Ctx2D {
 }
 
 export type TextureId =
-  | 'arcadeScreen'
-  | 'marquee'
+  | 'attractSnake'
+  | 'attractMaze'
+  | 'attractFrequency'
+  | 'marqueeSnake'
+  | 'marqueeMaze'
+  | 'marqueeFrequency'
   | 'signFace'
   | 'posterSunset'
   | 'posterReel'
@@ -63,14 +66,12 @@ export type TextureId =
   | 'woodDark'
   | 'crate'
   | 'grille'
-  | 'deck'
   | 'spineAtlas'
   | 'wallPanel'
   | 'rugWoven'
   | 'corkBoard'
   | 'lampGlow'
   | 'smpteBars'
-  | 'outOfOrder'
   | 'timecode'
 
 export type TextureFilter = 'nearest' | 'mipmap'
@@ -228,54 +229,239 @@ function speckle(
 // Arcade screen, marquee and sign
 // ---------------------------------------------------------------------------------------------
 
-/** Attract screen. Dim phosphor green so the Memory_Shift colour multiply still reads. */
-export function drawArcadeScreen(c: Ctx2D, w: number, h: number, seed: number): void {
+// ---------------------------------------------------------------------------------------------
+// Task 20.2: per-game attract screens (256x256) and marquees (256x64). Original art, no real brands.
+// ---------------------------------------------------------------------------------------------
+
+/** Phosphor-green CRT Snake: a serpent built from VHS-tape segments on a dark grid, with a faint shadow serpent. */
+export function drawAttractSnake(c: Ctx2D, w: number, h: number, seed: number): void {
   const rnd = makeRng(seed)
-  vertical(c, w, h, [[0, '#031009'], [1, '#05160d']])
-  // Phosphor dot grid.
-  for (let y = 3; y < h; y += 6) for (let x = 3; x < w; x += 6) rect(c, x, y, 2, 2, '#1c7a52', 0.16)
-  frame(c, 10, 10, w - 20, h - 20, '#1f8a5c', 3)
-  text(c, 'HI 000000', 76, 30, 'bold 14px monospace', '#3fbf8a', 0.8)
-  text(c, 'LOST MEMORY', w / 2 + 3, 85, 'bold 56px monospace', '#7a1f5a')
-  text(c, 'LOST MEMORY', w / 2, 82, 'bold 56px monospace', '#7dffc0')
-  rect(c, 96, 118, w - 192, 3, '#2fa874')
-  text(c, 'PRESS E', w / 2, 152, 'bold 34px monospace', '#c8ffe4')
-  // Pixel snake with a step in the middle, and an apple.
-  for (let i = 0; i < 9; i++) {
-    const y = 198 - (i >= 3 && i < 6 ? 14 : 0)
-    rect(c, 60 + i * 14, y, 12, 12, i === 8 ? '#e8fff4' : '#4fe0a0')
+  vertical(c, w, h, [[0, '#020a05'], [1, '#04140a']])
+  // Dark play grid.
+  for (let k = 16; k < w; k += 16) {
+    rect(c, k, 0, 1, h, '#0e4a2a', 0.35)
+    rect(c, 0, k, w, 1, '#0e4a2a', 0.35)
   }
-  rect(c, 192, 200, 10, 10, '#ff5a6a')
-  // Small memory-tape cassette motif.
-  rect(c, 330, 186, 96, 52, '#0e2a1e')
-  frame(c, 330, 186, 96, 52, '#4fe0a0', 2)
-  rect(c, 346, 194, 64, 14, '#183a2a')
-  disc(c, 356, 222, 8, '#05160d')
-  disc(c, 400, 222, 8, '#05160d')
-  ring(c, 356, 222, 8, '#4fe0a0', 2)
-  ring(c, 400, 222, 8, '#4fe0a0', 2)
-  speckle(c, rnd, 0, 0, w, h, 60, ['#2fa874', '#7dffc0', '#0a3a28'], 2, 0.25)
-  scanlines(c, w, h, 2, 0.22)
-  vignette(c, w, h, 40, 0.55)
+  const route = (i: number) => ({ x: 22 + i * 17, y: 150 + Math.sin(i * 0.8) * 24 })
+  // Shadow serpent: larger, offset, very faint, behind the real one.
+  for (let i = 0; i < 12; i++) {
+    const p = route(i)
+    rect(c, p.x - 6, p.y - 26 + (i % 2) * 3, 22, 16, '#0f6a3a', 0.18)
+  }
+  // The serpent: tape segments (cassette body, label strip, two reel dots) and a head.
+  for (let i = 0; i < 11; i++) {
+    const p = route(i)
+    const y = p.y + Math.floor(rnd() * 2)
+    rect(c, p.x, y, 16, 11, '#1f9c52')
+    frame(c, p.x, y, 16, 11, '#7dffb0', 1)
+    rect(c, p.x + 3, y + 1, 10, 3, '#b8ffd2', 0.8)
+    disc(c, p.x + 4.5, y + 7, 2, '#02140a')
+    disc(c, p.x + 11.5, y + 7, 2, '#02140a')
+  }
+  const head = route(11)
+  rect(c, head.x, head.y - 2, 18, 15, '#c8ffe0')
+  rect(c, head.x + 11, head.y + 1, 3, 3, '#ff3a4a')
+  rect(c, head.x + 11, head.y + 7, 3, 3, '#ff3a4a')
+  // Prey: a lone tape label.
+  rect(c, 58, 205, 9, 9, '#ff5a6a')
+  text(c, 'SNAKE.EXE', w / 2 + 2, 37, 'bold 28px monospace', '#0a5a30')
+  text(c, 'SNAKE.EXE', w / 2, 35, 'bold 28px monospace', '#7dffc0')
+  text(c, 'PRESS E', w / 2, 72, 'bold 16px monospace', '#c8ffe4')
+  text(c, 'INSERT 25¢', w / 2, 236, 'bold 12px monospace', '#3fbf8a', 0.9)
+  // Phosphor dot grid.
+  for (let y = 3; y < h; y += 8) for (let x = 3; x < w; x += 8) rect(c, x, y, 1, 1, '#2fa874', 0.2)
+  speckle(c, rnd, 0, 0, w, h, 50, ['#2fa874', '#7dffc0', '#0a3a28'], 2, 0.25)
+  scanlines(c, w, h, 2, 0.24)
+  vignette(c, w, h, 40, 0.6)
 }
 
-export function drawMarquee(c: Ctx2D, w: number, h: number, seed: number): void {
+/** Vanishing point of the maze corridor and the corridor depth steps (0 = near edge, 1 = vanishing rectangle). */
+const MAZE_OUTER = { l: 6, r: 250, t: 6, b: 250 } as const
+const MAZE_INNER = { l: 104, r: 152, t: 88, b: 150 } as const
+const MAZE_DEPTHS = [0, 0.3, 0.5, 0.65, 0.76, 0.84, 0.9] as const
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+
+/** Dark labyrinth in one-point perspective, three glowing photo fragments and a lurking silhouette at the far end. */
+export function drawAttractMaze(c: Ctx2D, w: number, h: number, seed: number): void {
   const rnd = makeRng(seed)
-  gradientRect(c, 0, 0, w, h, 0, 0, w, 0, [[0, '#5a1c00'], [0.5, '#ffb23a'], [1, '#5a1c00']])
-  gradientRect(c, 14, 14, w - 28, h - 28, 0, 14, 0, h - 14, [[0, '#2a0a3a'], [1, '#4a1060']])
-  frame(c, 14, 14, w - 28, h - 28, '#ffd27a', 2)
-  text(c, 'ARCADE', w / 2 + 3, 61, 'bold 60px monospace', '#a02a00')
-  text(c, 'ARCADE', w / 2, 58, 'bold 60px monospace', '#ffd27a')
-  text(c, 'LOST MEMORY CLUB', w / 2, 100, 'bold 20px monospace', '#ffe9b8')
-  // Border trim bulbs with a soft halo.
-  for (let x = 20; x <= w - 20; x += 32) {
-    for (const y of [7, h - 7]) {
-      disc(c, x, y, 6, '#ffb23a', 0.3)
-      disc(c, x, y, 3.5, '#fff2c0')
+  rect(c, 0, 0, w, h, '#06020c')
+  const level = (k: number) => {
+    const f = MAZE_DEPTHS[k]
+    return {
+      l: lerp(MAZE_OUTER.l, MAZE_INNER.l, f),
+      r: lerp(MAZE_OUTER.r, MAZE_INNER.r, f),
+      t: lerp(MAZE_OUTER.t, MAZE_INNER.t, f),
+      b: lerp(MAZE_OUTER.b, MAZE_INNER.b, f),
     }
   }
-  speckle(c, rnd, 14, 14, w - 28, h - 28, 40, ['#ffffff', '#000000'], 1, 0.08)
+  for (let k = 0; k < MAZE_DEPTHS.length - 1; k++) {
+    const a = level(k)
+    const b = level(k + 1)
+    const shade = k % 2 === 0
+    triangle(c, [[a.l, a.t], [b.l, b.t], [b.l, b.b], [a.l, a.b]], shade ? '#2c0a1e' : '#1c0716') // left wall
+    triangle(c, [[a.r, a.t], [b.r, b.t], [b.r, b.b], [a.r, a.b]], shade ? '#2c0a1e' : '#1c0716') // right wall
+    triangle(c, [[a.l, a.t], [a.r, a.t], [b.r, b.t], [b.l, b.t]], '#0c0414') // ceiling
+    triangle(c, [[a.l, a.b], [a.r, a.b], [b.r, b.b], [b.l, b.b]], shade ? '#1a0616' : '#12041a') // floor
+  }
+  // Depth frames and converging edges.
+  for (let k = 0; k < MAZE_DEPTHS.length; k++) {
+    const a = level(k)
+    frame(c, a.l, a.t, a.r - a.l, a.b - a.t, k % 2 === 0 ? '#c8203c' : '#8a3ad0', 1.5, 0.7)
+  }
+  const far = level(MAZE_DEPTHS.length - 1)
+  for (const [x, y] of [[far.l, far.t], [far.r, far.t], [far.l, far.b], [far.r, far.b]] as const) {
+    const ox = x < w / 2 ? MAZE_OUTER.l : MAZE_OUTER.r
+    const oy = y < h / 2 ? MAZE_OUTER.t : MAZE_OUTER.b
+    line(c, ox, oy, x, y, '#8a3ad0', 1.5, 0.8)
+  }
+  // Far end: a dark doorway with a lurking silhouette and a faint rim light.
+  rect(c, far.l, far.t, far.r - far.l, far.b - far.t, '#020106')
+  triangle(c, [[120, 114], [136, 114], [141, 156], [115, 156]], '#000000')
+  disc(c, 128, 107, 6, '#000000')
+  ring(c, 128, 107, 6, '#8a3ad0', 1, 0.55)
+  line(c, 120, 114, 115, 156, '#c8203c', 1, 0.45)
+  line(c, 136, 114, 141, 156, '#c8203c', 1, 0.45)
+  // Three glowing photo fragments: light frame, dark inner photo area.
+  for (const [x, y, fw, fh] of [[16, 70, 30, 24], [196, 120, 28, 34], [62, 176, 26, 22]] as const) {
+    rect(c, x - 3, y - 3, fw + 6, fh + 6, '#ff9ac0', 0.16)
+    rect(c, x, y, fw, fh, '#f0d8e8')
+    rect(c, x + 3, y + 3, fw - 6, fh - 6, '#1c0616')
+    rect(c, x + fw / 2 - 2, y + 6, 4, 5, '#7a2a5a', 0.8)
+  }
+  text(c, 'LAST EXIT', w / 2 + 2, 26, 'bold 26px monospace', '#5a0f8a')
+  text(c, 'LAST EXIT', w / 2, 24, 'bold 26px monospace', '#ff4a6a')
+  speckle(c, rnd, 0, 0, w, h, 50, ['#c8203c', '#8a3ad0', '#000000'], 2, 0.22)
+  scanlines(c, w, h, 2, 0.26)
+  vignette(c, w, h, 44, 0.6)
 }
+
+/** Dial scale of the frequency screen, in MHz, and the station it is tuned to. */
+export const FREQUENCY_TEXT = '89.4 MHz'
+const DIAL_MIN_MHZ = 88
+const DIAL_MAX_MHZ = 108
+const DIAL_STATION_MHZ = 89.4
+
+/** Retro radio oscilloscope: grid, a bright waveform that breaks into noise, a tuning dial with a needle. */
+export function drawAttractFrequency(c: Ctx2D, w: number, h: number, seed: number): void {
+  const rnd = makeRng(seed)
+  vertical(c, w, h, [[0, '#031210'], [1, '#02100e']])
+  // Oscilloscope panel with a 8 x 6 graticule.
+  const sx = 16
+  const sy = 44
+  const sw = w - 32
+  const sh = 120
+  rect(c, sx, sy, sw, sh, '#01201c')
+  for (let i = 1; i < 8; i++) line(c, sx + (i * sw) / 8, sy, sx + (i * sw) / 8, sy + sh, '#1fa8a0', 1, 0.28)
+  for (let j = 1; j < 6; j++) line(c, sx, sy + (j * sh) / 6, sx + sw, sy + (j * sh) / 6, '#1fa8a0', 1, 0.28)
+  line(c, sx, sy + sh / 2, sx + sw, sy + sh / 2, '#2ad8d0', 1, 0.5)
+  frame(c, sx, sy, sw, sh, '#2ad8d0', 2)
+  // Waveform: a clean sine on the left that tears into noise on the right. Drawn twice for a soft glow.
+  const mid = sy + sh / 2
+  const pts: Array<[number, number]> = []
+  for (let x = sx + 4; x <= sx + sw - 4; x += 4) {
+    const u = (x - sx) / sw
+    const clean = Math.sin(u * 22) * 34
+    const noise = (rnd() - 0.5) * 2 * 40
+    const mix = u < 0.5 ? 0 : Math.min(1, (u - 0.5) / 0.25)
+    pts.push([x, mid - (clean * (1 - mix) + noise * mix)])
+  }
+  for (const [lw, alpha, col] of [[5, 0.25, '#ff9a1a'], [2, 1, '#ffc23a']] as const) {
+    c.globalAlpha = alpha
+    c.strokeStyle = col
+    c.lineWidth = lw
+    c.beginPath()
+    c.moveTo(pts[0][0], pts[0][1])
+    for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1])
+    c.stroke()
+    c.globalAlpha = 1
+  }
+  // Tuning dial: ticks every MHz (long every 5) and a needle on the station.
+  const dx0 = 28
+  const dx1 = w - 28
+  const dialX = (mhz: number) => dx0 + ((mhz - DIAL_MIN_MHZ) / (DIAL_MAX_MHZ - DIAL_MIN_MHZ)) * (dx1 - dx0)
+  rect(c, dx0 - 8, 176, dx1 - dx0 + 16, 36, '#0a2a26', 0.9)
+  frame(c, dx0 - 8, 176, dx1 - dx0 + 16, 36, '#1fa8a0', 1)
+  for (let m = DIAL_MIN_MHZ; m <= DIAL_MAX_MHZ; m++) {
+    const x = dialX(m)
+    line(c, x, 196, x, (m - DIAL_MIN_MHZ) % 5 === 0 ? 182 : 189, '#ffc23a', 1, 0.85)
+  }
+  const nx = dialX(DIAL_STATION_MHZ)
+  line(c, nx, 178, nx, 210, '#ff3a3a', 2)
+  disc(c, nx, 210, 2, '#ff3a3a')
+  text(c, FREQUENCY_TEXT, w / 2, 228, 'bold 18px monospace', '#ffc23a')
+  text(c, 'DEAD FREQUENCY', w / 2 + 2, 22, 'bold 20px monospace', '#0a5a58')
+  text(c, 'DEAD FREQUENCY', w / 2, 20, 'bold 20px monospace', '#2ad8d0')
+  speckle(c, rnd, 0, 0, w, h, 50, ['#2ad8d0', '#ffc23a', '#000000'], 2, 0.2)
+  scanlines(c, w, h, 2, 0.26)
+  vignette(c, w, h, 40, 0.6)
+}
+
+export interface MarqueePalette {
+  /** Outer trim gradient: edge colour and centre colour. */
+  trimEdge: string
+  trimCentre: string
+  /** Backlit panel gradient: top and bottom. */
+  panelTop: string
+  panelBottom: string
+  bulb: string
+  glow: string
+  text: string
+  textShadow: string
+}
+
+export const MARQUEE_TEXTS = Object.freeze({
+  snake: 'SNAKE.EXE // THE HUNGRY TAPE',
+  maze: 'LAST EXIT // THE MAZE',
+  frequency: 'DEAD FREQUENCY // THE LOST SIGNAL',
+})
+
+/** Marquee lettering is measured with a fixed per-character width: monospace glyphs are about 0.6 em wide. */
+export const MARQUEE_CHAR_WIDTH_EM = 0.6
+/** Free space kept at both ends of the lettering. */
+export const MARQUEE_TEXT_MARGIN = 14
+const MARQUEE_MAX_FONT_PX = 20
+const MARQUEE_MIN_FONT_PX = 8
+
+/** Estimated lettering width in px at a font size. */
+export const marqueeTextWidth = (s: string, fontPx: number): number => Math.ceil(s.length * fontPx * MARQUEE_CHAR_WIDTH_EM)
+
+/** Largest whole font size whose estimated width fits in `canvasWidth` minus both margins. */
+export function marqueeFontSize(s: string, canvasWidth: number): number {
+  const fit = Math.floor((canvasWidth - 2 * MARQUEE_TEXT_MARGIN) / (s.length * MARQUEE_CHAR_WIDTH_EM))
+  return Math.max(MARQUEE_MIN_FONT_PX, Math.min(MARQUEE_MAX_FONT_PX, fit))
+}
+
+function drawMarqueeWith(c: Ctx2D, w: number, h: number, seed: number, label: string, p: MarqueePalette): void {
+  const rnd = makeRng(seed)
+  gradientRect(c, 0, 0, w, h, 0, 0, w, 0, [[0, p.trimEdge], [0.5, p.trimCentre], [1, p.trimEdge]])
+  gradientRect(c, 6, 8, w - 12, h - 16, 0, 8, 0, h - 8, [[0, p.panelTop], [1, p.panelBottom]])
+  frame(c, 6, 8, w - 12, h - 16, p.text, 1)
+  // Border bulbs with a soft halo, top and bottom rows.
+  for (let x = 12; x <= w - 12; x += 16) {
+    for (const y of [4, h - 4]) {
+      disc(c, x, y, 3.5, p.glow, 0.35)
+      disc(c, x, y, 2, p.bulb)
+    }
+  }
+  const px = marqueeFontSize(label, w)
+  const font = `bold ${px}px monospace`
+  text(c, label, w / 2 + 1, h / 2 + 2, font, p.textShadow)
+  text(c, label, w / 2, h / 2 + 1, font, p.text)
+  speckle(c, rnd, 8, 10, w - 16, h - 20, 20, ['#ffffff', '#000000'], 1, 0.08)
+}
+
+export const MARQUEE_PALETTES: Readonly<Record<'snake' | 'maze' | 'frequency', MarqueePalette>> = Object.freeze({
+  snake: { trimEdge: '#0a4a22', trimCentre: '#2fd06a', panelTop: '#041a0c', panelBottom: '#0a3a1c', bulb: '#eaffe0', glow: '#4fe08a', text: '#9dffc4', textShadow: '#04200e' },
+  maze: { trimEdge: '#4a0a2a', trimCentre: '#a02ad0', panelTop: '#1a0414', panelBottom: '#34082a', bulb: '#ffd0e0', glow: '#ff3a6a', text: '#ff7a98', textShadow: '#200418' },
+  frequency: { trimEdge: '#5a3a00', trimCentre: '#ffb000', panelTop: '#021a1c', panelBottom: '#06383a', bulb: '#fff2c0', glow: '#2ad8d0', text: '#ffc23a', textShadow: '#021412' },
+})
+
+export const drawMarqueeSnake = (c: Ctx2D, w: number, h: number, seed: number): void =>
+  drawMarqueeWith(c, w, h, seed, MARQUEE_TEXTS.snake, MARQUEE_PALETTES.snake)
+export const drawMarqueeMaze = (c: Ctx2D, w: number, h: number, seed: number): void =>
+  drawMarqueeWith(c, w, h, seed, MARQUEE_TEXTS.maze, MARQUEE_PALETTES.maze)
+export const drawMarqueeFrequency = (c: Ctx2D, w: number, h: number, seed: number): void =>
+  drawMarqueeWith(c, w, h, seed, MARQUEE_TEXTS.frequency, MARQUEE_PALETTES.frequency)
 
 /** Overhead ARCADE sign face: glowing letters (offset copies fake the bloom) between bulb rows. */
 export function drawSignFace(c: Ctx2D, w: number, h: number, seed: number): void {
@@ -459,34 +645,6 @@ export function drawGrille(c: Ctx2D, w: number, h: number, seed: number): void {
   speckle(c, rnd, 4, 4, w - 8, h - 8, 30, ['#000000', '#50525c'], 1, 0.25)
 }
 
-/**
- * Arcade control deck markings: a joystick ring and six button rings with label bars (no text).
- * Positions follow the deck part layout: the canvas top is the back of the deck, the bottom is the player side.
- */
-export const DECK_BUTTON_COLORS = ['#d62a2a', '#e8c42a', '#2aa84a', '#2a5ad6', '#e8e8ec', '#e87a2a'] as const
-export function drawDeck(c: Ctx2D, w: number, h: number, seed: number): void {
-  const rnd = makeRng(seed)
-  vertical(c, w, h, [[0, '#211c30'], [1, '#17131f']])
-  frame(c, 6, 6, w - 12, h - 12, '#4a4062', 2)
-  // Joystick: base ring, guide cross.
-  ring(c, 77, 70, 16, '#8a82a8', 2)
-  ring(c, 77, 70, 8, '#8a82a8', 1, 0.7)
-  line(c, 55, 70, 99, 70, '#4a4062', 1)
-  line(c, 77, 48, 77, 92, '#4a4062', 1)
-  // Six buttons, two rows of three.
-  DECK_BUTTON_COLORS.forEach((col, i) => {
-    const x = 133 + (i % 3) * 22
-    const y = i < 3 ? 52 : 82
-    ring(c, x, y, 9, col, 2)
-    rect(c, x - 6, y + 12, 12, 2, col, 0.6)
-  })
-  // Start buttons.
-  rect(c, 118, 106, 18, 6, '#8a82a8', 0.8)
-  rect(c, 142, 106, 18, 6, '#8a82a8', 0.8)
-  // Coin slot mark.
-  rect(c, 200, 96, 28, 4, '#8a82a8', 0.8)
-  speckle(c, rnd, 8, 8, w - 16, h - 16, 40, ['#000000', '#8a82a8'], 1, 0.15)
-}
 
 // ---------------------------------------------------------------------------------------------
 // Spine atlas (task 18.2): book and VHS slipcase spines for the bookcases
@@ -963,29 +1121,6 @@ export function drawSmpteBars(c: Ctx2D, w: number, h: number, seed: number): voi
   c.stroke()
 }
 
-/**
- * Dark green-black glass of a powered-down cabinet: a faint diagonal reflection streak, low-contrast
- * 'OUT OF ORDER' lettering, two strips of tape and a small paper note with illegible handwriting.
- */
-export function drawOutOfOrder(c: Ctx2D, w: number, h: number, seed: number): void {
-  const rnd = makeRng(seed)
-  vertical(c, w, h, [[0, '#06140d'], [1, '#020805']])
-  // Reflection streaks (skewed bands).
-  triangle(c, [[w * 0.08, 0], [w * 0.3, 0], [w * 0.1, h], [0, h], [0, h * 0.4]], '#cfe8da', 0.05)
-  triangle(c, [[w * 0.34, 0], [w * 0.4, 0], [w * 0.2, h], [w * 0.15, h]], '#cfe8da', 0.035)
-  text(c, 'OUT OF ORDER', w / 2, h * 0.48, 'bold 24px monospace', '#2f5a45', 0.6)
-  // Paper note held by two strips of tape, lower right.
-  const nx = w - 78
-  const ny = h - 54
-  rect(c, nx + 2, ny + 3, 56, 40, '#000000', 0.3)
-  rect(c, nx, ny, 56, 40, '#cfc8a8', 0.62)
-  for (let i = 0; i < 3; i++) scribble(c, rnd, nx + 6, ny + 14 + i * 9, 40 - rnd() * 10, '#2a2a3a', 0.55)
-  rect(c, nx + 6, ny - 4, 18, 7, '#d8d0a0', 0.45)
-  rect(c, nx + 34, ny - 4, 18, 7, '#d8d0a0', 0.45)
-  speckle(c, rnd, 0, 0, w, h, 50, ['#ffffff', '#1c4a36'], 1, 0.12)
-  vignette(c, w, h, 24, 0.5)
-}
-
 /** Time shown on the VCR display. */
 export const TIMECODE_TEXT = '00:19:96'
 
@@ -1005,8 +1140,12 @@ export function drawTimecode(c: Ctx2D, w: number, h: number, seed: number): void
 // ---------------------------------------------------------------------------------------------
 
 export const TEXTURE_SPECS: Readonly<Record<TextureId, TextureSpec>> = Object.freeze({
-  arcadeScreen: { id: 'arcadeScreen', width: 512, height: 256, filter: 'nearest', wrap: 'clamp', seed: 101, draw: drawArcadeScreen },
-  marquee: { id: 'marquee', width: 512, height: 128, filter: 'nearest', wrap: 'clamp', seed: 102, draw: drawMarquee },
+  attractSnake: { id: 'attractSnake', width: 256, height: 256, filter: 'nearest', wrap: 'clamp', seed: 101, draw: drawAttractSnake },
+  attractMaze: { id: 'attractMaze', width: 256, height: 256, filter: 'nearest', wrap: 'clamp', seed: 102, draw: drawAttractMaze },
+  attractFrequency: { id: 'attractFrequency', width: 256, height: 256, filter: 'nearest', wrap: 'clamp', seed: 122, draw: drawAttractFrequency },
+  marqueeSnake: { id: 'marqueeSnake', width: 256, height: 64, filter: 'nearest', wrap: 'clamp', seed: 123, draw: drawMarqueeSnake },
+  marqueeMaze: { id: 'marqueeMaze', width: 256, height: 64, filter: 'nearest', wrap: 'clamp', seed: 124, draw: drawMarqueeMaze },
+  marqueeFrequency: { id: 'marqueeFrequency', width: 256, height: 64, filter: 'nearest', wrap: 'clamp', seed: 125, draw: drawMarqueeFrequency },
   signFace: { id: 'signFace', width: 512, height: 128, filter: 'mipmap', wrap: 'clamp', seed: 103, draw: drawSignFace },
   posterSunset: { id: 'posterSunset', width: 256, height: 512, filter: 'mipmap', wrap: 'clamp', seed: 104, draw: drawPosterSunset },
   posterReel: { id: 'posterReel', width: 256, height: 512, filter: 'mipmap', wrap: 'clamp', seed: 105, draw: drawPosterReel },
@@ -1017,14 +1156,12 @@ export const TEXTURE_SPECS: Readonly<Record<TextureId, TextureSpec>> = Object.fr
   woodDark: { id: 'woodDark', width: 128, height: 128, filter: 'mipmap', wrap: 'repeat', seed: 110, draw: (c, w, h, s) => drawWood(c, w, h, s, WOOD_DARK) },
   crate: { id: 'crate', width: 128, height: 128, filter: 'mipmap', wrap: 'repeat', seed: 111, draw: (c, w, h, s) => drawWood(c, w, h, s, WOOD_CRATE) },
   grille: { id: 'grille', width: 128, height: 128, filter: 'mipmap', wrap: 'clamp', seed: 112, draw: drawGrille },
-  deck: { id: 'deck', width: 256, height: 128, filter: 'mipmap', wrap: 'clamp', seed: 113, draw: drawDeck },
   spineAtlas: { id: 'spineAtlas', width: SPINE_ATLAS_WIDTH, height: SPINE_ATLAS_HEIGHT, filter: 'mipmap', wrap: 'clamp', seed: 114, draw: drawSpineAtlas },
   wallPanel: { id: 'wallPanel', width: 256, height: 256, filter: 'mipmap', wrap: 'repeat', seed: 115, draw: drawWallPanel },
   rugWoven: { id: 'rugWoven', width: 256, height: 256, filter: 'mipmap', wrap: 'clamp', seed: 116, draw: drawRugWoven },
   corkBoard: { id: 'corkBoard', width: 512, height: 512, filter: 'mipmap', wrap: 'clamp', seed: 117, draw: drawCorkBoard },
   lampGlow: { id: 'lampGlow', width: 64, height: 64, filter: 'mipmap', wrap: 'clamp', seed: 118, draw: drawLampGlow },
   smpteBars: { id: 'smpteBars', width: 256, height: 128, filter: 'nearest', wrap: 'clamp', seed: 119, draw: drawSmpteBars },
-  outOfOrder: { id: 'outOfOrder', width: 256, height: 128, filter: 'mipmap', wrap: 'clamp', seed: 120, draw: drawOutOfOrder },
   timecode: { id: 'timecode', width: 128, height: 32, filter: 'nearest', wrap: 'clamp', seed: 121, draw: drawTimecode },
 })
 

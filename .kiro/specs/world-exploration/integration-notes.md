@@ -1,6 +1,6 @@
 # World Exploration: App.tsx Integration Notes
 
-Originally documentation only (task 9.9). Updated by tasks 13.5, 15.5 and 19.3. Related: `proposals.md`, `performance-log.md`, `manual-test-log.md`, `test-report.md`, `src/world/README.md`.
+Originally documentation only (task 9.9). Updated by tasks 13.5, 15.5, 19.3 and 20.3. Related: `proposals.md`, `performance-log.md`, `manual-test-log.md`, `test-report.md`, `src/world/README.md`.
 
 ## Status
 
@@ -27,19 +27,28 @@ Final `WorldSceneProps`: `onInspect(station: StationId)`, `memoryShifted: boolea
 | App passes the prop, dialogs, Escape, focus return, status messages | verified by automated test with a stubbed `WorldScene`: `src/App.test.ts` (8 tests) |
 | M1 to M5 in a browser | verified manually by the project owner per the owner's report; no recorded log (every row of `manual-test-log.md` is `not run`) |
 | End-to-end sequences (a) and (b) below in a real browser, HUD layout on small or short viewports | not verified (no recorded result) |
-| M6, the polish pass (tasks 18.1 to 18.3) and the refinement pass (tasks 19.1 to 19.2: re-centred media console, new lighting, SMPTE monitor, OUT OF ORDER screen, timecode, cables) in a browser | not verified visually (no browser run recorded). Layout data and budgets are verified by `src/world/layout/roomLayout.test.ts` (27 tests) and `src/world/scene/modelDetail.test.ts` (85 tests) |
+| M6, the polish pass (tasks 18.1 to 18.3) and the refinement pass (tasks 19.1 to 19.2: re-centred media console, new lighting, SMPTE monitor, timecode, cables) and the three-cabinet arcade pass (tasks 20.1 and 20.2) in a browser | not verified visually (no browser run recorded). Layout data and budgets are verified by `src/world/layout/roomLayout.test.ts` (31 tests) and `src/world/scene/modelDetail.test.ts` (91 tests) |
 
-Fresh `npm test` at the time of task 19.3: 27 files, 456 tests, all passed (run twice, same result).
+Fresh `npm test` at the time of task 20.3: 27 files, 484 tests, all passed (run twice, same result). `npm run typecheck` and `npm run build` exited 0.
 
-## Arcade relocation (M6)
+## Arcade area (M6, three cabinets from tasks 20.1 and 20.2)
 
-The arcade cabinet now stands inside the Arcade_Area (x 5.3..9.3, z -2..2), against its east wall, facing -x toward both east doorways. It is no longer on the north wall. The ARCADE sign hangs on the main-room face of the east wall above both doorways. Station ids, `StationId` and the `onInspect` payload are unchanged, so no change in `App.tsx` was needed. The Arcade_Area has a powered-down companion cabinet and a CRT stack as dressing (no interaction). Layout reachability is covered by `roomLayout.test.ts`. Visual result in a browser: not verified.
+The Arcade_Area (x 5.3..9.3, z -2..2) now holds **three arcade cabinets** against its east wall, x 8.4..9.2, facing -x toward both east doorways. Each cabinet is a solid collider and a Station that calls `onInspect('arcade')`:
 
+| Cabinet | z range | Anchor | `arcadeGame` (world data only) |
+| --- | --- | --- | --- |
+| SNAKE.EXE | -1.7..-0.7 | (8.4, -1.2) | `snake` |
+| LAST EXIT | -0.5..0.5 | (8.4, 0) | `maze` |
+| DEAD FREQUENCY | 0.7..1.7 | (8.4, 1.2) | `frequency` |
+
+**Integration consequence.** `App.tsx` and `src/arcade/` are unchanged. The `StationId` and the `onInspect` payload are unchanged (always `'arcade'`), and the optional `arcadeGame` field exists only in the world's layout data. So **every cabinet currently opens the same App arcade panel**, and the App cannot tell which cabinet was used. Only Snake exists in `src/arcade/`. **LAST EXIT and DEAD FREQUENCY are attract-screen art for games that are NOT implemented.** If the team later builds those games, the App would need a typed event or payload change, which needs the cross-team review described in the architecture rules.
+
+The ARCADE sign hangs on the main-room face of the east wall above both doorways. Dressing moved out of the Arcade_Area: the CRT stack is in the main-room north-east corner, the two crates are at x 4.3..4.9 in the south-east, and cable decals run between the cabinets. The earlier companion cabinet is removed. The Arcade_Area has an `arcade-light` at (7.4, 2.4, 0) with distance 6. Reachability of a cell in front of every cabinet through each door, and a 1.2 m lane from each door to every anchor, are covered by `roomLayout.test.ts`. Visual result of the three-cabinet pass in a browser: **not verified visually**.
 ## Layout after the refinement pass (tasks 18.1 to 19.2)
 
-The `vhs` station (CRT television on a media console) is on a central media island facing +Z. The console covers x -0.9..0.9, z -2.1..-1.5, the `vhs` anchor is at (0, -1.5) on the south face, and the CRT is centred on the console. The woven rug covers x -1.6..1.6, z -2.5..-0.1. `crt-light` is at (0, 1.6, -0.6). A warm tungsten light named `west-light` at (-2.6, 2.3, 0.2) replaces the former magenta light. The reception desk is unchanged at x -1.5..1.5, z 1.2..2.0. Walkways (computed from the layout, tested): 2.7 m in front of the island to the desk, 1.9 m to the north wall and 1.3 m to the filing cabinets. Two filing cabinets and a bulletin board are on the north wall. The arcade cabinet is unchanged in the east Arcade_Area (facing -x). Shelves are wood bookcases with dense books; walls, floor and rug are textured.
+The `vhs` station (CRT television on a media console) is on a central media island facing +Z. The console covers x -0.9..0.9, z -2.1..-1.5, the `vhs` anchor is at (0, -1.5) on the south face, and the CRT is centred on the console. The woven rug covers x -1.6..1.6, z -2.5..-0.1. `crt-light` is at (0, 1.6, -0.6). A warm tungsten light named `west-light` at (-2.6, 2.3, 0.2) replaces the former magenta light. The reception desk is unchanged at x -1.5..1.5, z 1.2..2.0. Walkways (computed from the layout, tested): 2.7 m in front of the island to the desk, 1.9 m to the north wall and 1.3 m to the filing cabinets. Two filing cabinets and a bulletin board are on the north wall. The east Arcade_Area is described in the section above (three cabinets). Shelves are wood bookcases with dense books; walls, floor and rug are textured.
 
-Render-only additions from tasks 19.1 and 19.2: SMPTE colour-bar reference monitor, "OUT OF ORDER" companion screen, green 00:19:96 timecode window, metallic tape slot, routed coaxial and power cables, metric wood UVs, `wallPanel` reduced to 256x256. Station ids, `StationId` and the `onInspect` payload are unchanged, so `App.tsx` needed no change. Not verified visually (no browser run).
+Render-only additions from tasks 19.1 and 19.2: SMPTE colour-bar reference monitor, green 00:19:96 timecode window, metallic tape slot, routed coaxial and power cables, metric wood UVs, `wallPanel` reduced to 256x256. Station ids, `StationId` and the `onInspect` payload are unchanged, so `App.tsx` needed no change. Not verified visually (no browser run).
 
 Open item: the spawn (0, 3) is exactly 1.0 m from the desk edge (z 2.0) and from the south wall (z 4), so a 1.2 m disc around the spawn is not clear. The layout test asserts 0.99 m. This was not requested in the final instructions and is not fixed.
 
@@ -52,22 +61,23 @@ Open item: the spawn (0, 3) is exactly 1.0 m from the desk edge (z 2.0) and from
 
 ## Computed metrics
 
-Computed from declared geometry and source, computed, not runtime-measured. Source: `performance-log.md`, re-checked with `npx vitest run src/world/scene/modelDetail.test.ts` (85 tests passed).
+Computed from declared geometry and source, computed, not runtime-measured. Source: `performance-log.md`, re-checked in task 20.3 with `npx vitest run src/world/scene/modelDetail.test.ts` (91 tests passed).
 
-- Triangles: 16,772 (detail 16,530 + base 242), limit 20,000.
-- Draw-call grouping estimate: 264 (not `renderer.info`).
-- Lights: 4 (1 ambient + 3 point: `crt-light`, `west-light`, arcade light), limit 4.
-- Procedural textures: 21, 6.81 MB estimate, limit 8 MB (margin about 1.19 MB). The largest is `corkBoard` (512x512, 1.33 MB). Per-texture list: `performance-log.md` section 2.1.
-- Colliders: 27.
-- Targeting benchmark: informational timing only, varies per run (0.477 us/call in the latest run, 1.023 us/call in the full-suite run).
+- Triangles: 19,152 (detail 18,910 + base 242), limit 20,000. The margin is thin: about 850 triangles (4 percent). The biggest consumers are the three bookshelves (2,352 + 2,280 + 2,088) and the three cabinets (1,316 each).
+- Draw-call grouping estimate: 283 (not `renderer.info`).
+- Lights: 4 (1 ambient + 3 point: `crt-light`, `west-light`, `arcade-light`), limit 4.
+- Procedural textures: 23, 6.668 MB estimate, limit 8 MB (margin about 1.33 MB). The largest is `corkBoard` (512x512, 1.33 MB). Per-texture list: `performance-log.md` section 2.1.
+- Colliders: 28.
+- Targeting benchmark: informational timing only, varies per run (0.569 us/call standalone, 1.592 us/call in the full-suite run of task 20.3).
 Runtime frame-time targets are not measured. See `performance-log.md`. No performance claim is made.
 
 ## Known gaps
 
 - No restored-memory viewer component exists in the repo. No story content was invented. The HUD shows progress booleans only.
-- Browser verification is missing for M6 and for the end-to-end App behavior listed above.
+- Browser verification is missing for M6, the three-cabinet arcade pass and the end-to-end App behavior listed above.
+- LAST EXIT and DEAD FREQUENCY have no game behind them; all three cabinets open the same App arcade panel (Snake).
 - P2 is pending. P5, P6 and P7 are pending (see `proposals.md`).
-- Runtime performance is not measured.
+- Runtime performance is not measured. No agent measurement was taken in task 20.3 (see `performance-log.md` section 1.1); task 15.4 awaits a human on the Reference_Hardware.
 
 ## Backward compatibility
 

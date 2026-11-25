@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { PLAYER_RADIUS, INTERACTION_RANGE } from '../logic/constants';
 import { overlapsAny } from '../logic/collision';
-import { segmentIntersectsAabb, selectInteractionTarget } from '../logic/targeting';
+import { segmentIntersectsAabb, selectInteractionStation, selectInteractionTarget } from '../logic/targeting';
 import { COLLIDERS, ROOM, estimateTriangles, reachableCells } from './roomLayout';
 import type { Aabb, Facing, StationDef, Vec2 } from '../worldTypes';
 
 const inside = (x: number, z: number, b: Aabb) =>
   x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ;
 
-const arcadeStation = (): StationDef => ROOM.stations.find((s) => s.id === 'arcade')!;
+const arcadeStations = (): StationDef[] => ROOM.stations.filter((s) => s.id === 'arcade');
+const CABINET_IDS = ['arcade-snake', 'arcade-maze', 'arcade-frequency'] as const;
+/** Per-door standing spot in the main room, just outside the doorway, used for line-of-sight checks. */
+const doorSpot = (d: (typeof ROOM.doors)[number]): Vec2 => ({ x: 4.4, z: (d.opening.minZ + d.opening.maxZ) / 2 });
 const prop = (id: string) => ROOM.props.find((p) => p.id === id)!;
 const FRONT: Record<Facing, Vec2> = {
   '+z': { x: 0, z: 1 },
@@ -43,7 +46,7 @@ describe('roomLayout', () => {
   });
 
   it('keeps both Stations and anchors inside bounds', () => {
-    expect(ROOM.stations.map((s) => s.id).sort()).toEqual(['arcade', 'vhs']);
+    expect(ROOM.stations.map((s) => s.id).sort()).toEqual(['arcade', 'arcade', 'arcade', 'vhs']);
     for (const s of ROOM.stations) {
       expect(inside(s.anchor.x, s.anchor.z, ROOM.bounds)).toBe(true);
       expect(s.collider.minX).toBeGreaterThanOrEqual(ROOM.bounds.minX);
@@ -60,7 +63,7 @@ describe('roomLayout', () => {
     expect(overlapsAny(ROOM.start, PLAYER_RADIUS, COLLIDERS)).toBe(false);
   });
 
-  it('puts the vhs Station on the central island facing +z and moves the arcade Station into the Arcade_Area', () => {
+  it('puts the vhs Station on the central island facing +z', () => {
     const vhs = ROOM.stations.find((s) => s.id === 'vhs')!;
     expect(vhs.collider).toEqual({ minX: -0.9, maxX: 0.9, minZ: -2.1, maxZ: -1.5 });
     expect(vhs.collider).toBe(prop('crt-vhs').box);
@@ -72,17 +75,64 @@ describe('roomLayout', () => {
     expect(vhs.collider.maxZ - vhs.collider.minZ).toBeCloseTo(0.6);
     // The old north-wall CRT collider is gone.
     expect(COLLIDERS.some((c) => c.minZ === -4 && c.minX === -3 && c.maxX === -2)).toBe(false);
-    const a = arcadeStation();
+  });
+
+  it('has three solid arcade cabinets on the east wall with the approved footprints, anchors, games and labels', () => {
     const area: Aabb = { minX: 5.3, maxX: 9.3, minZ: -2, maxZ: 2 };
-    expect(a.collider).toEqual({ minX: 8.4, maxX: 9.2, minZ: -0.5, maxZ: 0.5 });
-    expect(a.collider.minX).toBeGreaterThanOrEqual(area.minX);
-    expect(a.collider.maxX).toBeLessThanOrEqual(area.maxX - 0.05);
-    expect(a.collider.minZ).toBeGreaterThanOrEqual(area.minZ);
-    expect(a.collider.maxZ).toBeLessThanOrEqual(area.maxZ);
-    // Faces west, anchor on the west face and centred on the cabinet.
-    expect(a.facing).toBe('-x');
-    expect(prop('arcade-cabinet').facing).toBe('-x');
-    expect(a.anchor).toEqual({ x: a.collider.minX, z: 0 });
+    const expected = [
+      { id: 'arcade-snake', game: 'snake', label: 'SNAKE.EXE - The Hungry Tape', z0: -1.7, z1: -0.7, az: -1.2 },
+      { id: 'arcade-maze', game: 'maze', label: 'LAST EXIT - The Maze', z0: -0.5, z1: 0.5, az: 0 },
+      { id: 'arcade-frequency', game: 'frequency', label: 'DEAD FREQUENCY - The Lost Signal', z0: 0.7, z1: 1.7, az: 1.2 },
+    ];
+    const stations = arcadeStations();
+    expect(stations).toHaveLength(3);
+    expect(ROOM.stations.filter((s) => s.id === 'vhs')).toHaveLength(1);
+    expect(ROOM.props.some((p) => p.id === 'arcade-cabinet' || p.id === 'arcade-companion')).toBe(false);
+    expected.forEach((e, i) => {
+      const s = stations[i];
+      const p = prop(e.id);
+      expect(p.solid).toBe(true);
+      expect(p.facing).toBe('-x');
+      expect(p.box).toEqual({ minX: 8.4, maxX: 9.2, minZ: e.z0, maxZ: e.z1 });
+      expect(COLLIDERS).toContain(p.box);
+      expect(s.collider).toBe(p.box);
+      expect(s.facing).toBe('-x');
+      expect(s.arcadeGame).toBe(e.game);
+      expect(s.label).toBe(e.label);
+      expect(s.anchor).toEqual({ x: 8.4, z: e.az });
+      // Inside the Arcade_Area with a gap to the east wall.
+      expect(p.box.minX).toBeGreaterThanOrEqual(area.minX);
+      expect(p.box.maxX).toBeLessThanOrEqual(area.maxX - 0.05);
+      expect(p.box.minZ).toBeGreaterThanOrEqual(area.minZ);
+      expect(p.box.maxZ).toBeLessThanOrEqual(area.maxZ);
+    });
+    // No overlap: neighbouring cabinets are 0.2 m apart.
+    const boxes = CABINET_IDS.map((id) => prop(id).box);
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i];
+        const b = boxes[j];
+        const hit = a.minX < b.maxX && a.maxX > b.minX && a.minZ < b.maxZ && a.maxZ > b.minZ;
+        expect(hit).toBe(false);
+      }
+    }
+    expect(boxes[1].minZ - boxes[0].maxZ).toBeCloseTo(0.2);
+    expect(boxes[2].minZ - boxes[1].maxZ).toBeCloseTo(0.2);
+    // The only solid props inside the Arcade_Area are the three cabinets.
+    const solidInArea = ROOM.props.filter(
+      (p) => p.solid && p.box.minX >= area.minX && p.box.maxX <= area.maxX && p.box.minZ >= area.minZ && p.box.maxZ <= area.maxZ,
+    );
+    expect(solidInArea.map((p) => p.id).sort()).toEqual([...CABINET_IDS].sort());
+  });
+
+  it('moves the CRT stack and both crates out of the Arcade_Area, into the main room, clear of the doorways', () => {
+    for (const id of ['crt-stack', 'crate-a', 'crate-b']) {
+      const p = prop(id);
+      expect(p.solid).toBe(true);
+      expect(p.box.maxX).toBeLessThanOrEqual(5);
+      expect(overlapsAny({ x: 4.4, z: -1.2 }, PLAYER_RADIUS, [p.box])).toBe(false);
+      expect(overlapsAny({ x: 4.4, z: 1.2 }, PLAYER_RADIUS, [p.box])).toBe(false);
+    }
   });
 
   it('lets the player reach an approach cell for each Station', () => {
@@ -96,7 +146,7 @@ describe('roomLayout', () => {
     }
   });
 
-  it('targets each Station from a reachable cell in front of its face, excluding its own collider', () => {
+  it('targets each Station (and each of the three cabinets) from a reachable cell in front of its face, excluding its own collider', () => {
     const cells = reachableCells(ROOM.start);
     for (const s of ROOM.stations) {
       const n = FRONT[s.facing ?? '+z'];
@@ -108,7 +158,22 @@ describe('roomLayout', () => {
       });
       expect(c).toBeDefined();
       expect(selectInteractionTarget(c!, yawToward(c!, s.anchor), ROOM.stations, COLLIDERS)).toBe(s.id);
+      // The selected entry is this very station, not another cabinet that shares the id.
+      expect(selectInteractionStation(c!, yawToward(c!, s.anchor), ROOM.stations, COLLIDERS)).toBe(s);
     }
+  });
+
+  it('selects the nearest eligible cabinet, with ties going to the earlier entry in list order', () => {
+    const [snake, maze, frequency] = arcadeStations();
+    const at = (p: Vec2, towards: Vec2) => selectInteractionStation(p, yawToward(p, towards), ROOM.stations, COLLIDERS);
+    // Directly in front of each cabinet, 1 m out: that cabinet is the nearest.
+    expect(at({ x: 7.4, z: -1.2 }, snake.anchor)).toBe(snake);
+    expect(at({ x: 7.4, z: 0 }, maze.anchor)).toBe(maze);
+    expect(at({ x: 7.4, z: 1.2 }, frequency.anchor)).toBe(frequency);
+    // Equidistant between two neighbours: the first in list order wins, and the id is still 'arcade'.
+    expect(at({ x: 7.4, z: -0.6 }, { x: 8.4, z: -0.6 })).toBe(snake);
+    expect(at({ x: 7.4, z: 0.6 }, { x: 8.4, z: 0.6 })).toBe(maze);
+    expect(selectInteractionTarget({ x: 7.4, z: -0.6 }, yawToward({ x: 7.4, z: -0.6 }, { x: 8.4, z: -0.6 }), ROOM.stations, COLLIDERS)).toBe('arcade');
   });
 
   it('estimates well under 20,000 triangles', () => {
@@ -128,11 +193,11 @@ describe('roomLayout', () => {
     for (const p of ROOM.props) expect(COLLIDERS.includes(p.box)).toBe(p.solid);
   });
 
-  it('counts Colliders: 9 walls, 4 door frames and 14 solid props', () => {
+  it('counts Colliders: 9 walls, 4 door frames and 15 solid props (three cabinets replace the cabinet and its companion)', () => {
     expect(ROOM.walls).toHaveLength(9);
-    expect(ROOM.props.filter((p) => p.solid)).toHaveLength(14);
-    expect(COLLIDERS).toHaveLength(9 + 4 + 14);
-    for (const id of ['arcade-companion', 'crt-stack', 'crt-vhs', 'filing-cabinet-a', 'filing-cabinet-b']) {
+    expect(ROOM.props.filter((p) => p.solid)).toHaveLength(15);
+    expect(COLLIDERS).toHaveLength(9 + 4 + 15);
+    for (const id of [...CABINET_IDS, 'crt-stack', 'crt-vhs', 'filing-cabinet-a', 'filing-cabinet-b']) {
       expect(COLLIDERS).toContain(prop(id).box);
     }
   });
@@ -289,7 +354,8 @@ describe('roomLayout', () => {
 
   it('reaches the Arcade_Area and every Station from the start through the doors', () => {
     const cells = reachableCells(ROOM.start);
-    expect(cells.some((c) => c.x > 8 && Math.abs(c.z) < 1)).toBe(true);
+    // The player circle (0.35 m) stops at x = 8.05 in front of the cabinet faces (x = 8.4).
+    expect(cells.some((c) => c.x > 7.9 && Math.abs(c.z) < 1)).toBe(true);
     for (const d of ROOM.doors) {
       const mid = { x: 5.15, z: (d.opening.minZ + d.opening.maxZ) / 2 };
       expect(cells.some((c) => Math.hypot(c.x - mid.x, c.z - mid.z) < 0.15)).toBe(true);
@@ -299,72 +365,102 @@ describe('roomLayout', () => {
     }
   });
 
-  it('reaches the arcade anchor through each door separately', () => {
-    const a = arcadeStation();
+  it('reaches a cell in front of every cabinet anchor through each door separately', () => {
     for (const [i, open] of ROOM.doors.entries()) {
       const other = ROOM.doors[1 - i];
       const cells = reachableCells(ROOM.start, [...COLLIDERS, closeDoor(other)]);
       // The closed door really is closed: nothing reachable inside its opening.
       const oz = (other.opening.minZ + other.opening.maxZ) / 2;
       expect(cells.some((c) => Math.abs(c.x - 5.15) < 0.15 && Math.abs(c.z - oz) < 0.15)).toBe(false);
-      // The open door still leads to a cell right in front of the cabinet's west face.
+      // The open door still leads to a cell right in front of each cabinet's west face.
       const mid = { x: 5.15, z: (open.opening.minZ + open.opening.maxZ) / 2 };
       expect(cells.some((c) => Math.hypot(c.x - mid.x, c.z - mid.z) < 0.15)).toBe(true);
-      const front = cells.filter(
-        (c) => c.x < a.anchor.x && a.anchor.x - c.x <= 1.0 && Math.abs(c.z - a.anchor.z) <= 0.3,
-      );
-      expect(front.length).toBeGreaterThan(0);
+      for (const a of arcadeStations()) {
+        const front = cells.filter(
+          (c) => c.x < a.anchor.x && a.anchor.x - c.x <= 1.0 && Math.abs(c.z - a.anchor.z) <= 0.3,
+        );
+        expect(front.length, `${a.arcadeGame} via ${open.id}`).toBeGreaterThan(0);
+      }
       expect(cells.every((c) => !overlapsAny(c, PLAYER_RADIUS, COLLIDERS))).toBe(true);
     }
   });
 
-  it('keeps a 1.2 m wide lane from each door to the arcade anchor free of solid props', () => {
-    const a = arcadeStation();
-    const solid = ROOM.props.filter((p) => p.solid && p.box !== a.collider);
-    for (const d of ROOM.doors) {
-      const start = { x: 5.6, z: (d.opening.minZ + d.opening.maxZ) / 2 };
-      for (let t = 0; t <= 1; t += 0.01) {
-        const p = { x: start.x + (a.anchor.x - start.x) * t, z: start.z + (a.anchor.z - start.z) * t };
-        for (const s of solid) expect(distToBox(p, s.box)).toBeGreaterThanOrEqual(0.6 - 1e-6);
+  it('keeps a 1.2 m wide lane from each door to every cabinet anchor free of solid props', () => {
+    let narrowest = Infinity;
+    for (const a of arcadeStations()) {
+      // Other solid props, including the neighbouring cabinets. The target cabinet's own collider is excluded.
+      const solid = ROOM.props.filter((p) => p.solid && p.box !== a.collider);
+      for (const d of ROOM.doors) {
+        const start = { x: 5.6, z: (d.opening.minZ + d.opening.maxZ) / 2 };
+        // Doorway to a point 1 m in front of the cabinet, then straight in to the anchor.
+        const approach = { x: a.anchor.x - 1.0, z: a.anchor.z };
+        for (const [from, to] of [[start, approach], [approach, a.anchor]] as const) {
+          for (let t = 0; t <= 1; t += 0.01) {
+            const p = { x: from.x + (to.x - from.x) * t, z: from.z + (to.z - from.z) * t };
+            for (const s of solid) {
+              const gap = distToBox(p, s.box);
+              narrowest = Math.min(narrowest, gap);
+              expect(gap, `${a.arcadeGame} via ${d.id} vs ${s.id}`).toBeGreaterThanOrEqual(0.6 - 1e-6);
+            }
+          }
+        }
+      }
+    }
+    // Half-width 0.6 m on each side of the centre line is a 1.2 m lane.
+    expect(narrowest * 2).toBeGreaterThanOrEqual(1.2 - 1e-6);
+  });
+
+  it('keeps door openings from blocking line of sight to the cabinets on the same side and to the middle one', () => {
+    const [snake, maze, frequency] = arcadeStations();
+    const cells = reachableCells(ROOM.start);
+    const pairs: Array<[(typeof ROOM.doors)[number], StationDef[]]> = [
+      [ROOM.doors[0], [snake, maze]],
+      [ROOM.doors[1], [maze, frequency]],
+    ];
+    for (const [d, targets] of pairs) {
+      const z = doorSpot(d).z;
+      const spot = cells.find((c) => Math.abs(c.x - 4.4) < 0.05 && Math.abs(c.z - z) < 0.05)!;
+      expect(spot).toBeDefined();
+      for (const a of targets) {
+        for (const box of COLLIDERS) {
+          if (box === a.collider) continue;
+          expect(segmentIntersectsAabb(spot, a.anchor, box), `${d.id} -> ${a.arcadeGame}`).toBe(false);
+        }
       }
     }
   });
 
-  it('keeps door openings from blocking line of sight to the arcade Station', () => {
-    const arcade = arcadeStation();
+  it('selects an arcade cabinet from just inside the Arcade_Area, in front of either doorway', () => {
+    const [snake, maze, frequency] = arcadeStations();
     const cells = reachableCells(ROOM.start);
     for (const d of ROOM.doors) {
       const zMid = (d.opening.minZ + d.opening.maxZ) / 2;
-      const spot = cells.find((c) => Math.abs(c.x - 4.4) < 0.05 && Math.abs(c.z - zMid) < 0.05)!;
-      expect(spot).toBeDefined();
-      for (const box of COLLIDERS) {
-        if (box === arcade.collider) continue;
-        expect(segmentIntersectsAabb(spot, arcade.anchor, box)).toBe(false);
-      }
-    }
-  });
-
-  it('selects the real arcade Station from just inside the Arcade_Area, in front of either doorway', () => {
-    const a = arcadeStation();
-    for (const d of ROOM.doors) {
-      const zMid = (d.opening.minZ + d.opening.maxZ) / 2;
-      const cells = reachableCells(ROOM.start);
       const spot = cells.find((c) => Math.abs(c.x - 6.8) < 0.05 && Math.abs(c.z - zMid * 0.5) < 0.05)!;
       expect(spot).toBeDefined();
-      expect(Math.hypot(spot.x - a.anchor.x, spot.z - a.anchor.z)).toBeLessThanOrEqual(INTERACTION_RANGE);
-      expect(selectInteractionTarget(spot, yawToward(spot, a.anchor), ROOM.stations, COLLIDERS)).toBe('arcade');
+      expect(Math.hypot(spot.x - maze.anchor.x, spot.z - maze.anchor.z)).toBeLessThanOrEqual(INTERACTION_RANGE);
+      const picked = selectInteractionStation(spot, yawToward(spot, maze.anchor), ROOM.stations, COLLIDERS);
+      expect([snake, maze, frequency]).toContain(picked);
+      expect(selectInteractionTarget(spot, yawToward(spot, maze.anchor), ROOM.stations, COLLIDERS)).toBe('arcade');
     }
   });
 
-  it('sees the real arcade Station through a doorway but not past the pillar or a door frame', () => {
-    // The cabinet is more than 2 m from the doorways, so widen the range to test only occlusion.
+  it('sees a cabinet through a doorway but not past the pillar or a door frame', () => {
+    // The cabinets are more than 2 m from the doorways, so widen the range to test only occlusion.
     const far = 10;
-    const a = arcadeStation();
+    const [, maze] = arcadeStations();
     const throughDoor = { x: 4.4, z: -1.2 };
-    expect(selectInteractionTarget(throughDoor, yawToward(throughDoor, a.anchor), ROOM.stations, COLLIDERS, far)).toBe('arcade');
+    expect(selectInteractionTarget(throughDoor, yawToward(throughDoor, maze.anchor), ROOM.stations, COLLIDERS, far)).toBe('arcade');
     const behindPillar = { x: 4.4, z: 0 };
-    expect(selectInteractionTarget(behindPillar, yawToward(behindPillar, a.anchor), ROOM.stations, COLLIDERS, far)).toBeNull();
+    expect(selectInteractionTarget(behindPillar, yawToward(behindPillar, maze.anchor), ROOM.stations, COLLIDERS, far)).toBeNull();
     const behindWall = { x: 4.4, z: -2.5 };
-    expect(selectInteractionTarget(behindWall, yawToward(behindWall, a.anchor), ROOM.stations, COLLIDERS, far)).toBeNull();
+    expect(selectInteractionTarget(behindWall, yawToward(behindWall, maze.anchor), ROOM.stations, COLLIDERS, far)).toBeNull();
+  });
+
+  it('keeps the power cables in the gaps between the cabinets, visual only', () => {
+    const [a, b] = [prop('arcade-cable-a').box, prop('arcade-cable-b').box];
+    expect(a.minZ).toBeGreaterThanOrEqual(prop('arcade-snake').box.maxZ);
+    expect(a.maxZ).toBeLessThanOrEqual(prop('arcade-maze').box.minZ);
+    expect(b.minZ).toBeGreaterThanOrEqual(prop('arcade-maze').box.maxZ);
+    expect(b.maxZ).toBeLessThanOrEqual(prop('arcade-frequency').box.minZ);
   });
 });

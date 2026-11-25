@@ -35,7 +35,9 @@ import { resetGlbState } from '../assets/loadGlb'
 
 const DECORATED_IDS = [
   'crt-vhs',
-  'arcade-cabinet',
+  'arcade-snake',
+  'arcade-maze',
+  'arcade-frequency',
   'shelf-a',
   'shelf-b',
   'shelf-c',
@@ -64,7 +66,7 @@ describe('asset integration (empty manifest)', () => {
   })
 
   it('decorated ids that map to layout props exist in the layout', () => {
-    for (const id of ['crt-vhs', 'arcade-cabinet', 'shelf-a', 'shelf-b', 'shelf-c', 'crate-a', 'crate-b', 'couch']) {
+    for (const id of ['crt-vhs', 'arcade-snake', 'arcade-maze', 'arcade-frequency', 'shelf-a', 'shelf-b', 'shelf-c', 'crate-a', 'crate-b', 'couch']) {
       expect(ROOM.props.some((p) => p.id === id)).toBe(true)
     }
     // The layout prop for the 'armchair' asset id is 'abandoned-chair'.
@@ -89,8 +91,8 @@ describe('assetPlacement', () => {
     expect(assetPlacement(prop('couch').box).rotation[1]).toBe(0)
   })
 
-  it('rotates the +Z-facing model toward the layout facing (arcade cabinet faces -X)', () => {
-    const a = prop('arcade-cabinet')
+  it('rotates the +Z-facing model toward the layout facing (arcade cabinets face -X)', () => {
+    const a = prop('arcade-maze')
     expect(a.facing).toBe('-x')
     // The footprint is longer in Z, but an explicit facing wins over the shelf rule.
     expect(assetPlacement(a.box, a.facing).rotation[1]).toBeCloseTo(-Math.PI / 2)

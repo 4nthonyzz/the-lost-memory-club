@@ -5,8 +5,11 @@
  */
 import { useMemo, type ReactNode } from 'react'
 import { ROOM, type PropDef } from '../layout/roomLayout'
-import type { Aabb, Facing } from '../worldTypes'
+import type { Aabb, ArcadeGameKind, Facing } from '../worldTypes'
 import {
+  ARCADE_CABINET_GAMES,
+  ARCADE_CABINET_IDS,
+  ARCADE_CABINET_STYLES,
   arcadeCabinetParts,
   bulletinBoardParts,
   consoleCableParts,
@@ -16,6 +19,7 @@ import {
   mediaConsoleParts,
   referenceMonitorParts,
   vcrDeckParts,
+  type MaterialKey,
 } from './modelDetail'
 import { AssetModel } from '../assets/AssetModel'
 import { assetPlacement, facingFrame } from './assetPlacement'
@@ -33,7 +37,7 @@ export interface BoxHeightProps {
 }
 
 /** Parts of a station primitive, split into the body (swappable) and the screen plane (always drawn). */
-function splitScreen(parts: ReturnType<typeof crtTelevisionParts>, mat: 'crtScreen' | 'arcadeScreen') {
+function splitScreen(parts: ReturnType<typeof crtTelevisionParts>, mat: MaterialKey) {
   return {
     body: parts.filter((p) => p.mat !== mat),
     screen: parts.filter((p) => p.mat === mat),
@@ -82,18 +86,25 @@ export function BulletinBoard() {
   return <PartMeshes parts={parts} />
 }
 
-/** Angled marquee, side art, recessed screen (shared arcadeScreen), slanted control deck, joystick and 6 buttons. */
-export function ArcadeCabinet({ box, height, screen = true }: BoxHeightProps & { screen?: boolean }) {
+/**
+ * One arcade cabinet (task 20.1): tilted recessed screen bezel, speaker grille bar, marquee, angled control deck with
+ * two ball-top joysticks and six concave buttons, glowing coin slots and coloured T-molding. `game` picks the screen,
+ * marquee and molding materials.
+ */
+export function ArcadeCabinet({ box, height, game, screen = true }: BoxHeightProps & { game: ArcadeGameKind; screen?: boolean }) {
   const parts = useMemo(() => {
-    const split = splitScreen(arcadeCabinetParts(box, height), 'arcadeScreen')
+    const split = splitScreen(arcadeCabinetParts(box, height, game), ARCADE_CABINET_STYLES[game].screen)
     return screen ? [...split.body, ...split.screen] : split.body
-  }, [box, height, screen])
+  }, [box, height, game, screen])
   return <PartMeshes parts={parts} />
 }
 
-/** The arcade screen plane (shared arcadeScreen material). Always rendered by the primitive layer. */
-export function ArcadeScreen({ box, height }: BoxHeightProps) {
-  const parts = useMemo(() => splitScreen(arcadeCabinetParts(box, height), 'arcadeScreen').screen, [box, height])
+/** The cabinet screen plane (per-game shared material tinted by Memory_Shift). Always rendered by the primitive layer. */
+export function ArcadeScreen({ box, height, game }: BoxHeightProps & { game: ArcadeGameKind }) {
+  const parts = useMemo(
+    () => splitScreen(arcadeCabinetParts(box, height, game), ARCADE_CABINET_STYLES[game].screen).screen,
+    [box, height, game],
+  )
   return <PartMeshes parts={parts} />
 }
 
@@ -114,7 +125,6 @@ export function Stations() {
   const crt = propById('crt-vhs')
   const cabinetA = propById('filing-cabinet-a')
   const cabinetB = propById('filing-cabinet-b')
-  const arcade = propById('arcade-cabinet')
   return (
     <group>
       {/* Island: CRT, console, VCR, tapes and reference monitor are one asset facing +Z; the CRT screen plane is drawn separately below. */}
@@ -143,19 +153,27 @@ export function Stations() {
         </Faced>
       ))}
       <BulletinBoard />
-      <AssetModel
-        id="arcade-cabinet"
-        {...assetPlacement(arcade.box, arcade.facing)}
-        fallback={
-          <Faced box={arcade.box} facing={arcade.facing}>
-            {(local) => <ArcadeCabinet box={local} height={arcade.height} screen={false} />}
-          </Faced>
-        }
-      />
-      {/* The attract screen is the fixed arcadeScreen material, drawn the same way whatever the lock state. */}
-      <Faced box={arcade.box} facing={arcade.facing}>
-        {(local) => <ArcadeScreen box={local} height={arcade.height} />}
-      </Faced>
+      {/* Three arcade cabinets on the east wall. Each screen is its own shared material, drawn the same way whatever the lock state. */}
+      {ARCADE_CABINET_IDS.map((id) => {
+        const cab = propById(id)
+        const game = ARCADE_CABINET_GAMES[id]
+        return (
+          <group key={id}>
+            <AssetModel
+              id={id}
+              {...assetPlacement(cab.box, cab.facing)}
+              fallback={
+                <Faced box={cab.box} facing={cab.facing}>
+                  {(local) => <ArcadeCabinet box={local} height={cab.height} game={game} screen={false} />}
+                </Faced>
+              }
+            />
+            <Faced box={cab.box} facing={cab.facing}>
+              {(local) => <ArcadeScreen box={local} height={cab.height} game={game} />}
+            </Faced>
+          </group>
+        )
+      })}
     </group>
   )
 }

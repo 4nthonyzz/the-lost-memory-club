@@ -94,7 +94,9 @@ describe('asset log documentation', () => {
 
   it.each([
     ['crt_vhs', 'crt-vhs'],
-    ['arcade_cabinet', 'arcade-cabinet'],
+    ['arcade_cabinet', 'arcade-snake'],
+    ['arcade_cabinet', 'arcade-maze'],
+    ['arcade_cabinet', 'arcade-frequency'],
     ['shelf', 'shelf-a'],
     ['armchair', 'abandoned-chair'],
     ['couch', 'couch'],

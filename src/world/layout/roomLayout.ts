@@ -10,7 +10,7 @@
  */
 import { PLAYER_RADIUS } from '../logic/constants';
 import { overlapsAny } from '../logic/collision';
-import type { Aabb, Facing, StationDef, Vec2 } from '../worldTypes';
+import type { Aabb, ArcadeGameKind, Facing, StationDef, Vec2 } from '../worldTypes';
 
 export interface PropDef {
   id: string;
@@ -123,23 +123,28 @@ const BULLETIN = prop('bulletin-board', 'detail', box(-2.95, -1.55, -4, -3.95), 
 /** Floor decal framing the island, 3.2 m x 2.4 m centred on the console footprint. */
 const RUG = prop('rug', 'detail', box(-1.6, 1.6, -2.5, -0.1), 0.01, 1, false, undefined, { elevation: 0.01 });
 /**
- * Arcade cabinet against the east wall of the Arcade_Area, 0.1 m clear of the wall (x = 9.3).
- * Its front (west) face is at x = 8.4 and looks toward both doorways.
+ * Three interactive arcade cabinets against the east wall of the Arcade_Area (task 20.1), each 0.1 m clear
+ * of the wall (x = 9.3), 0.2 m apart. Their front (west) faces are at x = 8.4 and look toward both doorways.
+ * All three report the StationId 'arcade'; `arcadeGame` and `label` are layout data only.
  */
-const ARCADE_PROP = prop('arcade-cabinet', 'station', box(8.4, 9.2, -0.5, 0.5), 1.8, 1, true, undefined, { facing: '-x' });
+const ARCADE_SNAKE = prop('arcade-snake', 'station', box(8.4, 9.2, -1.7, -0.7), 1.8, 1, true, undefined, { facing: '-x' });
+const ARCADE_MAZE = prop('arcade-maze', 'station', box(8.4, 9.2, -0.5, 0.5), 1.8, 1, true, undefined, { facing: '-x' });
+const ARCADE_FREQUENCY = prop('arcade-frequency', 'station', box(8.4, 9.2, 0.7, 1.7), 1.8, 1, true, undefined, { facing: '-x' });
 
-/** Powered-down companion cabinet next to the active one, same facing, no interaction. */
-const ARCADE_COMPANION = prop('arcade-companion', 'furniture', box(8.4, 9.2, 0.7, 1.6), 1.8, 3, true, undefined, { facing: '-x' });
-/** Stacked CRT monitors in the north-east corner of the Arcade_Area. */
-const CRT_STACK = prop('crt-stack', 'furniture', box(8.6, 9.2, -1.9, -1.3), 1.0, 3, true, undefined, { facing: '-x' });
+/**
+ * Stacked CRT monitors. Moved out of the Arcade_Area (task 20.1) to the main room's north-east corner: the three
+ * cabinets and their 1.2 m lanes from both doorways leave no free floor inside the Arcade_Area.
+ */
+const CRT_STACK = prop('crt-stack', 'furniture', box(4.3, 4.9, -3.2, -2.6), 1.0, 3, true, undefined, { facing: '-x' });
 
 const CHAIR = prop('abandoned-chair', 'furniture', box(2.9, 3.5, 1.9, 2.5), 0.9, 3);
 const COUCH = prop('couch', 'furniture', box(-3.9, -2.1, 2.6, 3.4), 0.9, 3);
 
 const DETAILS: readonly PropDef[] = Object.freeze([
-  // Crates sit against the Arcade_Area side walls, outside the 1.2 m lanes from the doors to the arcade anchor.
-  prop('crate-a', 'detail', box(7.2, 7.8, -1.95, -1.35), 0.6, 3),
-  prop('crate-b', 'detail', box(7.2, 7.8, 1.35, 1.95), 0.5, 3),
+  // Crates moved to the main room's south-east corner (task 20.1) so the Arcade_Area keeps 1.2 m lanes from both
+  // doorways to all three cabinet anchors.
+  prop('crate-a', 'detail', box(4.3, 4.9, 3.1, 3.7), 0.6, 3),
+  prop('crate-b', 'detail', box(4.3, 4.9, 2.4, 3.0), 0.5, 3),
   prop('tape-stack', 'detail', box(-0.6, -0.2, 1.4, 1.8), 0.15, 3, false),
   prop('poster-north', 'detail', box(0.5, 1.5, -4, -3.95), 1.0, 3, false),
   prop('poster-arcade-area', 'detail', box(7, 8, -2, -1.95), 1.0, 3, false),
@@ -152,9 +157,22 @@ const DETAILS: readonly PropDef[] = Object.freeze([
   // above both doorways (x 4.78 is 0.07 m in front of the lintel faces at x 4.85).
   prop('arcade-sign', 'detail', box(4.78, 5, -1.4, 1.4), 0.5, 3, false, undefined, { elevation: 2.3, facing: '-x' }),
   prop('arcade-runner', 'detail', box(5.5, 8.1, -0.45, 0.45), 0.01, 3, false),
-  prop('arcade-cable-a', 'detail', box(8.98, 9.04, -1.3, -0.5), 0.02, 3, false),
-  prop('arcade-cable-b', 'detail', box(7.9, 8.4, 1.1, 1.16), 0.02, 3, false),
+  // Power cables run in the 0.2 m gaps between the cabinets (visual only, clear of the lanes).
+  prop('arcade-cable-a', 'detail', box(8.5, 9.1, -0.62, -0.58), 0.02, 3, false),
+  prop('arcade-cable-b', 'detail', box(8.5, 9.1, 0.58, 0.62), 0.02, 3, false),
 ]);
+
+/** One arcade StationDef: anchor on the west face, centred on the cabinet; the id is always 'arcade'. */
+function arcadeStation(p: PropDef, arcadeGame: ArcadeGameKind, label: string): StationDef {
+  return Object.freeze({
+    id: 'arcade' as const,
+    arcadeGame,
+    label,
+    anchor: Object.freeze({ x: p.box.minX, z: (p.box.minZ + p.box.maxZ) / 2 }),
+    collider: p.box,
+    facing: '-x' as const,
+  });
+}
 
 const STATIONS: readonly StationDef[] = Object.freeze([
   Object.freeze({
@@ -164,13 +182,9 @@ const STATIONS: readonly StationDef[] = Object.freeze([
     collider: VHS_PROP.box,
     facing: '+z' as const,
   }),
-  Object.freeze({
-    id: 'arcade' as const,
-    // Anchor on the west face, centred on the cabinet.
-    anchor: Object.freeze({ x: ARCADE_PROP.box.minX, z: (ARCADE_PROP.box.minZ + ARCADE_PROP.box.maxZ) / 2 }),
-    collider: ARCADE_PROP.box,
-    facing: '-x' as const,
-  }),
+  arcadeStation(ARCADE_SNAKE, 'snake', 'SNAKE.EXE - The Hungry Tape'),
+  arcadeStation(ARCADE_MAZE, 'maze', 'LAST EXIT - The Maze'),
+  arcadeStation(ARCADE_FREQUENCY, 'frequency', 'DEAD FREQUENCY - The Lost Signal'),
 ]);
 
 const PROPS: readonly PropDef[] = Object.freeze([
@@ -183,8 +197,9 @@ const PROPS: readonly PropDef[] = Object.freeze([
   FILING_B,
   BULLETIN,
   RUG,
-  ARCADE_PROP,
-  ARCADE_COMPANION,
+  ARCADE_SNAKE,
+  ARCADE_MAZE,
+  ARCADE_FREQUENCY,
   CRT_STACK,
   CHAIR,
   COUCH,

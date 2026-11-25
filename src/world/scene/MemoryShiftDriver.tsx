@@ -9,8 +9,8 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Color, Fog, type AmbientLight, type PointLight } from 'three'
 import { useReducedMotion } from '../controller/useReducedMotion'
 import { advanceProgress } from '../logic/palette'
-import { BASE_ARCADE_SCREEN_COLOR, BASE_CRT_SCREEN_COLOR, applyShift, type ShiftTargets } from './memoryShift'
-import { materials, overlayMaterials } from './sharedResources'
+import { BASE_CRT_SCREEN_COLOR, applyShift, arcadeScreenBaseColor, type ShiftTargets } from './memoryShift'
+import { ensureSharedTextures, materials, overlayMaterials } from './sharedResources'
 
 export interface MemoryShiftDriverProps {
   memoryShifted: boolean
@@ -34,6 +34,8 @@ export function MemoryShiftDriver({ memoryShifted, ambientRef, pointRefs, pointB
   reducedRef.current = reduced
 
   useLayoutEffect(() => {
+    // Attach the screen textures first: the base colour depends on whether a map is present.
+    ensureSharedTextures()
     const ambient = ambientRef.current
     const bg = scene.background instanceof Color ? scene.background : null
     const fog = scene.fog instanceof Fog ? scene.fog : null
@@ -51,7 +53,9 @@ export function MemoryShiftDriver({ memoryShifted, ambientRef, pointRefs, pointB
       wall: materials.wall,
       screens: [
         { material: materials.crtScreen, baseColor: BASE_CRT_SCREEN_COLOR },
-        { material: materials.arcadeScreen, baseColor: BASE_ARCADE_SCREEN_COLOR },
+        { material: materials.arcadeScreenSnake, baseColor: arcadeScreenBaseColor('snake', materials.arcadeScreenSnake.map !== null) },
+        { material: materials.arcadeScreenMaze, baseColor: arcadeScreenBaseColor('maze', materials.arcadeScreenMaze.map !== null) },
+        { material: materials.arcadeScreenFrequency, baseColor: arcadeScreenBaseColor('frequency', materials.arcadeScreenFrequency.map !== null) },
       ],
       overlays: overlayMaterials,
     }

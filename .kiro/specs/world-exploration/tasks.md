@@ -28,6 +28,8 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 - Approved scope change (polish pass), 2026-11-25: the `vhs` Station may be relocated from the north wall to a central archive media island in the main room (around x -0.4, z -0.3, facing +Z toward the spawn at (0, 3)). `StationId` and the station ids are unchanged. `roomLayout.ts` stays the single source of truth for colliders and anchors. New solid colliders are allowed (media console, two filing cabinets), with walkways of at least 1.2 m around the island. New procedural textures are allowed (spine atlas, wall paneling, woven rug, cork bulletin board); each must be registered in `sharedResources.ts` and disposed. Budgets: fewer than 20,000 triangles, at most 4 lights (`M3_LIGHT_COUNT` stays 4 and `crt-light` moves to the new CRT spot), texture memory at most 8 MB. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json` and `tools/blender/` stay unchanged. `ASSET_MANIFEST` stays empty. Earlier wording that places the `vhs` Station on the north wall (in this file, `requirements.md` and `design.md`) is superseded by this bullet.
 - Approved scope change (refinement pass), 2026-11-26: after a live browser walkthrough, one more targeted refinement is approved. The media island stays centered (about x -0.9..0.9, z -0.6..0) with the `vhs` anchor at (0, 0) facing +Z, and `crt-light` moves to (0, 1.6, 0.9). The reception desk (with its tape stack and desk lamp) moves to a dedicated south-east position. At least 2.2 m of unobstructed floor is kept in front (+Z) of the CRT, at least 1.2 m of walkway surrounds every solid collider, and the spawn (0, 3) stays clear. The second point light moves over the west bookcase and lounge zone (about (-2.5, 2.3, 0.4), warm tungsten); the 4-light cap is unchanged (1 ambient + 3 point). The `wallPanel` texture shrinks from 512x512 to 256x256. The island and the companion cabinet get richer detail. Budgets stay: fewer than 20,000 triangles, at most 4 lights, texture memory at most 8 MB. `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json` and `tools/blender/` stay unchanged. The earlier island coordinates (x -1.3..0.5, anchor (-0.4, 0), `crt-light` at (-0.4, 1.6, 0.8)) and the earlier desk position are superseded by this bullet.
 
+- Approved scope change (three arcade cabinets), 2026-11-27: the Arcade_Area east wall (x 8.4..9.2, facing -X) holds three interactive cabinets that replace the active cabinet, the powered-down companion cabinet and (if it conflicts) the CRT stack: SNAKE.EXE (z -1.7..-0.7, anchor (8.4, -1.2)), LAST EXIT (z -0.5..0.5, anchor (8.4, 0)) and DEAD FREQUENCY (z 0.7..1.7, anchor (8.4, 1.2)). `StationId` stays `'vhs' | 'arcade'`. All three cabinets call `onInspect('arcade')`. An optional `arcadeGame?: 'snake' | 'maze' | 'frequency'` field is layout and world data only. `App.tsx` and `src/arcade/` are unchanged, so all three currently open the same App arcade panel. Budgets stay: fewer than 20,000 triangles, at most 4 lights, texture memory at most 8 MB. `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json` and `tools/blender/` stay unchanged. Earlier wording about a single arcade cabinet (x around 8.4, z 0) and the companion cabinet is superseded by this bullet.
+
 ## Tasks
 
 ### Milestone 1: Playable 3D room (primitives only)
@@ -745,6 +747,42 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: documentation and the spec folder only.
     - _Requirements: 14.11, 14.12, 15.3, 15.6_
 
+### Three arcade cabinets
+
+- [x] 20. Three dedicated arcade cabinets
+  - [x] 20.1 Three-cabinet layout, geometry and lighting
+    - Files: `src/world/layout/roomLayout.ts`, `src/world/worldTypes.ts`, `src/world/scene/Lighting.tsx`, `src/world/scene/Stations.tsx`, `src/world/scene/modelDetail.ts`, `src/world/scene/Props.tsx`, `src/world/assets/assetPlacement.ts` (only if needed); tests `src/world/layout/roomLayout.test.ts`, `src/world/scene/modelDetail.test.ts`, `src/world/scene/assetIntegration.test.ts`, and `src/world/WorldScene*.test.ts` only where they hardcode the old arcade.
+    - Replace the single arcade cabinet and the companion cabinet with three solid cabinet colliders on the east wall: SNAKE.EXE (z -1.7..-0.7), LAST EXIT (z -0.5..0.5), DEAD FREQUENCY (z 0.7..1.7). Move or drop the CRT stack only if it conflicts.
+    - Add three arcade `StationDef`s (id `'arcade'`, optional `arcadeGame: 'snake' | 'maze' | 'frequency'`, facing -X, anchors (8.4, -1.2), (8.4, 0), (8.4, 1.2)). All three call `onInspect('arcade')`.
+    - High-craft geometry: recessed tilted CRT bezel, speaker grille bar, angled control deck with dual ball-top joysticks and concave buttons, dual glowing 25c coin-return slots, coloured side T-molding.
+    - Move or aim the arcade light so it lights all three cabinets evenly. Light count stays at most 4.
+    - Acceptance: at least 1.2 m lanes from both doorways to every anchor; every anchor reachable from the start through BFS; the nearest cabinet is targeted from in front of each one; triangle estimate below 20,000; lights at most 4; the arcade prompt text is unchanged; all existing tests pass.
+    - Tests: `roomLayout.test.ts` (three colliders, anchors, 1.2 m lanes, BFS reachability, nearest-cabinet targeting), `modelDetail.test.ts` (colliders match layout, triangle and light budgets). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 19.3.
+    - Boundary: `src/world/` only; `StationId`, `WorldSceneProps` and `onInspect` unchanged; layout stays the single source of truth for collision; no new dependency; no GLB.
+    - _Requirements: 1.2, 1.3, 1.4, 1.5, 1.7, 6.1, 7.1, 7.2, 7.3, 12.5, 13.8, 14.4, 14.5, 19.1, 20.1_
+
+  - [x] 20.2 Attract screen and marquee textures
+    - Files: `src/world/scene/proceduralTextures.ts`, `src/world/scene/sharedResources.ts`, `src/world/scene/memoryShift.ts`, `src/world/scene/MemoryShiftDriver.tsx` (only if the shift tint must cover three screens), `src/world/scene/proceduralTextures.test.ts`, `src/world/scene/modelDetail.test.ts`, existing Memory_Shift tests (updated, not weakened).
+    - Create three 256x256 attract screens and three 256x64 marquees (one per game: SNAKE.EXE, LAST EXIT, DEAD FREQUENCY). Textures are deterministic and drawn once.
+    - Remove or replace the old `arcadeScreen`, `marquee` and `outOfOrder` textures. Each new texture is registered in `sharedResources.ts` and disposed exactly once; `disposeSharedResources()` is safe to call twice. Provide a flat-colour fallback if a texture is unavailable.
+    - `memoryShift` tints all three screens.
+    - Acceptance: texture memory estimate at most 8 MB; triangle estimate below 20,000; lights at most 4; colliders unchanged by this task.
+    - Tests: `proceduralTextures.test.ts` (determinism with a fake context, power-of-two sizes, no randomness, sizes 256x256 and 256x64), `modelDetail.test.ts` (disposal once and twice-safe, texture memory budget), Memory_Shift tint test for all three screens. Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 20.1.
+    - Boundary: render-only; no collider changes; no new dependency; no GLB; `ASSET_MANIFEST` stays empty.
+    - _Requirements: 1.3, 1.4, 1.8, 9.1, 9.2, 9.8, 12.5, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 20.3 Docs, metrics and verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, lights and texture memory, and the targeting benchmark output, each labelled "computed, not runtime-measured". Runtime fields stay "not measured" unless a real measurement is recorded. Task 15.4 stays open.
+    - Document that all three cabinets currently open the same App arcade panel because `App.tsx` and `src/arcade/` are unchanged.
+    - Acceptance: documents match the final layout and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 20.2.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional. The 17 property-based test sub-tasks can be skipped for a faster MVP. Tasks 16.2 and 16.3 are marked `*` because they must not be implemented without approval.
@@ -794,7 +832,10 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     { "id": 32, "tasks": ["18.4"] },
     { "id": 33, "tasks": ["19.1"] },
     { "id": 34, "tasks": ["19.2"] },
-    { "id": 35, "tasks": ["19.3"] }
+    { "id": 35, "tasks": ["19.3"] },
+    { "id": 36, "tasks": ["20.1"] },
+    { "id": 37, "tasks": ["20.2"] },
+    { "id": 38, "tasks": ["20.3"] }
   ]
 }
 ```

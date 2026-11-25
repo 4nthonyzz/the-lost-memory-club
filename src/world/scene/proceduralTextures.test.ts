@@ -15,9 +15,18 @@ import {
   WALL_TEXTURE_ALBEDO,
   SMPTE_BAR_COLORS,
   TIMECODE_TEXT,
+  FREQUENCY_TEXT,
+  MARQUEE_PALETTES,
+  MARQUEE_TEXTS,
+  MARQUEE_TEXT_MARGIN,
+  marqueeFontSize,
+  marqueeTextWidth,
   type TextureId,
 } from './proceduralTextures'
 import { RecordingContext } from './recordingContext'
+
+const ATTRACT_IDS = ['attractSnake', 'attractMaze', 'attractFrequency'] as const
+const MARQUEE_IDS = ['marqueeSnake', 'marqueeMaze', 'marqueeFrequency'] as const
 
 function run(id: TextureId, seed?: number): RecordingContext {
   const ctx = new RecordingContext()
@@ -37,8 +46,8 @@ describe('texture specs', () => {
   })
 
   it('pixel-art textures are nearest-filtered and tiling textures repeat', () => {
-    expect(TEXTURE_SPECS.arcadeScreen.filter).toBe('nearest')
-    expect(TEXTURE_SPECS.marquee.filter).toBe('nearest')
+    for (const id of ATTRACT_IDS) expect(TEXTURE_SPECS[id].filter).toBe('nearest')
+    for (const id of MARQUEE_IDS) expect(TEXTURE_SPECS[id].filter).toBe('nearest')
     for (const id of ['floor', 'wood', 'woodDark', 'crate'] as const) expect(TEXTURE_SPECS[id].wrap).toBe('repeat')
   })
 })
@@ -85,8 +94,12 @@ describe('drawing stays inside the canvas', () => {
 
 describe('lettering', () => {
   it.each([
-    ['arcadeScreen', ['LOST MEMORY', 'PRESS E']],
-    ['marquee', ['ARCADE', 'LOST MEMORY CLUB']],
+    ['attractSnake', ['SNAKE.EXE', 'PRESS E']],
+    ['attractMaze', ['LAST EXIT']],
+    ['attractFrequency', ['DEAD FREQUENCY', '89.4 MHz']],
+    ['marqueeSnake', ['SNAKE.EXE // THE HUNGRY TAPE']],
+    ['marqueeMaze', ['LAST EXIT // THE MAZE']],
+    ['marqueeFrequency', ['DEAD FREQUENCY // THE LOST SIGNAL']],
     ['signFace', ['ARCADE']],
     ['posterSunset', ['MIDNIGHT', 'RENTALS']],
     ['posterReel', ['ARCHIVE', 'ARCHIVE 09 · EST. 1996']],
@@ -97,8 +110,8 @@ describe('lettering', () => {
     for (const s of expected) expect(texts).toContain(s)
   })
 
-  it('floor, wood, grille and deck textures contain no text', () => {
-    for (const id of ['floor', 'wood', 'woodDark', 'crate', 'grille', 'deck'] as const) expect(run(id).texts()).toEqual([])
+  it('floor, wood and grille textures contain no text', () => {
+    for (const id of ['floor', 'wood', 'woodDark', 'crate', 'grille'] as const) expect(run(id).texts()).toEqual([])
   })
 
   it('uses no real film, brand or franchise names', () => {
@@ -249,22 +262,9 @@ describe('task 19.2: smaller wall texture, reference card, glass and timecode', 
     expect(run('smpteBars').texts()).toEqual([])
   })
 
-  it('smpteBars is nearest-filtered and clamped; outOfOrder is mipmapped; timecode is nearest', () => {
+  it('smpteBars and timecode are nearest-filtered and clamped', () => {
     expect(TEXTURE_SPECS.smpteBars).toMatchObject({ width: 256, height: 128, filter: 'nearest', wrap: 'clamp' })
-    expect(TEXTURE_SPECS.outOfOrder).toMatchObject({ width: 256, height: 128, filter: 'mipmap', wrap: 'clamp' })
     expect(TEXTURE_SPECS.timecode).toMatchObject({ width: 128, height: 32, filter: 'nearest', wrap: 'clamp' })
-  })
-
-  it("outOfOrder shows 'OUT OF ORDER' in low contrast on dark glass", () => {
-    const ctx = run('outOfOrder')
-    expect(ctx.texts()).toContain('OUT OF ORDER')
-    // The lettering is a dim green on near-black, not a bright fill.
-    const idx = ctx.calls.findIndex((c) => c.op === 'fillText' && c.args[0] === 'OUT OF ORDER')
-    const colour = String(ctx.calls.slice(0, idx).filter((c) => c.op === 'set fillStyle').pop()!.args[0])
-    const [r, g, b] = [1, 3, 5].map((i) => parseInt(colour.slice(i, i + 2), 16))
-    expect(Math.max(r, g, b)).toBeLessThan(0x70)
-    const alpha = ctx.calls.slice(0, idx).filter((c) => c.op === 'set globalAlpha').pop()!.args[0] as number
-    expect(alpha).toBeLessThan(0.8)
   })
 
   it("timecode reads '00:19:96' in green", () => {
@@ -275,8 +275,8 @@ describe('task 19.2: smaller wall texture, reference card, glass and timecode', 
     expect(fills).toContain('#5dffa0')
   })
 
-  it('the three new textures are registered', () => {
-    for (const id of ['smpteBars', 'outOfOrder', 'timecode'] as const) expect(TEXTURE_IDS).toContain(id)
+  it('the new textures are registered', () => {
+    for (const id of ['smpteBars', 'timecode'] as const) expect(TEXTURE_IDS).toContain(id)
   })
 })
 
@@ -302,11 +302,91 @@ describe('alpha-friendly overlays', () => {
   })
 })
 
-describe('arcade screen stays dim enough to tint', () => {
-  it('uses no pure white fill', () => {
-    const fills = run('arcadeScreen').calls.filter((c) => c.op === 'set fillStyle').map((c) => String(c.args[0]).toLowerCase())
-    expect(fills).not.toContain('#ffffff')
-    expect(fills.length).toBeGreaterThan(10)
+describe('task 20.2: attract screens and marquees', () => {
+  const calls = (id: TextureId, op: string) => run(id).calls.filter((c) => c.op === op)
+  const fillStyles = (id: TextureId) => calls(id, 'set fillStyle').map((c) => String(c.args[0]).toLowerCase())
+
+  it('screens are 256 x 256 and marquees 256 x 64, nearest-filtered, clamped, with no mipmaps', () => {
+    for (const id of ATTRACT_IDS) expect(TEXTURE_SPECS[id]).toMatchObject({ width: 256, height: 256, filter: 'nearest', wrap: 'clamp' })
+    for (const id of MARQUEE_IDS) expect(TEXTURE_SPECS[id]).toMatchObject({ width: 256, height: 64, filter: 'nearest', wrap: 'clamp' })
+  })
+
+  it('the old arcadeScreen, marquee, outOfOrder and deck textures are gone', () => {
+    for (const id of ['arcadeScreen', 'marquee', 'outOfOrder', 'deck']) expect(TEXTURE_IDS as string[]).not.toContain(id)
+  })
+
+  it('every screen and marquee has its own seed, and each is deterministic and seed-dependent', () => {
+    const seeds = [...ATTRACT_IDS, ...MARQUEE_IDS].map((id) => TEXTURE_SPECS[id].seed)
+    expect(new Set(seeds).size).toBe(6)
+    for (const id of [...ATTRACT_IDS, ...MARQUEE_IDS]) {
+      expect(run(id).hash()).toBe(run(id).hash())
+      expect(run(id, TEXTURE_SPECS[id].seed + 1).hash()).not.toBe(run(id).hash())
+    }
+  })
+
+  it('draws the expected titles, lines and dial text', () => {
+    expect(run('attractSnake').texts()).toEqual(expect.arrayContaining(['SNAKE.EXE', 'PRESS E', 'INSERT 25¢']))
+    expect(run('attractMaze').texts()).toContain('LAST EXIT')
+    expect(run('attractFrequency').texts()).toEqual(expect.arrayContaining(['DEAD FREQUENCY', '89.4 MHz', FREQUENCY_TEXT]))
+    expect(MARQUEE_TEXTS.snake).toContain('THE HUNGRY TAPE')
+    expect(MARQUEE_TEXTS.maze).toContain('THE MAZE')
+    expect(MARQUEE_TEXTS.frequency).toContain('THE LOST SIGNAL')
+    for (const [key, id] of [['snake', 'marqueeSnake'], ['maze', 'marqueeMaze'], ['frequency', 'marqueeFrequency']] as const) {
+      expect(run(id).texts()).toContain(MARQUEE_TEXTS[key])
+    }
+  })
+
+  it('marquee lettering fits inside the canvas minus margins, using the fixed per-character width', () => {
+    for (const id of MARQUEE_IDS) {
+      const { width } = TEXTURE_SPECS[id]
+      const ctx = run(id)
+      const label = ctx.texts()[0]
+      const fonts = ctx.calls.filter((c) => c.op === 'set font').map((c) => String(c.args[0]))
+      expect(fonts.length).toBeGreaterThan(0)
+      for (const f of fonts) {
+        const px = Number(/(\d+)px/.exec(f)![1])
+        expect(marqueeTextWidth(label, px), `${id} ${f}`).toBeLessThanOrEqual(width - 2 * MARQUEE_TEXT_MARGIN)
+        expect(px).toBeGreaterThanOrEqual(8)
+      }
+    }
+    // The longest text is the one that is shrunk the most.
+    expect(marqueeFontSize(MARQUEE_TEXTS.frequency, 256)).toBeLessThan(marqueeFontSize(MARQUEE_TEXTS.maze, 256))
+    expect(marqueeFontSize('A', 256)).toBe(20)
+  })
+
+  it('screens have scanlines (full-width 1 px black strips every 2 px) and a phosphor dot grid or graticule', () => {
+    for (const id of ATTRACT_IDS) {
+      const strips = calls(id, 'fillRect').filter((c) => c.args[0] === 0 && c.args[2] === 256 && c.args[3] === 1)
+      expect(strips.length, id).toBeGreaterThanOrEqual(120)
+      // Scanlines (128) plus seeded speckle (50) and the art itself.
+      expect(calls(id, 'fillRect').length, id).toBeGreaterThan(170)
+    }
+  })
+
+  it('snake draws tape segments with reel dots; maze converges on a vanishing point; frequency strokes a waveform', () => {
+    expect(calls('attractSnake', 'arc').length).toBeGreaterThanOrEqual(22)
+    // Maze quads: four corridor surfaces per depth step, filled as paths.
+    expect(calls('attractMaze', 'fill').length).toBeGreaterThanOrEqual(24)
+    const lines = calls('attractMaze', 'lineTo').map((c) => c.args as number[])
+    expect(lines.some(([x, y]) => x >= 104 && x <= 152 && y >= 88 && y <= 150)).toBe(true)
+    expect(calls('attractFrequency', 'lineTo').length).toBeGreaterThanOrEqual(50)
+    expect(fillStyles('attractMaze').some((s) => s === '#f0d8e8')).toBe(true)
+  })
+
+  it('uses each game palette: green, crimson/violet, amber/cyan', () => {
+    const strokes = (id: TextureId) => calls(id, 'set strokeStyle').map((c) => String(c.args[0]).toLowerCase())
+    const all = (id: TextureId) => [...fillStyles(id), ...strokes(id)]
+    expect(all('attractSnake')).toEqual(expect.arrayContaining(['#7dffc0', '#7dffb0']))
+    expect(all('attractMaze')).toEqual(expect.arrayContaining(['#c8203c', '#8a3ad0']))
+    expect(all('attractFrequency')).toEqual(expect.arrayContaining(['#ffc23a', '#2ad8d0']))
+    expect(fillStyles('marqueeSnake')).toContain(MARQUEE_PALETTES.snake.text)
+    expect(fillStyles('marqueeMaze')).toContain(MARQUEE_PALETTES.maze.text)
+    expect(fillStyles('marqueeFrequency')).toContain(MARQUEE_PALETTES.frequency.text)
+  })
+
+  it('uses no real brand or game names', () => {
+    const banned = /NINTENDO|ATARI|SEGA|PAC-?MAN|NAMCO|TETRIS|SPACE INVADERS|DONKEY|BLOCKBUSTER|KIND REWIND/i
+    for (const id of [...ATTRACT_IDS, ...MARQUEE_IDS]) for (const s of run(id).texts()) expect(s).not.toMatch(banned)
   })
 })
 

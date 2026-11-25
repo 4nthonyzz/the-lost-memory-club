@@ -59,11 +59,27 @@ export function selectInteractionTarget(
   range: number = INTERACTION_RANGE,
   coneDeg: number = INTERACTION_CONE_DEG,
 ): StationId | null {
+  return selectInteractionStation(pos, yaw, stations, colliders, range, coneDeg)?.id ?? null;
+}
+
+/**
+ * Same selection as `selectInteractionTarget`, but returns the winning StationDef. Several entries may share
+ * one StationId (three arcade cabinets), so this tells them apart. The nearest eligible entry wins and ties
+ * go to the first entry in list order.
+ */
+export function selectInteractionStation(
+  pos: Vec2,
+  yaw: number,
+  stations: readonly StationDef[],
+  colliders: readonly Aabb[],
+  range: number = INTERACTION_RANGE,
+  coneDeg: number = INTERACTION_CONE_DEG,
+): StationDef | null {
   const fx = -Math.sin(yaw);
   const fz = -Math.cos(yaw);
   const cosCone = Math.cos((coneDeg * Math.PI) / 180);
 
-  let best: StationId | null = null;
+  let best: StationDef | null = null;
   let bestDist = Infinity;
 
   for (const station of stations) {
@@ -91,7 +107,7 @@ export function selectInteractionTarget(
 
     if (dist < bestDist) {
       bestDist = dist;
-      best = station.id;
+      best = station;
     }
   }
   return best;
