@@ -47,7 +47,8 @@ export const FLICKER_HZ = 1.4
 export const PALETTE_NORMAL: Palette = {
   background: '#0b1230',
   ambient: '#6f8fd8',
-  ambientIntensity: 0.6,
+  // Task 26.2: mid-tone balance. 0.54 with both desk lamps ON (factor 1.0); 1 lamp gives 0.513, 0 lamps 0.486.
+  ambientIntensity: 0.54,
   lightColor: '#a9bdf0',
   fogColor: '#0b1230',
   fogNear: 6,
@@ -62,7 +63,8 @@ export const PALETTE_NORMAL: Palette = {
 export const PALETTE_SHIFTED: Palette = {
   background: '#2a0a14',
   ambient: '#d86f86',
-  ambientIntensity: 0.55,
+  // Task 26.2: lowered from 0.55 so the shifted room stays slightly dimmer than the normal one (0.54).
+  ambientIntensity: 0.5,
   lightColor: '#f0a9b6',
   fogColor: '#2a0a14',
   fogNear: 4,

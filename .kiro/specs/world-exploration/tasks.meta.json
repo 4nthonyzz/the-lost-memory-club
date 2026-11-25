@@ -1334,6 +1334,54 @@
         "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
         "timestamp": 1795628839220
       }
+    ],
+    "26.1 Anisotropic filtering and procedural texture detail": [
+      {
+        "executionId": "e2bf819b-af8d-4e94-8f82-aa1cba4b5d0d",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795631741698
+      },
+      {
+        "executionId": "ed6a0a94-4218-402a-876f-f0cee9726c89",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795633005260
+      },
+      {
+        "executionId": "ed6a0a94-4218-402a-876f-f0cee9726c89",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795633421538
+      }
+    ],
+    "26.2 Mid-tone lighting balance": [
+      {
+        "executionId": "ed6a0a94-4218-402a-876f-f0cee9726c89",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795633422099
+      },
+      {
+        "executionId": "ed6a0a94-4218-402a-876f-f0cee9726c89",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795633910547
+      }
+    ],
+    "26.3 Docs, metrics and verification": [
+      {
+        "executionId": "ed6a0a94-4218-402a-876f-f0cee9726c89",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795633910794
+      },
+      {
+        "executionId": "ed6a0a94-4218-402a-876f-f0cee9726c89",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795634251818
+      }
+    ],
+    "26. Texture craft and mid-tone lighting": [
+      {
+        "executionId": "ed6a0a94-4218-402a-876f-f0cee9726c89",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795634251967
+      }
     ]
   }
 }

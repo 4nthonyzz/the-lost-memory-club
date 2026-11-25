@@ -135,7 +135,7 @@ Nine world-local props can be targeted and used with E: the two desk lamps (`des
   | 1 | 0.95 | 0.88 |
   | 0 | 0.90 | 0.75 |
 
-  The factors are applied in `applyShift` (`scene/memoryShift.ts`) after the Memory_Shift blend, from the authored base values every frame, so they do not accumulate. The ambient floor (0.35) is kept. `crt-light` (owned by the flicker) and `arcade-light` are untouched.
+  The factors are applied in `applyShift` (`scene/memoryShift.ts`) after the Memory_Shift blend, from the authored base values every frame, so they do not accumulate. The effective ambient is 0.540 / 0.513 / 0.486 with 2 / 1 / 0 lamps ON in the normal state and 0.500 / 0.475 / 0.450 in the shifted state (computed). The ambient floor (0.35) is kept. `crt-light` (owned by the flicker) and `arcade-light` are untouched.
 - **Ceiling bloom.** Additive bloom strips (2 triangles each, opacity 0.16, cool white, `lampGlow` map) hang 8 cm below the ceiling under the five ceiling fixtures (there are five, not two).
 
 ### Task 25: lamp craft, soft cones and arcade glow (computed from source and tests, not verified visually)
@@ -145,6 +145,31 @@ Nine world-local props can be targeted and used with E: the two desk lamps (`des
 - **Task 25.1, `coneFalloff`.** New 64x64 deterministic canvas texture (seed 133, linear filter, no mipmaps, 0.016 MB) on both lamp cones, with a flat-colour fallback and one disposal. No UV flip was needed. Cone opacity 0.14 to 0.20. The total is now 31 textures and 7.537 MB.
 - **Task 25.2, arcade floor glows.** Three additive decals reuse `lampGlow` (no new light), 0.9 x 0.9 m, opacity 0.26, at x 7.8 and z -1.2 / 0 / 1.2, tinted `#22c55e` (SNAKE.EXE), `#e11d48` (LAST EXIT) and `#f59e0b` (DEAD FREQUENCY). They sit at y 0.014, not the requested 0.003, because the runner decal is at 0.011 and a lower value would be hidden or z-fight. They have no collider.
 - **Task 25.2, Club Archive Notice.** See "Poster decision" and the document table above (7 documents, "NOTES READ: X / 7").
+
+### Task 26: texture craft and mid-tone lighting (computed from source and tests, **not verified visually**)
+
+- Interrupted run and repair (task 26): the browser error `does not provide an export named 'VCR_CHASSIS_COLOR'` came from an import of a constant that was never exported. Fix: `export const VCR_CHASSIS_COLOR = '#2b303a'` in `scene/proceduralTextures.ts` (line 1443). All partial hunks of the interrupted run were complete and were kept, and the touched files were normalised to CRLF. The production build now bundles without a missing-export error.
+- **26.1, anisotropy.** Every `CanvasTexture` gets anisotropy 4 (`TEXTURE_ANISOTROPY` in `scene/sharedResources.ts`, set once in `createCanvasTexture`). For nearest-filtered or non-mipmapped textures it has little or no visible effect.
+- **26.1, device.** The identified device is the media-console VCR (`vcrDeckParts`, material `vcrDeck`, chassis `#2b303a`, was `#2e2f36`). Its front panel is redrawn: trim, cassette bay with reels, silver and amber buttons, green and red LEDs. The loose near-black `tapeBlack` cassettes on the desk were left unchanged. If the "desk recorder" in the request meant those cassettes, that part was not done.
+- **26.1, textures redrawn in place** (same ids and sizes, no texture enlarged): `vcrDeck`, `wood`, `woodDark`, `floor`, `wallPanel`, `spineAtlas`, `corkBoard`, `deskDetail`, `crate`, `vhsShell`, the three attract screens, the three marquees and `crtGlass`.
+- **26.1, mug.** A dark coffee surface on the mug rim and a translucent coffee-ring stain on the desk top, two 8-sided discs (+64 triangles: 19,124 to 19,188). The `mugRim` glaze is brighter (`#f2b8a4`).
+- **26.1, wall tint.** `WALL_TEXTURE_ALBEDO` is unchanged and was not re-measured, so whether the wall tint shifted is **unverified**.
+- **26.2, lighting** (`scene/Lighting.tsx` `POINT_BASES`, `logic/palette.ts`):
+
+  | Light or setting | Before task 26.2 | After task 26.2 |
+  | --- | --- | --- |
+  | Ambient, normal state (both lamps ON) | 0.60 | 0.54 |
+  | Ambient, shifted state | 0.55 | 0.50 |
+  | `crt-light` intensity | 6 | 6.5 |
+  | `west-light` intensity | 6 | 7 |
+  | `west-light` distance | 7 | 8.5 |
+  | `arcade-light` intensity | 5 | 5.5 |
+  | `arcade-light` colour | #9a6ae0 | #8a72f0 |
+  | Tone mapping | ACESFilmic, exposure 1 | unchanged |
+
+  **Plain statement:** the requested "lift to about 0.54" is a reduction of the normal ambient from 0.60, not a lift. It is compensated by stronger point lights (CRT +8 percent, west +17 percent with a wider reach, arcade +10 percent). The effect on the image has not been seen in a browser.
+
+  Effective ambient (authored value times the lamp factor; computed): normal 0.540 / 0.513 / 0.486 with 2 / 1 / 0 lamps ON; shifted 0.500 / 0.475 / 0.450. The ambient floor 0.35 is kept. Flicker and reduced motion are unchanged.
 
 Arcade manuals (task 23.2): three colour-coded volumes stand on level 2 of the west bookcase `shelf-b` (y 1.117..1.397, spines at x -4.635, at z 1.4 / 1.8 / 2.2): emerald SNAKE.EXE, crimson LAST EXIT and amber DEAD FREQUENCY, each with a cream band. Seven ordinary books were removed from that row. Interaction anchors are at x -4.6 (the bookcase front face). They are not colliders.
 ## World layout
@@ -157,7 +182,7 @@ Source of truth: `layout/roomLayout.ts` (**verified by automated test**: `layout
 - Reception desk: unchanged at x -1.5..1.5, z 1.2..2.0.
 - Woven floor rug under the island: x -1.6..1.6, z -2.5..-0.1 (visual only).
 - Reception desk lamps (task 23.1): `desk-lamp-left` (green banker's lamp) and `desk-lamp-right` (cream table lamp), non-solid props on the desk top. No light is attached to them. The desk notebook, the cork board (bulletin board) and the Memory_Shift overlay poster are readable props (anchors on the notebook, the bulletin board and the poster; see "Interactable props").
-- Lights (4): ambient, `crt-light` at (0, 1.6, -0.6), a warm tungsten `west-light` at (-2.6, 2.3, 0.2) over the west bookcase and lounge zone (it replaces the former magenta light), and `arcade-light` at (7.4, 2.4, 0) with distance 6. Since task 24.1 the ambient and `west-light` intensities are multiplied by a factor that depends on how many desk lamps are ON (see "Lamp lighting").
+- Lights (4): ambient, `crt-light` at (0, 1.6, -0.6), a warm tungsten `west-light` at (-2.6, 2.3, 0.2) over the west bookcase and lounge zone (it replaces the former magenta light), and `arcade-light` at (7.4, 2.4, 0) with distance 6. Since task 26.2 the authored values are ambient 0.54 (shifted 0.50), `crt-light` 6.5, `west-light` 7 with distance 8.5, and `arcade-light` 5.5 in `#8a72f0` (see "Task 26"). Since task 24.1 the ambient and `west-light` intensities are multiplied by a factor that depends on how many desk lamps are ON (see "Lamp lighting").
 - Console detail (render-only, no collider change): SMPTE colour-bar reference monitor, green 00:19:96 timecode window and metallic tape slot on the VCR, routed coaxial and power cables behind the console, and metric wood UVs.
 - North wall: two filing cabinets flanking a wall-mounted bulletin board.
 - **Three arcade cabinets** inside the Arcade_Area against its east wall (x 8.4..9.2, front faces at x = 8.4, facing -x toward both doorways). Each is a solid collider and a Station that calls `onInspect('arcade')`:
@@ -190,6 +215,8 @@ Task 24.1 change (computed from source and tests, **not verified visually**): `l
 
 Task 25.1 change (computed from source and tests, **not verified visually**): the 31st texture, `coneFalloff` (64x64, seed 133, linear filter, no mipmaps, 0.016 MB), is the soft map of both lamp cones (`lampConeBanker`, `lampConeTable`). It has a flat-colour fallback, is registered for disposal and is disposed exactly once. No UV flip was needed. Task 25.2 adds no texture: the arcade floor glows reuse `lampGlow`.
 
+Task 26.1 change (computed from source and tests, **not verified visually**): anisotropy 4 on every texture, and the textures listed under "Task 26" were redrawn in place. No texture was added or enlarged, so the count stays 31 and the estimate 7.537 MB.
+
 Task 22 changes (all computed from source and tests, **not verified visually**):
 
 - `corkBoard` shrank from 512x512 to 256x256 (metric UV factor k = w/512, 1.00 MB freed).
@@ -203,7 +230,7 @@ Task 22 changes (all computed from source and tests, **not verified visually**):
 - Doorway panel insets and kickplates on the pillar and jambs sit outside the openings, protrude at most 2 cm, and have no colliders.
 - The `fabric`, `fabricLight` and `casing` materials are removed.
 
-The couch uses the `couchBody`, `couchCushion` and `couchPillow` materials, which take the `memoryShift` tint. The CRT casing fallback colour (no canvas) is charcoal. Without a canvas or 2D context, materials keep flat colors. Textures are disposed on unmount, each exactly once. **verified by automated test** (`scene/proceduralTextures.test.ts`, 157 tests; `scene/modelDetail.test.ts`, 148 tests). Whether they look readable in a browser: **not verified visually** (S7 to S11 `not run`).
+The couch uses the `couchBody`, `couchCushion` and `couchPillow` materials, which take the `memoryShift` tint. The CRT casing fallback colour (no canvas) is charcoal. Without a canvas or 2D context, materials keep flat colors. Textures are disposed on unmount, each exactly once. **verified by automated test** (`scene/proceduralTextures.test.ts`, 194 tests; `scene/modelDetail.test.ts`, 152 tests). Whether they look readable in a browser: **not verified visually** (S7 to S11 `not run`).
 
 Couch fix (task 21.1): the dark patch on the couch came from a dark "worn patch" box placed 4 mm above the middle cushion. It is removed, together with a second hidden patch. The roll caps are shortened by 4 mm to avoid coplanar faces. The pillow sits in the left seat corner; a test checks with an oriented-box (OBB) no-intersection test that it does not overlap the other couch parts. The couch has 388 triangles (was 412) and no new collider. Task 21 is **not verified visually**.
 
@@ -219,25 +246,25 @@ Dev builds only (`import.meta.env.DEV`). Run `npm run dev` and open the page wit
 
 ## Metrics
 
-Computed from declared geometry and source, **computed, not runtime-measured**. Source: `.kiro/specs/world-exploration/performance-log.md`. Figures re-checked in task 25.3 with `npx vitest run src/world/scene/modelDetail.test.ts` (148 tests passed); the console line was:
-`[18.2] computed triangles: 19124 (detail 18882 + base 242), draw-call estimate (grouped by geometry+material): 337, books 366, slipcases 136, leaning 16, per shelf shelf-a=16 draws/178 books, shelf-b=17 draws/168 books, shelf-c=16 draws/156 books, textures 31, texture memory estimate 7.54 MB`
-and the task 25.1 line: `[25.1] triangles 19124 (delta 24), textures 31, texture memory 7.537 MB (computed)`.
+Computed from declared geometry and source, **computed, not runtime-measured**. Source: `.kiro/specs/world-exploration/performance-log.md`. Figures re-checked in task 26.3 with `npx vitest run src/world/scene/modelDetail.test.ts` (152 tests passed); the console line was:
+`[18.2] computed triangles: 19188 (detail 18946 + base 242), draw-call estimate (grouped by geometry+material): 339, books 366, slipcases 136, leaning 16, per shelf shelf-a=16 draws/178 books, shelf-b=17 draws/168 books, shelf-c=16 draws/156 books, textures 31, texture memory estimate 7.54 MB`
+and the task 25.1 line (its baseline is fixed, so the delta is not the change of task 26): `[25.1] triangles 19188 (delta 88), textures 31, texture memory 7.537 MB (computed)`. The real change from task 25.3 to task 26.3 is +64 triangles (19,124 to 19,188, the mug coffee surface and the stain).
 
 | Metric | Value | Label |
 | --- | --- | --- |
-| Triangles | 19,124 (detail 18,882 + base 242), limit 20,000; task 25 changed it by +24 from 19,100 (25.1: brass collars +16 and liner +2; 25.2: the three floor glows, +6) | computed, not runtime-measured |
-| Draw-call grouping estimate | about 337 (was 332 before task 25) | computed estimate, not `renderer.info` |
+| Triangles | 19,188 (detail 18,946 + base 242), limit 20,000; task 26 changed it by +64 from 19,124 (26.1: mug coffee surface +32, desk stain +32); task 25 had changed it by +24 | computed, not runtime-measured |
+| Draw-call grouping estimate | about 339 (was 337 before task 26) | computed estimate, not `renderer.info` |
 | Books | 366 (shelf-a 178, shelf-b 168, shelf-c 156); includes the 3 manuals | computed |
-| Lights | 4 (1 ambient + 3 point), limit 4; tasks 23 to 25 added none | computed from source |
-| Procedural textures | 31, 7.537 MB estimated, limit 8 MB; every texture registered for disposal; task 25.1 added `coneFalloff` (0.016 MB), task 25.2 added none | computed, not runtime-measured |
-| Colliders | 28 (tasks 23 to 25 added none) | computed |
+| Lights | 4 (1 ambient + 3 point), limit 4; tasks 23 to 26 added none | computed from source |
+| Procedural textures | 31, 7.537 MB estimated, limit 8 MB (task 26 test limit 7.85 MB); anisotropy 4 on every texture; every texture registered for disposal; task 26 added and enlarged none | computed, not runtime-measured |
+| Colliders | 28 (tasks 23 to 26 added none) | computed |
 | Interactables | 9 (2 lamps + 7 readable documents) | computed |
-| Targeting benchmark | informational timing only, no threshold; varies per run and machine (task 25.3 runs: full suite 3.852 us/call and 1.833 us/call, standalone 1.048 us/call, 4 stations and 28 colliders; this benchmark times station targeting only, not `selectInteractionTargetAll`) | informational |
+| Targeting benchmark | informational timing only, no threshold; varies per run and machine (task 26.3 standalone run: measured total 25.97 ms, 1.298 us/call, 4 stations and 28 colliders; earlier task 25.3 runs gave 3.852, 1.833 and 1.048 us/call; this benchmark times station targeting only, not `selectInteractionTargetAll`) | informational |
 
-**The triangle margin is thin:** 19,124 leaves 876 triangles (about 4.4 percent) below the 20,000 limit. The biggest consumers (computed by summing declared objects in task 21.3, not recomputed after task 23; tasks 24.1 and 25 then added 58 and 24 triangles): the three bookshelves (2,352, 2,280 and 2,088 before the manuals replaced 7 books on `shelf-b`), the three cabinets (1,316 each), `console-cables` (1,088), the two filing cabinets (692 each) and the desk (672). Task 23.1 replaced the two old desk lamps (470 triangles) with two new ones (352): -118. Task 23.2 replaced 7 books on `shelf-b` (-84) with 3 manuals and 3 spine bands (+72): -12. Task 24.1 added 58 (two lamp cones at 24 triangles each plus five ceiling bloom strips at 2 each, by arithmetic); task 24.2 added no triangles.
+**The triangle margin is thin:** 19,188 leaves 812 triangles (about 4.1 percent) below the 20,000 limit. The biggest consumers (computed by summing declared objects in task 21.3, not recomputed after task 23; tasks 24.1, 25 and 26 then added 58, 24 and 64 triangles): the three bookshelves (2,352, 2,280 and 2,088 before the manuals replaced 7 books on `shelf-b`), the three cabinets (1,316 each), `console-cables` (1,088), the two filing cabinets (692 each) and the desk (672). Task 23.1 replaced the two old desk lamps (470 triangles) with two new ones (352): -118. Task 23.2 replaced 7 books on `shelf-b` (-84) with 3 manuals and 3 spine bands (+72): -12. Task 24.1 added 58 (two lamp cones at 24 triangles each plus five ceiling bloom strips at 2 each, by arithmetic); task 24.2 added no triangles.
 
 **The texture margin is also thin:** 7.537 MB computed against the 8 MB limit leaves about 0.46 MB. First candidates to cut if more room is needed: `console-cables` (1,088 triangles), the book count (366 books), the three 0.66 MB posters (`posterSunset`, `posterReel`, `shiftPoster`, 256x512) or `spineAtlas` (512x256, 0.66 MB), which could shrink. The per-texture list (MB, computed, not runtime-measured, rounded to two decimals): attractSnake 0.25, attractMaze 0.25, attractFrequency 0.25, marqueeSnake 0.06, marqueeMaze 0.06, marqueeFrequency 0.06, signFace 0.33, posterSunset 0.66, posterReel 0.66, shiftPoster 0.66, shiftPlaque 0.17, floor 0.08, wood 0.08, woodDark 0.08, crate 0.33, grille 0.08, spineAtlas 0.66, wallPanel 0.33, rugWoven 0.33, corkBoard 0.33, lampGlow 0.08, smpteBars 0.13, timecode 0.02, couchFabric 0.33, crtCasing 0.33, crtGlass 0.25, vcrDeck 0.17, vhsShell 0.08, metalCabinet 0.33, deskDetail 0.04, coneFalloff 0.02. The largest are the three posters and `spineAtlas` (0.66 each).
-**Measured runtime values** (measured by the project owner **before Tasks 23, 24 and 25; not repeated since**, so they do not describe the lamps, manuals, lamp cones, desk pools, ceiling bloom strips, arcade floor glows, Archive Document Card or notes counter. **Re-measuring is recommended**, because Tasks 24 and 25 add additive transparent layers; dev build, `?worldPerf=1` sampler, 60 s walkthrough across both rooms and all three arcade cabinets; raw output in `.kiro/specs/world-exploration/performance-log.md` section 4):
+**Measured runtime values** (measured by the project owner **before Tasks 23 to 26; not repeated since**, so they do not describe the lamps, manuals, lamp cones, desk pools, ceiling bloom strips, arcade floor glows, Archive Document Card or notes counter. **Re-measuring is recommended**, because Tasks 24 and 25 add additive transparent layers and Task 26 adds anisotropic filtering (4x) on every texture, which add GPU cost; dev build, `?worldPerf=1` sampler, 60 s walkthrough across both rooms and all three arcade cabinets; raw output in `.kiro/specs/world-exploration/performance-log.md` section 4):
 
 | Metric | Measured value |
 | --- | --- |
@@ -250,7 +277,7 @@ and the task 25.1 line: `[25.1] triangles 19124 (delta 24), textures 31, texture
 
 Caveats:
 - Hardware/GPU, browser and version, OS, window resolution and date were **not provided**. The Reference_Hardware (integrated graphics at 1280x720) cannot be confirmed, so the median <= 20 ms and p95 <= 33 ms targets are met on the owner's machine only.
-- Triangles and draw calls describe the last rendered frame from one camera position, after frustum culling, with each instanced mesh counted as one call. They are not comparable one-to-one with the computed whole-scene figures above (19,124 triangles, 337 draw-call estimate, 31 declared textures now; the measurement predates Tasks 23 to 25, so the scene it measured had fewer declared textures and a different triangle count); the lower measured numbers are expected.
+- Triangles and draw calls describe the last rendered frame from one camera position, after frustum culling, with each instanced mesh counted as one call. They are not comparable one-to-one with the computed whole-scene figures above (19,188 triangles, 339 draw-call estimate, 31 declared textures now; the measurement predates Tasks 23 to 25, so the scene it measured had fewer declared textures and a different triangle count); the lower measured numbers are expected.
 - Textures 29 measured vs 30 declared at the time (31 declared now): `renderer.info.memory.textures` counts textures uploaded to the GPU so far. One declared texture may not have been uploaded yet or may be absent (likely explanation, not verified).
 - A median near 16.7 ms is consistent with a 60 Hz vsync cap, so frame time is likely limited by display refresh. The real headroom is unknown.
 - Dev build, which is slower than production.
@@ -280,7 +307,7 @@ npm test
 npm run build
 ```
 
-Fresh run for this README (task 25.3): `npm run typecheck` exit 0, `npm run build` exit 0, `npm test` **31 test files, 694 tests, all passed** (exit 0, run twice with the same result, no timeout). The four CPU-heavy tests from task 24.3 still carry an explicit 30,000 ms per-test timeout. Details in `test-report.md`. Files under `src/world/` and their counts:
+Fresh run for this README (task 26.3): `npm run typecheck` exit 0, `npm run build` exit 0 (104 modules transformed), `npm test` **31 test files, 738 tests, all passed** (exit 0, run twice with the same result, no timeout). The four CPU-heavy tests from task 24.3 still carry an explicit 30,000 ms per-test timeout. Details in `test-report.md`. Files under `src/world/` and their counts:
 
 | Area | Files (tests) |
 | --- | --- |
@@ -289,7 +316,7 @@ Fresh run for this README (task 25.3): `npm run typecheck` exit 0, `npm run buil
 | Controller | `controller/useReducedMotion.test.ts` (8) |
 | Layout | `layout/roomLayout.test.ts` (32) |
 | Logic | `collision` (18), `frameStats` (5), `inputMode` (29), `inputMode.supplied` (17), `inputMode.fallback` (7), `inputMode.prop` (17), `inputState` (15), `look` (20), `movement` (15), `palette` (4), `palette.full` (13), `playerStep` (9), `propState` (12), `archiveDocuments` (6), `targeting` (40), `targeting.bench` (1, informational) |
-| Scene | `effectsTiming` (8), `memoryShift` (16), `lampCoupling` (8), `modelDetail` (148), `proceduralTextures` (157) |
+| Scene | `effectsTiming` (8), `memoryShift` (16), `lampCoupling` (11), `modelDetail` (152), `proceduralTextures` (194) |
 
 Outside `src/world/`: `src/App.test.ts` (8, stubbed `WorldScene`) and `src/core/gameReducer.test.ts` (4). Counts change when tests are added. Details, the 17 correctness properties and gaps: `.kiro/specs/world-exploration/test-report.md`.
 
@@ -303,14 +330,14 @@ See `.kiro/specs/world-exploration/proposals.md`. In short: P1 implemented; P3 a
 
 - No browser run is recorded for M6, the polish pass, the refinement pass or the three-cabinet pass; the new layout and textures are not verified visually.
 - All three cabinets open the same App arcade panel (Snake). LAST EXIT and DEAD FREQUENCY have no game behind them. Their manuals on `shelf-b` and their Archive Document Cards are in-world lore for gameplay that does not exist in `src/arcade/`.
-- Tasks 23, 24 and 25 (lamps, manuals, lamp cones and pools, room light coupling, ceiling bloom, Archive Document Card, notes counter, banker's lamp collars, soft cones, arcade floor glows, Club Archive Notice) are not verified visually or in a browser. Lamp state, the open card and the notes counter are session-only and reset on reload. Lamp pills appear in the world-owned overlay, not in the App HUD status line. All card texts are placeholder lore pending review by the story owner (Developer 3).
+- Tasks 23 to 26 (lamps, manuals, lamp cones and pools, room light coupling, ceiling bloom, Archive Document Card, notes counter, banker's lamp collars, soft cones, arcade floor glows, Club Archive Notice) are not verified visually or in a browser. Lamp state, the open card and the notes counter are session-only and reset on reload. Lamp pills appear in the world-owned overlay, not in the App HUD status line. All card texts are placeholder lore pending review by the story owner (Developer 3).
 - Archive Document Card: on short windows (about 400 to 500 px tall) the card region is small and its overflow cannot be scrolled with the mouse (`pointer-events: none`); the poster becomes targetable when the flag flips, slightly before its fade completes; closing on pointer-lock loss is wired but not testable in jsdom.
 - The requested 0.85 m lamp pool radius was not possible on the 0.8 m deep desk; the pool is a 0.8 m decal with a visible disc of about 0.36 m.
 - Spawn gap (open item): the spawn (0, 3) is exactly 1.0 m from the desk edge and the south wall, so a 1.2 m disc around the spawn is not clear. The test asserts 0.99 m. This was not requested in the final instructions and is not fixed. The manual test log has no recorded result.
-- Frame time and renderer counts were measured once by the project owner before Tasks 23, 24 and 25 (dev build, hardware not provided; see the Metrics section) and have not been repeated; re-measuring is recommended. First-render time is not measured, and the Reference_Hardware cannot be confirmed. The triangle margin below the 20,000 limit is only 876 (computed), and the texture margin below 8 MB is only about 0.46 MB (computed).
+- Frame time and renderer counts were measured once by the project owner before Tasks 23 to 26 (dev build, hardware not provided; see the Metrics section) and have not been repeated; re-measuring is recommended. First-render time is not measured, and the Reference_Hardware cannot be confirmed. The triangle margin below the 20,000 limit is only 812 (computed), and the texture margin below 8 MB is only about 0.46 MB (computed). Task 26 added 44 tests (lampCoupling +3, modelDetail +4, proceduralTextures +37).
 - No GLB assets and no Blender run. The scene uses primitives only.
 - No restored-memory viewer component exists in the repo. The HUD shows progress booleans only.
 - `reducedDistortion` (P2) is not wired, so there is no in-game reduced-distortion link.
 - When `inputEnabled` is absent, the world cannot tell when a panel closed.
-- The production bundle is a single 1,286.49 kB JS chunk (368.91 kB gzip, task 24.3 build) per `performance-log.md`; no code splitting.
+- The production bundle is a single 1,293.34 kB JS chunk (371.15 kB gzip, task 26.3 build) per `performance-log.md`; no code splitting.
 - Optional property-based tests are not implemented.

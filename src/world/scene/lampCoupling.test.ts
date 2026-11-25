@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { AMBIENT_INTENSITY_FLOOR, PALETTE_NORMAL } from '../logic/palette'
 import { LAMP_LIGHT_FACTOR_TABLE, countLampsOn, lampLightFactors } from './lampCoupling'
+import { PALETTE_SHIFTED } from '../logic/palette'
+import { M3_LIGHT_COUNT, POINT_BASES } from './Lighting'
 import { applyShift, POINT_LIGHT_SHIFTED_SCALE, type ShiftTargets } from './memoryShift'
 
 class FakeColor {
@@ -16,9 +18,9 @@ function makeTargets(): ShiftTargets & { ambient: { color: FakeColor; intensity:
     fog: { color: new FakeColor(), near: 0, far: 0 },
     ambient: { color: new FakeColor(), intensity: 0 },
     points: [
-      { light: { color: new FakeColor(), intensity: 0 }, baseColor: '#4fe0d0', baseIntensity: 6 }, // crt-light, never coupled
-      { light: { color: new FakeColor(), intensity: 0 }, baseColor: '#ffb766', baseIntensity: 6, lampCoupled: true }, // west-light
-      { light: { color: new FakeColor(), intensity: 0 }, baseColor: '#9a6ae0', baseIntensity: 5 }, // arcade-light
+      { light: { color: new FakeColor(), intensity: 0 }, baseColor: POINT_BASES[0].color, baseIntensity: POINT_BASES[0].intensity }, // crt-light, never coupled
+      { light: { color: new FakeColor(), intensity: 0 }, baseColor: POINT_BASES[1].color, baseIntensity: POINT_BASES[1].intensity, lampCoupled: true }, // west-light
+      { light: { color: new FakeColor(), intensity: 0 }, baseColor: POINT_BASES[2].color, baseIntensity: POINT_BASES[2].intensity }, // arcade-light
     ],
     wall: { color: new FakeColor() },
     screens: [],
@@ -86,7 +88,7 @@ describe('task 24.1: applying the lamp factors in applyShift', () => {
         expect(x.points[1].light.intensity).toBeCloseTo(base.points[1].light.intensity * f.west, 9)
         expect(x.ambient.intensity).toBeCloseTo(Math.max(AMBIENT_INTENSITY_FLOOR, base.ambient.intensity * f.ambient), 9)
         // The Memory_Shift scale still composes: west at t = 1 is base * shifted scale * factor.
-        if (t === 1) expect(x.points[1].light.intensity).toBeCloseTo(6 * POINT_LIGHT_SHIFTED_SCALE * f.west, 9)
+        if (t === 1) expect(x.points[1].light.intensity).toBeCloseTo(POINT_BASES[1].intensity * POINT_LIGHT_SHIFTED_SCALE * f.west, 9)
       }
     }
   })
@@ -117,5 +119,48 @@ describe('task 24.1: applying the lamp factors in applyShift', () => {
     expect(x.ambient.intensity).toBe(neutral.ambient.intensity)
     expect(x.points[1].light.intensity).toBe(neutral.points[1].light.intensity)
     expect(PALETTE_NORMAL.ambientIntensity * lampLightFactors(0).ambient).toBeGreaterThan(AMBIENT_INTENSITY_FLOOR)
+  })
+})
+
+describe('task 26.2: mid-tone lighting balance', () => {
+  it('has a normal ambient of about 0.54 with both lamps ON, inside 0.52-0.58 and above the floor', () => {
+    expect(PALETTE_NORMAL.ambientIntensity).toBeCloseTo(0.54, 9)
+    expect(PALETTE_NORMAL.ambientIntensity).toBeGreaterThanOrEqual(0.52)
+    expect(PALETTE_NORMAL.ambientIntensity).toBeLessThanOrEqual(0.58)
+    expect(PALETTE_NORMAL.ambientIntensity).toBeGreaterThanOrEqual(AMBIENT_INTENSITY_FLOOR)
+    // The shifted room is not brighter than the normal one.
+    expect(PALETTE_SHIFTED.ambientIntensity).toBeLessThan(PALETTE_NORMAL.ambientIntensity)
+  })
+
+  it('gives effective normal ambient 0.54 x 1.00 / 0.95 / 0.90 for 2 / 1 / 0 lamps, never below the floor in either state', () => {
+    const expected: Record<number, number> = { 2: 0.54, 1: 0.54 * 0.95, 0: 0.54 * 0.9 }
+    for (const n of [2, 1, 0]) {
+      const x = makeTargets()
+      applyShift(0, x, lampLightFactors(n))
+      expect(x.ambient.intensity).toBeCloseTo(expected[n], 9)
+      for (let i = 0; i <= 20; i++) {
+        applyShift(i / 20, x, lampLightFactors(n))
+        expect(x.ambient.intensity).toBeGreaterThanOrEqual(AMBIENT_INTENSITY_FLOOR)
+      }
+      applyShift(1, x, lampLightFactors(n))
+      expect(x.ambient.intensity).toBeGreaterThanOrEqual(AMBIENT_INTENSITY_FLOOR)
+    }
+  })
+
+  it('keeps exactly 4 lights, the warm west fill at #ffb766 / 7, and restores the authored bases at t = 0', () => {
+    expect(M3_LIGHT_COUNT).toBe(4)
+    expect(POINT_BASES).toHaveLength(3)
+    expect(POINT_BASES[1].color).toBe('#ffb766')
+    expect(POINT_BASES[1].intensity).toBe(7)
+    const x = makeTargets()
+    applyShift(1, x)
+    applyShift(0, x)
+    expect(x.points.map((p) => p.light.intensity)).toEqual(POINT_BASES.map((b) => b.intensity))
+    expect(x.points.map((p) => (p.light.color as unknown as FakeColor).hex)).toEqual(POINT_BASES.map((b) => b.color))
+    applyShift(1, x)
+    for (let i = 0; i < 3; i++) {
+      expect(x.points[i].light.intensity).toBeCloseTo(POINT_BASES[i].intensity * POINT_LIGHT_SHIFTED_SCALE, 9)
+      expect((x.points[i].light.color as unknown as FakeColor).hex).not.toBe(POINT_BASES[i].color)
+    }
   })
 })

@@ -30,6 +30,7 @@ import {
   SPINE_VARIANT_COUNT,
   TEXTURE_IDS,
   TEXTURE_SPECS,
+  VCR_CHASSIS_COLOR,
   WALL_METRES_U,
   WALL_METRES_V,
   type Ctx2D,
@@ -137,8 +138,8 @@ export const materials = {
   /** 22.1 armchair upholstery. Flat colours are the previous green armchair; with couchFabric the slate/teal multiplier applies. Tinted by Memory_Shift. */
   armchairBody: lambert(COUCH_FABRIC_COLORS.armchairBody.flat),
   armchairCushion: lambert(COUCH_FABRIC_COLORS.armchairCushion.flat),
-  /** 22.1 VCR housing: brushed dark metal texture; flat dark grey fallback. */
-  vcrDeck: lambert('#2e2f36'),
+  /** 22.1 VCR housing: brushed dark metal texture; flat charcoal-slate fallback (26.1: #2b303a, also the texture base colour). */
+  vcrDeck: lambert(VCR_CHASSIS_COLOR),
   rugLight: lambert('#8c3446'),
   /** 21.1 couch upholstery. Flat colours are the no-canvas fallback; with the couchFabric texture the multiplier is the textured hue. Tinted by Memory_Shift. */
   couchBody: lambert(COUCH_FABRIC_COLORS.couchBody.flat),
@@ -165,8 +166,11 @@ export const materials = {
   paper: lambert('#e6dfc6'),
   /** Notepad cover (22.2 part B): the grain cell of deskDetail times this colour; flat colour is the fallback. */
   notebookCover: lambert('#4a5866'),
-  /** Lighter ceramic rim ring of the desk mug (22.2 part B). */
-  mugRim: lambert('#d98a76'),
+  /** Lighter ceramic rim ring of the desk mug (22.2 part B); 26.1: a brighter glaze highlight. */
+  mugRim: lambert('#f2b8a4'),
+  /** 26.1 coffee surface inside the mug rim, and a translucent coffee ring stain on the desk top beside the mug. */
+  coffee: lambert('#2a170d'),
+  coffeeStain: new MeshLambertMaterial({ color: '#3a2112', transparent: true, opacity: 0.6, depthWrite: false }),
   /** Powered-down screen and marquee of the companion cabinet and the CRT stack. */
   screenOff: lambert('#050508'),
   marqueeOff: lambert('#2a2018'),
@@ -439,6 +443,9 @@ let canvasFactory: CanvasFactory = defaultCanvasFactory
 const registry: CanvasTexture[] = []
 const cache = new Map<TextureId, CanvasTexture | null>()
 
+/** Anisotropic filtering level of every procedural CanvasTexture (task 26.1). */
+export const TEXTURE_ANISOTROPY = 4
+
 export interface CanvasTextureOptions {
   filter?: TextureFilter
   wrap?: 'clamp' | 'repeat'
@@ -477,8 +484,11 @@ export function createCanvasTexture(
     tex.generateMipmaps = true
     tex.minFilter = LinearMipmapLinearFilter
     tex.magFilter = LinearFilter
-    tex.anisotropy = 4
   }
+  // Task 26.1: anisotropy 4 on every procedural texture, set in this one place. It sharpens mipmapped surfaces seen at grazing
+  // angles (floor, wall, wood). For nearest-filtered or non-mipmapped pixel-art textures (attract screens, marquees, crtGlass,
+  // smpte, timecode, coneFalloff) it has little or no effect, but it is harmless, so the value is uniform and easy to test.
+  tex.anisotropy = TEXTURE_ANISOTROPY
   const wrap = options.wrap === 'repeat' ? RepeatWrapping : ClampToEdgeWrapping
   tex.wrapS = wrap
   tex.wrapT = wrap
@@ -549,7 +559,7 @@ const TEXTURE_BINDINGS: readonly TextureBinding[] = [
   { material: 'armchairBody', texture: 'couchFabric', color: COUCH_FABRIC_COLORS.armchairBody.textured, fallbackColor: COUCH_FABRIC_COLORS.armchairBody.flat },
   { material: 'armchairCushion', texture: 'couchFabric', color: COUCH_FABRIC_COLORS.armchairCushion.textured, fallbackColor: COUCH_FABRIC_COLORS.armchairCushion.flat },
   { material: 'crtCasing', texture: 'crtCasing', color: CRT_CASING_COLORS.textured, fallbackColor: CRT_CASING_COLORS.flat },
-  { material: 'vcrDeck', texture: 'vcrDeck', color: '#ffffff', fallbackColor: '#2e2f36' },
+  { material: 'vcrDeck', texture: 'vcrDeck', color: '#ffffff', fallbackColor: VCR_CHASSIS_COLOR },
   /** The cabinet texture is light neutral grey; each multiplier is the old flat grey lifted about 15 %, so the lit result stays close to it. */
   { material: 'filingGrey', texture: 'metalCabinet', color: '#808996', fallbackColor: '#6f7782' },
   { material: 'filingDark', texture: 'metalCabinet', color: '#666e7b', fallbackColor: '#59606b' },

@@ -1214,6 +1214,9 @@ export function crateParts(box: Aabb, height: number): Part[] {
 /** Desk clutter heights in metres (task 22.2 part B). */
 export const MUG_BODY_H = 0.089
 export const MUG_RIM_H = 0.006
+/** Task 26.1: thickness of the coffee surface disc on the rim and of the stain disc on the desk top. */
+export const MUG_COFFEE_H = 0.0012
+export const MUG_STAIN_H = 0.001
 export const NOTE_COVER_H = 0.006
 export const NOTE_PAGE_H = 0.01
 /**
@@ -1256,6 +1259,10 @@ export function deskParts(box: Aabb, height: number): Part[] {
     part('cylinderLow', 'mug', [cx + 0.95, top + MUG_BODY_H / 2, cz - 0.1], [0.08, MUG_BODY_H, 0.08]),
     part('cylinderLow', 'mugRim', [cx + 0.95, top + MUG_BODY_H + MUG_RIM_H / 2, cz - 0.1], [0.084, MUG_RIM_H, 0.084]),
     bx('mug', [cx + 0.95 + 0.048, top + 0.04, cz - 0.1], [0.014, 0.05, 0.016]),
+    // Task 26.1: a dark coffee surface resting on the glazed rim (the lighter rim reads as the highlight), and a translucent
+    // coffee ring stain on the desk top beside the mug. Both are flat 8-sided discs (32 triangles each) and touch no other part.
+    part('cylinderLow', 'coffee', [cx + 0.95, top + MUG_BODY_H + MUG_RIM_H + MUG_COFFEE_H / 2, cz - 0.1], [0.07, MUG_COFFEE_H, 0.07]),
+    part('cylinderLow', 'coffeeStain', [cx + 0.95 - 0.02, top + MUG_STAIN_H / 2, cz - 0.1 + 0.095], [0.085, MUG_STAIN_H, 0.085]),
     // Notepad (task 22.2 part B): a grain-textured cover under a ruled page block (deskDetail cells), both rotated 0.25 rad;
     // the spiral strip rests on the page along its top edge. One tile of deskDetail spans DESK_DETAIL_TILE_M metres.
     {

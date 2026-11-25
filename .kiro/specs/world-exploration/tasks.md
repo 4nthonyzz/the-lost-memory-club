@@ -40,6 +40,8 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 
 - Approved scope change (lamp craft and arcade glow), 2026-12-02: `desk-notebook` moves to about anchor (-0.58, 1.62) so the left lamp is no longer stolen by the notebook when targeting. A new 64x64 `coneFalloff` texture (0.016 MB) gives soft lamp cones. The banker's lamp gets brass end caps (+16 triangles) and a warm inner liner. The ON green shade emissive is `#16a34a` at 0.38, and desk pools use opacity about 0.42. Three additive floor-glow decals in front of the arcade cabinets reuse `lampGlow` (+6 triangles, no new light). The arcade room ARCHIVE poster becomes the 7th readable document (prompt "Press E to read: Club Archive Notice", counter "NOTES READ: X / 7", anchor at the poster's real position). Budgets: fewer than 20,000 triangles (currently 19,100 computed), at most 4 lights, texture memory at most 8 MB (7.521 MB computed). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged. Earlier wording of "X / 6" in task 24.2 is superseded by this bullet.
 
+- Approved scope change (texture craft and mid-tone lighting), 2026-12-03: anisotropy 4 is set on every procedural `CanvasTexture` (no memory cost). Texture detail upgrades are redrawn in place (the texture count stays 31). At most one small-prop texture may grow from 128x128 to 256x256. Normal-state lighting is tuned to a mid-tone balance (ambient about 0.52 to 0.58 with both lamps on, the 0.35 floor is kept, the lamp-coupling ratios are kept). Memory_Shift, flicker and reduced motion are unchanged. Budgets: triangles at most 19,200 (below 20,000; currently 19,124 computed), at most 4 lights, texture memory at most 7.85 MB (currently 7.537 MB computed; hard limit 8 MB). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged.
+
 ## Tasks
 
 ### Milestone 1: Playable 3D room (primitives only)
@@ -954,6 +956,36 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: documentation and the spec folder only.
     - _Requirements: 14.11, 14.12, 15.3, 15.6_
 
+### Texture craft and mid-tone lighting
+
+- [x] 26. Texture craft and mid-tone lighting
+  - [x] 26.1 Anisotropic filtering and procedural texture detail
+    - Files: `src/world/scene/sharedResources.ts`, `src/world/scene/proceduralTextures.ts`, `src/world/scene/modelDetail.ts`; tests `src/world/scene/proceduralTextures.test.ts`, `src/world/scene/modelDetail.test.ts`.
+    - Set anisotropy 4 on every procedural `CanvasTexture` (central helper in `sharedResources.ts`). Redraw texture detail in place (texture count stays 31). At most one small-prop texture may grow from 128x128 to 256x256, with the texture memory estimate updated.
+    - Acceptance: every texture has anisotropy 4; texture count is 31; triangle estimate at most 19,200; lights at most 4; texture memory at most 7.85 MB (computed); textures stay deterministic and power-of-two; each texture disposed exactly once (twice-safe); colliders and Station anchors unchanged; Memory_Shift tinting still works.
+    - Tests: `proceduralTextures.test.ts` (determinism with a fake context, power-of-two sizes, no randomness, at most one 128 to 256 change); `modelDetail.test.ts` (anisotropy on all textures, count 31, memory and triangle budgets, light count, disposal once and twice-safe). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 25.3.
+    - Boundary: render-only; `src/world/` only; no new dependency; no GLB; `ASSET_MANIFEST` stays empty.
+    - _Requirements: 1.3, 1.4, 1.8, 9.8, 12.5, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 26.2 Mid-tone lighting balance
+    - Files: `src/world/logic/palette.ts`, `src/world/scene/Lighting.tsx`, `src/world/scene/WorldCanvas.tsx` or `src/world/WorldScene.tsx` (exposure, only if configured), `src/world/scene/memoryShift.ts`, `src/world/logic/lampCoupling.ts` (if needed); tests `palette.test.ts`, `palette.full.test.ts`, `memoryShift.test.ts`, `lampCoupling.test.ts`, `src/world/scene/modelDetail.test.ts`.
+    - Tune normal-state lighting to a mid-tone balance: ambient about 0.52 to 0.58 with both lamps on. Keep the 0.35 ambient floor and the lamp-coupling ratios. Memory_Shift, flicker and reduced motion are unchanged; `M3_LIGHT_COUNT` stays 4.
+    - Acceptance: ambient with both lamps on is within 0.52 to 0.58; ambient never drops below 0.35 in any state; coupling ratios are unchanged; the multiplier still composes on top of Memory_Shift and flicker; lights at most 4; colliders unchanged.
+    - Tests: `palette.test.ts` and `palette.full.test.ts` (normal and shifted values, floor kept), `memoryShift.test.ts` (tint at t = 0, 0.5 and 1 still exact), `lampCoupling.test.ts` (ratios for 0, 1 and 2 lamps), `modelDetail.test.ts` (light count and budgets). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 26.1.
+    - Boundary: render-only; `src/world/` only; no new dependency; no new three.js light.
+    - _Requirements: 9.1, 9.2, 9.8, 10.2, 10.3, 10.7, 14.5, 19.1_
+
+  - [x] 26.3 Docs, metrics and verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, lights and texture memory, each labelled "computed, not runtime-measured". Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final geometry, lighting values and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 26.2.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional. The 17 property-based test sub-tasks can be skipped for a faster MVP. Tasks 16.2 and 16.3 are marked `*` because they must not be implemented without approval.
@@ -1021,7 +1053,10 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     { "id": 50, "tasks": ["24.3"] },
     { "id": 51, "tasks": ["25.1"] },
     { "id": 52, "tasks": ["25.2"] },
-    { "id": 53, "tasks": ["25.3"] }
+    { "id": 53, "tasks": ["25.3"] },
+    { "id": 54, "tasks": ["26.1"] },
+    { "id": 55, "tasks": ["26.2"] },
+    { "id": 56, "tasks": ["26.3"] }
   ]
 }
 ```

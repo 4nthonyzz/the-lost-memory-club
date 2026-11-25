@@ -25,6 +25,7 @@ import {
   CRT_BADGE_TEXT,
   CRT_LED_COLOR,
   VCR_BUTTON_LABELS,
+  VCR_CHASSIS_COLOR,
   VCR_MARK_TEXT,
   VHS_LABEL_TEXTS,
   CABINET_CARD_TEXTS,
@@ -901,5 +902,65 @@ describe('task 25.1: coneFalloff texture', () => {
 
   it('contains no text and no brand names', () => {
     expect(run('coneFalloff').texts()).toEqual([])
+  })
+})
+describe('task 26.1: texture craft (redrawn in place)', () => {
+  const REDRAWN = [
+    'wood', 'woodDark', 'deskDetail', 'crate', 'wallPanel', 'floor', 'spineAtlas', 'vhsShell', 'vcrDeck', 'corkBoard',
+    'attractSnake', 'attractMaze', 'attractFrequency', 'marqueeSnake', 'marqueeMaze', 'marqueeFrequency', 'crtGlass',
+  ] as const satisfies readonly TextureId[]
+  const brands = /sony|panasonic|jvc|toshiba|samsung|sharp|zenith|rca|nintendo|sega|atari|blockbuster|kind rewind|maxell|fuji|memorex/i
+
+  it('keeps 31 textures, within 7.85 MB (computed), and every size is a power of two with no 128 -> 256 growth', () => {
+    expect(TEXTURE_IDS).toHaveLength(31)
+    expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(7.85 * 1048576)
+    expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
+    expect(totalTextureMemoryBytes() / 1048576).toBeCloseTo(7.537, 2)
+    for (const id of TEXTURE_IDS) expect(isPowerOfTwo(TEXTURE_SPECS[id].width) && isPowerOfTwo(TEXTURE_SPECS[id].height)).toBe(true)
+  })
+
+  it.each(REDRAWN)('%s is deterministic, uses no Math.random, differs with another seed and stays finite', (id) => {
+    const real = Math.random
+    Math.random = () => {
+      throw new Error('Math.random is not allowed in texture drawing')
+    }
+    try {
+      expect(run(id).hash()).toBe(run(id).hash())
+    } finally {
+      Math.random = real
+    }
+    expect(run(id, TEXTURE_SPECS[id].seed + 1).hash()).not.toBe(run(id).hash())
+    for (const call of run(id).calls) {
+      for (const a of call.args) if (typeof a === 'number') expect(Number.isFinite(a), `${id} ${call.op}`).toBe(true)
+    }
+  })
+
+  it.each(REDRAWN)('%s draws no filled rectangle completely outside the canvas and no brand names', (id) => {
+    const { width: W, height: H } = TEXTURE_SPECS[id]
+    for (const call of run(id).calls) {
+      if (call.op !== 'fillRect') continue
+      const [x, y, rw, rh] = call.args as number[]
+      expect(x < W && y < H && x + rw > 0 && y + rh > 0, `${id} fillRect ${call.args.join()}`).toBe(true)
+    }
+    for (const s of run(id).texts()) expect(s).not.toMatch(brands)
+  })
+
+  it('vcrDeck uses the charcoal-slate chassis colour as its base and draws two reels, two status LEDs and amber buttons', () => {
+    expect(VCR_CHASSIS_COLOR).toBe('#2b303a')
+    const ctx = run('vcrDeck')
+    expect(ctx.calls.find((c) => c.op === 'set fillStyle')!.args[0]).toBe(VCR_CHASSIS_COLOR)
+    const fills = ctx.calls.filter((c) => c.op === 'set fillStyle').map((c) => String(c.args[0]))
+    for (const led of ['#3dff7a', '#ff3b30', '#ffb020']) expect(fills).toContain(led)
+    // Two bay reels: a disc and a ring each, radius 6.
+    expect(ctx.calls.filter((c) => c.op === 'arc' && (c.args as number[])[2] === 6)).toHaveLength(4)
+  })
+
+  it('wallPanel keeps its baseboard grime band inside the tile', () => {
+    const { width: W, height: H } = TEXTURE_SPECS.wallPanel
+    for (const call of run('wallPanel').calls) {
+      if (call.op !== 'fillRect') continue
+      const [x, y, rw, rh] = call.args as number[]
+      if (rh <= 3 && y > H * 0.8) expect(x >= 0 && x + rw <= W + 1 && y + rh <= H + 1, call.args.join()).toBe(true)
+    }
   })
 })
