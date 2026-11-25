@@ -24,6 +24,14 @@ import {
   FABRIC_WALES,
   CRT_BADGE_TEXT,
   CRT_LED_COLOR,
+  VCR_BUTTON_LABELS,
+  VCR_MARK_TEXT,
+  VHS_LABEL_TEXTS,
+  CABINET_CARD_TEXTS,
+  CABINET_PLAIN_V,
+  CRATE_LABEL_HEADER,
+  CRATE_STENCIL_TEXT,
+  cabinetCardV,
   marqueeFontSize,
   marqueeTextWidth,
   type TextureId,
@@ -116,7 +124,7 @@ describe('lettering', () => {
   })
 
   it('floor, wood and grille textures contain no text', () => {
-    for (const id of ['floor', 'wood', 'woodDark', 'crate', 'grille'] as const) expect(run(id).texts()).toEqual([])
+    for (const id of ['floor', 'wood', 'woodDark', 'grille'] as const) expect(run(id).texts()).toEqual([])
   })
 
   it('uses no real film, brand or franchise names', () => {
@@ -519,5 +527,237 @@ describe('task 21.2: crtCasing and crtGlass textures', () => {
     const r = rects('crtGlass')
     expect(r.filter((a) => a[2] === 1 && a[3] === 256).length).toBeGreaterThanOrEqual(100)
     expect(r.filter((a) => a[2] === 1 && a[3] === 1).length).toBeGreaterThanOrEqual(400)
+  })
+})
+
+describe('task 22.1: corkBoard 256, vcrDeck and vhsShell textures', () => {
+  const brands = /sony|panasonic|jvc|toshiba|samsung|sharp|zenith|rca|nintendo|sega|atari|blockbuster|kind rewind|maxell|fuji|memorex/i
+  const NEW_IDS = ['vcrDeck', 'vhsShell'] as const
+
+  /** Every fillText with its font size, checked against the canvas (centre aligned, monospace about 0.6 em per glyph). */
+  function textBoxes(id: TextureId) {
+    let px = 10
+    const boxes: Array<{ s: string; px: number; x0: number; x1: number; y0: number; y1: number }> = []
+    for (const c of run(id).calls) {
+      if (c.op === 'set font') px = Number(/(\d+)px/.exec(String(c.args[0]))![1])
+      if (c.op === 'fillText') {
+        const [s, x, y] = c.args as [string, number, number]
+        const half = (s.length * px * 0.6) / 2
+        boxes.push({ s, px, x0: x - half, x1: x + half, y0: y - px / 2, y1: y + px / 2 })
+      }
+    }
+    return boxes
+  }
+
+  it('corkBoard is 256 x 256 (mipmap, clamp, same seed) and costs 1.0 MB less than at 512', () => {
+    expect(TEXTURE_SPECS.corkBoard).toMatchObject({ width: 256, height: 256, filter: 'mipmap', wrap: 'clamp', seed: 117 })
+    const saved = textureMemoryBytes({ width: 512, height: 512, filter: 'mipmap' }) - textureMemoryBytes(TEXTURE_SPECS.corkBoard)
+    expect(saved).toBeGreaterThan(1.0e6)
+  })
+
+  it('corkBoard keeps every pinned item and its lettering, scaled by k = w / 512 and inside the canvas', () => {
+    const { width: W, height: H } = TEXTURE_SPECS.corkBoard
+    const boxes = textBoxes('corkBoard')
+    expect(boxes.map((b) => b.s).sort()).toEqual(['ARCHIVE 09', 'DO NOT ERASE', 'TAPE 001', 'WHO TAPED OVER?'])
+    for (const b of boxes) {
+      expect(b.px, b.s).toBeGreaterThanOrEqual(7)
+      expect(b.px, b.s).toBeLessThanOrEqual(8)
+      expect(b.x0 >= 0 && b.x1 <= W && b.y0 >= 0 && b.y1 <= H, `${b.s} ${b.x0}..${b.x1}`).toBe(true)
+    }
+    // Same item counts as before the shrink: 12 push-pins, 13 string links, 4 sticky notes, 4 Polaroids.
+    const calls = run('corkBoard').calls
+    const strokes = calls.filter((c) => c.op === 'set strokeStyle').map((c) => String(c.args[0]))
+    expect(strokes.filter((s) => s === '#c42222')).toHaveLength(13)
+    expect(calls.filter((c) => c.op === 'arc')).toHaveLength(12 * 3 + 4) // three discs per pin, one silhouette head per Polaroid
+    const fills = calls.filter((c) => c.op === 'set fillStyle').map((c) => String(c.args[0]))
+    for (const col of ['#f2e060', '#f09ab0', '#9ad88a', '#8ac8e8']) expect(fills).toContain(col)
+    expect(fills.filter((f) => f === '#ece8dc')).toHaveLength(4)
+    expect(fills.filter((f) => f === '#efe8cf')).toHaveLength(4)
+    // Proportions: the first card (24, 28, 132 x 100 at 512 px) is at (12, 14, 66 x 50) at 256 px.
+    expect(calls.some((c) => c.op === 'fillRect' && (c.args as number[]).join() === '12,14,66,50')).toBe(true)
+  })
+
+  it('vcrDeck is 256 x 128 and vhsShell 128 x 128: mipmapped, unique seeds, power of two', () => {
+    expect(TEXTURE_SPECS.vcrDeck).toMatchObject({ width: 256, height: 128, filter: 'mipmap' })
+    expect(TEXTURE_SPECS.vhsShell).toMatchObject({ width: 128, height: 128, filter: 'mipmap', wrap: 'clamp' })
+    for (const id of NEW_IDS) {
+      expect(TEXTURE_IDS).toContain(id)
+      expect(isPowerOfTwo(TEXTURE_SPECS[id].width) && isPowerOfTwo(TEXTURE_SPECS[id].height)).toBe(true)
+      expect(TEXTURE_IDS.filter((o) => o !== id).every((o) => TEXTURE_SPECS[o].seed !== TEXTURE_SPECS[id].seed)).toBe(true)
+    }
+  })
+
+  it.each(NEW_IDS)('%s is deterministic per seed, differs for another seed and uses no brand names', (id) => {
+    expect(run(id).hash()).toBe(run(id).hash())
+    expect(run(id, TEXTURE_SPECS[id].seed + 1).hash()).not.toBe(run(id).hash())
+    for (const s of run(id).texts()) expect(s).not.toMatch(brands)
+  })
+
+  it.each(NEW_IDS)('%s keeps text inside the canvas', (id) => {
+    const { width: W, height: H } = TEXTURE_SPECS[id]
+    for (const b of textBoxes(id)) expect(b.x0 >= 0 && b.x1 <= W && b.y0 >= 0 && b.y1 <= H, `${b.s} ${b.x0}..${b.x1}`).toBe(true)
+  })
+
+  it('vcrDeck prints PLAY, STOP, REW, EJECT under the buttons and the generic HI-FI STEREO marking', () => {
+    expect([...VCR_BUTTON_LABELS]).toEqual(['PLAY', 'STOP', 'REW', 'EJECT'])
+    expect(VCR_MARK_TEXT).toBe('HI-FI STEREO')
+    const boxes = textBoxes('vcrDeck')
+    for (const s of [...VCR_BUTTON_LABELS, VCR_MARK_TEXT]) expect(boxes.map((b) => b.s)).toContain(s)
+    // Labels read left to right in button order, and neighbouring labels do not overlap.
+    const labels = VCR_BUTTON_LABELS.map((s) => boxes.find((b) => b.s === s)!)
+    for (let i = 1; i < labels.length; i++) expect(labels[i].x0).toBeGreaterThan(labels[i - 1].x1)
+  })
+
+  it('vcrDeck has brushed streaks, ventilation slots and a chrome trim line', () => {
+    const rects = run('vcrDeck').calls.filter((c) => c.op === 'fillRect').map((c) => c.args as number[])
+    expect(rects.filter((r) => r[2] === 256 && r[3] === 1).length).toBeGreaterThanOrEqual(128)
+    expect(rects.filter((r) => r[2] === 80 && r[3] === 4).length).toBe(12)
+    expect(rects.some((r) => r[0] === 0 && r[2] === 256 && r[3] === 1 && r[1] === 88)).toBe(true)
+  })
+
+  it('vhsShell prints the TAPE 001 and ARCHIVE labels and draws two reels, a flap seam and ribs', () => {
+    expect([...VHS_LABEL_TEXTS]).toEqual(['TAPE 001', 'ARCHIVE'])
+    const ctx = run('vhsShell')
+    for (const s of VHS_LABEL_TEXTS) expect(ctx.texts()).toContain(s)
+    // Two reels: a filled disc and a ring each, plus two hubs (arc calls with radius 8 and 2.5).
+    const arcs = ctx.calls.filter((c) => c.op === 'arc').map((c) => c.args as number[])
+    expect(arcs.filter((a) => a[2] === 8)).toHaveLength(4)
+    expect(arcs.filter((a) => a[2] === 2.5)).toHaveLength(2)
+    expect(new Set(arcs.filter((a) => a[2] === 8).map((a) => a[0]))).toEqual(new Set([40, 88]))
+    const rects = ctx.calls.filter((c) => c.op === 'fillRect').map((c) => c.args as number[])
+    expect(rects.some((r) => r[0] === 0 && r[1] === 69 && r[2] === 128 && r[3] === 1)).toBe(true)
+    expect(rects.filter((r) => r[2] === 1 && r[1] === 108).length).toBeGreaterThanOrEqual(30)
+  })
+
+  it('vhsShell is light near-neutral plastic so the material multiplier sets the hue', () => {
+    const base = run('vhsShell').calls.find((c) => c.op === 'set fillStyle')!.args[0] as string
+    const ch = [1, 3, 5].map((i) => parseInt(base.slice(i, i + 2), 16))
+    expect(Math.max(...ch) - Math.min(...ch)).toBeLessThanOrEqual(0x10)
+  })
+
+  it('texture memory after task 22.2 is at most 7.7 MB', () => {
+    expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(7.55 * 1048576)
+  })
+})
+
+describe('task 22.2: metalCabinet, and cardboard crate textures', () => {
+  const brands = /sony|panasonic|jvc|toshiba|samsung|sharp|zenith|rca|nintendo|sega|atari|blockbuster|kind rewind|maxell|fuji|memorex|ikea|hon\b|steelcase/i
+  const IDS = ['metalCabinet', 'crate'] as const
+  const rects = (id: TextureId) => run(id).calls.filter((c) => c.op === 'fillRect').map((c) => c.args as number[])
+  const textCalls = (id: TextureId) => run(id).calls.filter((c) => c.op === 'fillText').map((c) => ({ s: c.args[0] as string, x: c.args[1] as number, y: c.args[2] as number }))
+
+  it('sizes: metalCabinet 256 x 256 and crate 256 x 256 (mipmapped, repeating), unique seeds', () => {
+    expect(TEXTURE_SPECS.metalCabinet).toMatchObject({ width: 256, height: 256, filter: 'mipmap', wrap: 'repeat' })
+    expect(TEXTURE_SPECS.crate).toMatchObject({ width: 256, height: 256, filter: 'mipmap', wrap: 'repeat' })
+    for (const id of IDS) {
+      expect(isPowerOfTwo(TEXTURE_SPECS[id].width) && isPowerOfTwo(TEXTURE_SPECS[id].height)).toBe(true)
+      expect(TEXTURE_IDS.filter((o) => o !== id).every((o) => TEXTURE_SPECS[o].seed !== TEXTURE_SPECS[id].seed)).toBe(true)
+    }
+  })
+
+  it.each(IDS)('%s is deterministic per seed, differs for another seed, stays in bounds and uses no brand names', (id) => {
+    expect(run(id).hash()).toBe(run(id).hash())
+    expect(run(id, TEXTURE_SPECS[id].seed + 1).hash()).not.toBe(run(id).hash())
+    for (const s of run(id).texts()) expect(s).not.toMatch(brands)
+    const { width: W, height: H } = TEXTURE_SPECS[id]
+    for (const r of rects(id)) expect(r[0] >= -1 && r[1] >= -1 && r[0] + r[2] <= W + 1 && r[1] + r[3] <= H + 1, `${id} ${r.join(',')}`).toBe(true)
+  })
+
+  it('metalCabinet prints the four typed index cards, top drawer first, one per 64-row band', () => {
+    expect([...CABINET_CARD_TEXTS]).toEqual(['1994\u20131996', 'TAPES 01\u201340', 'CASE LOGS', 'MISC'])
+    const calls = textCalls('metalCabinet')
+    expect(calls.map((c) => c.s)).toEqual([...CABINET_CARD_TEXTS])
+    for (let d = 0; d < 4; d++) {
+      expect(calls[d].x).toBe(128)
+      // Card centre of drawer i (0 = bottom) is at tile fraction cabinetCardV(i), canvas row (1 - v) * 256.
+      expect(calls[d].y).toBeCloseTo((1 - cabinetCardV(3 - d)) * 256, 6)
+      expect(Math.floor(calls[d].y / 64)).toBe(d)
+    }
+  })
+
+  it('metalCabinet has vertical brushing, three drawer seams, four chrome frames and a plain stripe', () => {
+    const r = rects('metalCabinet')
+    expect(r.filter((q) => q[2] === 1 && q[3] === 256).length).toBeGreaterThanOrEqual(256)
+    for (const y of [64, 128, 192]) expect(r.some((q) => q[0] === 0 && q[2] === 256 && q[3] === 3 && q[1] === y - 1), `seam ${y}`).toBe(true)
+    expect(r.filter((q) => Math.abs(q[2] - 143.36) < 0.01).length).toBe(4)
+    // Nothing but speckle touches the plain rows 238..251 (v stripe): no seams, frames or cards there.
+    const [v0, v1] = CABINET_PLAIN_V
+    expect([Math.round((1 - v1) * 256), Math.round((1 - v0) * 256)]).toEqual([238, 252])
+    for (const q of r) {
+      if (q[2] >= 100 || q[3] >= 100) continue
+      if (q[2] === 1 && q[3] === 256) continue
+      if (q[2] <= 2 && q[3] <= 2) continue
+      expect(q[1] + q[3] <= 238 || q[1] >= 252 || q[2] <= 31, `rect ${q.join(',')} overlaps the plain rows`).toBe(true)
+    }
+  })
+
+  it('metalCabinet is light near-neutral grey so the material multipliers set the greys', () => {
+    const base = run('metalCabinet').calls.find((c) => c.op === 'set fillStyle')!.args[0] as string
+    const ch = [1, 3, 5].map((i) => parseInt(base.slice(i, i + 2), 16))
+    expect(Math.max(...ch) - Math.min(...ch)).toBeLessThanOrEqual(0x10)
+    expect(Math.min(...ch)).toBeGreaterThanOrEqual(0xb0)
+  })
+
+  it('crate is corrugated cardboard: flute lines, packing tape, a shipping label with a barcode and the stencil', () => {
+    expect(CRATE_STENCIL_TEXT).toBe('ARCHIVE // HANDLE WITH CARE')
+    const texts = run('crate').texts()
+    expect(texts).toContain(CRATE_STENCIL_TEXT)
+    expect(texts).toContain(CRATE_LABEL_HEADER)
+    const r = rects('crate')
+    // Fine vertical flutes: a dark and a light 1 px line every 4 px over the full height.
+    expect(r.filter((q) => q[2] === 1 && q[3] === 256 && q[0] % 2 === 0 && q[0] % 4 === 0).length).toBeGreaterThanOrEqual(64)
+    expect(r.filter((q) => q[2] === 1 && q[3] === 256 && q[0] % 4 === 2).length).toBeGreaterThanOrEqual(64)
+    // Semi-transparent tape strips: a vertical and a horizontal band.
+    const alphaOf = (q: number[]) => {
+      const calls = run('crate').calls
+      const i = calls.findIndex((c) => c.op === 'fillRect' && (c.args as number[]).every((v, k) => v === q[k]))
+      return calls.slice(0, i).reverse().find((c) => c.op === 'set globalAlpha')!.args[0] as number
+    }
+    const vTape = r.find((q) => q[0] === 112 && q[2] === 32 && q[3] === 256)!
+    const hTape = r.find((q) => q[0] === 0 && q[2] === 256 && q[3] === 14)!
+    for (const t of [vTape, hTape]) expect(alphaOf(t)).toBeGreaterThan(0.2)
+    for (const t of [vTape, hTape]) expect(alphaOf(t)).toBeLessThan(0.8)
+    // White label with a barcode of at least 10 bars between the label edges.
+    const label = r.find((q) => q[0] === 12 && q[1] === 136 && q[2] === 96 && q[3] === 68)!
+    expect(label).toBeDefined()
+    const bars = r.filter((q) => q[1] === 175 && q[3] === 22)
+    expect(bars.length).toBeGreaterThanOrEqual(10)
+    for (const b of bars) expect(b[0] >= label[0] && b[0] + b[2] <= label[0] + label[2]).toBe(true)
+    // Everything printed sits in the lower half (rows 128..255) except the tape band: it stays visible on the smallest boxes.
+    for (const c of textCalls('crate')) expect(c.y).toBeGreaterThan(128)
+  })
+
+  it('memory: metalCabinet 0.33 MB, crate 0.33 MB (was 0.09), total at most 7.55 MB', () => {
+    const mb = (id: TextureId) => textureMemoryBytes(TEXTURE_SPECS[id]) / 1048576
+    expect(mb('metalCabinet')).toBeCloseTo(0.33, 2)
+    expect(mb('crate')).toBeCloseTo(0.33, 2)
+    expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(7.7 * 1048576)
+    expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
+  })
+})
+
+describe('task 22.2 part B: deskDetail texture', () => {
+  const rects = (seed?: number) => run('deskDetail', seed).calls.filter((c) => c.op === 'fillRect').map((c) => c.args as number[])
+
+  it('is 128 x 64, mipmapped, repeating, power-of-two, with a unique seed and about 0.04 MB', () => {
+    expect(TEXTURE_SPECS.deskDetail).toMatchObject({ width: 128, height: 64, filter: 'mipmap', wrap: 'repeat' })
+    expect(isPowerOfTwo(128) && isPowerOfTwo(64)).toBe(true)
+    expect(TEXTURE_IDS.filter((o) => o !== 'deskDetail').every((o) => TEXTURE_SPECS[o].seed !== TEXTURE_SPECS.deskDetail.seed)).toBe(true)
+    expect(textureMemoryBytes(TEXTURE_SPECS.deskDetail) / 1048576).toBeCloseTo(0.04, 2)
+  })
+
+  it('is deterministic per seed, differs for another seed, stays in bounds and uses no text', () => {
+    expect(run('deskDetail').hash()).toBe(run('deskDetail').hash())
+    expect(run('deskDetail', TEXTURE_SPECS.deskDetail.seed + 1).hash()).not.toBe(run('deskDetail').hash())
+    expect(run('deskDetail').texts()).toEqual([])
+    for (const r of rects()) expect(r[0] >= 0 && r[1] >= 0 && r[0] + r[2] <= 128 && r[1] + r[3] <= 64, r.join(',')).toBe(true)
+  })
+
+  it('draws 13 ruled lines and a margin line in the right (paper) cell and page-edge rows at the bottom', () => {
+    const r = rects()
+    const lines = r.filter((q) => q[0] === 64 && q[2] === 64 && q[3] === 1 && q[1] < 60 && (q[1] - 6) % 4 === 0)
+    expect(lines).toHaveLength(13)
+    expect(r.some((q) => q[0] === 73 && q[2] === 1 && q[3] === 60)).toBe(true)
+    for (let y = 60; y < 64; y++) expect(r.some((q) => q[0] === 64 && q[1] === y && q[2] === 64 && q[3] === 1)).toBe(true)
   })
 })

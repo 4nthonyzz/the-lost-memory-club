@@ -16,7 +16,7 @@ const geometryOf = (p: Part) =>
     : p.metricFabric
       ? metricBoxGeometry(p.scale[0], p.scale[1], p.scale[2], FABRIC_METRES_PER_REPEAT)
       : p.metricRepeat
-        ? metricBoxGeometry(p.scale[0], p.scale[1], p.scale[2], p.metricRepeat)
+        ? metricBoxGeometry(p.scale[0], p.scale[1], p.scale[2], p.metricRepeat, false, p.metricAspect ?? 1, p.metricOffset, p.metricPlainV)
         : geometries[p.geo]
 const scaleOf = (p: Part): [number, number, number] => (isRealSizePart(p) ? [1, 1, 1] : [p.scale[0], p.scale[1], p.scale[2]])
 

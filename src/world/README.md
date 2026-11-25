@@ -13,7 +13,7 @@ Every feature below carries one of these labels.
 | **not verified** | Implemented, but no test or recorded check covers the behavior. |
 | **planned/prototype** | Not implemented, or implemented only as a stand-in. |
 
-Milestone M6, the polish pass and the spatial and visual refinement pass (media island, north-wall filing cabinets and bulletin board, wood bookcases with dense books, textured walls and rug, three arcade cabinets, ARCADE sign, dressing, re-centred console, SMPTE monitor, cables) have **no recorded browser run**. Their layout and data are verified by automated tests only; how they look and play is **not verified visually**. The same holds for task 21 (couch fix, couch fabric, CRT casing and glass textures): **not verified visually**.
+Milestone M6, the polish pass and the spatial and visual refinement pass (media island, north-wall filing cabinets and bulletin board, wood bookcases with dense books, textured walls and rug, three arcade cabinets, ARCADE sign, dressing, re-centred console, SMPTE monitor, cables) have **no recorded browser run**. Their layout and data are verified by automated tests only; how they look and play is **not verified visually**. The same holds for tasks 21 and 22 (couch fix and fabric, CRT casing and glass, VCR deck face, armchair, VHS shell textures, metal filing cabinets, cardboard crates, desk detail, doorway trim): **not verified visually**.
 
 ## Purpose and boundaries
 
@@ -114,7 +114,22 @@ Visual appearance of the M6, polish-pass, refinement-pass and three-cabinet layo
 
 ## Procedural textures
 
-26 deterministic canvas textures (`scene/proceduralTextures.ts`, `scene/sharedResources.ts`): three cabinet attract screens (`attractSnake`, `attractMaze`, `attractFrequency`, 256x256), three cabinet marquees (`marqueeSnake`, `marqueeMaze`, `marqueeFrequency`, 256x64), sign face, three posters (two ordinary, one shifted), shifted plaque, floor, wood, dark wood, crate, grille, book spine atlas, wall panel (256x256), woven rug, cork board, lamp glow, SMPTE colour bars and the timecode window, plus three added in tasks 21.1 and 21.2: `couchFabric` (256x256 woven upholstery, metric fabric UVs), `crtCasing` (256x256 charcoal casing with a generic "KV-1996" badge, metric UV, one tile across the front shell) and `crtGlass` (256x256, on the shared `crtScreen` material, which uses a white base when textured and a teal flat fallback). Earlier, 6 textures were added and 4 removed: `arcadeScreen`, `marquee`, `deck` and `outOfOrder`. The couch uses the `couchBody`, `couchCushion` and `couchPillow` materials, which take the `memoryShift` tint. The CRT casing fallback colour (no canvas) is now charcoal. Without a canvas or 2D context, materials keep flat colors. Textures are disposed on unmount, each exactly once. **verified by automated test** (`scene/proceduralTextures.test.ts`, 111 tests; `scene/modelDetail.test.ts`, 104 tests). Whether they look readable in a browser: **not verified visually** (S7 to S11 `not run`).
+30 deterministic canvas textures (`scene/proceduralTextures.ts`, `scene/sharedResources.ts`): three cabinet attract screens (`attractSnake`, `attractMaze`, `attractFrequency`, 256x256), three cabinet marquees (`marqueeSnake`, `marqueeMaze`, `marqueeFrequency`, 256x64), sign face, three posters (two ordinary, one shifted), shifted plaque, floor, wood, dark wood, crate, grille, book spine atlas, wall panel (256x256), woven rug, cork board, lamp glow, SMPTE colour bars and the timecode window, plus seven added in tasks 21 and 22. Task 21: `couchFabric` (256x256 woven upholstery, metric fabric UVs), `crtCasing` (256x256 charcoal casing with a generic "KV-1996" badge, metric UV, one tile across the front shell) and `crtGlass` (256x256, on the shared `crtScreen` material, which uses a white base when textured and a teal flat fallback). Task 22: `vcrDeck` (256x128 VCR face with PLAY, STOP, REW and EJECT buttons and a "HI-FI STEREO" label), `vhsShell` (128x128 tape shell), `metalCabinet` (256x256 filing-cabinet front) and `deskDetail` (128x64 notebook cover grain and ruled page block). Earlier, 6 textures were added and 4 removed: `arcadeScreen`, `marquee`, `deck` and `outOfOrder`.
+
+Task 22 changes (all computed from source and tests, **not verified visually**):
+
+- `corkBoard` shrank from 512x512 to 256x256 (metric UV factor k = w/512, 1.00 MB freed).
+- The reference monitor and the north-east CRT stack use `crtCasing`. The mint `casing` material is removed.
+- The VCR front uses `vcrDeck`.
+- The armchair uses `couchFabric` on the `armchairBody` and `armchairCushion` materials (slate and teal, tinted by `memoryShift`; the old green flat colour is the no-canvas fallback).
+- `vhsShell` is on `tapeBlack`; a new `tapeBlue` material carries the second tape colour.
+- `metalCabinet` is on both filing cabinets: index cards 1994 to 1996, drawer labels "TAPES 01-40", "CASE LOGS" and "MISC". The en dash in the card text is written as the escape `\u2013`. One tile spans the cabinet front with four drawer bands. Parts gained the optional fields `metricAspect`, `metricOffset` and `metricPlainV`.
+- `crate` is 256x256. Archive boxes use cardboard and the wooden crates carry a cardboard label panel (`crateWood` and `cardboard` materials). Shelf boxes use `crateWood`.
+- `deskDetail` (128x64) covers the notebook cover and ruled page block. The mug has a rim. The pencil moved because it intersected the notebook.
+- Doorway panel insets and kickplates on the pillar and jambs sit outside the openings, protrude at most 2 cm, and have no colliders.
+- The `fabric`, `fabricLight` and `casing` materials are removed.
+
+The couch uses the `couchBody`, `couchCushion` and `couchPillow` materials, which take the `memoryShift` tint. The CRT casing fallback colour (no canvas) is charcoal. Without a canvas or 2D context, materials keep flat colors. Textures are disposed on unmount, each exactly once. **verified by automated test** (`scene/proceduralTextures.test.ts`, 142 tests; `scene/modelDetail.test.ts`, 123 tests). Whether they look readable in a browser: **not verified visually** (S7 to S11 `not run`).
 
 Couch fix (task 21.1): the dark patch on the couch came from a dark "worn patch" box placed 4 mm above the middle cushion. It is removed, together with a second hidden patch. The roll caps are shortened by 4 mm to avoid coplanar faces. The pillow sits in the left seat corner; a test checks with an oriented-box (OBB) no-intersection test that it does not overlap the other couch parts. The couch has 388 triangles (was 412) and no new collider. Task 21 is **not verified visually**.
 
@@ -130,20 +145,23 @@ Dev builds only (`import.meta.env.DEV`). Run `npm run dev` and open the page wit
 
 ## Metrics
 
-Computed from declared geometry and source, **computed, not runtime-measured**. Source: `.kiro/specs/world-exploration/performance-log.md`. Figures re-checked in task 21.3 with `npx vitest run src/world/scene/modelDetail.test.ts` (104 tests passed); the console line was:
-`[18.2] computed triangles: 19128 (detail 18886 + base 242), draw-call estimate (grouped by geometry+material): 286, books 370, slipcases 136, leaning 16, per shelf shelf-a=16 draws/178 books, shelf-b=16 draws/172 books, shelf-c=16 draws/156 books, textures 26, texture memory estimate 7.58 MB`
+Computed from declared geometry and source, **computed, not runtime-measured**. Source: `.kiro/specs/world-exploration/performance-log.md`. Figures re-checked in task 22.3 with `npx vitest run src/world/scene/modelDetail.test.ts` (123 tests passed); the console line was:
+`[18.2] computed triangles: 19172 (detail 18930 + base 242), draw-call estimate (grouped by geometry+material): 319, books 370, slipcases 136, leaning 16, per shelf shelf-a=16 draws/178 books, shelf-b=16 draws/172 books, shelf-c=16 draws/156 books, textures 30, texture memory estimate 7.46 MB`
+
 | Metric | Value | Label |
 | --- | --- | --- |
-| Triangles | 19,128 (detail 18,886 + base 242), limit 20,000 | computed, not runtime-measured |
-| Draw-call grouping estimate | about 286 | computed estimate, not `renderer.info` |
+| Triangles | 19,172 (detail 18,930 + base 242), limit 20,000 | computed, not runtime-measured |
+| Draw-call grouping estimate | about 319 | computed estimate, not `renderer.info` |
 | Books | 370 (shelf-a 178, shelf-b 172, shelf-c 156) | computed |
 | Lights | 4 (1 ambient + 3 point), limit 4 | computed from source |
-| Procedural textures | 26, about 7.58 MB estimated, limit 8 MB | computed, not runtime-measured |
+| Procedural textures | 30, 7.459 MB estimated, limit 8 MB | computed, not runtime-measured |
 | Colliders | 28 | computed |
-| Targeting benchmark | informational timing only, no threshold; varies per run and machine (task 21.3 standalone run 0.451 us/call, full-suite run 1.346 us/call) | informational |
-**The triangle margin is thin:** 19,128 leaves about 870 triangles (4 percent) below the 20,000 limit. The biggest consumers (computed by summing declared objects): the three bookshelves (2,352, 2,280 and 2,088), the three cabinets (1,316 each), `console-cables` (1,088), the two filing cabinets (692 each) and the desk (672).
-**The texture margin is also thin:** 7.58 MB computed against the 8 MB limit leaves about 0.42 MB. First candidates to cut if more room is needed: `console-cables` (1,088 triangles), the book count (370 books), and `corkBoard` at 512x512 (1.33 MB), which could drop to 256x256. The per-texture list (MB, computed): attractSnake 0.25, attractMaze 0.25, attractFrequency 0.25, marqueeSnake 0.06, marqueeMaze 0.06, marqueeFrequency 0.06, signFace 0.33, posterSunset 0.66, posterReel 0.66, shiftPoster 0.66, shiftPlaque 0.17, floor 0.08, wood 0.08, woodDark 0.08, crate 0.08, grille 0.08, spineAtlas 0.66, wallPanel 0.33, rugWoven 0.33, corkBoard 1.33, lampGlow 0.02, smpteBars 0.13, timecode 0.02, couchFabric 0.33, crtCasing 0.33, crtGlass 0.25. `corkBoard` is the largest.
-No runtime measurement was taken by the agent in task 21.3. Chrome and Edge are installed, but no automation library (Playwright or Puppeteer) is present and nothing was installed. Human sign-off steps are in `performance-log.md` section 1.1; task 15.4 stays open.Runtime frame-time targets (median and 95th percentile at 1280x720 on integrated graphics, first-render time, runtime triangles and draw calls) are **not measured**. See `.kiro/specs/world-exploration/performance-log.md`. No runtime performance figure is claimed here.
+| Targeting benchmark | informational timing only, no threshold; varies per run and machine (task 22.3 standalone run 0.963 us/call, full-suite run 1.544 us/call) | informational |
+
+**The triangle margin is thin:** 19,172 leaves about 830 triangles (4 percent) below the 20,000 limit. The biggest consumers (computed by summing declared objects in task 21.3): the three bookshelves (2,352, 2,280 and 2,088), the three cabinets (1,316 each), `console-cables` (1,088), the two filing cabinets (692 each) and the desk (672); task 22 added 44 triangles in total.
+
+**The texture margin is also thin:** 7.459 MB computed against the 8 MB limit leaves about 0.54 MB. First candidates to cut if more room is needed: `console-cables` (1,088 triangles), the book count (370 books), the three 0.66 MB posters (`posterSunset`, `posterReel`, `shiftPoster`, 256x512) or `spineAtlas` (512x256, 0.66 MB), which could shrink. The per-texture list (MB, computed, not runtime-measured): attractSnake 0.25, attractMaze 0.25, attractFrequency 0.25, marqueeSnake 0.06, marqueeMaze 0.06, marqueeFrequency 0.06, signFace 0.33, posterSunset 0.66, posterReel 0.66, shiftPoster 0.66, shiftPlaque 0.17, floor 0.08, wood 0.08, woodDark 0.08, crate 0.33, grille 0.08, spineAtlas 0.66, wallPanel 0.33, rugWoven 0.33, corkBoard 0.33, lampGlow 0.02, smpteBars 0.13, timecode 0.02, couchFabric 0.33, crtCasing 0.33, crtGlass 0.25, vcrDeck 0.17, vhsShell 0.08, metalCabinet 0.33, deskDetail 0.04. The largest are the three posters and `spineAtlas` (0.66 each).
+No runtime measurement was taken by the agent in task 22.3. Chrome and Edge are installed, but no automation library (Playwright or Puppeteer) is present and nothing was installed. Human sign-off steps are in `performance-log.md` section 1.1; task 15.4 stays open. targets (median and 95th percentile at 1280x720 on integrated graphics, first-render time, runtime triangles and draw calls) are **not measured**. See `.kiro/specs/world-exploration/performance-log.md`. No runtime performance figure is claimed here.
 
 ## Disposal and edge-case checks
 
@@ -169,7 +187,7 @@ npm test
 npm run build
 ```
 
-Fresh `npm test` run for this README (task 21.3, run twice, same result; `npm run typecheck` and `npm run build` exit 0): **27 test files, 519 tests, all passed**. Files under `src/world/` and their counts:
+Fresh `npm test` run for this README (task 22.3, run twice, same result; `npm run typecheck` and `npm run build` exit 0): **27 test files, 572 tests, all passed**. Files under `src/world/` and their counts:
 
 | Area | Files (tests) |
 | --- | --- |
@@ -178,7 +196,7 @@ Fresh `npm test` run for this README (task 21.3, run twice, same result; `npm ru
 | Controller | `controller/useReducedMotion.test.ts` (8) |
 | Layout | `layout/roomLayout.test.ts` (31) |
 | Logic | `collision` (18), `frameStats` (5), `inputMode` (29), `inputMode.supplied` (17), `inputMode.fallback` (7), `inputState` (15), `look` (20), `movement` (15), `palette` (4), `palette.full` (13), `playerStep` (9), `targeting` (14), `targeting.bench` (1, informational) |
-| Scene | `effectsTiming` (8), `memoryShift` (13), `modelDetail` (104), `proceduralTextures` (111) |
+| Scene | `effectsTiming` (8), `memoryShift` (16), `modelDetail` (123), `proceduralTextures` (142) |
 
 Outside `src/world/`: `src/App.test.ts` (8, stubbed `WorldScene`) and `src/core/gameReducer.test.ts` (4). Counts change when tests are added. Details, the 17 correctness properties and gaps: `.kiro/specs/world-exploration/test-report.md`.
 

@@ -32,6 +32,8 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 
 - Approved scope change (couch and CRT craftsmanship), 2026-11-28: the couch pillow clipping and the middle-cushion artefact are fixed, and two new 256x256 textures (`couchFabric`, `crtCasing`) plus a CRT glass screen texture (scanlines, curved-glass vignette, phosphor grain) are allowed. Every new texture is registered in `sharedResources.ts` and disposed exactly once (`disposeSharedResources()` is twice-safe), with a flat-colour fallback if a texture is unavailable. `memoryShift` tints the new materials cleanly over t = 0..1. Budgets stay: fewer than 20,000 triangles (currently 19,152 computed, so geometry changes must be near zero or net-negative), at most 4 lights, texture memory at most 8 MB. `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json` and `tools/blender/` stay unchanged. No real trademarks are used; the CRT badge reads the generic "KV-1996".
 
+- Approved scope change (cohesive prop textures), 2026-11-29: `corkBoard` shrinks to 256x256. New deterministic textures are allowed: `vcrDeck` (256x128), `vhsShell` (128x128) and `metalCabinet` (256x256). `crate` is upgraded to 256x256. Small desk-clutter detail (notebook, mug) and recessed door-panel detail are allowed. The reference monitor uses the `crtCasing` look. The armchair uses `couchFabric` with metric fabric UVs and a slate/teal hue. Every new texture is registered in `sharedResources.ts` and disposed exactly once (`disposeSharedResources()` is twice-safe), with a flat-colour fallback. `memoryShift` tints the new fabric and casing materials over t = 0..1, with t = 0 exact. Budgets stay: fewer than 20,000 triangles (currently 19,128 computed, so geometry changes must be near zero), at most 4 lights, texture memory at most 8 MB (target at most 7.7 MB). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json` and `tools/blender/` stay unchanged. No real trademarks are used.
+
 ## Tasks
 
 ### Milestone 1: Playable 3D room (primitives only)
@@ -815,6 +817,45 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: documentation and the spec folder only.
     - _Requirements: 14.11, 14.12, 15.3, 15.6_
 
+### Cohesive prop textures
+
+- [x] 22. Cohesive prop texture upgrade
+  - [x] 22.1 Texture headroom, media island, armchair and VHS shells
+    - Files: `src/world/scene/proceduralTextures.ts`, `src/world/scene/sharedResources.ts`, `src/world/scene/memoryShift.ts`, `src/world/scene/modelDetail.ts`, `src/world/scene/Stations.tsx`, `src/world/scene/Props.tsx`, `src/world/scene/proceduralTextures.test.ts`, `src/world/scene/modelDetail.test.ts`, and the Memory_Shift test file (updated, not weakened).
+    - Shrink `corkBoard` from 512x512 to 256x256 and scale its pinned items by k = w/512 so proportions stay the same.
+    - Apply the `crtCasing` look to the reference monitor casing.
+    - Add a `vcrDeck` 256x128 texture: brushed dark metal, vents, PLAY / STOP / REW / EJECT markings and a "HI-FI STEREO" label.
+    - Apply `couchFabric` to the armchair with metric fabric UVs and a slate/teal hue; `memoryShift` tints it over t = 0..1 with t = 0 exact.
+    - Add a `vhsShell` 128x128 texture: ribbed shell, two reels, dust-flap seam, "TAPE 001" and "ARCHIVE" labels. Apply it to the `tape`, `tapeBlue` and tape-stack parts.
+    - Every new texture is registered in `sharedResources.ts` with a flat-colour fallback and disposed exactly once.
+    - Acceptance: triangle estimate below 20,000 (near-zero geometry change from 19,128 computed); lights at most 4; texture memory at most 8 MB (target at most 7.7 MB, computed); colliders and Station anchors unchanged; `ASSET_MANIFEST` empty.
+    - Tests: `proceduralTextures.test.ts` (determinism with a fake context, power-of-two sizes, no randomness, `corkBoard` 256x256, `vcrDeck` 256x128, `vhsShell` 128x128); `modelDetail.test.ts` (disposal once and twice-safe, texture memory budget, triangle and light budgets, colliders unchanged); Memory_Shift tint test for armchair and casing at t = 0, 0.5 and 1. Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 21.3.
+    - Boundary: render-only; `src/world/` only; no new dependency; no GLB; no real trademarks.
+    - _Requirements: 1.3, 1.4, 1.8, 9.1, 9.2, 9.8, 12.5, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 22.2 Filing cabinets, boxes, crates, desk clutter and doors
+    - Files: `src/world/scene/proceduralTextures.ts`, `src/world/scene/sharedResources.ts`, `src/world/scene/modelDetail.ts`, `src/world/scene/Props.tsx`, `src/world/scene/Room.tsx`, `src/world/scene/proceduralTextures.test.ts`, `src/world/scene/modelDetail.test.ts`.
+    - Add a `metalCabinet` 256x256 texture: painted steel grain, drawer seams, chrome label frames, index cards dated 1994-1996, "TAPES 01-40" and "CASE LOGS" labels. Apply it to the filing cabinets.
+    - Upgrade `crate` to 256x256: corrugated cardboard, packing tape, shipping label and an "ARCHIVE // HANDLE WITH CARE" stencil. Apply it to archive boxes and crates.
+    - Add notebook (ruled edges, cover grain) and mug (rim shading) detail on the desk.
+    - Add recessed door-panel and kickplate detail on the two east doors, without changing door openings or colliders.
+    - Every new or upgraded texture is registered in `sharedResources.ts` with a flat-colour fallback and disposed exactly once.
+    - Acceptance: triangle estimate below 20,000; lights at most 4; texture memory at most 8 MB (target at most 7.7 MB, computed); colliders, doorway openings and Station anchors unchanged; Memory_Shift tinting still works.
+    - Tests: `proceduralTextures.test.ts` (determinism, power-of-two sizes, no randomness, `metalCabinet` and `crate` 256x256); `modelDetail.test.ts` (disposal once and twice-safe, budgets, colliders unchanged, both doors still reachable). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 22.1.
+    - Boundary: render-only; `src/world/` only; no new dependency; no GLB; no real trademarks.
+    - _Requirements: 1.3, 1.4, 1.5, 1.8, 9.1, 9.2, 9.8, 12.5, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 22.3 Docs, metrics and verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, lights and texture memory, each labelled "computed, not runtime-measured". Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final geometry and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 22.2.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional. The 17 property-based test sub-tasks can be skipped for a faster MVP. Tasks 16.2 and 16.3 are marked `*` because they must not be implemented without approval.
@@ -870,7 +911,10 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     { "id": 38, "tasks": ["20.3"] },
     { "id": 39, "tasks": ["21.1"] },
     { "id": 40, "tasks": ["21.2"] },
-    { "id": 41, "tasks": ["21.3"] }
+    { "id": 41, "tasks": ["21.3"] },
+    { "id": 42, "tasks": ["22.1"] },
+    { "id": 43, "tasks": ["22.2"] },
+    { "id": 44, "tasks": ["22.3"] }
   ]
 }
 ```

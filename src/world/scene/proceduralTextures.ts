@@ -7,12 +7,15 @@
  *   signFace     512x128 mip       0.33 MB     posterSunset 256x512 mip  0.70 MB
  *   posterReel, shiftPoster 256x512 mip 0.70 MB each     shiftPlaque 256x128 mip 0.17 MB
  *   floor, wood, woodDark, crate, grille: 128x128 mip, 0.09 MB each     spineAtlas 512x256 mip 0.67 MB (task 18.2).
- *   Task 18.3: corkBoard 512x512 mip 1.33 MB, rugWoven 256x256 mip 0.33 MB, lampGlow 64x64 mip 0.02 MB.
+ *   Task 18.3: corkBoard (512x512 mip 1.33 MB, shrunk to 256x256 mip 0.33 MB in task 22.1), rugWoven 256x256 mip 0.33 MB, lampGlow 64x64 mip 0.02 MB.
  *   Task 19.2: wallPanel 256x256 mip 0.33 MB, smpteBars 256x128 nearest 0.13 MB, timecode 128x32 nearest 0.02 MB.
  *   Task 20.2: three attract screens 256x256 nearest 0.25 MB each and three marquees 256x64 nearest 0.06 MB each
  *   replace the old arcadeScreen, marquee, outOfOrder and deck textures.
  *   Task 21.1: couchFabric 256x256 mip 0.33 MB.
  *   Task 21.2: crtCasing 256x256 mip 0.33 MB, crtGlass 256x256 nearest 0.25 MB.
+ *   Task 22.1: vcrDeck 256x128 mip 0.17 MB, vhsShell 128x128 mip 0.08 MB.
+ *   Task 22.2: metalCabinet 256x256 mip 0.33 MB (new), crate 128x128 -> 256x256 mip 0.33 MB (+0.25 MB).
+ *   Task 22.2 part B: deskDetail 128x64 mip 0.04 MB (notebook cover grain and ruled paper).
  *   The total is checked against TEXTURE_MEMORY_BUDGET_BYTES in tests.
  */
 import { makeRng } from './effectsTiming'
@@ -78,6 +81,10 @@ export type TextureId =
   | 'couchFabric'
   | 'crtCasing'
   | 'crtGlass'
+  | 'vcrDeck'
+  | 'vhsShell'
+  | 'metalCabinet'
+  | 'deskDetail'
 
 export type TextureFilter = 'nearest' | 'mipmap'
 
@@ -609,7 +616,6 @@ export interface WoodPalette {
 
 const WOOD_LIGHT: WoodPalette = { base: '#7a5638', grain: '#4a3020', knot: '#3a2416' }
 const WOOD_DARK: WoodPalette = { base: '#4e3522', grain: '#2c1c10', knot: '#1e120a' }
-const WOOD_CRATE: WoodPalette = { base: '#947444', grain: '#5e4626', knot: '#46321a' }
 
 /** Horizontal grain lines (start and end on the same y so it tiles) with two knots and two plank seams. */
 export function drawWood(c: Ctx2D, w: number, h: number, seed: number, palette: WoodPalette = WOOD_LIGHT): void {
@@ -963,87 +969,105 @@ function tilted(c: Ctx2D, cx: number, cy: number, w: number, h: number, angle: n
   return pts
 }
 
-/** Tiny stroke handwriting: a jittery polyline with occasional pen lifts. Unreadable on purpose. */
-function scribble(c: Ctx2D, rnd: () => number, x: number, y: number, w: number, color: string, alpha = 0.85): void {
+/**
+ * Tiny stroke handwriting: a jittery polyline with occasional pen lifts. Unreadable on purpose.
+ * `k` scales the step, the jitter and the line width (1 = the 512 px authoring size).
+ */
+function scribble(c: Ctx2D, rnd: () => number, x: number, y: number, w: number, color: string, alpha = 0.85, k = 1): void {
   c.globalAlpha = alpha
   c.strokeStyle = color
-  c.lineWidth = 1
+  c.lineWidth = Math.max(1, k)
   c.beginPath()
   c.moveTo(x, y)
-  for (let xx = x + 3; xx < x + w; xx += 3) {
-    const yy = y + (rnd() - 0.5) * 5
-    if (rnd() < 0.12) c.moveTo(xx + 3, yy)
+  const step = 3 * k
+  for (let xx = x + step; xx < x + w; xx += step) {
+    const yy = y + (rnd() - 0.5) * 5 * k
+    if (rnd() < 0.12) c.moveTo(xx + step, yy)
     else c.lineTo(xx, yy)
   }
   c.stroke()
   c.globalAlpha = 1
 }
 
-function pushPin(c: Ctx2D, x: number, y: number, color: string): void {
-  disc(c, x + 2, y + 3, 5, '#000000', 0.3)
-  disc(c, x, y, 5, color)
-  disc(c, x - 1.5, y - 1.5, 1.8, '#ffffff', 0.7)
+function pushPin(c: Ctx2D, x: number, y: number, color: string, k = 1): void {
+  disc(c, x + 2 * k, y + 3 * k, 5 * k, '#000000', 0.3)
+  disc(c, x, y, 5 * k, color)
+  disc(c, x - 1.5 * k, y - 1.5 * k, 1.8 * k, '#ffffff', 0.7)
 }
 
-/** Ruled index card with a red header line, an optional title and handwriting lines. */
-function indexCard(c: Ctx2D, rnd: () => number, x: number, y: number, w: number, h: number, title: string | null, font: string, ink: string): void {
-  rect(c, x + 3, y + 4, w, h, '#000000', 0.25)
+/**
+ * Ruled index card with a red header line, an optional title and handwriting lines. Position and size are in
+ * canvas px; `k` scales the fixed offsets inside the card (shadow, header, rule spacing, margins).
+ */
+function indexCard(c: Ctx2D, rnd: () => number, x: number, y: number, w: number, h: number, title: string | null, font: string, ink: string, k = 1): void {
+  const hair = Math.max(1, k)
+  rect(c, x + 3 * k, y + 4 * k, w, h, '#000000', 0.25)
   rect(c, x, y, w, h, '#efe8cf')
-  rect(c, x, y + 18, w, 1, '#c85a5a', 0.8)
-  for (let ly = y + 32; ly < y + h - 6; ly += 13) rect(c, x + 4, ly, w - 8, 1, '#8ab0d8', 0.6)
-  if (title) text(c, title, x + w / 2, y + 9, font, ink)
-  for (let ly = y + 40; ly < y + h - 8; ly += 13) scribble(c, rnd, x + 8, ly, w - 16 - rnd() * 30, '#2a2a3a')
+  rect(c, x, y + 18 * k, w, hair, '#c85a5a', 0.8)
+  for (let ly = y + 32 * k; ly < y + h - 6 * k; ly += 13 * k) rect(c, x + 4 * k, ly, w - 8 * k, hair, '#8ab0d8', 0.6)
+  if (title) text(c, title, x + w / 2, y + 9 * k, font, ink)
+  for (let ly = y + 40 * k; ly < y + h - 8 * k; ly += 13 * k) scribble(c, rnd, x + 8 * k, ly, w - 16 * k - rnd() * 30 * k, '#2a2a3a', 0.85, k)
 }
 
-/** Polaroid: light frame, dark photo area with a simple window and silhouette, handwritten caption. */
-function polaroid(c: Ctx2D, rnd: () => number, cx: number, cy: number, w: number, h: number, angle: number): void {
-  tilted(c, cx + 3, cy + 4, w, h, angle, '#000000', 0.25)
+/** Polaroid: light frame, dark photo area with a simple window and silhouette, handwritten caption. `k` scales fixed offsets. */
+function polaroid(c: Ctx2D, rnd: () => number, cx: number, cy: number, w: number, h: number, angle: number, k = 1): void {
+  tilted(c, cx + 3 * k, cy + 4 * k, w, h, angle, '#000000', 0.25)
   tilted(c, cx, cy, w, h, angle, '#ece8dc')
-  const side = w - 16
-  const py0 = cy - h / 2 + 8 + side / 2
+  const side = w - 16 * k
+  const py0 = cy - h / 2 + 8 * k + side / 2
   tilted(c, cx, py0, side, side, angle, '#1d1a24')
   tilted(c, cx - side * 0.2, py0 - side * 0.1, side * 0.3, side * 0.36, angle, '#34344c')
   disc(c, cx + side * 0.18, py0 + side * 0.1, side * 0.13, '#0c0a10')
   rect(c, cx + side * 0.06, py0 + side * 0.2, side * 0.26, side * 0.28, '#0c0a10')
-  speckle(c, rnd, cx - side / 2 + 2, py0 - side / 2 + 2, side - 4, side - 4, 24, ['#ffffff', '#000000'], 1, 0.18)
-  scribble(c, rnd, cx - w / 2 + 12, cy + h / 2 - 12, w - 28, '#3a3a4a', 0.7)
+  speckle(c, rnd, cx - side / 2 + 2 * k, py0 - side / 2 + 2 * k, side - 4 * k, side - 4 * k, Math.max(1, Math.round(24 * k * k)), ['#ffffff', '#000000'], 1, 0.18)
+  scribble(c, rnd, cx - w / 2 + 12 * k, cy + h / 2 - 12 * k, w - 28 * k, '#3a3a4a', 0.7, k)
 }
 
-/** Sticky note: tilted coloured square with a darker lower edge and two lines of handwriting. */
-function stickyNote(c: Ctx2D, rnd: () => number, cx: number, cy: number, s: number, angle: number, color: string, edge: string): void {
-  tilted(c, cx + 2, cy + 3, s, s, angle, '#000000', 0.25)
+/** Sticky note: tilted coloured square with a darker lower edge and two lines of handwriting. `k` scales fixed offsets. */
+function stickyNote(c: Ctx2D, rnd: () => number, cx: number, cy: number, s: number, angle: number, color: string, edge: string, k = 1): void {
+  tilted(c, cx + 2 * k, cy + 3 * k, s, s, angle, '#000000', 0.25)
   tilted(c, cx, cy, s, s, angle, color)
-  tilted(c, cx, cy + s / 2 - 3, s, 6, angle, edge, 0.6)
-  scribble(c, rnd, cx - s / 2 + 8, cy - 6, s - 16, '#3a2a2a', 0.8)
-  scribble(c, rnd, cx - s / 2 + 8, cy + 8, s - 24, '#3a2a2a', 0.8)
+  tilted(c, cx, cy + s / 2 - 3 * k, s, 6 * k, angle, edge, 0.6)
+  scribble(c, rnd, cx - s / 2 + 8 * k, cy - 6 * k, s - 16 * k, '#3a2a2a', 0.8, k)
+  scribble(c, rnd, cx - s / 2 + 8 * k, cy + 8 * k, s - 24 * k, '#3a2a2a', 0.8, k)
 }
 
 /**
  * Cork bulletin board for a 1.3 m x 0.9 m plane (the canvas is square, so it is stretched about 1.44x
  * vertically; shapes are sized for that). Original content only: index cards, Polaroids, sticky notes,
  * red string between push-pins, and a few generic archive words.
+ *
+ * Task 22.1: the canvas is 256 x 256. Every coordinate, size, line width and font size was authored for 512 px
+ * and is multiplied by `k = w / 512` (same approach as drawWallPanel). Font sizes are clamped to at least 7 px
+ * so the card titles stay legible, and all lettering stays inside the canvas.
  */
 export function drawCorkBoard(c: Ctx2D, w: number, h: number, seed: number): void {
   const rnd = makeRng(seed)
+  const k = w / 512
+  const S = (n: number) => n * k
+  const lw = (n: number) => Math.max(1, n * k)
+  const sz = (n: number) => Math.max(1, Math.round(n * k))
+  const cnt = (n: number) => Math.max(1, Math.round(n * k * k))
+  const font = (n: number) => `bold ${Math.max(7, Math.round(n * k))}px monospace`
   rect(c, 0, 0, w, h, '#a47a4a')
-  speckle(c, rnd, 0, 0, w, h, 700, ['#7e5a34', '#b99060', '#5e4226', '#c8a470'], 2, 0.5)
-  speckle(c, rnd, 0, 0, w, h, 120, ['#3e2a18', '#d8b888'], 3, 0.25)
+  speckle(c, rnd, 0, 0, w, h, cnt(700), ['#7e5a34', '#b99060', '#5e4226', '#c8a470'], sz(2), 0.5)
+  speckle(c, rnd, 0, 0, w, h, cnt(120), ['#3e2a18', '#d8b888'], sz(3), 0.25)
   // Cards (axis aligned so the lettering is straight).
-  indexCard(c, rnd, 24, 28, 132, 100, 'TAPE 001', 'bold 16px monospace', '#1a1a2a')
-  indexCard(c, rnd, 292, 30, 150, 100, 'ARCHIVE 09', 'bold 16px monospace', '#1a1a2a')
-  indexCard(c, rnd, 226, 184, 164, 110, null, 'bold 13px monospace', '#8a1a1a')
-  text(c, 'WHO TAPED OVER?', 226 + 82, 184 + 9, 'bold 13px monospace', '#8a1a1a')
-  rect(c, 226 + 14, 184 + 14, 136, 2, '#8a1a1a', 0.7)
-  indexCard(c, rnd, 24, 318, 150, 110, 'DO NOT ERASE', 'bold 11px monospace', '#1a1a2a')
+  indexCard(c, rnd, S(24), S(28), S(132), S(100), 'TAPE 001', font(16), '#1a1a2a', k)
+  indexCard(c, rnd, S(292), S(30), S(150), S(100), 'ARCHIVE 09', font(16), '#1a1a2a', k)
+  indexCard(c, rnd, S(226), S(184), S(164), S(110), null, font(13), '#8a1a1a', k)
+  text(c, 'WHO TAPED OVER?', S(226 + 82), S(184 + 9), font(13), '#8a1a1a')
+  rect(c, S(226 + 14), S(184 + 14), S(136), lw(2), '#8a1a1a', 0.7)
+  indexCard(c, rnd, S(24), S(318), S(150), S(110), 'DO NOT ERASE', font(11), '#1a1a2a', k)
   // Polaroids and sticky notes.
-  polaroid(c, rnd, 224, 84, 96, 118, -0.05)
-  polaroid(c, rnd, 158, 222, 96, 118, 0.06)
-  polaroid(c, rnd, 238, 380, 96, 118, 0.04)
-  polaroid(c, rnd, 436, 392, 96, 118, -0.06)
-  stickyNote(c, rnd, 478, 66, 54, 0.08, '#f09ab0', '#c8708a')
-  stickyNote(c, rnd, 58, 204, 62, -0.07, '#f2e060', '#c8b440')
-  stickyNote(c, rnd, 448, 204, 62, 0.05, '#9ad88a', '#70b060')
-  stickyNote(c, rnd, 346, 352, 58, -0.04, '#8ac8e8', '#5a9cc0')
+  polaroid(c, rnd, S(224), S(84), S(96), S(118), -0.05, k)
+  polaroid(c, rnd, S(158), S(222), S(96), S(118), 0.06, k)
+  polaroid(c, rnd, S(238), S(380), S(96), S(118), 0.04, k)
+  polaroid(c, rnd, S(436), S(392), S(96), S(118), -0.06, k)
+  stickyNote(c, rnd, S(478), S(66), S(54), 0.08, '#f09ab0', '#c8708a', k)
+  stickyNote(c, rnd, S(58), S(204), S(62), -0.07, '#f2e060', '#c8b440', k)
+  stickyNote(c, rnd, S(448), S(204), S(62), 0.05, '#9ad88a', '#70b060', k)
+  stickyNote(c, rnd, S(346), S(352), S(58), -0.04, '#8ac8e8', '#5a9cc0', k)
   // Red string between push-pins, as straight segments.
   const pins = {
     a: [90, 34], b: [224, 32], c: [367, 36], d: [478, 44], e: [308, 190], f: [158, 170],
@@ -1056,12 +1080,12 @@ export function drawCorkBoard(c: Ctx2D, w: number, h: number, seed: number): voi
   for (const [from, to] of links) {
     const p = pins[from]
     const q = pins[to]
-    line(c, p[0] + 1, p[1] + 2, q[0] + 1, q[1] + 2, '#000000', 1.5, 0.25)
-    line(c, p[0], p[1], q[0], q[1], '#c42222', 1.5, 0.92)
+    line(c, S(p[0] + 1), S(p[1] + 2), S(q[0] + 1), S(q[1] + 2), '#000000', lw(1.5), 0.25)
+    line(c, S(p[0]), S(p[1]), S(q[0]), S(q[1]), '#c42222', lw(1.5), 0.92)
   }
   const pinColors = ['#d62a2a', '#2a5ad6', '#e8c42a', '#2aa84a'] as const
-  Object.values(pins).forEach((p, i) => pushPin(c, p[0], p[1], pinColors[i % pinColors.length]))
-  vignette(c, w, h, 24, 0.35)
+  Object.values(pins).forEach((p, i) => pushPin(c, S(p[0]), S(p[1]), pinColors[i % pinColors.length], k))
+  vignette(c, w, h, S(24), 0.35)
 }
 
 /** Soft warm halo for the additive lamp glow planes: concentric translucent discs on a transparent canvas. */
@@ -1280,6 +1304,289 @@ export function drawCrtGlass(c: Ctx2D, w: number, h: number, seed: number): void
 }
 
 // ---------------------------------------------------------------------------------------------
+// Task 22.1: VCR deck housing and VHS cassette shell
+// ---------------------------------------------------------------------------------------------
+
+/** Transport button labels printed under the VCR buttons, left to right. */
+export const VCR_BUTTON_LABELS = ['PLAY', 'STOP', 'REW', 'EJECT'] as const
+/** Generic marking on the VCR front. Not a real trademark. */
+export const VCR_MARK_TEXT = 'HI-FI STEREO'
+/** The VCR texture tile is 0.62 m wide (the VCR width) and 0.31 m tall: 2.4 mm per px in both axes. */
+export const VCR_TILE_METRES = 0.62
+export const VCR_TILE_ASPECT = 0.5
+
+/**
+ * VCR housing, 256 x 128. The housing part uses metric UVs with repeat = 0.62 m (the VCR width) and a 0.5
+ * aspect, so one tile is 0.62 x 0.31 m and a px is 2.4 mm in both axes (text is not stretched). Layout:
+ *  - the front face (0.1 m tall) shows canvas rows 87..128. The front-face button parts sit at x px 161 + 18.6 i,
+ *    rows 109..118, so the four labels are printed below them (row 123) and "HI-FI STEREO" at the left;
+ *  - the chrome trim line runs along the top front edge (row 88);
+ *  - top and side faces show the rest, so the ventilation slots sit in rows 24..78 (top face middle).
+ * Near-neutral dark metal: the material multiplier is white, so this is what the player sees.
+ */
+export function drawVcrDeck(c: Ctx2D, w: number, h: number, seed: number): void {
+  const rnd = makeRng(seed)
+  rect(c, 0, 0, w, h, '#2c2e35')
+  // Brushed grain: one faint light or dark streak per row, plus short brighter strokes.
+  for (let y = 0; y < h; y++) rect(c, 0, y, w, 1, rnd() < 0.5 ? '#14151a' : '#7a7e88', 0.05 + rnd() * 0.09)
+  for (let i = 0; i < 70; i++) {
+    const len = 18 + Math.floor(rnd() * 44)
+    rect(c, Math.floor(rnd() * (w - len)), Math.floor(rnd() * h), len, 1, '#9096a2', 0.12)
+  }
+  // Ventilation slots: two banks of six slots with a lower highlight lip.
+  for (const x0 of [24, 152]) {
+    for (let r = 0; r < 6; r++) {
+      const y = 24 + r * 10
+      rect(c, x0, y, 80, 4, '#07070a', 0.92)
+      rect(c, x0, y + 4, 80, 1, '#9096a2', 0.3)
+    }
+  }
+  // Front: chrome trim at the top edge, then buttons with labels.
+  rect(c, 0, 88, w, 1, '#e4e8f0', 0.85)
+  rect(c, 0, 89, w, 1, '#08080b', 0.6)
+  VCR_BUTTON_LABELS.forEach((label, i) => {
+    const bx = 161 + i * 18.6
+    rect(c, bx - 7.25, 109.4, 14.5, 8.3, '#101116', 0.9)
+    frame(c, bx - 7.25, 109.4, 14.5, 8.3, '#9096a2', 1, 0.6)
+    text(c, label, bx, 123, 'bold 6px monospace', '#e8ecf4', 0.95)
+  })
+  text(c, VCR_MARK_TEXT, 70, 123, 'bold 6px monospace', '#d6dae4', 0.9)
+  rect(c, 14, 126, 112, 1, '#e4e8f0', 0.35)
+  speckle(c, rnd, 0, 0, w, h, 120, ['#000000', '#c8ccd6'], 1, 0.1)
+}
+
+/** Tape labels written on the cassette shell. */
+export const VHS_LABEL_TEXTS = ['TAPE 001', 'ARCHIVE'] as const
+
+/** Text with a hand-written slant (a shear) when the context can transform; plain text otherwise. */
+function handText(c: Ctx2D, s: string, x: number, y: number, font: string, color: string, alpha = 1, slant = -0.22): void {
+  if (!c.setTransform) {
+    text(c, s, x, y, font, color, alpha)
+    return
+  }
+  c.save()
+  // x' = x + slant * (y' - y): the baseline row stays put and the top leans right.
+  c.setTransform(1, 0, slant, 1, -slant * y, 0)
+  text(c, s, x, y, font, color, alpha)
+  c.restore()
+}
+
+/**
+ * VHS cassette shell, 128 x 128, near-neutral light-grey plastic: the material multiplier (tape black or tape
+ * navy) sets the colour, so the detail reads as darker and lighter tones of it. A part uses metric UVs with
+ * repeat = its length (x), so one tile spans the cassette length (0.19 m, 1.5 mm per px) and:
+ *  - the top face (0.1 m deep) shows rows 61..128: dust-flap seam at the front (row 69), a handwritten
+ *    "TAPE 001" label strip, then a window (rows 88..107) with two tape reels;
+ *  - the long side faces and the ends (0.03 m tall) show rows 108..128: ribbed plastic with a "ARCHIVE"
+ *    spine label.
+ */
+export function drawVhsShell(c: Ctx2D, w: number, h: number, seed: number): void {
+  const rnd = makeRng(seed)
+  rect(c, 0, 0, w, h, '#a4a4ac')
+  speckle(c, rnd, 0, 0, w, h, 90, ['#ffffff', '#6a6a72'], 1, 0.12)
+  // Ribbed plastic: vertical grooves on the rows that face the sides, and above the label area.
+  for (let x = 2; x < w; x += 4) {
+    rect(c, x, 108, 1, h - 108, '#3a3a42', 0.28)
+    rect(c, x + 1, 108, 1, h - 108, '#ffffff', 0.1)
+    rect(c, x, 0, 1, 60, '#3a3a42', 0.2)
+  }
+  // Dust flap along the front edge: a darker band, a seam line, hinge marks.
+  rect(c, 0, 61, w, 8, '#7e7e88', 0.6)
+  rect(c, 0, 69, w, 1, '#101014', 0.85)
+  rect(c, 0, 70, w, 1, '#ffffff', 0.25)
+  for (const x of [8, 120]) rect(c, x, 63, 2, 5, '#2a2a30', 0.8)
+  // Handwritten label strip on the top face.
+  rect(c, 12, 72, 104, 14, '#e6e2d2')
+  rect(c, 12, 72, 104, 1, '#b84a4a', 0.7)
+  handText(c, VHS_LABEL_TEXTS[0], 42, 80, 'bold 8px monospace', '#1a1a2a', 0.95)
+  scribble(c, rnd, 70, 80, 40, '#2a2a3a', 0.8)
+  // Window with two reels (arcs), the tape path between them and a lower edge highlight.
+  rect(c, 14, 88, 100, 20, '#202026')
+  frame(c, 14, 88, 100, 20, '#e0e0e8', 1, 0.5)
+  for (const cx of [40, 88]) {
+    disc(c, cx, 98, 8, '#5c6068')
+    ring(c, cx, 98, 8, '#c8ccd6', 1, 0.8)
+    for (let a = 0; a < 3; a++) {
+      const ang = (a * TAU) / 3
+      line(c, cx, 98, cx + Math.cos(ang) * 6, 98 + Math.sin(ang) * 6, '#16161a', 1, 0.9)
+    }
+    disc(c, cx, 98, 2.5, '#16161a')
+  }
+  line(c, 48, 105, 80, 105, '#0c0c10', 1, 0.8)
+  // Spine label on the side rows.
+  rect(c, 14, 111, 100, 13, '#e6e2d2')
+  rect(c, 14, 111, 100, 1, '#b84a4a', 0.7)
+  handText(c, VHS_LABEL_TEXTS[1], 40, 118, 'bold 8px monospace', '#1a1a2a', 0.95)
+  scribble(c, rnd, 66, 118, 44, '#2a2a3a', 0.8)
+}
+
+// ---------------------------------------------------------------------------------------------
+// Task 22.2: cardboard crate, painted-steel filing cabinet and desk detail
+// ---------------------------------------------------------------------------------------------
+
+/** Stencilled lettering printed along the bottom of the cardboard texture. */
+export const CRATE_STENCIL_TEXT = 'ARCHIVE // HANDLE WITH CARE'
+/** Small header printed on the white shipping label. */
+export const CRATE_LABEL_HEADER = 'SHIP TO'
+
+/**
+ * Corrugated cardboard, 256 x 256 (id `crate`, upgraded from 128 x 128 wood in task 22.2). Metric UVs use
+ * repeat = the box width (archive boxes) or the label panel width (crates), so one tile spans the front and
+ * the pixels stay square. Only the lower part (canvas rows 128..255, v 0..0.5) is visible on the smallest
+ * boxes, so every decal sits there:
+ *  - fine vertical flute lines and paper speckle over the whole tile;
+ *  - a semi-transparent brown packing-tape band down the middle (x 112..143) and one across (rows 104..117);
+ *  - a white shipping label (x 12..107, rows 136..203) with a header, address lines and a barcode-like stroke pattern;
+ *  - two "this way up" arrows on the right;
+ *  - the stencil text on row 232.
+ */
+export function drawCrate(c: Ctx2D, w: number, h: number, seed: number): void {
+  const rnd = makeRng(seed)
+  rect(c, 0, 0, w, h, '#b48d5e')
+  // Flutes: alternating dark and light vertical lines every 4 px.
+  for (let x = 0; x < w; x += 4) {
+    rect(c, x, 0, 1, h, '#6e5330', 0.14 + rnd() * 0.1)
+    rect(c, x + 2, 0, 1, h, '#e2c490', 0.1)
+  }
+  // Paper speckle and a few darker blotches.
+  speckle(c, rnd, 0, 0, w, h, 420, ['#5a4326', '#ecd3a4'], 1, 0.2)
+  for (let i = 0; i < 12; i++) rect(c, Math.floor(rnd() * (w - 40)), Math.floor(rnd() * (h - 12)), 20 + Math.floor(rnd() * 20), 6 + Math.floor(rnd() * 6), '#7a5c34', 0.06)
+  // Packing tape: a vertical centre band and a horizontal band, semi-transparent, with a shine edge.
+  rect(c, 112, 0, 32, h, '#7a5524', 0.42)
+  rect(c, 112, 0, 1, h, '#3a2810', 0.4)
+  rect(c, 143, 0, 1, h, '#3a2810', 0.4)
+  rect(c, 116, 0, 2, h, '#f0d8a0', 0.18)
+  rect(c, 0, 104, w, 14, '#7a5524', 0.4)
+  rect(c, 0, 104, w, 1, '#3a2810', 0.35)
+  rect(c, 0, 117, w, 1, '#3a2810', 0.35)
+  // Shipping label: white sheet, header, address lines and a barcode.
+  rect(c, 12, 136, 96, 68, '#f0eee6')
+  frame(c, 12.5, 136.5, 95, 67, '#8a8a90', 1, 0.7)
+  text(c, CRATE_LABEL_HEADER, 38, 145, 'bold 7px monospace', '#2a2a30', 0.9)
+  for (let i = 0; i < 3; i++) rect(c, 20, 153 + i * 5, 50 + Math.floor(rnd() * 26), 2, '#4a4a54', 0.7)
+  let bx = 20
+  for (let i = 0; bx < 98; i++) {
+    const bw = 1 + Math.floor(rnd() * 3)
+    if (i % 2 === 0) rect(c, bx, 175, bw, 22, '#14141a', 0.92)
+    bx += bw + 1
+  }
+  // "This way up" arrows.
+  for (const x of [168, 210]) {
+    triangle(c, [[x, 142], [x - 11, 160], [x + 11, 160]], '#3a2a14', 0.7)
+    rect(c, x - 4, 160, 8, 26, '#3a2a14', 0.7)
+  }
+  // Stencil lettering with a slightly lighter drop edge.
+  text(c, CRATE_STENCIL_TEXT, 128.5, 233, 'bold 12px monospace', '#f0d8a0', 0.25)
+  text(c, CRATE_STENCIL_TEXT, 128, 232, 'bold 12px monospace', '#2a2016', 0.85)
+}
+
+/** Printed on the typed index cards, top drawer first. The dash is an en dash, written as the escape \u2013 in source. */
+export const CABINET_CARD_TEXTS = ['1994\u20131996', 'TAPES 01\u201340', 'CASE LOGS', 'MISC'] as const
+
+/**
+ * Metric frame of the filing-cabinet texture: one tile spans the cabinet body front (0.5 m wide, 1.31 m tall, the
+ * four drawer bands). Pixels are therefore 2 mm wide and 5.1 mm tall; lettering is pre-squashed to compensate.
+ */
+export const CABINET_TILE_WIDTH_M = 0.5
+export const CABINET_TILE_HEIGHT_M = 1.31
+/** Drawer count of the tile (equal horizontal bands, bottom drawer first in v). */
+export const CABINET_DRAWER_BANDS = 4
+/** Label frame and card sizes in metres on the drawer front, and the card centre above the drawer centre as a tile fraction. */
+export const CABINET_FRAME_M = { w: 0.28, h: 0.09 } as const
+export const CABINET_CARD_M = { w: 0.23, h: 0.056 } as const
+export const CABINET_CARD_V_OFFSET = 0.065
+/** Rows 238..251 of the canvas hold only brushed steel (no seam, card or frame): used for strips, sides and the top lip. v range. */
+export const CABINET_PLAIN_V = [(256 - 252) / 256, (256 - 238) / 256] as const
+
+/** Centre of drawer `i` (0 = bottom) card as a tile v fraction (0 = bottom of the body front). */
+export const cabinetCardV = (i: number): number => (i + 0.5) / CABINET_DRAWER_BANDS + CABINET_CARD_V_OFFSET
+
+/** Text squashed vertically by `sy` (keeps the baseline row); plain text when the context cannot transform. */
+function squashedText(c: Ctx2D, s: string, x: number, y: number, font: string, color: string, sy: number, fallbackFont: string): void {
+  if (!c.setTransform) {
+    text(c, s, x, y, fallbackFont, color)
+    return
+  }
+  c.save()
+  c.setTransform(1, 0, 0, sy, 0, y * (1 - sy))
+  text(c, s, x, y, font, color)
+  c.restore()
+}
+
+/**
+ * Painted steel filing cabinet, 256 x 256, near-neutral light grey so the existing flat colours (as
+ * multipliers) set the two greys. One tile spans the cabinet body front (see CABINET_TILE_*): the canvas is cut
+ * into four 64-row drawer bands. Contents:
+ *  - fine vertical brushing and faint paint mottling;
+ *  - recessed seams (dark bands with a lower highlight) at rows 64, 128 and 192, and gap lines near both sides;
+ *  - one chrome label frame (light border, darker inset) per band holding a typed index card with CABINET_CARD_TEXTS;
+ *  - rows 238..251 stay plain steel (CABINET_PLAIN_V).
+ */
+export function drawMetalCabinet(c: Ctx2D, w: number, h: number, seed: number): void {
+  const rnd = makeRng(seed)
+  const px = (m: number) => (m / CABINET_TILE_WIDTH_M) * w
+  const py = (m: number) => (m / CABINET_TILE_HEIGHT_M) * h
+  rect(c, 0, 0, w, h, '#cdd0d6')
+  for (let x = 0; x < w; x++) rect(c, x, 0, 1, h, rnd() < 0.5 ? '#ffffff' : '#4a4e56', 0.03 + rnd() * 0.05)
+  for (let i = 0; i < 36; i++) rect(c, Math.floor(rnd() * (w - 30)), Math.floor(rnd() * (h - 20)), 16 + Math.floor(rnd() * 14), 8 + Math.floor(rnd() * 12), rnd() < 0.5 ? '#ffffff' : '#6a6e78', 0.045)
+  // Seams between the four drawers (kept away from the plain rows 238..251).
+  const band = h / CABINET_DRAWER_BANDS
+  for (let k = 1; k < CABINET_DRAWER_BANDS; k++) {
+    const y = k * band
+    rect(c, 0, y - 3, w, 2, '#5a5e66', 0.45)
+    rect(c, 0, y - 1, w, 3, '#101216', 0.85)
+    rect(c, 0, y + 2, w, 1, '#ffffff', 0.3)
+  }
+  // Drawer side gaps.
+  for (const x of [Math.round(px(0.015)), w - Math.round(px(0.015)) - 1]) {
+    for (let k = 0; k < CABINET_DRAWER_BANDS; k++) rect(c, x, k * band + 6, 1, band - 28, '#14161a', 0.35)
+  }
+  // Label frames and typed cards, top drawer first.
+  const sy = py(1) / px(1)
+  const fw = px(CABINET_FRAME_M.w)
+  const fh = py(CABINET_FRAME_M.h)
+  const cw = px(CABINET_CARD_M.w)
+  const ch = py(CABINET_CARD_M.h)
+  CABINET_CARD_TEXTS.forEach((label, d) => {
+    const yc = (1 - cabinetCardV(CABINET_DRAWER_BANDS - 1 - d)) * h
+    const x0 = w / 2 - fw / 2
+    rect(c, x0, yc - fh / 2, fw, fh, '#eef0f4')
+    frame(c, x0 + 0.5, yc - fh / 2 + 0.5, fw - 1, fh - 1, '#7c818c', 1, 0.9)
+    rect(c, x0 + 3, yc - fh / 2 + 2, fw - 6, fh - 4, '#3c4048')
+    rect(c, w / 2 - cw / 2, yc - ch / 2, cw, ch, '#f0ead2')
+    rect(c, w / 2 - cw / 2, yc + ch / 2 - 1, cw, 1, '#b8a888', 0.7)
+    squashedText(c, label, w / 2, yc, 'bold 15px monospace', '#24242c', sy, 'bold 8px monospace')
+  })
+  speckle(c, rnd, 0, 0, w, h, 90, ['#000000', '#ffffff'], 1, 0.08)
+}
+
+/** Metres covered by one deskDetail tile width. Cell width is half of it, so each 64 px cell covers DESK_DETAIL_TILE_M / 2. */
+export const DESK_DETAIL_TILE_M = 0.44
+/** Tile height over width of the 128 x 64 deskDetail texture. */
+export const DESK_DETAIL_ASPECT = 0.5
+/** First canvas row of the page-edge stripes at the bottom of the ruled-paper cell (v 0..0.0625). */
+export const DESK_DETAIL_EDGE_ROW = 60
+
+/**
+ * Desk clutter detail, 128 x 64 (task 22.2 part B). Two 64 x 64 cells side by side:
+ *  - left (x 0..63): notebook cover grain, light neutral grey so the material multiplier sets the colour;
+ *  - right (x 64..127): ruled paper with 13 blue-grey lines every 4 rows, a red margin line at x 73 and, in the
+ *    bottom four rows (DESK_DETAIL_EDGE_ROW..63), alternating light/dark page edges that show on the side of the page block.
+ */
+export function drawDeskDetail(c: Ctx2D, w: number, h: number, seed: number): void {
+  const rnd = makeRng(seed)
+  const cell = w / 2
+  rect(c, 0, 0, cell, h, '#c9ccd0')
+  for (let y = 0; y < h; y++) rect(c, 0, y, cell, 1, rnd() < 0.5 ? '#ffffff' : '#3a3d44', 0.04 + rnd() * 0.07)
+  for (let x = 0; x < cell; x += 3) rect(c, x, 0, 1, h, rnd() < 0.5 ? '#ffffff' : '#3a3d44', 0.03 + rnd() * 0.04)
+  speckle(c, rnd, 0, 0, cell, h, 70, ['#000000', '#ffffff'], 1, 0.1)
+  rect(c, cell, 0, cell, h, '#e6dfc6')
+  speckle(c, rnd, cell, 0, cell, h, 40, ['#b8ad8c', '#fffaf0'], 1, 0.12)
+  for (let k = 0; k < 13; k++) rect(c, cell, 6 + k * 4, cell, 1, '#7f93b0', 0.75)
+  rect(c, cell + 9, 0, 1, DESK_DETAIL_EDGE_ROW, '#c0605a', 0.7)
+  for (let y = DESK_DETAIL_EDGE_ROW; y < h; y++) rect(c, cell, y, cell, 1, y % 2 ? '#bfb698' : '#f4eedb')
+}
+
 // Table, memory estimate
 // ---------------------------------------------------------------------------------------------
 
@@ -1298,18 +1605,22 @@ export const TEXTURE_SPECS: Readonly<Record<TextureId, TextureSpec>> = Object.fr
   floor: { id: 'floor', width: 128, height: 128, filter: 'mipmap', wrap: 'repeat', seed: 108, draw: drawFloor },
   wood: { id: 'wood', width: 128, height: 128, filter: 'mipmap', wrap: 'repeat', seed: 109, draw: (c, w, h, s) => drawWood(c, w, h, s, WOOD_LIGHT) },
   woodDark: { id: 'woodDark', width: 128, height: 128, filter: 'mipmap', wrap: 'repeat', seed: 110, draw: (c, w, h, s) => drawWood(c, w, h, s, WOOD_DARK) },
-  crate: { id: 'crate', width: 128, height: 128, filter: 'mipmap', wrap: 'repeat', seed: 111, draw: (c, w, h, s) => drawWood(c, w, h, s, WOOD_CRATE) },
+  crate: { id: 'crate', width: 256, height: 256, filter: 'mipmap', wrap: 'repeat', seed: 111, draw: drawCrate },
   grille: { id: 'grille', width: 128, height: 128, filter: 'mipmap', wrap: 'clamp', seed: 112, draw: drawGrille },
   spineAtlas: { id: 'spineAtlas', width: SPINE_ATLAS_WIDTH, height: SPINE_ATLAS_HEIGHT, filter: 'mipmap', wrap: 'clamp', seed: 114, draw: drawSpineAtlas },
   wallPanel: { id: 'wallPanel', width: 256, height: 256, filter: 'mipmap', wrap: 'repeat', seed: 115, draw: drawWallPanel },
   rugWoven: { id: 'rugWoven', width: 256, height: 256, filter: 'mipmap', wrap: 'clamp', seed: 116, draw: drawRugWoven },
-  corkBoard: { id: 'corkBoard', width: 512, height: 512, filter: 'mipmap', wrap: 'clamp', seed: 117, draw: drawCorkBoard },
+  corkBoard: { id: 'corkBoard', width: 256, height: 256, filter: 'mipmap', wrap: 'clamp', seed: 117, draw: drawCorkBoard },
   lampGlow: { id: 'lampGlow', width: 64, height: 64, filter: 'mipmap', wrap: 'clamp', seed: 118, draw: drawLampGlow },
   smpteBars: { id: 'smpteBars', width: 256, height: 128, filter: 'nearest', wrap: 'clamp', seed: 119, draw: drawSmpteBars },
   timecode: { id: 'timecode', width: 128, height: 32, filter: 'nearest', wrap: 'clamp', seed: 121, draw: drawTimecode },
   couchFabric: { id: 'couchFabric', width: 256, height: 256, filter: 'mipmap', wrap: 'repeat', seed: 126, draw: drawCouchFabric },
   crtCasing: { id: 'crtCasing', width: 256, height: 256, filter: 'mipmap', wrap: 'clamp', seed: 127, draw: drawCrtCasing },
   crtGlass: { id: 'crtGlass', width: 256, height: 256, filter: 'nearest', wrap: 'clamp', seed: 128, draw: drawCrtGlass },
+  vcrDeck: { id: 'vcrDeck', width: 256, height: 128, filter: 'mipmap', wrap: 'repeat', seed: 129, draw: drawVcrDeck },
+  vhsShell: { id: 'vhsShell', width: 128, height: 128, filter: 'mipmap', wrap: 'clamp', seed: 130, draw: drawVhsShell },
+  metalCabinet: { id: 'metalCabinet', width: 256, height: 256, filter: 'mipmap', wrap: 'repeat', seed: 131, draw: drawMetalCabinet },
+  deskDetail: { id: 'deskDetail', width: 128, height: 64, filter: 'mipmap', wrap: 'repeat', seed: 132, draw: drawDeskDetail },
 })
 
 export const TEXTURE_IDS = Object.keys(TEXTURE_SPECS) as TextureId[]

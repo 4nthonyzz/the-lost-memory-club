@@ -465,7 +465,7 @@ export function shelfContents(id: string, box: Aabb, height: number): ShelfConte
       const bd = Math.min(0.17, zf - z0 - 0.01)
       const zc = zf - bd / 2
       const cx = cur + W / 2
-      const p = (lx: number, y: number, lz: number, sx: number, sy: number, sz: number) => boxParts.push(localPart(g, 'crate', lx, y, lz, sx, sy, sz))
+      const p = (lx: number, y: number, lz: number, sx: number, sy: number, sz: number) => boxParts.push(localPart(g, 'crateWood', lx, y, lz, sx, sy, sz))
       p(cx, floor + wall / 2, zc, W - 2 * wall, wall, bd - 2 * wall)
       p(cur + wall / 2, floor + wallH / 2, zc, wall, wallH, bd)
       p(cur + W - wall / 2, floor + wallH / 2, zc, wall, wallH, bd)

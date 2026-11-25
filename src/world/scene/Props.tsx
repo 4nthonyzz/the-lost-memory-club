@@ -21,7 +21,7 @@ import {
 import { assetPlacement } from './assetPlacement'
 import { BookMeshes, PartMeshes } from './PartMeshes'
 import { Block } from './Room'
-import { ensureSharedTextures, geometries, hasSharedTexture, materials } from './sharedResources'
+import { ensureSharedTextures, geometries, hasSharedTexture, materials, metricBoxGeometry } from './sharedResources'
 import { Faced } from './Stations'
 
 function propById(id: string): PropDef {
@@ -100,6 +100,10 @@ function Details() {
   const sx = (stack.box.minX + stack.box.maxX) / 2
   const sz = (stack.box.minZ + stack.box.maxZ) / 2
   const posters = useMemo(posterParts, [])
+  // Real-size cassette box with metric UVs (one vhsShell tile spans the cassette length), shared by the three tapes.
+  const stackW = stack.box.maxX - stack.box.minX
+  const stackD = stack.box.maxZ - stack.box.minZ
+  const tapeGeometry = useMemo(() => metricBoxGeometry(stackW, 0.04, stackD, stackW), [stackW, stackD])
   return (
     <group>
       {/* Rug decal under the island, from the layout */}
@@ -121,10 +125,9 @@ function Details() {
       {[0, 1, 2].map((i) => (
         <mesh
           key={i}
-          geometry={geometries.box}
+          geometry={tapeGeometry}
           material={materials.tapeBlack}
           position={[sx, DESK_TOP + 0.02 + i * 0.05, sz]}
-          scale={[stack.box.maxX - stack.box.minX, 0.04, stack.box.maxZ - stack.box.minZ]}
         />
       ))}
       {/* Framed posters: textured planes inside four-piece wooden frames */}

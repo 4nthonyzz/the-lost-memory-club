@@ -242,3 +242,44 @@ describe('mixHex', () => {
     expect(mixHex('#000000', '#ffffff', 0.5)).toBe('#808080')
   })
 })
+
+describe('task 22.1: armchair upholstery tint', () => {
+  const keys = ['armchairBody', 'armchairCushion'] as const
+  const lum = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).reduce((a, b) => a + b, 0)
+  const targets = (textured: boolean) =>
+    keys.map((k) => ({ material: { color: new FakeColor() }, baseColor: couchBaseColor(k, textured) }))
+
+  it('keeps the previous green armchair colours as the flat fallback and a lifted slate/teal when textured', () => {
+    expect(COUCH_FABRIC_COLORS.armchairBody.flat).toBe('#3d5a4c')
+    expect(COUCH_FABRIC_COLORS.armchairCushion.flat).toBe('#4f7561')
+    expect(COUCH_FABRIC_COLORS.armchairBody.textured).toBe('#63848c')
+    expect(COUCH_FABRIC_COLORS.armchairCushion.textured).toBe('#779ba0')
+    for (const k of keys) {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(COUCH_FABRIC_COLORS[k].textured.slice(i, i + 2), 16))
+      expect(b).toBeGreaterThanOrEqual(r) // teal/slate: blue not below red
+      expect(g).toBeGreaterThan(r)
+    }
+  })
+
+  it.each([false, true])('t = 0 is exactly the base, t = 1 darker and duller, t = 0.5 between (textured: %s)', (textured) => {
+    const list = targets(textured)
+    const t = makeTargets()
+    t.couch = list
+    applyShift(0, t)
+    list.forEach((s) => expect(s.material.color.hex).toBe(s.baseColor))
+    applyShift(1, t)
+    list.forEach((s) => {
+      expect(s.material.color.hex).toBe(couchShiftColor(s.baseColor))
+      expect(lum(s.material.color.hex)).toBeLessThan(lum(s.baseColor))
+    })
+    applyShift(0.5, t)
+    list.forEach((s) => {
+      const mid = s.material.color.hex
+      expect(mid).toBe(mixHex(s.baseColor, couchShiftColor(s.baseColor), 0.5))
+      expect(lum(mid)).toBeLessThan(lum(s.baseColor))
+      expect(lum(mid)).toBeGreaterThan(lum(couchShiftColor(s.baseColor)))
+    })
+    applyShift(0, t)
+    list.forEach((s) => expect(s.material.color.hex).toBe(s.baseColor))
+  })
+})

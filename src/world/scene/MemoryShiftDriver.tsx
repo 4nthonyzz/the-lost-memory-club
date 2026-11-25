@@ -58,7 +58,7 @@ export function MemoryShiftDriver({ memoryShifted, ambientRef, pointRefs, pointB
         { material: materials.arcadeScreenFrequency, baseColor: arcadeScreenBaseColor('frequency', materials.arcadeScreenFrequency.map !== null) },
       ],
       overlays: overlayMaterials,
-      couch: (['couchBody', 'couchCushion', 'couchPillow'] as const).map((key) => ({
+      couch: (['couchBody', 'couchCushion', 'couchPillow', 'armchairBody', 'armchairCushion'] as const).map((key) => ({
         material: materials[key],
         baseColor: couchBaseColor(key, materials[key].map !== null),
       })),

@@ -10,7 +10,7 @@
 import { ROOM } from '../layout/roomLayout'
 import type { Aabb, ArcadeGameKind } from '../worldTypes'
 import { facingFrame } from './assetPlacement'
-import { TEXTURE_IDS, totalTextureMemoryBytes } from './proceduralTextures'
+import { CABINET_CARD_M, CABINET_PLAIN_V, DESK_DETAIL_ASPECT, DESK_DETAIL_TILE_M, TEXTURE_IDS, VCR_TILE_ASPECT, totalTextureMemoryBytes } from './proceduralTextures'
 import { SHELF_IDS, shelfContents, shelfFrameParts } from './shelfModel'
 import type { geometries, materials } from './sharedResources'
 
@@ -41,14 +41,33 @@ export interface Part {
    * front-face width.
    */
   metricRepeat?: number
+  /**
+   * Tile height over tile width for a non-square texture used with metricRepeat (task 22.1): the vcrDeck is
+   * 256 x 128, so its aspect is 0.5 and a px covers the same metres in both axes. Default 1.
+   */
+  metricAspect?: number
+  /**
+   * UV origin shift in metres (task 22.2), added to the in-plane face coordinates (a, b) before dividing by the repeat. Lets a part show a chosen
+   * region of a shared tile: a drawer of the filing-cabinet front. Needs metricRepeat.
+   */
+  metricOffset?: readonly [number, number]
+  /**
+   * With metricOffset (task 22.2): v range of a plain-steel stripe of the tile. Every face except +-z then shows only that stripe, so
+   * the sides, top and thin strips of a cabinet never show cards or seams. Used by the filing cabinets.
+   */
+  metricPlainV?: readonly [number, number]
 }
 
 /** True when the part is rendered from a cached real-size geometry (mesh scale 1). */
 export const isRealSizePart = (p: Part): boolean => Boolean(p.metric || p.metricFabric || p.metricRepeat)
 
-/** Draw-call group of a part: geometry + material, plus the board size for metric parts. */
+/** Draw-call group of a part: geometry + material, plus the board size and the UV mapping for metric parts. */
 export function partGroupKey(p: Part): string {
-  return isRealSizePart(p) ? `${p.geo}|${p.mat}|${p.scale.map((v) => Math.round(v * 1e4)).join(',')}` : `${p.geo}|${p.mat}`
+  if (!isRealSizePart(p)) return `${p.geo}|${p.mat}`
+  const size = p.scale.map((v) => Math.round(v * 1e4)).join(',')
+  const aspect = p.metricAspect && p.metricAspect !== 1 ? `|a${p.metricAspect}` : ''
+  const offset = p.metricOffset ? `|o${p.metricOffset.map((v) => Math.round(v * 1e4)).join(',')}` : ''
+  return `${p.geo}|${p.mat}|${size}${aspect}${offset}`
 }
 
 /** Triangles per shared unit geometry. A test checks these against the real three.js geometries. */
@@ -68,6 +87,11 @@ const HALF_PI = Math.PI / 2
 const part = (geo: GeometryKey, mat: MaterialKey, pos: Vec3, scale: Vec3, rot?: Vec3): Part =>
   rot ? { geo, mat, pos, scale, rot } : { geo, mat, pos, scale }
 const bx = (mat: MaterialKey, pos: Vec3, scale: Vec3, rot?: Vec3) => part('box', mat, pos, scale, rot)
+/**
+ * VHS cassette box (task 22.1): real-size box on a vhsShell-mapped material (tapeBlack or tapeBlue). One texture tile spans the
+ * cassette length (x), so the reels window, label and flap sit on the top face undistorted and the ribs on the sides.
+ */
+const tape = (mat: 'tapeBlack' | 'tapeBlue', pos: Vec3, scale: Vec3, rot?: Vec3): Part => ({ ...bx(mat, pos, scale, rot), metricRepeat: scale[0] })
 /** Unrotated wood board with metric UVs (long boards: grain tiles instead of stretching). */
 const wd = (mat: 'wood' | 'woodDark', pos: Vec3, scale: Vec3): Part => ({ geo: 'box', mat, pos, scale, metric: true })
 
@@ -204,9 +228,11 @@ export function vcrDeckParts(box: Aabb): Part[] {
   const y = SHELF_Y + 0.015 + 0.05
   const zf = front + 0.003
   return [
-    bx('plastic', [vcx, y, front - 0.19], [vw, 0.1, 0.38]),
+    // Housing on the vcrDeck material: one tile is the VCR width (0.62 m) by half that (the texture is 2:1), so the front
+    // face (0.1 m tall) shows the bottom 41 rows with the button labels and the HI-FI STEREO marking undistorted.
+    { ...bx('vcrDeck', [vcx, y, front - 0.19], [vw, 0.1, 0.38]), metricRepeat: vw, metricAspect: VCR_TILE_ASPECT },
     bx('bezel', [vcx - 0.12, y + 0.005, zf], [0.28, 0.04, 0.006]),
-    bx('tapeBlack', [vcx - 0.12, y + 0.005, front - 0.045], [0.19, 0.026, 0.104]),
+    tape('tapeBlack', [vcx - 0.12, y + 0.005, front - 0.045], [0.19, 0.026, 0.104]),
     bx('tapeLabel', [vcx - 0.12, y + 0.0185, front - 0.02], [0.1, 0.002, 0.03]),
     ...[0, 1, 2, 3].map((i) => bx('metal', [vcx + 0.08 + i * 0.045, y - 0.015, zf + 0.002], [0.035, 0.02, 0.01])),
     // Metallic tape slot: a top rail, a bottom rail and a thin flap in front of the dark slot opening.
@@ -226,7 +252,7 @@ export function consoleTapeParts(box: Aabb): Part[] {
   const parts: Part[] = []
   const stack = (x: number, z: number, y0: number, n: number, rotY: number) => {
     for (let i = 0; i < n; i++) {
-      parts.push(bx(i % 2 ? 'spineB' : 'tapeBlack', [x, y0 + 0.015 + i * 0.03, z], [0.19, 0.03, 0.1], [0, rotY * (i % 2 ? -1 : 1), 0]))
+      parts.push(tape(i % 2 ? 'tapeBlue' : 'tapeBlack', [x, y0 + 0.015 + i * 0.03, z], [0.19, 0.03, 0.1], [0, rotY * (i % 2 ? -1 : 1), 0]))
     }
     parts.push(bx('tapeLabel', [x, y0 + 0.03 * n + 0.001, z], [0.1, 0.002, 0.06]))
   }
@@ -244,7 +270,8 @@ export function referenceMonitorParts(box: Aabb): Part[] {
   const y0 = CONSOLE_TOP
   const front = cz + d / 2 - 0.12
   return [
-    bx('casing', [mx, y0 + mh / 2, front - 0.1], [mw, mh, 0.2]),
+    // Housing on the dark molded crtCasing material (same look as the main television); one tile spans the monitor width.
+    { ...bx('crtCasing', [mx, y0 + mh / 2, front - 0.1], [mw, mh, 0.2]), metricRepeat: mw },
     bx('casingDark', [mx, y0 + mh / 2 + 0.01, front - 0.26], [mw * 0.6, mh * 0.7, 0.14]),
     bx('bezel', [mx, y0 + mh / 2, front + 0.002], [mw * 0.86, mh * 0.82, 0.006]),
     part('plane', 'smpteScreen', [mx, y0 + mh / 2, front + 0.006], [mw * 0.74, mh * 0.66, 1]),
@@ -324,29 +351,52 @@ export function filingCabinetParts(box: Aabb, height: number, variant = 0): Part
   const face: MaterialKey = variant === 0 ? 'filingDark' : 'filingDarkB'
   const base = 0.06
   const lip = 0.03
+  const bodyH = height - lip - base
+  // metalCabinet mapping (task 22.2): one tile spans the cabinet body front, so repeat = body width and the aspect makes the tile
+  // as tall as the body (the four 64-row bands of the texture are exactly the four drawers: band i spans v i/4..(i+1)/4).
+  // A part's metricOffset is its lower-left front corner relative to the body's lower-left front corner, in metres.
+  const tileX0 = cx - w / 2
+  const aspect = bodyH / w
+  const mapped = (mat: MaterialKey, pos: Vec3, scale: Vec3): Part => ({
+    ...bx(mat, pos, scale),
+    metricRepeat: w,
+    metricAspect: aspect,
+    metricOffset: [pos[0] - scale[0] / 2 - tileX0, pos[1] - scale[1] / 2 - base],
+    metricPlainV: CABINET_PLAIN_V,
+  })
+  // Thin frame strips show only plain steel: a taller tile (aspect x 6) squeezes the strip into the plain stripe of the texture.
+  const STRIP_STRETCH = 6
+  const strip = (pos: Vec3, scale: Vec3): Part => ({
+    ...bx(body, pos, scale),
+    metricRepeat: w,
+    metricAspect: aspect * STRIP_STRETCH,
+    metricOffset: [0, CABINET_PLAIN_V[0] * STRIP_STRETCH * bodyH],
+    metricPlainV: CABINET_PLAIN_V,
+  })
   const parts: Part[] = [
     bx('bezel', [cx, base / 2, cz], [w - 0.04, base, d - 0.04]),
-    bx(body, [cx, (height - lip + base) / 2, cz], [w, height - lip - base, d]),
-    bx(body, [cx, height - lip / 2, cz + 0.005], [w + 0.02, lip, d + 0.03]),
+    mapped(body, [cx, (height - lip + base) / 2, cz], [w, bodyH, d]),
+    // The top lip starts exactly one tile above the body bottom, so it wraps onto the plain bottom rows of the texture.
+    mapped(body, [cx, height - lip / 2, cz + 0.005], [w + 0.02, lip, d + 0.03]),
   ]
-  const pitch = (height - base - lip) / FILING_DRAWERS
+  const pitch = bodyH / FILING_DRAWERS
   const fw = w - 0.03
   const fh = pitch - 0.012
   const s = 0.012
   for (let i = 0; i < FILING_DRAWERS; i++) {
     const y = base + pitch * (i + 0.5)
     parts.push(
-      // Dark gap outline, then the recessed drawer face, then the raised frame strips around it.
+      // Dark gap outline, then the recessed drawer face (shows its band of the tile), then the raised frame strips around it.
       bx('bezel', [cx, y, f + 0.001], [fw, fh, 0.002]),
-      bx(face, [cx, y, f + 0.004], [fw - 2 * s, fh - 2 * s, 0.004]),
-      bx(body, [cx, y + fh / 2 - s / 2, f + 0.006], [fw, s, 0.012]),
-      bx(body, [cx, y - fh / 2 + s / 2, f + 0.006], [fw, s, 0.012]),
-      bx(body, [cx - fw / 2 + s / 2, y, f + 0.006], [s, fh - 2 * s, 0.012]),
-      bx(body, [cx + fw / 2 - s / 2, y, f + 0.006], [s, fh - 2 * s, 0.012]),
-      // Label slot with its paper label and an ink line, in the upper part of the drawer.
-      bx('labelSlot', [cx, y + fh * 0.27, f + 0.007], [0.17, 0.05, 0.004]),
-      bx('tapeLabel', [cx, y + fh * 0.27, f + 0.0095], [0.14, 0.036, 0.002]),
-      bx('bezel', [cx, y + fh * 0.27, f + 0.0108], [0.1, 0.005, 0.001]),
+      mapped(face, [cx, y, f + 0.004], [fw - 2 * s, fh - 2 * s, 0.004]),
+      strip([cx, y + fh / 2 - s / 2, f + 0.006], [fw, s, 0.012]),
+      strip([cx, y - fh / 2 + s / 2, f + 0.006], [fw, s, 0.012]),
+      strip([cx - fw / 2 + s / 2, y, f + 0.006], [s, fh - 2 * s, 0.012]),
+      strip([cx + fw / 2 - s / 2, y, f + 0.006], [s, fh - 2 * s, 0.012]),
+      // Chrome label slot (kept as geometry) and a typed index card that shows its card cell of the tile. The texture
+      // draws the larger chrome frame around them (CABINET_FRAME_M); the old ink line is gone, the typed text replaces it.
+      bx('labelSlot', [cx, y + fh * 0.27, f + 0.007], [0.25, 0.075, 0.004]),
+      mapped('filingCard', [cx, y + fh * 0.27, f + 0.0095], [CABINET_CARD_M.w, CABINET_CARD_M.h, 0.002]),
       // Pull: horizontal bar on two posts.
       part('cylinderLow', 'metal', [cx, y - fh * 0.14, f + 0.034], [0.02, 0.16, 0.02], [0, 0, HALF_PI]),
       bx('metal', [cx - 0.07, y - fh * 0.14, f + 0.018], [0.012, 0.012, 0.028]),
@@ -396,7 +446,9 @@ export function archiveBoxParts(box: Aabb, height: number): Part[] {
     // Local offsets (lx, lz) rotated about Y by the box yaw.
     const at = (lx: number, ly: number, lz: number): Vec3 => [x + lx * cs + lz * sn, y0 + ly, z - lx * sn + lz * cs]
     parts.push(
-      bx('cardboard', [x, y0 + bh / 2, z], [bw, bh, bd], rot),
+      // Corrugated cardboard texture (task 22.2): one tile spans the box width, so the label, tape band and stencil keep their
+      // proportions. Only the lower half of the tile (v 0..0.5) is visible on the smallest box, where every decal sits.
+      { ...bx('cardboard', [x, y0 + bh / 2, z], [bw, bh, bd], rot), metricRepeat: bw },
       bx('cardboardDark', at(0, bh + 0.002, 0), [0.05, 0.004, bd], rot),
       bx('cardboardDark', at(0, bh * 0.5, bd / 2 + 0.001), [0.05, bh, 0.003], rot),
       bx('tapeLabel', at(bw * 0.2, bh * 0.55, bd / 2 + 0.002), [bw * 0.4, bh * 0.28, 0.004], rot),
@@ -411,7 +463,7 @@ export function archiveBoxParts(box: Aabb, height: number): Part[] {
   cardboardBox(cx + w * 0.26, cz + d * 0.28, 0, w * 0.3, height * 0.34, d * 0.35, -0.3)
   // Two small stacks of loose tapes: one on top of the stack, one on the floor.
   const tapeStack = (x: number, z: number, y0: number, n: number, yaw: number) => {
-    for (let i = 0; i < n; i++) parts.push(bx(i % 2 ? 'spineB' : 'tapeBlack', [x, y0 + 0.012 + i * 0.024, z], [0.1, 0.024, 0.052], [0, yaw, 0]))
+    for (let i = 0; i < n; i++) parts.push(tape(i % 2 ? 'tapeBlue' : 'tapeBlack', [x, y0 + 0.012 + i * 0.024, z], [0.1, 0.024, 0.052], [0, yaw, 0]))
   }
   tapeStack(cx - w * 0.18, cz - d * 0.12, bigH + midH, Math.max(1, Math.floor(stackH / 0.024)), 0.25)
   tapeStack(cx + w * 0.26, cz - d * 0.25, 0, 2, 0.4)
@@ -753,7 +805,8 @@ export function crtStackParts(box: Aabb, height: number): Part[] {
   shifts.forEach((s, i) => {
     const y = baseH + h * (i + 0.5)
     parts.push(
-      bx('casing', [cx + s, y, cz], [mw, h, md]),
+      // Same dark molded crtCasing look as the television and reference monitor: one tile per monitor width (task 22.2).
+      { ...bx('crtCasing', [cx + s, y, cz], [mw, h, md]), metricRepeat: mw },
       bx('bezel', [cx + s, y, front + 0.003], [mw * 0.8, h * 0.82, 0.006]),
       part('plane', 'screenOff', [cx + s, y, front + 0.0065], [mw * 0.68, h * 0.66, 1]),
     )
@@ -920,6 +973,9 @@ export * from './shelfModel'
 // Furniture
 // ---------------------------------------------------------------------------------------------
 
+/** Armchair upholstery box (task 22.1): real-size geometry with metric fabric UVs, like the couch. */
+const fa = (mat: 'armchairBody' | 'armchairCushion', pos: Vec3, scale: Vec3, rot?: Vec3): Part => ({ ...bx(mat, pos, scale, rot), metricFabric: true })
+
 export function armchairParts(box: Aabb): Part[] {
   const { cx, cz, w, d } = centre(box)
   const parts: Part[] = []
@@ -928,17 +984,17 @@ export function armchairParts(box: Aabb): Part[] {
     for (const lz of [box.minZ + leg / 2, box.maxZ - leg / 2]) parts.push(part('cylinderLow', 'woodDark', [lx, 0.06, lz], [leg, 0.12, leg]))
   }
   parts.push(
-    bx('fabric', [cx, 0.21, cz], [w, 0.18, d]),
-    bx('fabricLight', [cx, 0.36, cz - 0.04], [w - 0.2, 0.12, d - 0.15]),
+    fa('armchairBody', [cx, 0.21, cz], [w, 0.18, d]),
+    fa('armchairCushion', [cx, 0.36, cz - 0.04], [w - 0.2, 0.12, d - 0.15]),
     // Back shell and tilted back cushion (back on the +z side).
-    bx('fabric', [cx, 0.58, box.maxZ - 0.07], [w - 0.04, 0.6, 0.14]),
-    bx('fabricLight', [cx, 0.6, box.maxZ - 0.17], [w - 0.24, 0.36, 0.1], [0.15, 0, 0]),
-    bx('fabric', [box.minX + 0.05, 0.41, cz], [0.1, 0.22, d - 0.04]),
-    bx('fabric', [box.maxX - 0.05, 0.41, cz], [0.1, 0.22, d - 0.04]),
+    fa('armchairBody', [cx, 0.58, box.maxZ - 0.07], [w - 0.04, 0.6, 0.14]),
+    fa('armchairCushion', [cx, 0.6, box.maxZ - 0.17], [w - 0.24, 0.36, 0.1], [0.15, 0, 0]),
+    fa('armchairBody', [box.minX + 0.05, 0.41, cz], [0.1, 0.22, d - 0.04]),
+    fa('armchairBody', [box.maxX - 0.05, 0.41, cz], [0.1, 0.22, d - 0.04]),
     // Rolled arm tops (axis along z), rolled back top (axis along x) and a throw pillow on the seat.
-    part('cylinderLow', 'fabric', [box.minX + 0.05, 0.53, cz], [0.11, d - 0.04, 0.11], [HALF_PI, 0, 0]),
-    part('cylinderLow', 'fabric', [box.maxX - 0.05, 0.53, cz], [0.11, d - 0.04, 0.11], [HALF_PI, 0, 0]),
-    part('cylinderLow', 'fabric', [cx, 0.88, box.maxZ - 0.07], [0.1, w - 0.04, 0.1], [0, 0, HALF_PI]),
+    part('cylinderLow', 'armchairBody', [box.minX + 0.05, 0.53, cz], [0.11, d - 0.04, 0.11], [HALF_PI, 0, 0]),
+    part('cylinderLow', 'armchairBody', [box.maxX - 0.05, 0.53, cz], [0.11, d - 0.04, 0.11], [HALF_PI, 0, 0]),
+    part('cylinderLow', 'armchairBody', [cx, 0.88, box.maxZ - 0.07], [0.1, w - 0.04, 0.1], [0, 0, HALF_PI]),
     bx('rugLight', [cx + 0.14, 0.5, cz + 0.02], [0.2, 0.16, 0.06], [-0.5, 0.2, 0.1]),
   )
   return parts
@@ -1019,7 +1075,7 @@ export function crateParts(box: Aabb, height: number): Part[] {
   for (let i = 0; i < levels; i++) {
     const y = 0.03 + pitch * (i + 0.5)
     const sh = pitch * 0.6
-    parts.push(bx('crate', [cx, y, cz], [w + 0.02, sh, d - 0.02]), bx('crate', [cx, y, cz], [w - 0.02, sh, d + 0.02]))
+    parts.push(bx('crateWood', [cx, y, cz], [w + 0.02, sh, d - 0.02]), bx('crateWood', [cx, y, cz], [w - 0.02, sh, d + 0.02]))
   }
   parts.push(bx('crateSlat', [cx, height - 0.012, cz], [w, 0.024, d]))
   // Diagonal brace on the front face and hand-hold slots on both end faces.
@@ -1029,6 +1085,11 @@ export function crateParts(box: Aabb, height: number): Part[] {
     bx('bezel', [box.minX - 0.012, height * 0.62, cz], [0.012, 0.05, d * 0.4]),
     bx('bezel', [box.maxX + 0.012, height * 0.62, cz], [0.012, 0.05, d * 0.4]),
   )
+  // Shipping-label panel (task 22.2): the crates stay wood-slatted and show the cardboard texture only on this 0.3 x 0.2 m panel on
+  // the room-facing (-X) side, below the hand-hold. One tile spans the panel width, so the shipping label, the tape band and the
+  // lower stencil text keep their proportions; the panel shows v 0..0.67 of the tile. It sticks out 0.016 m from the box side.
+  const panelW = 0.3
+  parts.push({ ...bx('crate', [box.minX - 0.014, height * 0.32, cz], [0.004, 0.2, panelW]), metricRepeat: panelW })
   const post = 0.05
   for (const px of [box.minX + post / 2 - 0.006, box.maxX - post / 2 + 0.006]) {
     for (const pz of [box.minZ + post / 2 - 0.006, box.maxZ - post / 2 + 0.006]) {
@@ -1037,6 +1098,12 @@ export function crateParts(box: Aabb, height: number): Part[] {
   }
   return parts
 }
+
+/** Desk clutter heights in metres (task 22.2 part B). */
+export const MUG_BODY_H = 0.089
+export const MUG_RIM_H = 0.006
+export const NOTE_COVER_H = 0.006
+export const NOTE_PAGE_H = 0.01
 
 /** Reception desk (front on the +z side): panelled front, drawers, lamp, bell, book and archive box. */
 export function deskParts(box: Aabb, height: number): Part[] {
@@ -1066,22 +1133,36 @@ export function deskParts(box: Aabb, height: number): Part[] {
     bx('rug', [cx - 0.6, top + 0.015, cz - 0.1], [0.28, 0.03, 0.2]),
     bx('tapeLabel', [cx - 0.6, top + 0.032, cz - 0.1], [0.25, 0.004, 0.17]),
     // Archive box with upright tapes.
-    bx('crate', [cx + 0.5, top + 0.1, cz], [0.4, 0.2, 0.3]),
+    { ...bx('crate', [cx + 0.5, top + 0.1, cz], [0.4, 0.2, 0.3]), metricRepeat: 0.4 },
     bx('crateSlat', [cx + 0.5, top + 0.2, cz + 0.14], [0.42, 0.02, 0.02]),
     bx('spineA', [cx + 0.4, top + 0.22, cz], [0.03, 0.19, 0.1]),
     bx('spineB', [cx + 0.45, top + 0.22, cz], [0.03, 0.19, 0.1]),
     bx('spineC', [cx + 0.5, top + 0.22, cz], [0.03, 0.19, 0.1]),
     bx('spineA', [cx + 0.55, top + 0.22, cz], [0.03, 0.19, 0.1]),
     // Coffee mug (low-segment cylinder with a handle), a notepad with a pencil and a loose tape.
-    part('cylinderLow', 'mug', [cx + 0.95, top + 0.0475, cz - 0.1], [0.08, 0.095, 0.08]),
-    bx('mug', [cx + 0.95 + 0.048, top + 0.05, cz - 0.1], [0.014, 0.05, 0.016]),
-    bx('paper', [cx - 0.95, top + 0.008, cz + 0.1], [0.15, 0.016, 0.21], [0, 0.25, 0]),
-    bx('metal', [cx - 0.95, top + 0.018, cz + 0.1 - 0.1], [0.15, 0.006, 0.008], [0, 0.25, 0]),
-    part('cylinderLow', 'spineC', [cx - 0.78, top + 0.006, cz + 0.2], [0.01, 0.16, 0.01], [0, 0.5, HALF_PI]),
-    bx('tapeBlack', [cx + 0.75, top + 0.015, cz + 0.2], [0.19, 0.03, 0.1], [0, -0.5, 0]),
+    // Mug (task 22.2 part B): body 0.089 m tall plus a lighter ceramic rim ring 0.006 m tall on top (total 0.095 m, as before).
+    part('cylinderLow', 'mug', [cx + 0.95, top + MUG_BODY_H / 2, cz - 0.1], [0.08, MUG_BODY_H, 0.08]),
+    part('cylinderLow', 'mugRim', [cx + 0.95, top + MUG_BODY_H + MUG_RIM_H / 2, cz - 0.1], [0.084, MUG_RIM_H, 0.084]),
+    bx('mug', [cx + 0.95 + 0.048, top + 0.04, cz - 0.1], [0.014, 0.05, 0.016]),
+    // Notepad (task 22.2 part B): a grain-textured cover under a ruled page block (deskDetail cells), both rotated 0.25 rad;
+    // the spiral strip rests on the page along its top edge. One tile of deskDetail spans DESK_DETAIL_TILE_M metres.
+    {
+      ...bx('notebookCover', [cx - 0.95, top + NOTE_COVER_H / 2, cz + 0.1], [0.15, NOTE_COVER_H, 0.21], [0, 0.25, 0]),
+      metricRepeat: DESK_DETAIL_TILE_M,
+      metricAspect: DESK_DETAIL_ASPECT,
+    },
+    {
+      ...bx('paper', [cx - 0.95, top + NOTE_COVER_H + NOTE_PAGE_H / 2, cz + 0.1], [0.14, NOTE_PAGE_H, 0.2], [0, 0.25, 0]),
+      metricRepeat: DESK_DETAIL_TILE_M,
+      metricAspect: DESK_DETAIL_ASPECT,
+      metricOffset: [DESK_DETAIL_TILE_M / 2, 0],
+    },
+    bx('metal', [cx - 0.95 - 0.0243, top + NOTE_COVER_H + NOTE_PAGE_H + 0.003, cz + 0.1 - 0.095], [0.15, 0.006, 0.008], [0, 0.25, 0]),
+    part('cylinderLow', 'spineC', [cx - 0.7, top + 0.006, cz + 0.2], [0.01, 0.16, 0.01], [0, 0.5, HALF_PI]),
+    tape('tapeBlack', [cx + 0.75, top + 0.015, cz + 0.2], [0.19, 0.03, 0.1], [0, -0.5, 0]),
     // Two loose tapes with labels.
-    bx('tapeBlack', [cx - 0.2, top + 0.015, cz + 0.05], [0.19, 0.03, 0.1]),
-    bx('tapeBlack', [cx - 0.2, top + 0.045, cz + 0.05], [0.19, 0.03, 0.1]),
+    tape('tapeBlack', [cx - 0.2, top + 0.015, cz + 0.05], [0.19, 0.03, 0.1]),
+    tape('tapeBlack', [cx - 0.2, top + 0.045, cz + 0.05], [0.19, 0.03, 0.1]),
     bx('tapeLabel', [cx - 0.2, top + 0.0605, cz + 0.05], [0.1, 0.002, 0.06]),
   ]
 }
@@ -1144,6 +1225,39 @@ export function trimParts(): Part[] {
       const s = grow(frame, 0.02)
       parts.push(bx('skirting', [s.pos[0], SKIRT_H / 2, s.pos[2]], [s.size[0], SKIRT_H, s.size[1]]))
     }
+  }
+  return parts
+}
+
+/** Thickness of door-detail plates: they protrude this far from the frame or wall face they sit on (limit 0.02 m). */
+export const DOOR_DETAIL_T = 0.01
+export const DOOR_DETAIL_LIMIT = 0.02
+
+/**
+ * East doorway detail (task 22.2 part B). The doorways have no leaves, so nothing may enter an opening: every
+ * part is a thin plate on the outside of a jamb or of the pillar wall between the doors, never on the faces
+ * that look into an opening. Per side of the pillar (west x = pillar.minX, east x = pillar.maxX): a dark
+ * wood panel inset and a metal kickplate just above the skirting. Plus a kickplate on the room-side face of
+ * each outer jamb. Visual only: no Colliders.
+ */
+export function doorDetailParts(): Part[] {
+  const [first, second] = ROOM.doors
+  const outerNorth = first.frames[0]
+  const outerSouth = second.frames[1]
+  const lo = first.frames[1].maxZ
+  const hi = second.frames[0].minZ
+  const pillar = ROOM.walls.find((w) => w.minZ >= lo - 1e-6 && w.maxZ <= hi + 1e-6)
+  if (!pillar) throw new Error('Missing pillar wall between the east doors')
+  const t = DOOR_DETAIL_T
+  const kickY = SKIRT_H + 0.09
+  const parts: Part[] = []
+  const pcz = (pillar.minZ + pillar.maxZ) / 2
+  const pw = pillar.maxZ - pillar.minZ
+  for (const x of [pillar.minX - t / 2, pillar.maxX + t / 2]) {
+    parts.push(wd('woodDark', [x, 1.15, pcz], [t, 1.5, pw * 0.78]), bx('metal', [x, kickY, pcz], [t, 0.18, pw - 0.04]))
+  }
+  for (const f of [outerNorth, outerSouth]) {
+    parts.push(bx('metal', [f.minX - t / 2, kickY, (f.minZ + f.maxZ) / 2], [t, 0.18, f.maxZ - f.minZ - 0.02]))
   }
   return parts
 }
@@ -1220,6 +1334,7 @@ export function declaredObjects(): Array<{ name: string; parts: Part[]; extraTri
     { name: 'crate-a', parts: crateParts(prop('crate-a').box, prop('crate-a').height) },
     { name: 'crate-b', parts: crateParts(prop('crate-b').box, prop('crate-b').height) },
     { name: 'trim', parts: trimParts() },
+    { name: 'door-detail', parts: doorDetailParts() },
     ...fixtureCentres().map(([x, z], i) => ({ name: `fixture-${i}`, parts: ceilingFixtureParts(x, z) })),
   ]
   for (const id of SHELF_IDS) {

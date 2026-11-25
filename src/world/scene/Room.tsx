@@ -10,6 +10,7 @@ import {
   ceilingFixtureParts,
   conduitParts,
   cornerPostParts,
+  doorDetailParts,
   fixtureCentres,
   trimParts,
   ventilationParts,
@@ -101,6 +102,12 @@ export function WallTrim() {
   return <PartMeshes parts={parts} />
 }
 
+/** Panel insets and metal kickplates on the east doorway pillar and outer jambs (task 22.2 part B). Visual only. */
+export function DoorDetail() {
+  const parts = useMemo(doorDetailParts, [])
+  return <PartMeshes parts={parts} />
+}
+
 /** Fluorescent ceiling fixture: metal housing plus an emissive tube box. Not a light source. */
 export function CeilingFixture({ x, z }: { x: number; z: number }) {
   const parts = useMemo(() => ceilingFixtureParts(x, z), [x, z])
@@ -155,6 +162,7 @@ export function Room() {
       ))}
       <Doors />
       <WallTrim />
+      <DoorDetail />
       <RoomDressing />
       <ArcadeSign />
       {fixtureCentres().map(([x, z]) => (

@@ -54,6 +54,7 @@ import {
   referenceMonitorParts,
   crtTelevisionParts,
   declaredObjects,
+  doorDetailParts,
   posterParts,
   clampLeanHeight,
   leanFootprint,
@@ -241,7 +242,7 @@ describe('layout stays the single source of truth', () => {
     // The console top is at 0.7 m; the VCR stands on the lower shelf below it.
     const top = mediaConsoleParts(crt.box).find((p) => p.pos[1] > 0.65 && p.scale[0] > 1.8)!
     expect(top.pos[1] + top.scale[1] / 2).toBeCloseTo(CONSOLE_TOP)
-    const vcr = vcrDeckParts(crt.box).find((p) => p.mat === 'plastic')!
+    const vcr = vcrDeckParts(crt.box).find((p) => p.mat === 'vcrDeck')!
     expect(vcr.pos[1] + vcr.scale[1] / 2).toBeLessThan(CONSOLE_TOP - 0.1)
   })
 
@@ -572,7 +573,7 @@ describe('bookcase contents', () => {
     for (const b of stacks) expect(Math.abs(Math.abs(b.rot[2]) - Math.PI / 2)).toBeLessThan(1e-9)
     expect(c.instances.filter((b) => b.group === 'boxed').length).toBeGreaterThanOrEqual(6)
     expect(c.boxParts.length).toBeGreaterThanOrEqual(5)
-    expect(c.boxParts.every((q) => q.mat === 'crate')).toBe(true)
+    expect(c.boxParts.every((q) => q.mat === 'crateWood')).toBe(true)
   })
 
   it.each(SHELF_IDS)('%s has no overlapping books along the shelf (a lean rests against the next book)', (id) => {
@@ -769,7 +770,7 @@ describe('silhouette refinements', () => {
     expect(desk.filter((p) => p.mat === 'paper')).toHaveLength(1)
     expect(desk.filter((p) => p.mat === 'tapeBlack').length).toBeGreaterThanOrEqual(3)
     expect(d.height).toBe(1)
-    expect(armchairParts(prop('abandoned-chair').box).filter((p) => p.geo === 'cylinderLow' && p.mat === 'fabric').length).toBeGreaterThanOrEqual(3)
+    expect(armchairParts(prop('abandoned-chair').box).filter((p) => p.geo === 'cylinderLow' && p.mat === 'armchairBody').length).toBeGreaterThanOrEqual(3)
     expect(couchParts(prop('couch').box).filter((p) => p.geo === 'cylinderLow').length).toBeGreaterThanOrEqual(5)
   })
 
@@ -786,7 +787,7 @@ describe('silhouette refinements', () => {
   it('crates keep their ribs and slats and gain a diagonal brace', () => {
     const c = prop('crate-a')
     const parts = crateParts(c.box, c.height)
-    expect(parts.filter((p) => p.mat === 'crate').length).toBeGreaterThanOrEqual(4)
+    expect(parts.filter((p) => p.mat === 'crateWood').length).toBeGreaterThanOrEqual(4)
     expect(parts.filter((p) => p.mat === 'crateSlat').length).toBeGreaterThanOrEqual(6)
     expect(parts.some((p) => p.rot && p.mat === 'crateSlat')).toBe(true)
   })
@@ -828,7 +829,7 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
       // Pulls: one round bar per drawer on two posts.
       expect(parts.filter((p) => p.geo === 'cylinderLow' && p.mat === 'metal')).toHaveLength(FILING_DRAWERS)
       expect(parts.filter((p) => p.mat === 'labelSlot')).toHaveLength(FILING_DRAWERS)
-      expect(parts.filter((p) => p.mat === 'tapeLabel')).toHaveLength(FILING_DRAWERS)
+      expect(parts.filter((p) => p.mat === 'filingCard')).toHaveLength(FILING_DRAWERS)
       // Recessed: the face sits behind the raised frame strips of the same drawer.
       const face = parts.find((p) => p.mat === (variant === 0 ? 'filingDark' : 'filingDarkB'))!
       const strip = parts.find((p) => p.mat === (variant === 0 ? 'filingGrey' : 'filingGreyB') && p.scale[2] === 0.012)!
@@ -1053,8 +1054,8 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
     // 21 textures after 18.3; task 20.2 removed four (arcadeScreen, marquee, outOfOrder, deck) and added six; task 21.1 added couchFabric.
-    // Task 21.2 adds crtCasing and crtGlass.
-    expect(report.textureCount).toBe(26)
+    // Task 21.2 adds crtCasing and crtGlass; 22.1 adds vcrDeck and vhsShell, 22.2 adds metalCabinet (A) and deskDetail (B).
+    expect(report.textureCount).toBe(30)
     for (const name of ['conduit', 'ventilation', 'cable-loops', 'corner-posts', 'wall-clock', 'desk-lamp', 'desk-lamp-glow']) {
       expect(report.objects.map((o) => o.name)).toContain(name)
     }
@@ -1088,7 +1089,8 @@ describe('task 19.2: texture headroom and craftsmanship', () => {
     )
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
     // 7.0 MB after 19.2; task 21.1 adds couchFabric (0.33 MB), so the headroom check is now 7.5 MB (budget stays 8 MB).
-    // Task 21.2 adds crtCasing (0.33 MB) and crtGlass (0.25 MB): the headroom check is now 7.7 MB.
+    // Task 21.2 adds crtCasing (0.33 MB) and crtGlass (0.25 MB): the headroom check was 7.7 MB.
+    // Task 22.1 shrinks corkBoard to 256x256 (-1.00 MB) and adds vcrDeck and vhsShell (+0.25 MB): now 7.0 MB.
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.7 * 1048576)
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
     expect(report.totalDrawCalls).toBeLessThan(400)
@@ -1341,8 +1343,8 @@ describe('task 20.2: attract screen and marquee textures on the cabinets', () =>
     setCanvasFactory(() => fakeCanvas())
     ensureSharedTextures()
     // 23 after task 20.2, plus couchFabric (21.1), crtCasing and crtGlass (21.2).
-    expect(liveTextureCount()).toBe(26)
-    expect(TEXTURE_IDS).toHaveLength(26)
+    expect(liveTextureCount()).toBe(30)
+    expect(TEXTURE_IDS).toHaveLength(30)
     const total = totalTextureMemoryBytes()
     const perTexture = TEXTURE_IDS.map((id) => `${id} ${TEXTURE_SPECS[id].width}x${TEXTURE_SPECS[id].height}=${(textureMemoryBytes(TEXTURE_SPECS[id]) / 1048576).toFixed(3)}MB`)
     const report = sceneDetailReport()
@@ -1552,9 +1554,9 @@ describe('task 21.2: CRT casing texture and glass screen', () => {
     const shells = parts.filter((p) => p.mat === 'crtCasing')
     expect(shells).toHaveLength(2)
     for (const s of shells) expect(s.metricRepeat).toBeCloseTo(s.scale[0], 9)
-    // The shared `casing` material (used by other objects) is untouched and distinct.
-    expect(materials.crtCasing).not.toBe(materials.casing)
-    expect(parts.some((p) => p.mat === 'casing')).toBe(false)
+    // The old mint `casing` material was removed in task 22.2 (the CRT stack now uses crtCasing too).
+    expect('casing' in materials).toBe(false)
+    expect(parts.some((p) => (p.mat as string) === 'casing')).toBe(false)
     // Real-size shells render from cached metric geometry and keep their draw-call grouping per size.
     expect(new Set(shells.map(partGroupKey)).size).toBe(2)
   })
@@ -1628,5 +1630,405 @@ describe('task 21.2: CRT casing texture and glass screen', () => {
     expect(textureMemoryBytes(TEXTURE_SPECS.crtCasing)).toBeLessThanOrEqual(0.34 * 1048576)
     expect(textureMemoryBytes(TEXTURE_SPECS.crtGlass)).toBeLessThanOrEqual(0.25 * 1048576)
     expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(7.7 * 1048576)
+  })
+})
+
+describe('task 22.1: media island, armchair and VHS shells', () => {
+  afterEach(() => setCanvasFactory(null))
+
+  const crt = () => prop('crt-vhs')
+  const chair = () => prop('abandoned-chair')
+  const tapeMats = ['tapeBlack', 'tapeBlue'] as const
+  /** Every part list that holds loose VHS tapes. */
+  const tapeParts = () => [
+    ...vcrDeckParts(crt().box),
+    ...consoleTapeParts(crt().box),
+    ...deskParts(prop('reception-desk').box, prop('reception-desk').height),
+    ...ARCHIVE_BOX_IDS.flatMap((id) => archiveBoxParts(prop(id).box, prop(id).height)),
+  ].filter((p) => (tapeMats as readonly string[]).includes(p.mat))
+
+  it('the reference monitor housing uses crtCasing with one tile per monitor width, not the old casing', () => {
+    const parts = referenceMonitorParts(crt().box)
+    const housing = parts.filter((p) => p.mat === 'crtCasing')
+    expect(housing).toHaveLength(1)
+    expect(housing[0].metricRepeat).toBeCloseTo(housing[0].scale[0], 9)
+    expect(parts.some((p) => (p.mat as string) === 'casing')).toBe(false)
+    expect(parts.some((p) => p.mat === 'smpteScreen')).toBe(true)
+  })
+
+  it('the VCR housing uses the vcrDeck material with a 0.62 m x 0.31 m tile, and keeps its timecode, slot and buttons', () => {
+    const parts = vcrDeckParts(crt().box)
+    const housing = parts.filter((p) => p.mat === 'vcrDeck')
+    expect(housing).toHaveLength(1)
+    expect(housing[0].metricRepeat).toBeCloseTo(housing[0].scale[0], 9)
+    expect(housing[0].metricAspect).toBe(0.5)
+    expect(parts.some((p) => p.mat === 'plastic')).toBe(false)
+    expect(parts.some((p) => p.mat === 'timecode')).toBe(true)
+    expect(parts.filter((p) => p.mat === 'tapeSlotMetal')).toHaveLength(3)
+    expect(parts.filter((p) => p.mat === 'metal')).toHaveLength(4)
+    // The aspect changes the cached geometry: v spans half a tile over the same height.
+    const sq = metricBoxGeometry(0.62, 0.1, 0.38, 0.62)
+    const wide = metricBoxGeometry(0.62, 0.1, 0.38, 0.62, false, 0.5)
+    expect(wide).not.toBe(sq)
+    expect(metricBoxGeometry(0.62, 0.1, 0.38, 0.62, false, 0.5)).toBe(wide)
+    const maxV = (g: typeof sq) => Math.max(...Array.from({ length: g.getAttribute('uv').count }, (_, i) => g.getAttribute('uv').getY(i)))
+    expect(maxV(wide) / maxV(sq)).toBeCloseTo(2, 6)
+  })
+
+  it('armchair fabric parts use the armchair materials; boxes carry metric fabric UVs and the legs keep wood', () => {
+    const parts = armchairParts(chair().box)
+    const fabric = parts.filter((p) => p.mat === 'armchairBody' || p.mat === 'armchairCushion')
+    expect(fabric.length).toBe(9)
+    expect(fabric.filter((p) => p.geo === 'box').every((p) => p.metricFabric === true)).toBe(true)
+    expect(fabric.filter((p) => p.geo === 'box')).toHaveLength(6)
+    expect(parts.filter((p) => p.geo === 'cylinderLow' && p.mat === 'woodDark')).toHaveLength(4)
+    expect(parts.some((p) => p.mat === ('fabric' as never) || p.mat === ('fabricLight' as never))).toBe(false)
+  })
+
+  it('armchair triangles are unchanged and the scene stays under 20,000 with the same triangle count as before 22.1', () => {
+    const report = sceneDetailReport()
+    const obj = report.objects.find((o) => o.name === 'armchair')!
+    const tri = armchairParts(chair().box).reduce((n, p) => n + GEOMETRY_TRIANGLES[p.geo], 0)
+    expect(obj.triangles).toBe(tri)
+    // 19,128 before task 22.2; part A changes it by -72 net (crate label panels +24, cabinet ink lines -96), part B by +116 (notebook page block +12, mug rim +32, door detail +72).
+    expect(report.totalTriangles).toBe(19128 - 72 + 116)
+    expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
+  })
+
+  it('every loose tape part uses a vhsShell-mapped material with one tile per cassette length', () => {
+    const parts = tapeParts()
+    expect(parts.length).toBeGreaterThanOrEqual(15)
+    for (const p of parts) {
+      expect(p.geo).toBe('box')
+      expect(p.metricRepeat, p.mat).toBeCloseTo(p.scale[0], 9)
+    }
+    // Navy tapes exist in the console stacks and the archive-box stacks; the bookcase spine material is not used for tapes.
+    expect(parts.some((p) => p.mat === 'tapeBlue')).toBe(true)
+    expect(consoleTapeParts(crt().box).some((p) => p.mat === ('spineB' as never))).toBe(false)
+  })
+
+  it('without a canvas the new materials keep their flat colours', () => {
+    setCanvasFactory(null)
+    ensureSharedTextures()
+    const hex = (k: keyof typeof materials) => `#${(materials[k] as unknown as { color: { getHexString(): string } }).color.getHexString()}`
+    expect(hex('armchairBody')).toBe('#3d5a4c')
+    expect(hex('armchairCushion')).toBe('#4f7561')
+    expect(hex('vcrDeck')).toBe('#2e2f36')
+    expect(hex('tapeBlack')).toBe('#15151a')
+    expect(hex('tapeBlue')).toBe('#2a4aa0')
+    for (const k of ['armchairBody', 'armchairCushion', 'vcrDeck', 'tapeBlack', 'tapeBlue'] as const) expect(materials[k].map).toBeNull()
+  })
+
+  it('with a canvas the new textures are attached with their multipliers and every texture is disposed exactly once', () => {
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    const deck = getSharedTexture('vcrDeck')!
+    const shell = getSharedTexture('vhsShell')!
+    const fabric = getSharedTexture('couchFabric')!
+    expect([deck.image.width, deck.image.height]).toEqual([256, 128])
+    expect([shell.image.width, shell.image.height]).toEqual([128, 128])
+    expect([getSharedTexture('corkBoard')!.image.width, getSharedTexture('corkBoard')!.image.height]).toEqual([256, 256])
+    for (const t of [deck, shell]) {
+      expect(t.colorSpace).toBe('srgb')
+      expect(t.generateMipmaps).toBe(true)
+      expect(t.minFilter).toBe(1008) // LinearMipmapLinearFilter
+      expect(t.magFilter).toBe(1006) // LinearFilter
+    }
+    expect(materials.vcrDeck.map).toBe(deck)
+    expect(materials.tapeBlack.map).toBe(shell)
+    expect(materials.tapeBlue.map).toBe(shell)
+    expect(materials.armchairBody.map).toBe(fabric)
+    expect(materials.armchairCushion.map).toBe(fabric)
+    expect(materials.crtCasing.map).toBe(getSharedTexture('crtCasing'))
+    expect(`#${materials.armchairBody.color.getHexString()}`).toBe(COUCH_FABRIC_COLORS.armchairBody.textured)
+    expect(`#${materials.armchairCushion.color.getHexString()}`).toBe(COUCH_FABRIC_COLORS.armchairCushion.textured)
+    // Tape multipliers keep their hue: black stays neutral-dark, navy stays blue.
+    const rgb = (c: { r: number; g: number; b: number }) => [c.r, c.g, c.b]
+    const black = rgb(materials.tapeBlack.color)
+    expect(Math.max(...black)).toBeLessThan(0.1)
+    const blue = rgb(materials.tapeBlue.color)
+    expect(blue[2]).toBeGreaterThan(blue[1])
+    expect(blue[1]).toBeGreaterThan(blue[0])
+
+    expect(liveTextureCount()).toBe(TEXTURE_IDS.length)
+    const spies = TEXTURE_IDS.map((id) => vi.spyOn(getSharedTexture(id)!, 'dispose'))
+    disposeSharedResources()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+    expect(liveTextureCount()).toBe(0)
+    expect(`#${materials.armchairBody.color.getHexString()}`).toBe(COUCH_FABRIC_COLORS.armchairBody.flat)
+    expect(`#${materials.tapeBlue.color.getHexString()}`).toBe('#2a4aa0')
+    expect(materials.vcrDeck.map).toBeNull()
+    expect(() => disposeSharedResources()).not.toThrow()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+  })
+
+  it('counts: 30 textures and at most 7.7 MB (budget 8 MB), colliders unchanged', () => {
+    const report = sceneDetailReport()
+    const perTexture = TEXTURE_IDS.map((id) => `${id} ${TEXTURE_SPECS[id].width}x${TEXTURE_SPECS[id].height}=${(textureMemoryBytes(TEXTURE_SPECS[id]) / 1048576).toFixed(3)}MB`)
+    console.info(
+      `[22.1] computed triangles ${report.totalTriangles}, draw-call estimate ${report.totalDrawCalls}, textures ${report.textureCount}, ` +
+        `texture memory estimate ${(report.textureMemoryBytes / 1048576).toFixed(3)} MB (computed, not runtime-measured): ${perTexture.join(', ')}`,
+    )
+    expect(report.textureCount).toBe(30)
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.7 * 1048576)
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
+    expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
+    expect(M3_LIGHT_COUNT).toBeLessThanOrEqual(MAX_LIGHTS)
+    expect(COLLIDERS.length).toBe(ROOM.walls.length + 4 + ROOM.props.filter((p) => p.solid).length)
+  })
+})
+
+describe('task 22.2 (part A): metalCabinet, cardboard crate and CRT stack casing', () => {
+  afterEach(() => setCanvasFactory(null))
+
+  const cabinets = () => [0, 1].map((v) => filingCabinetParts(prop(`filing-cabinet-${v ? 'b' : 'a'}`).box, prop(`filing-cabinet-${v ? 'b' : 'a'}`).height, v))
+  const mapped = ['filingGrey', 'filingDark', 'filingGreyB', 'filingDarkB', 'filingCard'] as const
+  const hex = (k: keyof typeof materials) => `#${(materials[k] as unknown as { color: { getHexString(): string } }).color.getHexString()}`
+
+  it('cabinet body and drawer fronts use metalCabinet-mapped materials with metric UVs; handles and slots stay geometry', () => {
+    for (const parts of cabinets()) {
+      const on = parts.filter((p) => (mapped as readonly string[]).includes(p.mat))
+      expect(on.length).toBeGreaterThan(FILING_DRAWERS * 5)
+      for (const p of on) {
+        expect(p.metricRepeat).toBeGreaterThan(0)
+        expect(p.metricAspect).toBeGreaterThan(0)
+        expect(p.metricOffset).toBeDefined()
+      }
+      expect(parts.filter((p) => p.mat === 'filingCard')).toHaveLength(FILING_DRAWERS)
+      expect(parts.filter((p) => p.mat === 'labelSlot')).toHaveLength(FILING_DRAWERS)
+      expect(parts.filter((p) => p.mat === 'metal').length).toBeGreaterThanOrEqual(FILING_DRAWERS * 3)
+    }
+  })
+
+  it('the four drawer bands of the tile line up with the four drawer fronts (documented mapping)', () => {
+    const parts = filingCabinetParts(prop('filing-cabinet-a').box, prop('filing-cabinet-a').height, 0)
+    const body = parts.find((p) => p.mat === 'filingGrey' && p.scale[1] > 0.5)!
+    const bodyH = body.scale[1]
+    const faces = parts.filter((p) => p.mat === 'filingDark')
+    expect(faces).toHaveLength(FILING_DRAWERS)
+    // v range (in tile fractions) covered by each face is inside its own quarter of the tile.
+    const bands = faces.map((p) => {
+      const v0 = (p.metricOffset![1] / (p.metricRepeat! * p.metricAspect!)) * (1 / 1)
+      const v1 = v0 + p.scale[1] / (p.metricRepeat! * p.metricAspect!)
+      return [v0, v1]
+    })
+    expect(bodyH / (body.metricRepeat! * body.metricAspect!)).toBeCloseTo(1, 6)
+    bands.sort((a, b) => a[0] - b[0]).forEach(([v0, v1], i) => {
+      expect(v0).toBeGreaterThanOrEqual(i / FILING_DRAWERS - 1e-6)
+      expect(v1).toBeLessThanOrEqual((i + 1) / FILING_DRAWERS + 1e-6)
+    })
+  })
+
+  it('without a canvas the cabinet materials have the exact old flat colours and no map', () => {
+    setCanvasFactory(null)
+    ensureSharedTextures()
+    const flat = { filingGrey: '#6f7782', filingDark: '#59606b', filingGreyB: '#7a7d70', filingDarkB: '#656858', filingCard: '#d8d2b8' } as const
+    for (const k of mapped) {
+      expect(hex(k)).toBe(flat[k])
+      expect(materials[k].map).toBeNull()
+    }
+    expect(getSharedTexture('metalCabinet')).toBeNull()
+    expect(materials.crate.map).toBeNull()
+    expect(hex('crate')).toBe('#8a6a3c')
+  })
+
+  it('archive boxes, desk archive box and crate label panels use the cardboard crate texture; crate bodies stay wood', () => {
+    for (const id of ARCHIVE_BOX_IDS) {
+      const boxes = archiveBoxParts(prop(id).box, prop(id).height).filter((p) => p.mat === 'cardboard')
+      expect(boxes.length).toBeGreaterThan(0)
+      for (const p of boxes) expect(p.metricRepeat).toBeCloseTo(p.scale[0], 9)
+    }
+    for (const id of ['crate-a', 'crate-b']) {
+      const parts = crateParts(prop(id).box, prop(id).height)
+      const panel = parts.filter((p) => p.mat === 'crate')
+      expect(panel).toHaveLength(1)
+      expect(panel[0].metricRepeat).toBeCloseTo(panel[0].scale[2], 9)
+      expect(parts.filter((p) => p.mat === 'crateWood').length).toBeGreaterThanOrEqual(2)
+    }
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    const tex = getSharedTexture('crate')!
+    expect([tex.image.width, tex.image.height]).toEqual([256, 256])
+    expect(materials.crate.map).toBe(tex)
+    expect(materials.cardboard.map).toBe(tex)
+    expect(materials.crateWood.map).toBe(getSharedTexture('wood'))
+  })
+
+  it('the CRT stack housings use crtCasing (one tile per monitor width) and the mint casing material is gone', () => {
+    const stack = prop('crt-stack')
+    const parts = crtStackParts(stack.box, stack.height)
+    const housings = parts.filter((p) => p.mat === 'crtCasing')
+    expect(housings.length).toBeGreaterThanOrEqual(2)
+    for (const p of housings) expect(p.metricRepeat).toBeCloseTo(p.scale[0], 9)
+    for (const o of declaredObjects()) for (const p of o.parts) expect(p.mat as string).not.toBe('casing')
+    expect('casing' in materials).toBe(false)
+  })
+
+  it('metalCabinet and crate are textured, disposed exactly once, twice-safe; budget numbers hold', () => {
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    const cab = getSharedTexture('metalCabinet')!
+    expect([cab.image.width, cab.image.height]).toEqual([256, 256])
+    expect(cab.colorSpace).toBe('srgb')
+    expect(cab.generateMipmaps).toBe(true)
+    for (const k of mapped) expect(materials[k].map).toBe(cab)
+    expect(liveTextureCount()).toBe(TEXTURE_IDS.length)
+    const spies = TEXTURE_IDS.map((id) => vi.spyOn(getSharedTexture(id)!, 'dispose'))
+    disposeSharedResources()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+    expect(() => disposeSharedResources()).not.toThrow()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+    expect(liveTextureCount()).toBe(0)
+    expect(hex('filingGrey')).toBe('#6f7782')
+
+    const report = sceneDetailReport()
+    const mb = (id: (typeof TEXTURE_IDS)[number]) => (textureMemoryBytes(TEXTURE_SPECS[id]) / 1048576).toFixed(3)
+    console.info(
+      `[22.2A] triangles ${report.totalTriangles}, draw calls ${report.totalDrawCalls}, textures ${report.textureCount}, texture memory ${(report.textureMemoryBytes / 1048576).toFixed(3)} MB ` +
+        `(computed, not runtime-measured), metalCabinet ${mb('metalCabinet')} MB, crate ${mb('crate')} MB`,
+    )
+    expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
+    expect(report.totalTriangles - 19128).toBeLessThanOrEqual(60)
+    expect(report.textureCount).toBe(30)
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.55 * 1048576)
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
+    expect(M3_LIGHT_COUNT).toBe(4)
+  })
+})
+
+describe('task 22.2 (part B): desk clutter and east doorway detail', () => {
+  afterEach(() => setCanvasFactory(null))
+
+  const desk = prop('reception-desk')
+  const deskP = () => deskParts(desk.box, desk.height)
+  const top = desk.height
+  const EPS = 1e-6
+
+  /** Conservative world AABB of a part (rotated about Y or by the cylinder tilt: uses the bounding sphere of the rotated half extents). */
+  const aabb = (p: Part) => {
+    const e = new Euler(p.rot?.[0] ?? 0, p.rot?.[1] ?? 0, p.rot?.[2] ?? 0)
+    const m = new Matrix4().makeRotationFromEuler(e)
+    const half = p.geo === 'box' || p.geo === 'plane' ? [p.scale[0] / 2, p.scale[1] / 2, p.scale[2] / 2] : [p.scale[0] / 2, p.scale[1] / 2, p.scale[2] / 2]
+    const lo = new Vector3(Infinity, Infinity, Infinity)
+    const hi = new Vector3(-Infinity, -Infinity, -Infinity)
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
+      const v = new Vector3(half[0] * sx, half[1] * sy, half[2] * sz).applyMatrix4(m)
+      lo.min(v)
+      hi.max(v)
+    }
+    return { minX: lo.x + p.pos[0], maxX: hi.x + p.pos[0], minY: lo.y + p.pos[1], maxY: hi.y + p.pos[1], minZ: lo.z + p.pos[2], maxZ: hi.z + p.pos[2] }
+  }
+  const overlap3 = (a: ReturnType<typeof aabb>, b: ReturnType<typeof aabb>) =>
+    Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX) > EPS &&
+    Math.min(a.maxY, b.maxY) - Math.max(a.minY, b.minY) > EPS &&
+    Math.min(a.maxZ, b.maxZ) - Math.max(a.minZ, b.minZ) > EPS
+
+  it('notebook has a grain cover and a ruled page block stacked on the desk top, the mug has a rim ring', () => {
+    const parts = deskP()
+    const cover = parts.filter((p) => p.mat === 'notebookCover')
+    const page = parts.filter((p) => p.mat === 'paper')
+    const rim = parts.filter((p) => p.mat === 'mugRim')
+    expect(cover).toHaveLength(1)
+    expect(page).toHaveLength(1)
+    expect(rim).toHaveLength(1)
+    expect(rim[0].geo).toBe('cylinderLow')
+    expect(cover[0].metricRepeat).toBe(page[0].metricRepeat)
+    expect(page[0].metricOffset![0]).toBeCloseTo(page[0].metricRepeat! / 2, 9)
+    expect(cover[0].metricOffset).toBeUndefined()
+    const c = aabb(cover[0])
+    const g = aabb(page[0])
+    expect(c.minY).toBeCloseTo(top, 9)
+    expect(g.minY).toBeCloseTo(c.maxY, 9)
+    // The rim is the top of the mug: same footprint centre, resting on the body.
+    const body = parts.find((p) => p.mat === 'mug' && p.geo === 'cylinderLow')!
+    expect(rim[0].pos[0]).toBe(body.pos[0])
+    expect(body.pos[1] - body.scale[1] / 2).toBeCloseTo(top, 9)
+    expect(rim[0].pos[1] - rim[0].scale[1] / 2).toBeCloseTo(body.pos[1] + body.scale[1] / 2, 9)
+    expect(rim[0].scale[0]).toBeGreaterThan(body.scale[0])
+  })
+
+  it('every desk clutter part rests on the desk top, stays inside its footprint and intersects no other desk part', () => {
+    const parts = deskP()
+    const clutter = parts.filter((p) => p.pos[1] - p.scale[1] / 2 >= top - EPS || ['notebookCover', 'paper', 'mugRim'].includes(p.mat))
+    const boxes = clutter.map(aabb)
+    const slab = { minX: desk.box.minX - 0.05, maxX: desk.box.maxX + 0.05, minZ: desk.box.minZ - 0.05, maxZ: desk.box.maxZ + 0.05 }
+    boxes.forEach((b, i) => {
+      expect(b.minY, `part ${clutter[i].mat}`).toBeGreaterThanOrEqual(top - EPS)
+      expect(b.minX >= slab.minX && b.maxX <= slab.maxX && b.minZ >= slab.minZ && b.maxZ <= slab.maxZ, `${clutter[i].mat} inside top`).toBe(true)
+    })
+    // Pairs that nest on purpose are excluded: the lamp and bell stacks are single objects declared before this part.
+    const mine = clutter.map((p, i) => ({ p, b: boxes[i] })).filter(({ p }) => ['notebookCover', 'paper', 'mugRim', 'mug'].includes(p.mat) || (p.mat === 'spineC' && p.geo === 'cylinderLow') || (p.mat === 'metal' && p.geo === 'box' && p.scale[0] === 0.15))
+    for (let i = 0; i < clutter.length; i++) {
+      for (const m of mine) {
+        if (m.p === clutter[i]) continue
+        // The mug handle and body touch by design; the lamp, bell and archive box are far away.
+        if (m.p.mat === 'mug' && clutter[i].mat === 'mug') continue
+        expect(overlap3(m.b, boxes[i]), `${m.p.mat} vs ${clutter[i].mat}`).toBe(false)
+      }
+    }
+  })
+
+  const doors = () => doorDetailParts()
+  it('door detail parts stay out of every opening, protrude at most 2 cm from the face they sit on and add no collider', () => {
+    const parts = doors()
+    expect(parts.length).toBeGreaterThanOrEqual(6)
+    const colliders = [...ROOM.walls, ...ROOM.doors.flatMap((d) => d.frames)]
+    for (const p of parts) {
+      expect(['metal', 'woodDark']).toContain(p.mat)
+      const b = aabb(p)
+      for (const d of ROOM.doors) {
+        const o = d.opening
+        const inside = Math.min(b.maxX, o.maxX) - Math.max(b.minX, o.minX) > EPS && Math.min(b.maxZ, o.maxZ) - Math.max(b.minZ, o.minZ) > EPS
+        expect(inside, `${p.mat} inside ${d.id}`).toBe(false)
+      }
+      // It touches a frame or wall box and sticks out of it by at most 2 cm in x; z and y stay within the face.
+      const host = colliders.find((c) => b.minX < c.maxX + 0.02 + EPS && b.maxX > c.minX - 0.02 - EPS && b.minZ >= c.minZ - EPS && b.maxZ <= c.maxZ + EPS)
+      expect(host, `${p.mat} host`).toBeDefined()
+      const out = Math.max(host!.minX - b.minX, b.maxX - host!.maxX, 0)
+      expect(out).toBeLessThanOrEqual(0.02 + EPS)
+      expect(out).toBeGreaterThan(0)
+      expect(b.minY).toBeGreaterThan(0.1)
+      expect(b.maxY).toBeLessThan(2.1)
+    }
+    expect(COLLIDERS.length).toBe(ROOM.walls.length + 4 + ROOM.props.filter((p) => p.solid).length)
+    expect(declaredObjects().some((o) => o.name === 'door-detail')).toBe(true)
+  })
+
+  it('deskDetail is bound to paper and the cover, disposed once, twice-safe, with a null fallback and the old flat colours', () => {
+    const col = (k: keyof typeof materials) => `#${(materials[k] as unknown as { color: { getHexString(): string } }).color.getHexString()}`
+    setCanvasFactory(() => null)
+    ensureSharedTextures()
+    expect(getSharedTexture('deskDetail')).toBeNull()
+    expect(materials.paper.map).toBeNull()
+    expect(materials.notebookCover.map).toBeNull()
+    expect(col('paper')).toBe('#e6dfc6')
+    disposeSharedResources()
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    const tex = getSharedTexture('deskDetail')!
+    expect([tex.image.width, tex.image.height]).toEqual([128, 64])
+    expect(materials.paper.map).toBe(tex)
+    expect(materials.notebookCover.map).toBe(tex)
+    const spies = TEXTURE_IDS.map((id) => vi.spyOn(getSharedTexture(id)!, 'dispose'))
+    disposeSharedResources()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+    expect(() => disposeSharedResources()).not.toThrow()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+    expect(col('paper')).toBe('#e6dfc6')
+    expect(col('notebookCover')).toBe('#4a5866')
+  })
+
+  it('counts: 30 textures, at most 7.5 MB (budget 8 MB), under 20,000 triangles with at most +120 over 19,056, 4 lights', () => {
+    const report = sceneDetailReport()
+    console.info(
+      `[22.2B] triangles ${report.totalTriangles} (delta ${report.totalTriangles - 19056}), draw calls ${report.totalDrawCalls}, textures ${report.textureCount}, ` +
+        `texture memory ${(report.textureMemoryBytes / 1048576).toFixed(3)} MB (computed, not runtime-measured), deskDetail ${(textureMemoryBytes(TEXTURE_SPECS.deskDetail) / 1048576).toFixed(3)} MB`,
+    )
+    expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
+    expect(report.totalTriangles - 19056).toBeLessThanOrEqual(120)
+    expect(report.textureCount).toBe(30)
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.5 * 1048576)
+    expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
+    expect(M3_LIGHT_COUNT).toBe(4)
   })
 })

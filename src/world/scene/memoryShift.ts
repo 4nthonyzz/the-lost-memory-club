@@ -62,6 +62,12 @@ export const COUCH_FABRIC_COLORS = Object.freeze({
   couchBody: { flat: '#7a2c3c', textured: '#98374b' },
   couchCushion: { flat: '#8c3446', textured: '#af4158' },
   couchPillow: { flat: '#26b5c9', textured: '#30e2fb' },
+  /**
+   * Armchair (task 22.1): `flat` is the previous green armchair colour (no-canvas fallback, unchanged).
+   * `textured` is a muted slate/teal (#4f6a70 body, #5f7c80 cushion) lifted about 1.25x like the couch.
+   */
+  armchairBody: { flat: '#3d5a4c', textured: '#63848c' },
+  armchairCushion: { flat: '#4f7561', textured: '#779ba0' },
 })
 
 export type CouchMaterialKey = keyof typeof COUCH_FABRIC_COLORS

@@ -86,18 +86,22 @@ export const materials = {
   woodDark: lambert('#4a3220'),
   metal: lambert('#777c86'),
   plastic: lambert('#22232a'),
+  /** Cardboard-box look (task 22.2): flat brown is the no-canvas fallback; with the crate texture the multiplier is white. Used by the desk archive box and the crate label panels. */
   crate: lambert('#8a6a3c'),
+  /** Wooden crate rings and shelf boxes (task 22.2): the old crate colour on the wood texture, since `crate` is cardboard now. */
+  crateWood: lambert('#8a6a3c'),
   rug: lambert('#7a2c3c'),
   /** Framed posters. Flat colours are the fallback; the poster textures replace them. */
   posterSunset: lambert('#8a2a6a'),
   posterReel: lambert('#0c3a44'),
   doorFrame: lambert('#3b2a1d'),
+  /** VHS cassettes. Flat colours are the no-canvas fallback; with the vhsShell texture the multiplier is a lifted tone of the same hue (task 22.1). */
   tapeBlack: lambert('#15151a'),
+  tapeBlue: lambert('#2a4aa0'),
   tapeLabel: lambert('#d8d2b8'),
   cabinet: lambert('#5a1f7a'),
   lampShade: lambert('#e8c27a'),
   /** 13.6 detail materials. All fixed colours, none reads game state. */
-  casing: lambert('#8d887a'),
   casingDark: lambert('#5f5b52'),
   bezel: lambert('#0c0c10'),
   displayGreen: new MeshBasicMaterial({ color: '#2a8a5a' }),
@@ -113,8 +117,11 @@ export const materials = {
   fluorescent: new MeshBasicMaterial({ color: '#e8f4ff' }),
   trim: lambert('#2a2230'),
   skirting: lambert('#1f1a26'),
-  fabric: lambert('#3d5a4c'),
-  fabricLight: lambert('#4f7561'),
+  /** 22.1 armchair upholstery. Flat colours are the previous green armchair; with couchFabric the slate/teal multiplier applies. Tinted by Memory_Shift. */
+  armchairBody: lambert(COUCH_FABRIC_COLORS.armchairBody.flat),
+  armchairCushion: lambert(COUCH_FABRIC_COLORS.armchairCushion.flat),
+  /** 22.1 VCR housing: brushed dark metal texture; flat dark grey fallback. */
+  vcrDeck: lambert('#2e2f36'),
   rugLight: lambert('#8c3446'),
   /** 21.1 couch upholstery. Flat colours are the no-canvas fallback; with the couchFabric texture the multiplier is the textured hue. Tinted by Memory_Shift. */
   couchBody: lambert(COUCH_FABRIC_COLORS.couchBody.flat),
@@ -137,7 +144,12 @@ export const materials = {
   grille: lambert('#1c1d24'),
   coinGlow: new MeshBasicMaterial({ color: '#ffcf5a' }),
   mug: lambert('#b4503c'),
+  /** Notepad page block (22.2 part B): shows the ruled-paper cell of deskDetail; flat paper colour is the no-canvas fallback. */
   paper: lambert('#e6dfc6'),
+  /** Notepad cover (22.2 part B): the grain cell of deskDetail times this colour; flat colour is the fallback. */
+  notebookCover: lambert('#4a5866'),
+  /** Lighter ceramic rim ring of the desk mug (22.2 part B). */
+  mugRim: lambert('#d98a76'),
   /** Powered-down screen and marquee of the companion cabinet and the CRT stack. */
   screenOff: lambert('#050508'),
   marqueeOff: lambert('#2a2018'),
@@ -148,6 +160,8 @@ export const materials = {
   /** 18.3: the second cabinet is a slightly warmer, greener grey. Label slots are bright metal. */
   filingGreyB: lambert('#7a7d70'),
   filingDarkB: lambert('#656858'),
+  /** 22.2 typed index card on each drawer: the flat colour of tapeLabel; with metalCabinet it shows the card cell. */
+  filingCard: lambert('#d8d2b8'),
   labelSlot: lambert('#d4d8de'),
   /** Cork board: the cork texture (white multiplier) replaces the flat colour when a canvas exists. */
   cork: lambert('#9a7448'),
@@ -256,12 +270,27 @@ const round4 = (v: number) => Math.round(v * 1e4) / 1e4
  * `metresPerRepeat` metres on every face. With `alignGrain` u follows the longer in-plane edge (wood grain);
  * otherwise u is the first in-plane axis and v the second, which keeps vertical ribs vertical on the sides
  * (+-x faces: u = z, v = y; +-z faces: u = x, v = y; +-y faces: u = x, v = z). One cache, one disposal.
+ * `aspect` (task 22.1) is the tile height over its width in metres, for a non-square texture such as the
+ * 256 x 128 vcrDeck (aspect 0.5); it only applies to the plain (non-grain) mapping. Default 1.
  */
-export function metricBoxGeometry(w: number, h: number, d: number, metresPerRepeat: number, alignGrain = false): BoxGeometry {
+export function metricBoxGeometry(
+  w: number,
+  h: number,
+  d: number,
+  metresPerRepeat: number,
+  alignGrain = false,
+  aspect = 1,
+  uvOffset?: readonly [number, number],
+  plainV?: readonly [number, number],
+): BoxGeometry {
   const sx = round4(w)
   const sy = round4(h)
   const sz = round4(d)
-  const key = `${alignGrain ? 'grain' : 'plain'}|${metresPerRepeat}|${sx},${sy},${sz}`
+  const kind = uvOffset ? 'panel' : alignGrain ? 'grain' : 'plain'
+  const aKey = aspect === 1 ? '' : `|a${aspect}`
+  const oKey = uvOffset ? `|o${uvOffset[0]},${uvOffset[1]}` : ''
+  const pKey = plainV ? `|p${plainV[0]},${plainV[1]}` : ''
+  const key = `${kind}|${metresPerRepeat}|${sx},${sy},${sz}${aKey}${oKey}${pKey}`
   const cached = woodBoxCache.get(key)
   if (cached) return cached
   const g = new BoxGeometry(sx, sy, sz)
@@ -274,8 +303,12 @@ export function metricBoxGeometry(w: number, h: number, d: number, metresPerRepe
     const [a, b] = axes[Math.floor(i / 4)]
     const pa = [pos.getX(i), pos.getY(i), pos.getZ(i)][a] + size[a] / 2
     const pb = [pos.getX(i), pos.getY(i), pos.getZ(i)][b] + size[b] / 2
-    if (alignGrain && size[b] > size[a]) uv.setXY(i, pb / metresPerRepeat, pa / metresPerRepeat)
-    else uv.setXY(i, pa / metresPerRepeat, pb / metresPerRepeat)
+    if (uvOffset && plainV && Math.floor(i / 4) < 4) {
+      // Panel mode (task 22.2): only the +-z faces show the tile at the part's offset; every other face shows the plain stripe.
+      uv.setXY(i, pa / metresPerRepeat, plainV[0] + (pb / size[b]) * (plainV[1] - plainV[0]))
+    } else if (uvOffset) uv.setXY(i, (pa + uvOffset[0]) / metresPerRepeat, (pb + uvOffset[1]) / (metresPerRepeat * aspect))
+    else if (alignGrain && size[b] > size[a]) uv.setXY(i, pb / metresPerRepeat, pa / metresPerRepeat)
+    else uv.setXY(i, pa / metresPerRepeat, pb / (metresPerRepeat * aspect))
   }
   uv.needsUpdate = true
   woodBoxCache.set(key, g)
@@ -292,7 +325,7 @@ export const fabricBoxCount = (): number => [...woodBoxCache.keys()].filter((k) 
 
 // ---------------------------------------------------------------------------------------------
 // Procedural canvas textures (task 15.7, 18.3, 19.2). Deterministic, drawn once, never redrawn per frame.
-// Budget: 21 textures (see proceduralTextures.ts for the estimate), limit 8 MB.
+// Budget: 30 textures (see proceduralTextures.ts for the estimate), limit 8 MB.
 // ---------------------------------------------------------------------------------------------
 
 /** The part of a canvas element that createCanvasTexture needs. */
@@ -407,8 +440,10 @@ const TEXTURE_BINDINGS: readonly TextureBinding[] = [
   { material: 'floor', texture: 'floor', color: '#ffffff' },
   { material: 'wood', texture: 'wood', color: '#ffffff' },
   { material: 'woodDark', texture: 'woodDark', color: '#ffffff' },
-  { material: 'crate', texture: 'crate', color: '#ffffff' },
-  { material: 'crateSlat', texture: 'crate', color: '#b89c78' },
+  { material: 'crate', texture: 'crate', color: '#ffffff', fallbackColor: '#8a6a3c' },
+  { material: 'cardboard', texture: 'crate', color: '#ffffff', fallbackColor: '#a98457' },
+  { material: 'crateWood', texture: 'wood', color: '#ffffff', fallbackColor: '#8a6a3c' },
+  { material: 'crateSlat', texture: 'wood', color: '#b09878', fallbackColor: '#6e5230' },
   { material: 'grille', texture: 'grille', color: '#ffffff' },
   { material: 'bookSpine', texture: 'spineAtlas', color: '#ffffff' },
   /** The wall colour stays a near-white multiplier owned by Memory_Shift, so no `color` here. */
@@ -416,11 +451,25 @@ const TEXTURE_BINDINGS: readonly TextureBinding[] = [
   { material: 'couchBody', texture: 'couchFabric', color: COUCH_FABRIC_COLORS.couchBody.textured, fallbackColor: COUCH_FABRIC_COLORS.couchBody.flat },
   { material: 'couchCushion', texture: 'couchFabric', color: COUCH_FABRIC_COLORS.couchCushion.textured, fallbackColor: COUCH_FABRIC_COLORS.couchCushion.flat },
   { material: 'couchPillow', texture: 'couchFabric', color: COUCH_FABRIC_COLORS.couchPillow.textured, fallbackColor: COUCH_FABRIC_COLORS.couchPillow.flat },
+  { material: 'armchairBody', texture: 'couchFabric', color: COUCH_FABRIC_COLORS.armchairBody.textured, fallbackColor: COUCH_FABRIC_COLORS.armchairBody.flat },
+  { material: 'armchairCushion', texture: 'couchFabric', color: COUCH_FABRIC_COLORS.armchairCushion.textured, fallbackColor: COUCH_FABRIC_COLORS.armchairCushion.flat },
   { material: 'crtCasing', texture: 'crtCasing', color: CRT_CASING_COLORS.textured, fallbackColor: CRT_CASING_COLORS.flat },
+  { material: 'vcrDeck', texture: 'vcrDeck', color: '#ffffff', fallbackColor: '#2e2f36' },
+  /** The cabinet texture is light neutral grey; each multiplier is the old flat grey lifted about 15 %, so the lit result stays close to it. */
+  { material: 'filingGrey', texture: 'metalCabinet', color: '#808996', fallbackColor: '#6f7782' },
+  { material: 'filingDark', texture: 'metalCabinet', color: '#666e7b', fallbackColor: '#59606b' },
+  { material: 'filingGreyB', texture: 'metalCabinet', color: '#8c9081', fallbackColor: '#7a7d70' },
+  { material: 'filingDarkB', texture: 'metalCabinet', color: '#747865', fallbackColor: '#656858' },
+  { material: 'filingCard', texture: 'metalCabinet', color: '#ffffff', fallbackColor: '#d8d2b8' },
+  /** The shell texture is light neutral plastic; the multiplier sets black or navy and keeps a little detail contrast. */
+  { material: 'tapeBlack', texture: 'vhsShell', color: '#303038', fallbackColor: '#15151a' },
+  { material: 'tapeBlue', texture: 'vhsShell', color: '#4476f8', fallbackColor: '#2a4aa0' },
   /** The glass texture carries the look, so the multiplier is white; Memory_Shift tints it from there. */
   { material: 'crtScreen', texture: 'crtGlass', color: crtScreenBaseColor(true), fallbackColor: crtScreenBaseColor(false) },
   { material: 'rugWoven', texture: 'rugWoven', color: '#ffffff' },
   { material: 'cork', texture: 'corkBoard', color: '#ffffff' },
+  { material: 'paper', texture: 'deskDetail', color: '#ffffff', fallbackColor: '#e6dfc6' },
+  { material: 'notebookCover', texture: 'deskDetail', color: '#6a7888', fallbackColor: '#4a5866' },
   { material: 'lampHalo', texture: 'lampGlow', color: '#ffffff' },
   /** Slightly dimmed multiplier: the reference card stays below the main CRT's brightness. */
   { material: 'smpteScreen', texture: 'smpteBars', color: '#b8b8b8' },
