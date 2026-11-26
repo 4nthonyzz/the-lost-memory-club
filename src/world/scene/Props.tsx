@@ -1,10 +1,10 @@
 /** Reception desk, bookcases with instanced books and tapes, furniture and environmental details. Sizes come from ROOM props. */
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
-import type { Mesh } from 'three'
+import type { Group, Mesh } from 'three'
 import { AssetModel } from '../assets/AssetModel'
 import { ROOM, type PropDef } from '../layout/roomLayout'
-import type { Aabb } from '../worldTypes'
+import type { Aabb, Facing } from '../worldTypes'
 import {
   ARCHIVE_BOX_IDS,
   archiveBoxParts,
@@ -20,11 +20,16 @@ import {
   deskParts,
   type DeskLampKind,
   type Part,
+  advancePlatterAngle,
   posterParts,
+  hifiTableGroups,
+  speakerParts,
   shelfFrameParts,
   shelfContents,
 } from './modelDetail'
+import { useReducedMotion } from '../controller/useReducedMotion'
 import { assetPlacement } from './assetPlacement'
+import { backAgainstWall } from './floorCull'
 import { BookMeshes, PartMeshes } from './PartMeshes'
 import { Block } from './Room'
 import { ensureSharedTextures, geometries, hasSharedTexture, materials, metricBoxGeometry } from './sharedResources'
@@ -128,6 +133,70 @@ export function Couch({ box }: { box: Aabb }) {
   return <PartMeshes parts={parts} />
 }
 
+/**
+ * The two-tier Hi-Fi console body (tasks 33.1, 34.1, 35.1), in the prop-local frame. Three separately addressable groups: the static console (steel posts, walnut top and shelf,
+ * turntable controls and open dust cover, NOW PLAYING jacket stand, cassettes, brass lamp, LP rack, receiver, record crate, front LED bar and tabletop glow), the platter group (placed at the spindle axis, so rotating
+ * it about y spins the record) and the tonearm. While `playing` the platter spins at 33 1/3 RPM in useFrame (TURNTABLE_SPIN_RAD_PER_SEC), the tonearm sits
+ * on the record, the display is emerald, the LED bar is bright and the glow is stronger; stopped, the tonearm rests on its cradle, the display is amber and the
+ * LED and glow are dim. `track` selects the jacket colour (0..3 = the four records, anything else = neutral STOP). Under reduced motion nothing spins; the
+ * pose still switches instantly. There is no invalidate loop: the frame loop is the existing one (it is idle in 'demand' mode while a station panel is
+ * open, so the spin pauses there too). Without the lampGlow texture the additive glow disc would be a flat blob, so it is skipped.
+ */
+function HifiTable({ box, playing, track, wallBack, platterRef }: { box: Aabb; playing: boolean; track: number; wallBack: boolean; platterRef?: RefObject<Group | null> }) {
+  const groups = useMemo(() => hifiTableGroups(box, { playing, track }, wallBack), [box, playing, track, wallBack])
+  const textured = useMemo(() => {
+    ensureSharedTextures()
+    return hasSharedTexture('lampGlow')
+  }, [])
+  const solid = useMemo(() => (textured ? groups.static : groups.static.filter((p) => p.hifiRole !== 'glow')), [groups, textured])
+  const own = useRef<Group>(null)
+  const ref = platterRef ?? own
+  const reduced = useReducedMotion()
+  useFrame((_, dt) => {
+    const g = ref.current
+    if (g) g.rotation.y = advancePlatterAngle(g.rotation.y, dt, playing, reduced)
+  })
+  return (
+    <group>
+      <PartMeshes parts={solid} />
+      <group ref={ref} position={[groups.spindle[0], groups.spindle[1], groups.spindle[2]]}>
+        <PartMeshes parts={groups.platter} />
+      </group>
+      <PartMeshes parts={groups.tonearm} />
+    </group>
+  )
+}
+
+/** The record player on its layout footprint: the Hi-Fi console faces `facing` (-z for the south-wall spot, 34.1). `track` defaults to 4 (neutral jacket). */
+export function RecordPlayer({
+  box,
+  facing,
+  playing = false,
+  track = 4,
+  platterRef,
+}: {
+  box: Aabb
+  facing?: Facing
+  playing?: boolean
+  track?: number
+  platterRef?: RefObject<Group | null>
+}) {
+  const wallBack = useMemo(() => backAgainstWall(box, facing, ROOM.walls), [box, facing])
+  return (
+    <Faced box={box} facing={facing}>
+      {(local) => <HifiTable box={local} playing={playing} track={track} wallBack={wallBack} platterRef={platterRef} />}
+    </Faced>
+  )
+}
+
+/** The floor loudspeaker (task 35.1) beside the console, on its layout footprint, facing -z. Static: it never animates. */
+export function Loudspeaker({ box, height, facing }: { box: Aabb; height: number; facing?: Facing }) {
+  const wallBack = useMemo(() => backAgainstWall(box, facing, ROOM.walls), [box, facing])
+  return (
+    <Faced box={box} facing={facing}>{(local) => <PartMeshes parts={speakerParts(local, height, wallBack)} />}</Faced>
+  )
+}
+
 export function Crate({ box, height }: { box: Aabb; height: number }) {
   const parts = useMemo(() => crateParts(box, height), [box, height])
   return <PartMeshes parts={parts} />
@@ -226,11 +295,21 @@ function ArcadeAreaDressing() {
   )
 }
 
-/** `lampOn` is the world-local lamp state (task 23.2). Absent means both lamps are on. */
-export function Props({ lampOn }: { lampOn?: Readonly<Record<string, boolean>> } = {}) {
+/**
+ * `lampOn` is the world-local lamp state (task 23.2). Absent means both lamps are on. `turntablePlaying` is true while a music track really plays (task 33.3).
+ * `turntableTrack` (task 34.2) is the selected track 0..4 mirrored from the audio engine: the NOW PLAYING jacket shows its colour as soon as it is selected,
+ * even before audio is unlocked (the LED, glow, display and tonearm stay tied to `turntablePlaying`); 4 (STOP) and the default show the neutral jacket.
+ */
+export function Props({
+  lampOn,
+  turntablePlaying = false,
+  turntableTrack = 4,
+}: { lampOn?: Readonly<Record<string, boolean>>; turntablePlaying?: boolean; turntableTrack?: number } = {}) {
   const desk = propById('reception-desk')
   const chair = propById('abandoned-chair')
   const couch = propById('couch')
+  const recordPlayer = propById('record-player')
+  const loudspeaker = propById('loudspeaker')
   return (
     <group>
       <ShiftDressing />
@@ -245,6 +324,8 @@ export function Props({ lampOn }: { lampOn?: Readonly<Record<string, boolean>> }
       })}
       <AssetModel id="armchair" {...assetPlacement(chair.box)} fallback={<Armchair box={chair.box} />} />
       <AssetModel id="couch" {...assetPlacement(couch.box)} fallback={<Couch box={couch.box} />} />
+      <RecordPlayer box={recordPlayer.box} facing={recordPlayer.facing} playing={turntablePlaying} track={turntableTrack} />
+      <Loudspeaker box={loudspeaker.box} height={loudspeaker.height} facing={loudspeaker.facing} />
       <Details />
       <ArcadeAreaDressing />
     </group>

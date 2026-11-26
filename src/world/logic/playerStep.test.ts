@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { Aabb } from '../worldTypes';
-import { PITCH_LIMIT_DEG, WALK_SPEED } from './constants';
+import {
+  DT_MAX,
+  LOOK_SMOOTHING_LAMBDA,
+  MOUSE_SENSITIVITY,
+  MOVE_SMOOTHING_LAMBDA,
+  PITCH_LIMIT_DEG,
+  WALK_SPEED,
+} from './constants';
 import type { InputMode } from './inputMode';
 import type { HeldKeys, KeyRole } from './inputState';
 import { stepPlayer, type PlayerStepInput } from './playerStep';
@@ -106,15 +113,74 @@ describe('stepPlayer smoothing', () => {
     return { pos, look, velocity };
   }
 
-  it('look is more than 99% converged after 0.15 s at lambda 32', () => {
+  it('keyboard look is more than 99% converged within 0.11 s at LOOK_SMOOTHING_LAMBDA and never overshoots', () => {
+    expect(Math.exp(-LOOK_SMOOTHING_LAMBDA * 0.11)).toBeLessThan(0.01);
     const target = { yaw: 1, pitch: 0.5 };
     let look = { yaw: 0, pitch: 0 };
-    for (let k = 0; k < 9; k++) {
-      look = stepPlayer(input({ look, targetLook: target, dt: 1 / 60 })).look;
+    for (let k = 0; k < 7; k++) {
+      look = stepPlayer(input({ look, targetLook: target, dt: 0.11 / 7 })).look;
+      expect(look.yaw).toBeLessThanOrEqual(1 + 1e-12);
+      expect(look.pitch).toBeLessThanOrEqual(0.5 + 1e-12);
     }
-    // 9 frames of 1/60 s = 0.15 s
     expect(look.yaw).toBeGreaterThan(0.99);
     expect(look.pitch).toBeGreaterThan(0.495);
+  });
+
+  it('velocity is more than 99% converged within 0.165 s at MOVE_SMOOTHING_LAMBDA and never overshoots', () => {
+    expect(Math.exp(-MOVE_SMOOTHING_LAMBDA * 0.165)).toBeLessThan(0.01);
+    let velocity = { x: 0, z: 0 };
+    let pos = { x: 0, z: 8 };
+    for (let k = 0; k < 11; k++) {
+      const r = stepPlayer(input({ pos, velocity, keys: keys('forward'), dt: 0.165 / 11 }));
+      velocity = r.velocity;
+      pos = { x: 0, z: 8 };
+      expect(Math.abs(velocity.z)).toBeLessThanOrEqual(WALK_SPEED + 1e-9);
+    }
+    expect(Math.abs(velocity.z)).toBeGreaterThan(WALK_SPEED * 0.99);
+  });
+
+  it('steady walking speed equals WALK_SPEED', () => {
+    const r = run(60, 1, { keys: keys('forward') });
+    expect(Math.hypot(r.velocity.x, r.velocity.z)).toBeCloseTo(WALK_SPEED, 3);
+  });
+
+  it('applies a mouse delta 1:1 to the rendered and target look for any dt', () => {
+    for (const dt of [1 / 30, 1 / 60, 1 / 144]) {
+      const start = { yaw: 0.4, pitch: 0.1 };
+      const r = stepPlayer(input({ look: start, targetLook: start, mouseDelta: { x: 50, y: -30 }, dt }));
+      expect(r.look.yaw - start.yaw).toBeCloseTo(-50 * MOUSE_SENSITIVITY, 12);
+      expect(r.look.pitch - start.pitch).toBeCloseTo(30 * MOUSE_SENSITIVITY, 12);
+      expect(r.look).toEqual(r.targetLook);
+    }
+  });
+
+  it('keeps a keyboard-look difference in flight when a mouse delta arrives', () => {
+    const look = { yaw: 0, pitch: 0 };
+    const targetLook = { yaw: 0.5, pitch: 0.2 };
+    const dt = 1 / 60;
+    const alpha = 1 - Math.exp(-LOOK_SMOOTHING_LAMBDA * dt);
+    const r = stepPlayer(input({ look, targetLook, mouseDelta: { x: 20, y: 10 }, dt }));
+    const dyaw = -20 * MOUSE_SENSITIVITY;
+    const dpitch = -10 * MOUSE_SENSITIVITY;
+    expect(r.targetLook.yaw).toBeCloseTo(0.5 + dyaw, 12);
+    // Remaining gap is (1 - alpha) of the original gap: the difference was not discarded.
+    expect(r.targetLook.yaw - r.look.yaw).toBeCloseTo((1 - alpha) * 0.5, 12);
+    expect(r.targetLook.pitch - r.look.pitch).toBeCloseTo((1 - alpha) * 0.2, 12);
+    expect(r.look.pitch).toBeCloseTo(dpitch + alpha * 0.2, 12);
+  });
+
+  it('walls are never penetrated at the walking speed with dt = DT_MAX', () => {
+    const thin: Aabb = { minX: 0, maxX: 0.15, minZ: -5, maxZ: 5 };
+    let pos = { x: -0.36, z: 0 };
+    let velocity = { x: 0, z: 0 };
+    for (let k = 0; k < 40; k++) {
+      const r = stepPlayer(
+        input({ pos, velocity, look: { yaw: -Math.PI / 2, pitch: 0 }, keys: keys('forward'), colliders: [thin], dt: DT_MAX }),
+      );
+      pos = r.pos;
+      velocity = r.velocity;
+      expect(pos.x).toBeLessThanOrEqual(-0.35 + 1e-9);
+    }
   });
 
   it('never overshoots the look target or the target velocity', () => {

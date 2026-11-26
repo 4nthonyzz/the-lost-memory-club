@@ -3,8 +3,8 @@
 // All values below are INITIAL values, approved for the first implementation
 // and to be validated in testing. They may change after testing.
 
-/** Walking speed in world units per second. */
-export const WALK_SPEED = 2.5;
+/** Walking speed in world units per second (2.5 * 1.15 = 2.875, rounded to 2.88). */
+export const WALK_SPEED = 2.88;
 /** Radius of the Player's circular footprint, in world units. */
 export const PLAYER_RADIUS = 0.35;
 /** Maximum Player-to-Station distance for targeting, in world units. */
@@ -25,7 +25,7 @@ export const DT_MAX = 0.1;
 export const MAX_STEP = 0.1;
 /** Constant camera eye height above the floor, in world units. */
 export const EYE_HEIGHT = 1.6;
-/** Look smoothing rate (1/s) for the exponential approach of the rendered look to the target. Initial value, validated in testing. */
-export const LOOK_SMOOTHING_LAMBDA = 32;
+/** Look smoothing rate (1/s) for the exponential approach of the rendered look to the target (keyboard look only; mouse look is applied 1:1). Initial value, validated in testing. */
+export const LOOK_SMOOTHING_LAMBDA = 42;
 /** Movement smoothing rate (1/s) for the exponential approach of the velocity to the target. Initial value, validated in testing. */
-export const MOVE_SMOOTHING_LAMBDA = 20;
+export const MOVE_SMOOTHING_LAMBDA = 28;

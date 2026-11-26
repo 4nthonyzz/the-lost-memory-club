@@ -6,6 +6,7 @@
 import {
   AdditiveBlending,
   BoxGeometry,
+  type BufferGeometry,
   CanvasTexture,
   CircleGeometry,
   DoubleSide,
@@ -50,6 +51,9 @@ import {
 /** Radial segments of every round lamp glow surface and light cone (task 30.1). */
 const LAMP_RADIAL_SEGMENTS = 24
 
+/** Radial segments of the record player platter (task 33.1). */
+export const TURNTABLE_PLATTER_SEGMENTS = 24
+
 export const geometries = {
   /** Unit box; size it with mesh `scale`. */
   box: new BoxGeometry(1, 1, 1),
@@ -75,6 +79,11 @@ export const geometries = {
    * Scale uniformly by 4 x the wanted top radius.
    */
   lampCone: new CylinderGeometry(0.25, 0.5, 1, LAMP_RADIAL_SEGMENTS, 1, true),
+  /**
+   * Record player platter (task 33.1): unit-height cylinder of diameter 1 with 24 radial segments (96 triangles). The 12-inch
+   * (0.30 m) vinyl is this geometry scaled by [0.30, thickness, 0.30]. Shared and cached like every other unit geometry.
+   */
+  platter: new CylinderGeometry(0.5, 0.5, 1, TURNTABLE_PLATTER_SEGMENTS),
 }
 
 /**
@@ -160,6 +169,20 @@ const arcadeGlowMaterial = (color: string) =>
     polygonOffsetUnits: -2,
   })
 
+/** Task 34.1: warm additive tabletop glow (lampGlow map when a canvas exists), no depth write, pulled toward the camera by a polygon offset. */
+export const HIFI_GLOW_OPACITY = Object.freeze({ on: 0.25, off: 0.07 })
+const hifiGlowMaterial = (opacity: number) =>
+  new MeshBasicMaterial({
+    color: '#ffa63c',
+    transparent: true,
+    opacity,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  })
+
 export const materials = {
   floor: lambert('#3a3340'),
   wall: lambert(BASE_WALL_COLOR),
@@ -178,7 +201,7 @@ export const materials = {
   posterReel: lambert('#0c3a44'),
   doorFrame: lambert('#3b2a1d'),
   /** VHS cassettes. Flat colours are the no-canvas fallback; with the vhsShell texture the multiplier is a lifted tone of the same hue (task 22.1). */
-  tapeBlack: lambert('#15151a'),
+  tapeBlack: lambert('#2a2d36'),
   tapeBlue: lambert('#2a4aa0'),
   tapeLabel: lambert('#d8d2b8'),
   cabinet: lambert('#5a1f7a'),
@@ -196,6 +219,8 @@ export const materials = {
   btnOrange: lambert('#e87a2a'),
   bulb: new MeshBasicMaterial({ color: '#fff2c0' }),
   fluorescent: new MeshBasicMaterial({ color: '#e8f4ff' }),
+  /** 31.2 steel housing and end caps of the ceiling fixtures (brushed metalCabinet stripe when textured; flat #777c86 otherwise). */
+  fixtureHousing: lambert('#777c86'),
   trim: lambert('#2a2230'),
   skirting: lambert('#1f1a26'),
   /** 22.1 armchair upholstery. Flat colours are the previous green armchair; with couchFabric the slate/teal multiplier applies. Tinted by Memory_Shift. */
@@ -341,6 +366,43 @@ export const materials = {
     depthWrite: false,
     side: DoubleSide,
   }),
+  /**
+   * 33.1 record player. Flat colours only, no texture: black vinyl, the coloured centre label, and the track-indicator display. The
+   * display is an emissive MeshBasicMaterial (no light): warm amber while idle, emerald while a track plays (swapped per mesh, so each
+   * state keeps its own material).
+   */
+  vinyl: lambert('#0b0b0f'),
+  recordLabel: lambert('#d2542f'),
+  trackDisplay: new MeshBasicMaterial({ color: '#ffb347' }),
+  trackDisplayOn: new MeshBasicMaterial({ color: '#3ddc97' }),
+  /**
+   * 34.1 Hi-Fi table. Flat colours only, no new texture. The four LP sleeves and the NOW PLAYING jacket share these materials (the jacket of track n uses
+   * the sleeve material of the same colour, so the two merge into one draw call); sleeveNeutral is the dark grey of the STOP state. The front LED
+   * accent bar is a warm amber MeshBasicMaterial pair (bright while playing, dim while stopped), and the tabletop glow is an additive lampGlow pair
+   * (dimmer while stopped). All are swapped per mesh, never mutated.
+   */
+  sleeveGreen: lambert('#16a34a'),
+  sleeveRose: lambert('#e11d48'),
+  sleeveSky: lambert('#38bdf8'),
+  sleeveAmber: lambert('#f59e0b'),
+  sleeveNeutral: lambert('#3a3d46'),
+  hifiLedOn: new MeshBasicMaterial({ color: '#ffc15a' }),
+  hifiLedOff: new MeshBasicMaterial({ color: '#5c3912' }),
+  hifiGlowOn: hifiGlowMaterial(0.25),
+  hifiGlowOff: hifiGlowMaterial(0.07),
+  /**
+   * 35.1 two-tier console. Flat colours only, no new texture. `sleeveTint` is white: every LP sleeve, stacked record and crate record is one instance of it with its own
+   * colour. `hifiDustCover` is the clear acrylic lid (opacity 0.18, slight blue tint, no depth write). The small brass lamp has a dark double-sided shade and an
+   * emissive amber bulb (MeshBasicMaterial, no light). The receiver dial and display are MeshBasicMaterial pairs swapped per mesh: bright while a track plays, dim while stopped.
+   */
+  sleeveTint: lambert('#ffffff'),
+  hifiDustCover: new MeshLambertMaterial({ color: '#b9d4ff', transparent: true, opacity: 0.18, depthWrite: false }),
+  hifiLampShade: new MeshLambertMaterial({ color: '#23242b', side: DoubleSide }),
+  hifiLampBulb: new MeshBasicMaterial({ color: '#ffb347' }),
+  receiverDialOn: new MeshBasicMaterial({ color: '#ffd27a' }),
+  receiverDialOff: new MeshBasicMaterial({ color: '#4a3a1c' }),
+  receiverDisplayOn: new MeshBasicMaterial({ color: '#5df2a8' }),
+  receiverDisplayOff: new MeshBasicMaterial({ color: '#1d4634' }),
   /** Screens: tinted only by the Memory_Shift blend. They never read lock state. */
   crtScreen: new MeshBasicMaterial({ color: BASE_CRT_SCREEN_COLOR }),
   /** Per-cabinet screens: flat game colours are the no-canvas fallback; with a canvas the attract texture is attached and the base becomes white. Tinted by Memory_Shift. */
@@ -493,6 +555,98 @@ export function atlasBoxGeometry(w: number, h: number, d: number, rect: UvRect, 
   woodBoxCache.set(key, g)
   return g
 }
+
+/** Pixel rectangles of the 128 x 128 vhsShell canvas (x0, y0 inclusive to x1, y1 exclusive) that the desk cassette shows (task 31.2). */
+export const VHS_SHELL_REGIONS = Object.freeze({
+  /** Top face (0.19 x 0.1 m): dust flap, handwritten label strip and the reel window (108 x 48 px, 2.25:1 for a 1.9:1 face). */
+  top: [10, 61, 118, 109] as readonly [number, number, number, number],
+  /** Front face (0.19 x 0.03 m): the white "ARCHIVE" spine label sticker (104 x 17 px). */
+  front: [12, 109, 116, 126] as readonly [number, number, number, number],
+  /** Every other face: the ribbed stripe below the label. */
+  plain: [0, 125, 128, 128] as readonly [number, number, number, number],
+})
+
+const VHS_SHELL_SIZE = 128
+
+/** UV rectangle of a vhsShell pixel region, inset half a texel (canvas top is v = 1). */
+export function vhsShellUvRect(px: readonly [number, number, number, number]): UvRect {
+  return {
+    u0: (px[0] + 0.5) / VHS_SHELL_SIZE,
+    u1: (px[2] - 0.5) / VHS_SHELL_SIZE,
+    v0: 1 - (px[3] - 0.5) / VHS_SHELL_SIZE,
+    v1: 1 - (px[1] + 0.5) / VHS_SHELL_SIZE,
+  }
+}
+
+/**
+ * Real-size desk cassette box (task 31.2): the top face (+y, face 2) shows the label strip and reel window, the front face (+z, face 4)
+ * the spine label, and every other face the ribbed stripe. Native BoxGeometry orientation is kept (on +y, v grows toward -z; on +z, v grows
+ * toward +y), so the text reads upright for a player standing on the +z side. Cached with the metric boxes, disposed once.
+ */
+export function cassetteBoxGeometry(w: number, h: number, d: number): BoxGeometry {
+  const sx = round4(w)
+  const sy = round4(h)
+  const sz = round4(d)
+  const key = `cassette|${sx},${sy},${sz}`
+  const cached = woodBoxCache.get(key)
+  if (cached) return cached
+  const g = new BoxGeometry(sx, sy, sz)
+  const uv = g.getAttribute('uv')
+  const top = vhsShellUvRect(VHS_SHELL_REGIONS.top)
+  const front = vhsShellUvRect(VHS_SHELL_REGIONS.front)
+  const plain = vhsShellUvRect(VHS_SHELL_REGIONS.plain)
+  for (let i = 0; i < uv.count; i++) {
+    const face = Math.floor(i / 4)
+    const r = face === 2 ? top : face === BOX_FACE_FRONT ? front : plain
+    uv.setXY(i, r.u0 + uv.getX(i) * (r.u1 - r.u0), r.v0 + uv.getY(i) * (r.v1 - r.v0))
+  }
+  uv.needsUpdate = true
+  woodBoxCache.set(key, g)
+  return g
+}
+
+/** BoxGeometry face order is +x, -x, +y, -y, +z, -z, six indices per face (the -Y face owns indices 18..23). */
+const BOX_FACE_INDEX_COUNT = 6
+/** Culled variants per source geometry, keyed by the removed face indices ('3' = the open bottom of 33.1). */
+const culledCache = new Map<BufferGeometry, Map<string, BufferGeometry>>()
+
+/**
+ * Copy of a box geometry without its -Y face (task 33.1): used by floor-flush boxes whose bottom is never visible. The copy keeps every
+ * UV of the source, so metric, atlas and cassette mappings are unchanged on the other five faces (10 triangles). Cached per source
+ * geometry and disposed once by disposeSharedResources(). `source` must be a BoxGeometry (indexed, 12 triangles).
+ */
+export const openBottomBoxGeometry = (source: BufferGeometry): BufferGeometry => culledBoxGeometry(source, [3])
+
+/**
+ * Copy of a box geometry without the given faces (task 34.1; generalises the open bottom of 33.1). `faces` are BoxGeometry face indices (+x 0, -x 1, +y 2,
+ * -y 3, +z 4, -z 5), each removing two triangles. The copy keeps every UV and vertex of the source, so metric, atlas and cassette mappings are unchanged
+ * on the remaining faces. Cached per (source geometry, removed faces) and disposed once by disposeSharedResources(). `source` must be a BoxGeometry.
+ */
+export function culledBoxGeometry(source: BufferGeometry, faces: readonly number[]): BufferGeometry {
+  const unique = [...new Set(faces)].sort((a, b) => a - b)
+  if (unique.some((f) => !Number.isInteger(f) || f < 0 || f > 5)) throw new Error('culledBoxGeometry: face index out of range')
+  const key = unique.join('.')
+  let perSource = culledCache.get(source)
+  const cached = perSource?.get(key)
+  if (cached) return cached
+  const index = source.getIndex()
+  if (!index || index.count !== 36) throw new Error('culledBoxGeometry needs an indexed 12-triangle box')
+  const kept = Array.from(index.array).filter((_, i) => !unique.includes(Math.floor(i / BOX_FACE_INDEX_COUNT)))
+  const g = source.clone()
+  g.setIndex(kept)
+  if (!perSource) {
+    perSource = new Map()
+    culledCache.set(source, perSource)
+  }
+  perSource.set(key, g)
+  return g
+}
+
+/** Number of live cached culled box geometries, open-bottom ones included (tests and reports). */
+export const openBottomBoxCount = (): number => [...culledCache.values()].reduce((n, m) => n + m.size, 0)
+
+/** Number of live cached cassette geometries (tests and reports). */
+export const cassetteBoxCount = (): number => [...woodBoxCache.keys()].filter((k) => k.startsWith('cassette|')).length
 
 /** Number of live cached atlas-window box geometries (tests and reports). */
 export const atlasBoxCount = (): number => [...woodBoxCache.keys()].filter((k) => k.startsWith('atlas|')).length
@@ -672,8 +826,16 @@ const TEXTURE_BINDINGS: readonly TextureBinding[] = [
   { material: 'filingGreyB', texture: 'metalCabinet', color: '#8c9081', fallbackColor: '#7a7d70' },
   { material: 'filingDarkB', texture: 'metalCabinet', color: '#747865', fallbackColor: '#656858' },
   { material: 'filingCard', texture: 'metalCabinet', color: '#ffffff', fallbackColor: '#d8d2b8' },
+  /** 31.2 ceiling fixtures: the light brushed-steel stripe of metalCabinet. Housing: lit steel close to the old #777c86; tube: emissive cool white #eef6ff (flat fallback is the old #e8f4ff). */
+  { material: 'fixtureHousing', texture: 'metalCabinet', color: '#9298a3', fallbackColor: '#777c86' },
+  { material: 'fluorescent', texture: 'metalCabinet', color: '#eef6ff', fallbackColor: '#e8f4ff' },
   /** The shell texture is light neutral plastic; the multiplier sets black or navy and keeps a little detail contrast. */
-  { material: 'tapeBlack', texture: 'vhsShell', color: '#303038', fallbackColor: '#15151a' },
+  /**
+   * 31.2: the satin charcoal shell is #2a2d36 (the flat fallback). The vhsShell base is #a4a4ac (linear about 0.37), so the multiplier is
+   * lifted to #474b54 (linear 0.063, 0.071, 0.089): base times multiplier is about #2a2d36 and the white label sticker stays readable.
+   * The old #303038 multiplier rendered the shell near #1b1b1f and the label near #22.
+   */
+  { material: 'tapeBlack', texture: 'vhsShell', color: '#474b54', fallbackColor: '#2a2d36' },
   { material: 'tapeBlue', texture: 'vhsShell', color: '#4476f8', fallbackColor: '#2a4aa0' },
   /** The glass texture carries the look, so the multiplier is white; Memory_Shift tints it from there. */
   { material: 'crtScreen', texture: 'crtGlass', color: crtScreenBaseColor(true), fallbackColor: crtScreenBaseColor(false) },
@@ -690,6 +852,8 @@ const TEXTURE_BINDINGS: readonly TextureBinding[] = [
   { material: 'arcadeGlowSnake', texture: 'lampGlow', color: '#22c55e' },
   { material: 'arcadeGlowMaze', texture: 'lampGlow', color: '#e11d48' },
   { material: 'arcadeGlowFrequency', texture: 'lampGlow', color: '#f59e0b' },
+  { material: 'hifiGlowOn', texture: 'lampGlow', color: '#ffa63c' },
+  { material: 'hifiGlowOff', texture: 'lampGlow', color: '#ffa63c' },
   /** Slightly dimmed multiplier: the reference card stays below the main CRT's brightness. */
   { material: 'smpteScreen', texture: 'smpteBars', color: '#b8b8b8' },
   { material: 'timecode', texture: 'timecode', color: '#ffffff' },
@@ -750,6 +914,8 @@ export function disposeSharedResources(): void {
   wallGeometryCache.clear()
   for (const g of woodBoxCache.values()) g.dispose()
   woodBoxCache.clear()
+  for (const m of culledCache.values()) for (const g of m.values()) g.dispose()
+  culledCache.clear()
   for (const m of Object.values(materials)) m.dispose()
   disposeTextures()
 }

@@ -4,14 +4,25 @@
  * Matrices are written once in a layout effect; nothing is allocated per frame.
  */
 import { useLayoutEffect, useMemo, useRef } from 'react'
-import { Color, Object3D, type InstancedMesh } from 'three'
+import { Color, Object3D, type BufferGeometry, type InstancedMesh } from 'three'
 import { instanceColour, isRealSizePart, partGroupKey, type BookInstance, type Part } from './modelDetail'
 import { FABRIC_METRES_PER_REPEAT } from './proceduralTextures'
-import { atlasBoxGeometry, ensureSharedTextures, geometries, manualGeometries, materials, metricBoxGeometry, spineGeometries, woodBoxGeometry } from './sharedResources'
+import { removedFaces } from './floorCull'
+import { atlasBoxGeometry, cassetteBoxGeometry, culledBoxGeometry, ensureSharedTextures, geometries, manualGeometries, materials, metricBoxGeometry, spineGeometries, woodBoxGeometry } from './sharedResources'
 
-/** Metric wood boards use a cached real-size geometry and unit mesh scale; every other part scales the unit geometry. */
-const geometryOf = (p: Part) =>
-  p.atlas
+/**
+ * Metric wood boards use a cached real-size geometry and unit mesh scale; every other part scales the unit geometry. Parts with hidden faces
+ * (the floor-flush bottom of 33.1, the wall-flush faces of 34.1) use the cached variant of that geometry without those faces.
+ */
+const geometryOf = (p: Part): BufferGeometry => {
+  const faces = removedFaces(p)
+  return faces.length ? culledBoxGeometry(fullGeometryOf(p), faces) : fullGeometryOf(p)
+}
+
+const fullGeometryOf = (p: Part): BufferGeometry =>
+  p.cassette
+    ? cassetteBoxGeometry(p.scale[0], p.scale[1], p.scale[2])
+    : p.atlas
     ? atlasBoxGeometry(p.scale[0], p.scale[1], p.scale[2], p.atlas.rect, p.atlas.faces, p.atlas.plain)
     : p.metric
     ? woodBoxGeometry(p.scale[0], p.scale[1], p.scale[2])
@@ -29,6 +40,7 @@ function InstancedGroup({ items }: { items: readonly Part[] }) {
     const mesh = ref.current
     if (!mesh) return
     const o = new Object3D()
+    const c = new Color()
     items.forEach((p, i) => {
       o.position.set(p.pos[0], p.pos[1], p.pos[2])
       if (p.rot) o.rotation.set(p.rot[0], p.rot[1], p.rot[2])
@@ -36,8 +48,11 @@ function InstancedGroup({ items }: { items: readonly Part[] }) {
       o.scale.set(...scaleOf(p))
       o.updateMatrix()
       mesh.setMatrixAt(i, o.matrix)
+      // Task 35.1: per-instance colour (LP sleeves and records) multiplies the white shared material.
+      if (p.colour) mesh.setColorAt(i, c.set(p.colour))
     })
     mesh.instanceMatrix.needsUpdate = true
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
     mesh.computeBoundingSphere()
   }, [items])
   return <instancedMesh ref={ref} args={[geometryOf(first), materials[first.mat], items.length]} />
@@ -112,7 +127,7 @@ export function PartMeshes({ parts }: { parts: readonly Part[] }) {
   return (
     <group>
       {groups.map(([key, items]) =>
-        items.length === 1 ? (
+        items.length === 1 && !items[0].colour ? (
           <mesh
             key={key}
             geometry={geometryOf(items[0])}

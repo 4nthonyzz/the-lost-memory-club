@@ -13,7 +13,7 @@ Every feature below carries one of these labels.
 | **not verified** | Implemented, but no test or recorded check covers the behavior. |
 | **planned/prototype** | Not implemented, or implemented only as a stand-in. |
 
-Milestone M6, the polish pass and the spatial and visual refinement pass (media island, north-wall filing cabinets and bulletin board, wood bookcases with dense books, textured walls and rug, three arcade cabinets, ARCADE sign, dressing, re-centred console, SMPTE monitor, cables) have **no recorded browser run**. Their layout and data are verified by automated tests only; how they look and play is **not verified visually**. The same holds for tasks 21 and 22 (couch fix and fabric, CRT casing and glass, VCR deck face, armchair, VHS shell textures, metal filing cabinets, cardboard crates, desk detail, doorway trim): **not verified visually**. Task 23 (two desk lamps with ON/OFF visuals, the 128x128 `lampGlow`, the interactable lamps and manuals, the lamp status pill, the three manual books on `shelf-b`) and Task 24 (lamp cones and desk pools, emissive shades, room light coupling by lamps ON, ceiling bloom strips, the Archive Document Card, the three new readable props and the notes counter) are also **not verified visually**; their logic and computed data are **verified by automated test** only. Task 25 (notebook move, banker's lamp brass collars and liner, the soft `coneFalloff` cones, richer pools, the three arcade floor glows and the seventh document, the Club Archive Notice) is **not verified visually** either. Tasks 26 and 27 (texture craft, rebalanced lighting, cabinet and manual detail, the themed two-page card) and Task 28 (the scrollable document card and the protruding themed manuals) are **not verified visually** either. Task 29 (the open-book manual cards and the animated cabinet attract screens) is **not verified visually** as well: the book breakpoints, the spine, ribbon and stamp visuals and the fit inside the region need real layout (jsdom does none), and the attract animation smoothness, the pulse look and the texture upload cost have not been seen or measured in a browser. Task 30 (the rounded lamp glows and cones, the frame-rate-independent look and movement smoothing, and the faster attract screens at 24 Hz) is **not verified visually** either: the motion feel, the smoothness and the lamp look have not been seen in a browser.
+Milestone M6, the polish pass and the spatial and visual refinement pass (media island, north-wall filing cabinets and bulletin board, wood bookcases with dense books, textured walls and rug, three arcade cabinets, ARCADE sign, dressing, re-centred console, SMPTE monitor, cables) have **no recorded browser run**. Their layout and data are verified by automated tests only; how they look and play is **not verified visually**. The same holds for tasks 21 and 22 (couch fix and fabric, CRT casing and glass, VCR deck face, armchair, VHS shell textures, metal filing cabinets, cardboard crates, desk detail, doorway trim): **not verified visually**. Task 23 (two desk lamps with ON/OFF visuals, the 128x128 `lampGlow`, the interactable lamps and manuals, the lamp status pill, the three manual books on `shelf-b`) and Task 24 (lamp cones and desk pools, emissive shades, room light coupling by lamps ON, ceiling bloom strips, the Archive Document Card, the three new readable props and the notes counter) are also **not verified visually**; their logic and computed data are **verified by automated test** only. Task 25 (notebook move, banker's lamp brass collars and liner, the soft `coneFalloff` cones, richer pools, the three arcade floor glows and the seventh document, the Club Archive Notice) is **not verified visually** either. Tasks 26 and 27 (texture craft, rebalanced lighting, cabinet and manual detail, the themed two-page card) and Task 28 (the scrollable document card and the protruding themed manuals) are **not verified visually** either. Task 29 (the open-book manual cards and the animated cabinet attract screens) is **not verified visually** as well: the book breakpoints, the spine, ribbon and stamp visuals and the fit inside the region need real layout (jsdom does none), and the attract animation smoothness, the pulse look and the texture upload cost have not been seen or measured in a browser. Task 30 (the rounded lamp glows and cones, the frame-rate-independent look and movement smoothing, and the faster attract screens at 24 Hz) is **not verified visually** either: the motion feel, the smoothness and the lamp look have not been seen in a browser. Task 31 (look and walk feel, desk cassettes, ceiling fixtures) is **not verified visually**. Task 32 (procedural world audio, the `M` key and the audio badge) is **not verified by listening**: no real sound was heard, and it is covered only by unit tests with a fake audio context (see `Task 32`). Task 33 (record player, five tracks, turntable card) is **not verified visually or by listening**. Task 34 (the Hi-Fi listening table on the south wall and the now-playing jacket) is **not verified visually**: nothing about it has been seen in a browser (see "Task 34"). Task 35 (the two-tier Hi-Fi console with the floor loudspeaker and the playback wiring) is **not verified visually or by listening** (see "Task 35").
 
 ## Purpose and boundaries
 
@@ -21,7 +21,8 @@ Milestone M6, the polish pass and the spatial and visual refinement pass (media 
 - It never reads `GameState` or lock state. It does not know whether the arcade is locked.
 - It has no storage: no LocalStorage, no cookies, no backend. Lamp state, the open card and the notes counter are session-only React state in `WorldScene` (see "Interactable props").
 - It imports nothing from `src/arcade/` or `src/memories/`. From `src/core/` it imports only the `StationId` type.
-- It never requests pointer lock by itself. Lock is requested only from a user gesture.
+- It never requests pointer lock by itself. Lock is requested only from a user gesture. The audio badge and the card never request it.
+- It owns a small procedural Web Audio engine (`audio/`, task 32) with no audio files. See `Task 32` below for the ownership note: the game-foundation spec assigns audio effects to Developer 3, so this engine must be reviewed with Developer 3 before merge.
 - Status: **verified by automated test** (`src/world/boundary.test.ts`, 10 tests, checks the import boundary).
 
 ## Layout of `src/world/`
@@ -30,11 +31,12 @@ Milestone M6, the polish pass and the spatial and visual refinement pass (media 
 src/world/
   WorldScene.tsx            public component, WebGL fallback, error boundary, context-loss watch
   worldTypes.ts             Aabb, Vec2, StationDef, Facing, PropInteractableId, ReadableId, InteractableDef, InteractionTarget
+  audio/                    worldAudio.ts (procedural Web Audio engine), engineFactory.ts (per-mount factory with a test-only override), worldAudio.test.ts
   assets/                   GLB pipeline: assetManifest.ts (empty), AssetModel.tsx, loadGlb.ts
   controller/               usePlayerRig, useWorldInput, usePointerLock, useReducedMotion, useFrameSampler (dev only)
   layout/roomLayout.ts      single source of truth: bounds, walls, doors, props, colliders, station anchors
   logic/                    pure rules: movement, collision, look, targeting, inputMode, inputState, propState, archiveDocuments, palette, frameStats, playerStep, smoothing, constants
-  overlay/                  DOM overlays and world.css: prompt, WorldMessage (lamp pill), WorldInspectorCard, NotesCounter, crosshair, capture overlay, hints, panel notice, WebGL fallback
+  overlay/                  DOM overlays and world.css: prompt, WorldMessage (lamp pill), WorldInspectorCard, NotesCounter, AudioBadge, crosshair, capture overlay, hints, panel notice, WebGL fallback
   scene/                    Room, Props, Stations, Lighting, Effects, MemoryShiftDriver, lampCoupling, PartMeshes, WorldCanvas,
                             modelDetail.ts, proceduralTextures.ts, sharedResources.ts, memoryShift.ts, effectsTiming.ts, assetPlacement.ts
   *.test.ts (and tests beside each module)
@@ -49,9 +51,11 @@ tools/blender/              generate_assets.py, count_triangles.py, README.md (n
 | Mouse (after pointer lock) | Look |
 | I J K L | Keyboard look (works without pointer lock) |
 | E | Interact with the targeted station, desk lamp or readable prop; closes an open Archive Document Card |
+| M | Toggles audio mute in every mode (ignored with Ctrl / Alt / Meta held, in form fields and buttons, and outside the world wrapper); also the audio badge button |
 | Esc | Releases the mouse (browser pointer-lock exit) and closes an open Archive Document Card |
 | Click the view, or Enter / E on the capture overlay | Capture the mouse (a user gesture requests pointer lock) |
 | Mouse wheel, only while a card is open | Scrolls the card (also while the pointer is locked); the page does not scroll |
+| 1 to 5 (Digit or Numpad), only while a card is open | Turntable card: select tracks 1 to 5 (STOP is 5). Document card: 1 and 2 switch pages, 3 to 5 do nothing (task 33.3) |
 | ArrowUp / ArrowDown, only while a card is open | Scroll the card by 48 px; they do not move the player |
 | PageUp / PageDown, only while a card is open | Scroll the card by about one page |
 
@@ -155,7 +159,7 @@ Nine world-local props can be targeted and used with E: the two desk lamps (`des
 
 - Interrupted run and repair (task 26): the browser error `does not provide an export named 'VCR_CHASSIS_COLOR'` came from an import of a constant that was never exported. Fix: `export const VCR_CHASSIS_COLOR = '#2b303a'` in `scene/proceduralTextures.ts` (line 1443). All partial hunks of the interrupted run were complete and were kept, and the touched files were normalised to CRLF. The production build now bundles without a missing-export error.
 - **26.1, anisotropy.** Every `CanvasTexture` gets anisotropy 4 (`TEXTURE_ANISOTROPY` in `scene/sharedResources.ts`, set once in `createCanvasTexture`). For nearest-filtered or non-mipmapped textures it has little or no visible effect.
-- **26.1, device.** The identified device is the media-console VCR (`vcrDeckParts`, material `vcrDeck`, chassis `#2b303a`, was `#2e2f36`). Its front panel is redrawn: trim, cassette bay with reels, silver and amber buttons, green and red LEDs. The loose near-black `tapeBlack` cassettes on the desk were left unchanged. If the "desk recorder" in the request meant those cassettes, that part was not done.
+- **26.1, device.** The identified device is the media-console VCR (`vcrDeckParts`, material `vcrDeck`, chassis `#2b303a`, was `#2e2f36`). Its front panel is redrawn: trim, cassette bay with reels, silver and amber buttons, green and red LEDs. The loose near-black `tapeBlack` cassettes on the desk were left unchanged in task 26 (superseded: task 31.2 lifted `tapeBlack` and gave the desk cassettes their own faces). If the "desk recorder" in the request meant those cassettes, that part was not done.
 - **26.1, textures redrawn in place** (same ids and sizes, no texture enlarged): `vcrDeck`, `wood`, `woodDark`, `floor`, `wallPanel`, `spineAtlas`, `corkBoard`, `deskDetail`, `crate`, `vhsShell`, the three attract screens, the three marquees and `crtGlass`.
 - **26.1, mug.** A dark coffee surface on the mug rim and a translucent coffee-ring stain on the desk top, two 8-sided discs (+64 triangles: 19,124 to 19,188). The `mugRim` glaze is brighter (`#f2b8a4`).
 - **26.1, wall tint.** `WALL_TEXTURE_ALBEDO` is unchanged and was not re-measured, so whether the wall tint shifted is **unverified**.
@@ -250,11 +254,11 @@ Everything in this section is computed from source and automated tests (jsdom an
 
 - **30.1, root cause of the right-lamp square.** The table lamp's inner glow (`lampInnerOn`, `MeshBasicMaterial` `#ffc272`, `DoubleSide`) was an opaque, untextured 0.13 x 0.13 m flat quad. Its half-diagonal is 0.092 m and the cream shade radius is about 0.074 m, so the corners stuck out of the shade by about 17.5 mm and read as a square.
 - **30.1, fix.** The inner glow, the banker's halo and both desk pools are now 24-segment discs. The pools are centred exactly under the shades and their radius is capped to the nearest desk edge (banker 0.19 m, table 0.23 m; the old decal was 0.4 m). The table lamp's halo sprite was removed. The cones are new open 24-segment `lampCone` geometries with a top radius of 85 percent of the shade opening (table 0.102 m of 0.12 m; banker 0.045 m of the 0.053 m hood opening, where the old 0.108 m cone was wider than the hood), tops inside the shades and bottoms 4 mm above the desk. The bulbs changed from spheres to 8-sided cylinders to stay under the triangle cap, so they may look slightly faceted. Triangles went from 19,116 to 19,154 (+38). Tests: `scene/modelDetail.test.ts` ("task 30.1: ..." cases for discs, shade containment, cones, pools, OFF state and the +38 budget).
-- **30.2, smoothing helpers.** `logic/smoothing.ts` exports `smoothingAlpha(lambda, dt)` (`1 - exp(-lambda * dt)`, 0 for non-positive or non-finite dt), `dampScalar`, `dampAngle` (shortest arc) and `dampVec2`. Constants in `logic/constants.ts`: `LOOK_SMOOTHING_LAMBDA` 32 and `MOVE_SMOOTHING_LAMBDA` 20 (initial values, **not tuned by feel**).
-- **30.2, look and movement.** `stepPlayer` (`logic/playerStep.ts`) keeps a target look and a rendered look. Input moves the target and the rendered look approaches it exponentially. Movement damps the velocity toward the target velocity and applies it through `moveWithCollision`, with the into-wall velocity component zeroed. The rig (`controller/usePlayerRig.ts`) holds the smoothing state.
+- **30.2, smoothing helpers.** `logic/smoothing.ts` exports `smoothingAlpha(lambda, dt)` (`1 - exp(-lambda * dt)`, 0 for non-positive or non-finite dt), `dampScalar`, `dampAngle` (shortest arc) and `dampVec2`. The constants `LOOK_SMOOTHING_LAMBDA` and `MOVE_SMOOTHING_LAMBDA` in `logic/constants.ts` were retuned in task 31.1 (see "Task 31" below for the current values).
+- **30.2, look and movement.** `stepPlayer` (`logic/playerStep.ts`) keeps a target look and a rendered look. Keyboard look moves the target and the rendered look approaches it exponentially (since task 31.1 mouse look bypasses the smoothing). Movement damps the velocity toward the target velocity and applies it through `moveWithCollision`, with the into-wall velocity component zeroed. The rig (`controller/usePlayerRig.ts`) holds the smoothing state.
 - **30.2, reduced motion.** With reduced motion, smoothing is bypassed and the result equals the old instantaneous behaviour exactly (test "reducedMotion reproduces the instantaneous result"). The default for everyone else is now smoothed look and movement; the instantaneous behaviour is the reduced-motion path only.
 - **30.2, snapping.** Velocity goes to 0 and the look equals its target when the mode is inspecting, on blur, on `CLEAR_INPUT` and on suspension. The input hook bumps `clearEpochRef` (`controller/useWorldInput.ts`) whenever input is cleared, and the rig snaps when it sees a new epoch. A normal key release decays instead of snapping. The rig's frame loop and the blur-to-snap wiring are **not exercised by unit tests** (the pure `stepPlayer` snap is).
-- **30.2, frame-rate evidence.** Test "gives nearly the same result at 30, 60 and 144 fps": the final look is within 0.02 rad and the final position within 0.1 m across those frame rates. Further tests: convergence above 99 percent after 0.15 s at lambda 32, no overshoot, wall penetration never, pitch clamped and yaw wrapped while smoothing.
+- **30.2, frame-rate evidence.** Test "gives nearly the same result at 30, 60 and 144 fps": the final look is within 0.02 rad and the final position within 0.1 m across those frame rates. Further tests: keyboard-look convergence above 99 percent (current thresholds in "Task 31"), no overshoot, wall penetration never, pitch clamped and yaw wrapped while smoothing.
 - **30.3, attract cadence.** `ATTRACT_MAX_HZ` is 24 (`scene/effectsTiming.ts`), separate from the 12 Hz CRT overlay noise throttle (`NOISE_MAX_HZ`, unchanged). Test: 20 to 24 redraws in every rolling second at 60 and 144 fps.
 - **30.3, motion.**
   - SNAKE.EXE: 7.5 cells per second (`SNAKE_CELLS_PER_SEC`) with sub-cell interpolation of the drawn positions. Fragment spacing is 12 cells (`SNAKE_FRAGMENT_SPACING`), so collections are 1.6 s apart.
@@ -263,16 +267,172 @@ Everything in this section is computed from source and automated tests (jsdom an
   - Scanlines and the grid are drawn in batched paths.
 - **30.3, photosensitivity.** A test samples every pulse component at 240 Hz for 40 s and requires at most 3 luminance direction changes in every rolling second (`scene/effectsTiming.test.ts`, "<component> changes direction at most 3 times in every rolling second"). It measures the helper values, **not drawn pixels**. A second test requires snake collections at least 1.5 s apart.
 - **30.3, cost estimate (arithmetic, not measured).** Three 256x256 RGBA textures are 786,432 bytes; at 24 uploads per second that is about 18.9 MB/s of texture uploads plus 72 canvas redraws per second. This doubles the 29.2 estimate (about 9.4 MB/s at 12 Hz) and is the largest runtime cost added since the owner's measurement. **Re-measure before relying on it** (frame time, and GPU upload time if available).
-- **Metrics after task 30 (computed, not runtime-measured):** 19,154 triangles (detail 18,912 + base 242), draw-call estimate 343, 4 lights, 32 textures at 7.703 MiB, 28 colliders, 9 interactables, 888 tests in 32 files (856 in 31 files before; `smoothing.test.ts` is the new file).
+- **Metrics after task 30 (computed, not runtime-measured):** 19,154 triangles (detail 18,912 + base 242), draw-call estimate 343, 4 lights, 32 textures at 7.703 MiB, 28 colliders, 9 interactables, 888 tests in 32 files (856 in 31 files before; `smoothing.test.ts` is the new file). Superseded by the task 31 test count (898 in 32 files); the scene numbers did not change.
 - **Known limitations of task 30:**
-  - Motion feel, smoothness and the lamp look are not verified visually. Lambdas 32 and 20 are untuned. The bulbs may look faceted.
+  - Motion feel, smoothness and the lamp look are not verified visually. The smoothing constants are untuned by feel (retuned in task 31.1, see below). The bulbs may look faceted.
   - The rig's frame loop and the blur-to-snap wiring are untested by unit tests.
   - The 24 Hz upload cost is estimated by arithmetic only.
   - Task 30 is **not verified visually**.
 
+### Task 31: look and walk feel, desk cassettes and ceiling fixtures
+
+All of task 31 is **not verified visually** (look feel, walk speed, cassette readability, fixture brightness). Every number below is computed from code and tests, not runtime-measured.
+
+- **31.1, mouse look.** A mouse delta is applied 1:1 to both the target look and the rendered look in `stepPlayer` (`logic/playerStep.ts:68-76`), so mouse aiming has zero smoothing lag. Any keyboard-look gap already in flight between target and rendered look is preserved (each look is clamped and wrapped on its own).
+- **31.1, keyboard look and movement.** Keyboard look (I/J/K/L; the arrow keys move) is still smoothed: `LOOK_SMOOTHING_LAMBDA` 42 (was 32). `WALK_SPEED` 2.88 m/s (2.5 x 1.15 = 2.875, rounded; was 2.5; the earlier approved initial value of 2.5 is superseded). `MOVE_SMOOTHING_LAMBDA` 28 (was 20). The maximum displacement per frame is `WALK_SPEED` x `DT_MAX` = 0.288 m, substepped at 0.1 m or less (`MAX_STEP`), so a thin wall is not tunnelled (test: a 0.15 m wall at dt = `DT_MAX`). Bounds, collision zeroing, the snap rules and the reduced-motion bypass are unchanged. Tests: `logic/playerStep.test.ts` (19 to 24).
+- **31.2, why the desk cassettes looked near-black.** The `#303038` multiplier on `tapeBlack` darkened the light `vhsShell` base (about `#a4a4ac`) to about `#1b1b1f`, and the top-face UV mapping put the label upside down.
+- **31.2, tapeBlack (changed globally, so every black tape is affected).** Flat fallback `#2a2d36` (was `#15151a`). Textured multiplier `#474b54` (was `#303038`), so that the rendered shell is about `#2a2d36` in linear light. The literal `#2a2d36` was **not** used as the multiplier: the texture base is already mid-grey (linear about 0.37), so a multiplier of `#2a2d36` would render the shell at roughly `#17` per channel (computed), much darker than the intended `#2a2d36`.
+- **31.2, `cassetteBoxGeometry`** (`scene/sharedResources.ts`): a cached real-size box for the three desk cassettes (`Part.cassette`, `deskTape` in `scene/modelDetail.ts`). Top face: dust-flap seam, handwritten label strip and reel window, upright when read from +z. Front face: the white ARCHIVE spine sticker. Other faces: the ribbed stripe. It lives in the same cache as the metric boxes and is disposed with them.
+- **31.2, loose cassette position.** `DESK_CASSETTE_DX` 0.82 (was 0.75 as `cx + 0.75`), because the rotated cassette's corner touched the archive box.
+- **31.2, ceiling fixtures.** The diffuser tube (`fluorescent`, a `MeshBasicMaterial`) now uses the brushed-steel stripe of the `metalCabinet` texture, tinted `#eef6ff` (flat fallback is still `#e8f4ff`). A new `fixtureHousing` material (`#9298a3` textured, `#777c86` flat) carries the housing and its end caps. Considered and rejected: the `grille` texture and `lampGlow`, because both would darken the tube. No warm-end tint was added, because the scene has no warm region to match. The bloom strips are unchanged.
+- **31.2, cost.** 0 triangles and 0 bytes of texture added (existing textures reused).
+- **31.2, known risk for visual review.** The tubes now render dimmer than before: computed about `#bf` per channel against the old flat `#e8f4ff`, so they may read as less lit. This is arithmetic from the texture's stripe tone, not a rendered check.
+- **Metrics after task 31 (computed, not runtime-measured):** 19,154 triangles (detail 18,912 + base 242), draw-call estimate 343, 4 lights, 32 textures at 7.703 MiB (anisotropy 4 on each), 28 colliders, 9 interactables, **898 tests in 32 files at the time of task 31** (940 in 33 files after task 32; 888 before; `playerStep.test.ts` 19 to 24 and `modelDetail.test.ts` 186 to 191).
+- **Runtime performance** is still the owner's single measurement from before tasks 23 to 31 (`performance-log.md` section 4). It was not repeated. Re-measuring is strongly recommended, especially because of the 24 Hz attract-screen uploads from task 30.3.
+
+### Task 32: procedural world audio (**not verified by listening**)
+
+Zero audio files, no new dependency, no timers, no storage. Everything is synthesised with the Web Audio API in `audio/worldAudio.ts`. **Tested only by unit tests with a fake audio context** (`audio/worldAudio.test.ts`, 26 tests; `WorldScene.test.ts` wiring tests). No real sound was heard by anyone, and jsdom has no audio. All numbers below come from the source code.
+
+**Ownership note (read before merging).** The game-foundation spec assigns audio effects to Developer 3. This engine is world-local (`src/world/audio/`) and must be reviewed with Developer 3 before merge, so the game does not run two audio systems. The reduced-distortion option is not tied to audio.
+
+**32.1, engine API** (history; since task 33.2 the single ambient loop below is track 0 of a five-track catalog, see "Task 33") (`createWorldAudioEngine({ contextFactory? })`):
+
+| Method | Behaviour |
+| --- | --- |
+| `unlock()` | Creates the context on the first call (factory, or `AudioContext` / `webkitAudioContext`), resumes it when suspended and starts the ambient bed once |
+| `setHidden(bool)` | true suspends the context; false resumes it (only if unlocked and not muted) |
+| `setDucked(bool)` | Ramps the BGM bus to x0.4 (or back) over 0.35 s |
+| `setMuted(bool)`, `toggleMuted()`, `isMuted()` | Master gain ramp to 0 or 1 over 0.08 s; `toggleMuted` returns the new state |
+| `isUnlocked()` | true after a successful `unlock()` |
+| `tick(elapsedSec)` | Schedules bell notes up to 1.5 s ahead of `ctx.currentTime`; the audio clock is the only time source |
+| `playVhsInsertSfx()`, `playArcadeCoinSfx()`, `playLampSwitchSfx()`, `playPageRustleSfx()` | One-shot SFX; silent when locked, muted, hidden or closed |
+| `dispose()` | Stops and disconnects every node, closes the context once, then every method is a no-op |
+
+- **Bus graph:** master gain 1 -> destination; BGM gain 0.15 and SFX gain 0.6, both into master. The bell delay and the pad feed the BGM bus.
+- **SFX recipes:**
+  - VHS insert: triangle clunk 115 -> 42 Hz (0.12 s, low-passed), 1850 Hz square latch click, 210 -> 290 Hz tape-load whir (triangle plus a quieter sawtooth, 0.72 s), then 0.45 s of band-passed static (noise, 3000 Hz centre).
+  - Arcade coin: sine pings at 2450 Hz and 3680 Hz, 48 ms apart, then a B5 -> E6 square chime (987.77 and 1318.51 Hz, 0.14 s each, 0.28 s in total).
+  - Lamp: a 35 ms high-passed noise click plus a short 3000 Hz sine tick.
+  - Page rustle: 85 ms band-passed noise sweeping 1200 -> 3000 Hz.
+- **Music:** 78 BPM; a D-Dorian pad on D3 A3 C4 E4 G4 (sawtooth plus triangle per note, low-pass about 1100 Hz with a slow filter LFO) with a tape wow of +-6 cents (0.45 Hz); a continuous tape hiss bed; sparse bells every 2 beats from a 16-step pattern, through a 0.38 s feedback delay (feedback 0.3). The look-ahead is 1.5 s. After a time jump (for example a tab that was hidden) no backlog of notes is played.
+- **Continuous nodes keep sounding while no frames render** (they are plain oscillators and a looping buffer). Only the bells need `tick`, so they stop while rendering is paused.
+- **Deterministic noise:** the noise buffer is filled once with `mulberry32` (fixed seed) and bursts start at fixed offsets; no `Math.random`.
+- **Fallback:** without an `AudioContext` (or when the factory returns null or throws) every method is a silent no-op and nothing throws. `dispose()` closes the context.
+
+**32.2, wiring in `WorldScene.tsx`:**
+
+- One engine per `WorldScene` mount, created lazily through `audio/engineFactory.ts` (`createWorldAudio`) and disposed on unmount. Tests can replace the factory with `__setWorldAudioFactoryForTests`.
+- **Unlock only from a user gesture:** a click or an accepted keydown on the wrapper (`onGesture` in `controller/useWorldInput.ts`), the two WebGL-fallback buttons, and the badge. The context is created only inside `unlock()` (the factory is called only there).
+- `visibilitychange` calls `setHidden(document.hidden)`; it never unlocks.
+- **Ducking x0.4** is driven by a React effect on the `inspecting` input mode (so it also applies with `inputEnabled`).
+- **SFX map:** E on the VHS station plays the VHS insert; E on an arcade station plays the coin (also when the arcade is locked and the App then shows its lock message, so the coin is a diegetic rejected coin); a desk lamp plays the lamp click; opening an Archive Document Card plays the page rustle, and so does a real page change inside an open card; closing a card is silent. `onInspect` is still called once, for stations only.
+- **Music scheduling:** `Effects` receives an `onAudioTick` hook that runs inside its existing `useFrame`; no timer is used.
+- **`KeyM`** toggles mute in every mode (including inspecting and with `inputEnabled` false). It is ignored with Ctrl / Alt / Meta held, in INPUT / TEXTAREA / SELECT / BUTTON / contenteditable targets and outside the wrapper (Shift does not block it; role in `logic/inputState.ts`, wired in `controller/useWorldInput.ts`).
+- **`AudioBadge`** (`overlay/AudioBadge.tsx`): a button reading `AUDIO: ON [M]` or `AUDIO: MUTED [M]` with `aria-pressed`, at right 12 px and bottom 54 px (above the notes counter), visible while inspecting. `ControlsHint` shows `M: toggle audio`. Clicking the badge or a card never requests pointer lock.
+
+**Known limitations of task 32:**
+
+- No real sound was verified: the tests use a fake context and jsdom has none. Loudness, balance and the sound character were never heard or measured.
+- Browser autoplay and `resume()` behaviour is untested.
+- The `Effects` tick has no direct test (`Effects` is mocked in the world tests).
+- Audio CPU cost is unmeasured.
+- The engine is new code outside the game-foundation audio plan; see the ownership note above.
+
+**Metrics after task 32 (history; current numbers are in "Task 33" and "Metrics"; computed, not runtime-measured):** 19,154 triangles (detail 18,912 + base 242), draw-call estimate 343, 4 lights, 32 textures at 7.703 MiB, 28 colliders, 9 interactables, **940 tests in 33 files** (898 in 32 files before; `audio/worldAudio.test.ts` is new with 26 tests, `WorldScene.test.ts` 50 to 65, `inputState.test.ts` 18 to 19). Task 32 added no triangles, lights or textures. The production bundle grew because the audio module and the badge are now in it (see Metrics).
+
+### Task 33: record player, five-track music and the turntable card (computed from source and tests, **not verified visually or by listening**)
+
+**Ownership note.** The audio engine is still world-local (`src/world/audio/`). It is new code outside the game-foundation audio plan and **must be reviewed with Developer 3 before merge**. Task 33 grows it from one ambient loop into a five-track catalog, so the review now covers more code than after task 32.
+
+**33.1, the record player (`layout/roomLayout.ts`, `scene/modelDetail.ts`, `scene/floorCull.ts`).**
+
+- **Superseded by task 34.1 (history).** Task 33.1 placed the console at x 2.2..3.1, z -4..-3.55 on the north wall facing +z (0.9 x 0.45 m, height 0.75 m, anchor (2.65, -3.55)). It now stands on the south wall as the Hi-Fi table; see "Task 34" for the current footprint and anchor. What still holds: range 2.2 m, **solid collider**, interactable kind `'turntable'`, id `'record-player'`; it is not a Station, `StationId` is unchanged and it never reaches `onInspect`.
+- Parts are split into three addressable groups. Static (console, plinth, controls, cradle): 282 triangles. Platter group (24-segment 0.30 m vinyl, label disc, spindle): 152. Tonearm: 92. The tonearm has two poses, stopped at yaw 125 degrees and playing at 157.5 degrees (`TURNTABLE_ARM_ANGLE`).
+- Three new flat-colour materials, **no texture added**: `vinyl`, `recordLabel` and `trackDisplayOn` (emissive `MeshBasicMaterial`, emerald while a track plays; the idle display keeps `trackDisplay`).
+- Triangle accounting (computed from declared geometry): turntable +526 (19,154 to 19,680), floor-flush bottom faces culled on 34 boxes -68 (`scene/floorCull.ts`, `openBottomBoxGeometry`; 2 triangles per box), back-panel console cables reduced to their raw control points -480 (15 segments x 32). **Total 19,154 to 19,132 (net -22).**
+- Layout counts: interactables 10, solid props 16, colliders 29 (9 walls, 4 door frames, 16 solid props).
+
+**33.2, music catalog and crossfade (`audio/worldAudio.ts`).** `MUSIC_CATALOG` has five entries:
+
+| Index | Title | BPM | Recipe |
+| --- | --- | --- | --- |
+| 0 | 01 // MIDNIGHT RENTAL (1994) | 78 | The task 32 bed: D-Dorian pad (sawtooth plus triangle, low-pass about 1100 Hz with a slow LFO, +-6 cent wow), tape hiss, sparse delayed bells |
+| 1 | 02 // NEON ARCADE LOBBY (1996) | 92 | Two-operator FM chord stabs over a bass pulse (low-pass) |
+| 2 | 03 // RAIN ON CRT GLASS (1997) | 72 | Rhodes-style electric-piano chords under vinyl crackle |
+| 3 | 04 // STATIC & STARLIGHT (1998) | 84 | Sawtooth arpeggio through a low-pass and a feedback delay, with a soft pad |
+| 4 | 05 // STOP TURNTABLE (SILENT) | 0 | No music, room sounds only |
+
+- Each started track has its own bus gain into the BGM bus. A change is a **0.7 s crossfade on the audio clock**: the old bus ramps to 0 and its voices get `stop(t)`; the new bus ramps from 0 to 1. Cleanup runs from each source's `ended` event, plus a sweep in `tick` for retired tracks whose events never fired. **No timers.**
+- Track 0 keeps continuous nodes (pad, LFOs, hiss). They are stopped when the track is left and **recreated** when it is selected again; no node is reused across a fade.
+- `setTrack(i)` before `unlock()` stores the selection and applies it on unlock. Invalid indices are ignored; selecting the active track is a no-op. **Mute does not change the selection.** `isPlaying()` is true when the selection is 0 to 3 and the engine is unlocked (also while muted or hidden).
+- `playVinylNeedleDropSfx()`: about 0.55 s: a cue-lever click, a stylus sub-thump at +0.18 s and band-passed groove crackle from +0.25 s.
+
+**33.3, turntable card, keys and prompt (`WorldScene.tsx`, `overlay/WorldInspectorCard.tsx`, `overlay/turntableCatalog.ts`, `logic/inputMode.ts`, `logic/inputState.ts`, `logic/propState.ts`).**
+
+- E on the record player calls `openCard('record-player')`. It is **not counted in NOTES READ**, which stays at 7. The card has `data-theme="turntable"` and `TURNTABLE_PALETTE` (every text pair has a contrast of at least 4.5:1, `logic/cardThemes.test.ts`), five track rows and the footer `Press 1-5 to select · E or move away to close`.
+- Key routing: with the turntable card open, `Digit` or `Numpad` 1 to 5 select tracks 0 to 4. With a document card open, 1 and 2 switch pages and 3 to 5 do nothing. With no card open the number keys do nothing.
+- Clicking a row selects the track, unlocks audio (it is a user gesture) and **never recaptures pointer lock**. Selecting STOP plays no needle drop; selecting another track does.
+- Playing state is `engine.isPlaying()` (track 0 to 3 and unlocked). The prompt reads `Press E to use 1990s Turntable`, and `Press E to use 1990s Turntable · Now playing: <title>` while a track plays.
+- The platter spins at 33 1/3 RPM from `useFrame` (`advancePlatterAngle`, `dt` clamped to 0.1 s). Under reduced motion the platter does not spin; the tonearm pose and the display tone switch instantly.
+
+**Known limitations of task 33:**
+
+- No sound was verified: every audio test uses a fake context. The loudness balance between the four tracks and the CPU cost of the music are unmeasured.
+- The platter spin and the tonearm pose were never seen. The back-panel cables, now cut to their raw control points, may show small gaps at the corners. Z-fighting of the label disc on the vinyl is unverified.
+- The `Props.tsx` wiring of the platter and tonearm groups is covered only by a weak source-text test.
+- Pointer-lock behaviour, autoplay policy and `resume()` in a real browser are untested.
+
+**Metrics after task 33 (history; current numbers are in "Task 34" and "Metrics"; computed, not runtime-measured):** 19,132 triangles (detail 18,890 + base 242; margin 868 below 20,000 and 68 below the 19,200 test limit), draw-call estimate 377, 4 lights, 32 textures at 7.703 MiB, 29 colliders, 10 interactables, **1,011 tests in 34 files** (940 in 33 files after task 32; +71: `WorldScene.test.ts` 65 to 78, `worldAudio.test.ts` 26 to 43, `modelDetail.test.ts` 191 to 209, `targeting.test.ts` 42 to 49, `propState.test.ts` 17 to 24, `roomLayout.test.ts` 33 to 37, `inputState.test.ts` 19 to 21, `inputMode.prop.test.ts` 22 to 24 and the new `cardThemes.test.ts` with 1).
+
+### Task 34: Hi-Fi listening table and now-playing jacket (history, superseded by Task 35 for geometry and numbers; **not verified visually**)
+
+**34.1, the table (`layout/roomLayout.ts`, `scene/modelDetail.ts`, `scene/floorCull.ts`, `scene/sharedResources.ts`, `scene/Props.tsx`).**
+
+- Footprint: box x -2.1..-0.85, z 3.55..4 (1.25 x 0.45 m) against the **south** wall, facing -z, directly east of the couch. Prop height 0.95 m (the top of the LP sleeves; the table top is 0.62 m and the turntable 0.75 m). Anchor (-1.475, 3.55) on the middle of the front face. The line-of-sight box is the whole table, so the crate end counts too. Range 2.2 m, solid collider, kind `'turntable'`, id `'record-player'` (unchanged); still not a Station, `StationId` is unchanged.
+- Why this spot: the table-centre is about 4.1 m (3D) from the west light and well inside its 8.5 m range; it is 1.0125 m from the spawn, which clears the 0.99 m spawn disc asserted by the tests; it touches no doorway lane, island walkway or bookcase walkway; every existing test passed unchanged. Candidates beside the couch facing +x, in front of the couch and in the south-west corner were rejected because they block couch access, a tested reachable cell, or lose the wall-flush back faces.
+- **It is not visible from the spawn's default view direction.** The player spawns at (0, 3) facing north and the table is behind and to the left, so it appears only when the player turns around.
+- Parts (1.25 m table): walnut table with a lower shelf; the turntable on the left 0.9 m; a slat crate holding 4 LP sleeves fanned out in `#16a34a`, `#e11d48`, `#38bdf8` and `#f59e0b`; a NOW PLAYING stand with a **0.20 m** jacket (not a 12 inch sleeve, because only 0.38 m of the table is free); a neutral `#3a3d46` jacket on STOP; an LED bar with the materials `hifiLedOn` and `hifiLedOff` (flat `MeshBasicMaterial`); and an additive glow ellipse (0.25 opacity while playing, 0.07 stopped) that is mostly hidden under the plinth. No new light, texture or timer.
+- Triangle accounting (computed from declared geometry): the table is 638 triangles against 526 for the old console (+112). Culling 24 wall-flush faces saves 48: 8 corner-post faces (-16), 2 on each of the 3 bookcases (moulding and crown, -12), 1 on each of the 2 filing-cabinet bodies (-4), 1 on the conduit junction box (-2), 1 on the grille frame (-2) and 6 on the door-detail plates (-12). The bookcase panels sit 5 mm off the wall, so they were not culled. **Total 19,132 to 19,196 (net +64).** Draw-call estimate 377 to 390.
+- (History) After task 34 the budgets were nearly exhausted against the old test limits. Task 35 raised those limits; the current margins are in "Task 35".
+
+**34.2, now-playing jacket (`WorldScene.tsx`, `scene/Props.tsx`).** `WorldScene` passes `turntableTrack` (the selected track index from its audio mirror) through `Props` to `RecordPlayer`. The jacket shows the **selected** track's colour, also before audio is unlocked (it starts green for track 0), and is neutral on STOP. The LED, glow, display, tonearm and platter spin stay tied to the playing flag. No `onInspect`, no mode change, no storage; `WorldSceneProps` is unchanged.
+
+**Test fixes in 34.3 (no assertion weakened).** `scene/proceduralTextures.test.ts` "task 29.2 ... keeps every draw coordinate inside the canvas and keeps the titles on every sampled frame" had started to time out at the 5,000 ms default (about 11.8 s with a raised timeout). It still samples 3 screens x 80 time points = 240 frames before and after (the test now also asserts the frame count). The extra cost came from one `expect` with a formatted message per draw call (the per-call `expect` is the likely cause; the drop to about 0.5 s after the change supports it, but I did not profile the original); the test now collects violations in a single pass and asserts once that the list is empty, and carries an explicit 30,000 ms timeout. It runs in about 0.5 s. `layout/roomLayout.test.ts` "keeps a 1.2 m wide lane ..." had failed once in a full run during 34.1. Its logic is deterministic (three standalone runs before the change and three after, and two full runs after, all passed; it took 0.6 to 1.1 s alone before the change). The original failure message was not captured, so the cause is inferred, not proven: a per-sample `expect` inside a triple loop is slow and a 5,000 ms default timeout is plausible under a loaded full run. It now collects the too-narrow samples, asserts once, and has a 30,000 ms timeout. The 1.2 m threshold (0.6 m half-width, `narrowest * 2 >= 1.2`) is unchanged.
+
+**Known limitations of task 34 (all unverified visually):** the sleeve fan, the jacket lean, the glow's visibility, the LED brightness and the look of the table as a whole were never seen. The jacket colour change on track selection was not seen at runtime. The audio still needs the Developer 3 review.
+
+**Metrics after task 34 (history; current numbers are in "Task 35" and "Metrics"; computed, not runtime-measured):** 19,196 triangles (margin 4 below 19,200), draw-call estimate 390 (limit `< 400`), 4 lights, 32 textures at 7.703 MiB, 29 colliders, 10 interactables, **1,035 tests in 34 files** (1,011 after task 33; +24: `WorldScene.test.ts` 78 to 80, `roomLayout.test.ts` 37 to 39, `targeting.test.ts` 49 to 50, `modelDetail.test.ts` 209 to 228).
+
+### Task 35: two-tier Hi-Fi console, floor loudspeaker, raised budget caps (computed from source and tests, **not verified visually or by listening**)
+
+**Budget decision.** The project owner approved raising the scene triangle cap from 19,200 to the Requirement 14 limit of 20,000 and the draw-call test limit from `< 400` to `< 425` (the `TRIANGLE_CAP` and `DRAW_CALL_CAP` constants in `scene/modelDetail.test.ts`). The scene is now at **19,988 triangles (12 left under the hard 20,000 requirement)** and **403 draw calls (21 left under 425)**. **The triangle budget is effectively exhausted: any further geometry requires removing something.** Texture memory (7.703 MiB, 32 textures) and the 4 lights are unchanged; no texture was added.
+
+**35.1, the console (`layout/roomLayout.ts`, `scene/modelDetail.ts`, `scene/floorCull.ts`, `scene/sharedResources.ts`, `scene/PartMeshes.tsx`, `scene/Props.tsx`).** `record-player` is a two-tier console in the unchanged box x -2.1..-0.85, z 3.55..4 (south wall, facing -z; id, kind `'turntable'`, anchor, range and collider unchanged; still not a Station, `StationId` unchanged).
+
+- Frame: steel posts, a walnut top and a walnut lower shelf.
+- Top tier: a turntable in a 0.8 m section under an open acrylic dust cover (4 panels and 2 brackets, opened 60 degrees, opacity 0.18; a 2 mm tonearm clearance is tested), the NOW PLAYING stand, 2 cassettes, and a brass lamp with an emissive amber bulb (a `MeshBasicMaterial`, no light).
+- Lower tier: a 6-rod wire rack with 12 sleeves, a silver receiver (dial and display, On/Off materials) on 2 flat records, and a crate of 10 records with labels.
+- 24 coloured records and sleeves share one instance-colour group (`sleeveTint`, white material; new `Part.colour` support in `PartMeshes.tsx` calls `setColorAt` per instance). The design was trimmed to fit the budget: 2 cassettes, 6 rods, 2 stack records, 10 crate records and no receiver knob.
+- Floor loudspeaker `loudspeaker`: x -2.49..-2.15, z 3.68..4, height 0.96, solid, not interactable, between the couch back (z 3.4) and the south wall. It could not sit between the couch and the console because the couch touches the console's west edge, and moving the console east would break the spawn disc.
+- The referenced image `image_457.png` was not available, so the text description was the specification.
+
+| Group | Triangles | Draw calls (computed) |
+| --- | --- | --- |
+| Console (`record-player`) | 1,250 | 34 |
+| Loudspeaker | 180 | 5 |
+
+Totals: 19,196 to **19,988** triangles and 390 to **403** draw calls. Colliders: 9 walls + 4 door frames + 17 solid props = 30 (the loudspeaker is the new one). All figures are computed, not runtime-measured.
+
+**35.2, playback wiring (no source change was needed; tests were added).** Each part follows the session-only selected track (`turntableTrack`) and the playing flag from `WorldScene.tsx`: platter spin, tonearm pose, the track display, the receiver dial and display materials, the LED bar, the glow (0.25 playing, 0.07 stopped) and the NOW PLAYING jacket colour by track (`#3a3d46` on STOP). The lamp bulb is always lit by design. Reduced motion stops the spin. No `onInspect`, no mode change, no storage, no new timer; `WorldSceneProps` is unchanged.
+
+**Known limitations of task 35 (all unverified visually):** the sorting and look of the transparent dust cover, the loudspeaker placement behind the couch end, the legibility of the 1 cm label bands, the per-instance colour tint and the crowded top tier have not been seen. The audio still needs the Developer 3 review.
+
+**Metrics after task 35 (computed, not runtime-measured):** 19,988 triangles (12 below 20,000), draw-call estimate 403 (limit `< 425`), 4 lights, 32 textures at 7.703 MiB, 30 colliders, 10 interactables, **1,054 tests in 34 files** (1,035 after task 34; +19: `WorldScene.test.ts` 80 to 81, `roomLayout.test.ts` 39 to 43, `targeting.test.ts` 50 to 54, `modelDetail.test.ts` 228 to 238).
+
 ## World layout
 
-Source of truth: `layout/roomLayout.ts` (**verified by automated test**: `layout/roomLayout.test.ts`, 33 tests, including grid-search reachability of every station and a cell in front of each cabinet through each door separately).
+Source of truth: `layout/roomLayout.ts` (**verified by automated test**: `layout/roomLayout.test.ts`, 39 tests, including grid-search reachability of every station and a cell in front of each cabinet through each door separately).
 
 - Main room: x -5..5, z -4..4, height 3. The player starts at (0, 3) facing north.
 - Arcade_Area: x 5.3..9.3, z -2..2, east of the main room, entered through two doors in the east wall (`door-east-north`, `door-east-south`). Door frames are colliders; the openings are not.
@@ -292,7 +452,8 @@ Source of truth: `layout/roomLayout.ts` (**verified by automated test**: `layout
 - Arcade floor glows (task 25.2): three additive decals in front of the cabinets at x 7.8, z -1.2 / 0 / 1.2 (0.9 x 0.9 m, y 0.014). The framed ARCHIVE poster on the Arcade_Area north wall (x 7..8) is the readable `poster-archive` with anchor (7.5, -1.93).
 - ARCADE sign: hangs on the main-room face of the east wall above both doorways.
 - Dressing: reception desk (moved south of the island), three wood bookcases with dense books, couch, abandoned chair, posters, cables, textured walls and a woven floor rug under the island. Moved out of the Arcade_Area: the CRT stack is in the main-room north-east corner, the two crates are at x 4.3..4.9 in the south-east, and cable decals run between the cabinets. The companion cabinet is removed. The Arcade_Area keeps its arcade floor dressing.
-- 28 colliders (9 walls, 4 door frames, 15 solid props), from the targeting benchmark line and `roomLayout.test.ts`.
+- Record player (tasks 33.1, 34.1 and 35.1): two-tier Hi-Fi console with a turntable at x -2.1..-0.85, z 3.55..4 against the south wall east of the couch, facing -z, anchor (-1.475, 3.55); see "Task 35". The loudspeaker (`loudspeaker`, x -2.49..-2.15, z 3.68..4, solid, not interactable) stands west of it behind the couch end. The north wall has no record player.
+- 30 colliders (9 walls, 4 door frames, 17 solid props, including the record player and the loudspeaker), from the targeting benchmark line and `roomLayout.test.ts`.
 
 Visual appearance of the M6, polish-pass, refinement-pass and three-cabinet layout (the three-cabinet pass is **not verified visually**): **not verified visually** (rows S1 to S13 in `manual-test-log.md` are `not run`).
 
@@ -322,14 +483,14 @@ Task 22 changes (all computed from source and tests, **not verified visually**):
 - The reference monitor and the north-east CRT stack use `crtCasing`. The mint `casing` material is removed.
 - The VCR front uses `vcrDeck`.
 - The armchair uses `couchFabric` on the `armchairBody` and `armchairCushion` materials (slate and teal, tinted by `memoryShift`; the old green flat colour is the no-canvas fallback).
-- `vhsShell` is on `tapeBlack`; a new `tapeBlue` material carries the second tape colour.
+- `vhsShell` is on `tapeBlack` (flat `#2a2d36`, textured multiplier `#474b54` since task 31.2); a new `tapeBlue` material carries the second tape colour.
 - `metalCabinet` is on both filing cabinets: index cards 1994 to 1996, drawer labels "TAPES 01-40", "CASE LOGS" and "MISC". The en dash in the card text is written as the escape `\u2013`. One tile spans the cabinet front with four drawer bands. Parts gained the optional fields `metricAspect`, `metricOffset` and `metricPlainV`.
 - `crate` is 256x256. Archive boxes use cardboard and the wooden crates carry a cardboard label panel (`crateWood` and `cardboard` materials). Shelf boxes use `crateWood`.
 - `deskDetail` (128x64) covers the notebook cover and ruled page block. The mug has a rim. The pencil moved because it intersected the notebook.
 - Doorway panel insets and kickplates on the pillar and jambs sit outside the openings, protrude at most 2 cm, and have no colliders.
 - The `fabric`, `fabricLight` and `casing` materials are removed.
 
-The couch uses the `couchBody`, `couchCushion` and `couchPillow` materials, which take the `memoryShift` tint. The CRT casing fallback colour (no canvas) is charcoal. Without a canvas or 2D context, materials keep flat colors. Textures are disposed on unmount, each exactly once. **verified by automated test** (`scene/proceduralTextures.test.ts`, 231 tests; `scene/modelDetail.test.ts`, 186 tests). Whether they look readable in a browser: **not verified visually** (S7 to S11 `not run`).
+The couch uses the `couchBody`, `couchCushion` and `couchPillow` materials, which take the `memoryShift` tint. The CRT casing fallback colour (no canvas) is charcoal. Without a canvas or 2D context, materials keep flat colors. Textures are disposed on unmount, each exactly once. **verified by automated test** (`scene/proceduralTextures.test.ts`, 231 tests; `scene/modelDetail.test.ts`, 191 tests). Whether they look readable in a browser: **not verified visually** (S7 to S11 `not run`).
 
 Couch fix (task 21.1): the dark patch on the couch came from a dark "worn patch" box placed 4 mm above the middle cushion. It is removed, together with a second hidden patch. The roll caps are shortened by 4 mm to avoid coplanar faces. The pillow sits in the left seat corner; a test checks with an oriented-box (OBB) no-intersection test that it does not overlap the other couch parts. The couch has 388 triangles (was 412) and no new collider. Task 21 is **not verified visually**.
 
@@ -345,25 +506,26 @@ Dev builds only (`import.meta.env.DEV`). Run `npm run dev` and open the page wit
 
 ## Metrics
 
-Computed from declared geometry and source, **computed, not runtime-measured**. Source: `.kiro/specs/world-exploration/performance-log.md`. Figures re-checked in task 30.4 with `npx vitest run src/world/scene/modelDetail.test.ts` (186 tests passed); the console lines were:
-`[18.2] computed triangles: 19154 (detail 18912 + base 242), draw-call estimate (grouped by geometry+material): 343, books 363, slipcases 136, leaning 16, per shelf shelf-a=16 draws/178 books, shelf-b=19 draws/165 books, shelf-c=16 draws/156 books, textures 32, texture memory estimate 7.70 MB`
-`[22.1] computed triangles 19154, draw-call estimate 343, textures 32, texture memory estimate 7.703 MB (computed, not runtime-measured): ... cabinetAndManualDetail 256x128=0.166MB`
-`[30.1] triangles 19154 (delta 38 from 19116)` and `[28.2] triangles 19154 (delta 2), textures 32, texture memory 7.703 MiB (computed)` (the `[28.2]` delta is only against the 19,152 baseline of task 27; the per-shelf counts include the 136 slipcases).
+Computed from declared geometry and source, **computed, not runtime-measured**. Source: `.kiro/specs/world-exploration/performance-log.md`. Figures re-checked in task 35.3 with `npx vitest run src/world/scene/modelDetail.test.ts` (238 tests passed, exit 0); the console lines were:
+`[18.2] computed triangles: 19988 (detail 19746 + base 242), draw-call estimate (grouped by geometry+material): 403, books 363, slipcases 136, leaning 16, per shelf shelf-a=16 draws/178 books, shelf-b=19 draws/165 books, shelf-c=16 draws/156 books, textures 32, texture memory estimate 7.70 MB`
+`[22.1] computed triangles 19988, draw-call estimate 403, textures 32, texture memory estimate 7.703 MB (computed, not runtime-measured)`
+`[22.2B] triangles 19988 (delta 932), draw calls 403, textures 32, texture memory 7.703 MB (computed, not runtime-measured), deskDetail 0.042 MB`, `[25.1] triangles 19988 (delta 888), textures 32, texture memory 7.703 MB (computed)` and `[28.2] triangles 19988 (delta 836), textures 32, texture memory 7.703 MiB (computed)` (the deltas are against older baselines of their own tasks; the per-shelf counts include the 136 slipcases).
 
 | Metric | Value | Label |
 | --- | --- | --- |
-| Triangles | 19,154, limit 20,000 (test limit 19,200); task 30.1 changed it by +38 from 19,116 (lamp discs, cones and cylinder bulbs); task 29 changed nothing; task 28.2 had changed it by -36 from 19,152, task 27 by -36 and task 26 by +64 | computed, not runtime-measured |
-| Draw-call grouping estimate | about 343 (task 30.1 removed one draw with the table lamp halo sprite; was 344 after task 29 and 339 before task 27) | computed estimate, not `renderer.info` |
+| Triangles | 19,988 (detail 19,746 + base 242), limit 20,000 (test cap `TRIANGLE_CAP` = 20,000, margin 12); task 35.1 changed it by +792 from 19,196: two-tier console 1,250 against 638 for the Hi-Fi table, plus the loudspeaker 180 | computed, not runtime-measured |
+| Draw-call grouping estimate | 403 (390 after task 34; test limit `DRAW_CALL_CAP` = `< 425`, margin 21; task 35.3 `[18.2]` line) | computed estimate, not `renderer.info` |
 | Books | 363 as printed by the `[18.2]` line (per-shelf item counts 178 + 165 + 156 = 499 also include the 136 slipcases); 16 leaning books included; task 28.2 removed 3 ordinary books from `shelf-b` | computed |
-| Lights | 4 (1 ambient + 3 point), limit 4 (`Lighting.tsx:14` and `:51-54`); tasks 23 to 30 added none | computed from source |
-| Procedural textures | 32, 7.703 MiB (8,076,989 bytes) estimated, limit 8 MB (test limit 7.85 MB); anisotropy 4 on every texture; every texture registered for disposal; task 27.1 added `cabinetAndManualDetail` (0.166 MiB) and enlarged none; tasks 29 and 30 added none and changed no size, but the three attract screens are redrawn and re-uploaded up to 24 times per second since task 30.3 (estimate, about 18.9 MB/s and 72 canvas redraws per second, arithmetic, not measured) | computed, not runtime-measured |
-| Colliders | 28 (tasks 23 to 30 added none) | computed |
-| Interactables | 9 (2 lamps + 7 readable documents) | computed |
-| Targeting benchmark | informational timing only, no threshold; varies per run and machine (task 29.3 standalone run: measured total 27.69 ms, 1.385 us/call, 254 reachable cells x 16 yaws, 4 stations and 28 colliders, 1308 calls returned a station; the earlier task 28.3 standalone run printed 12.12 ms, 0.606 us/call, with the same workload: 254 reachable cells x 16 yaws, 4 stations and 28 colliders; the two full `npm test` runs of task 28.3 gave 33.61 ms / 1.681 us/call and 48.21 ms / 2.410 us/call while other files ran in parallel; 0.626 us/call in task 27.3); this benchmark times station targeting only, not `selectInteractionTargetAll` | informational |
-**The triangle margin is thin:** 19,154 leaves 846 triangles (about 4.2 percent) below the 20,000 limit (46 below the 19,200 test limit). The biggest consumers (computed by summing declared objects in task 21.3, not recomputed after task 23; tasks 24.1, 25, 26 and 27 then added 58, 24 and 64 triangles and removed 36): the three bookshelves (2,352, 2,280 and 2,088 before the manuals replaced 7 books on `shelf-b`), the three cabinets (1,316 each), `console-cables` (1,088), the two filing cabinets (692 each) and the desk (672). Task 23.1 replaced the two old desk lamps (470 triangles) with two new ones (352): -118. Task 23.2 replaced 7 books on `shelf-b` (-84) with 3 manuals and 3 spine bands (+72): -12. Task 24.1 added 58 (two lamp cones at 24 triangles each plus five ceiling bloom strips at 2 each, by arithmetic); task 24.2 added no triangles.
+| Lights | 4 (1 ambient + 3 point), limit 4 (`Lighting.tsx:51-54`); tasks 23 to 35 added none (the Hi-Fi glow and the lamp bulb are an additive mesh and a `MeshBasicMaterial`, not lights) | computed from source |
+| Procedural textures | 32, 7.703 MiB (8,076,989 bytes) estimated, limit 8 MB (test limit 7.85 MB); anisotropy 4 on every texture; every texture registered for disposal; tasks 33 to 35 added none (the vinyl, label, display, sleeves, jacket and LED are flat-colour materials); the three attract screens are redrawn and re-uploaded up to 24 times per second since task 30.3 (estimate, about 18.9 MB/s and 72 canvas redraws per second, arithmetic, not measured) | computed, not runtime-measured |
+| Colliders | 30 (9 walls + 4 door frames + 17 solid props; task 35.1 added the loudspeaker; the console box is unchanged) | computed |
+| Interactables | 10 (2 lamps, 3 manuals, notebook, cork board, shift poster, archive poster and the record player; the record player is not a note, so NOTES READ stays at 7) | computed |
+| Production bundle (task 35.3 build, `npm run build` exit 0) | 111 modules transformed; JS 1,358.15 kB (393.74 kB gzip), CSS 14.70 kB (3.63 kB gzip); the task 34.3 build was 1,353.59 kB JS (391.89 kB gzip) and the task 33.4 build was 1,348.43 kB JS (390.09 kB gzip); the task 32.3 build had 109 modules, JS 1,333.42 kB (385.08 kB gzip) and CSS 13.55 kB. Vite still warns that a chunk is larger than 500 kB (a warning, not an error; no code splitting) | build output |
+| Targeting benchmark | informational timing only, no threshold; varies per run and machine. Task 35.3 standalone run: measured total 21.73 ms, computed 1.087 us/call, 252 reachable cells x 16 yaws, 4 stations and 30 colliders, 1401 calls returned a station (the task 34.3 run printed 18.61 ms with 29 colliders; the task 33.4 run printed 16.01 ms with 251 cells; the task 32.3 run printed 11.60 ms with 254 cells and 28 colliders, so the workloads differ). This benchmark times station targeting only, not `selectInteractionTargetAll` | informational |
+**The triangle budget is effectively exhausted:** 19,988 leaves 12 triangles below the hard 20,000 limit (Requirement 14), and the draw-call estimate of 403 is 21 below the `< 425` test limit. Any further geometry requires removing something. The biggest consumers (computed by summing declared objects in task 21.3, not recomputed since): the three bookshelves, the three cabinets (1,316 each), the two filing cabinets (692 each) and the desk (672). The console is 1,250 triangles and the loudspeaker 180. `console-cables` was 1,088 triangles and lost 480 in task 33.1.
 
 **The texture margin is also thin:** 7.703 MiB computed (8,076,989 bytes) against the 8 MB limit leaves about 0.30 MB. First candidates to cut if more room is needed: `console-cables` (1,088 triangles), the book count (363 books), the three 0.66 MB posters (`posterSunset`, `posterReel`, `shiftPoster`, 256x512) or `spineAtlas` (512x256, 0.66 MB), which could shrink. The per-texture list (MB, computed, not runtime-measured, rounded to two decimals): attractSnake 0.25, attractMaze 0.25, attractFrequency 0.25, marqueeSnake 0.06, marqueeMaze 0.06, marqueeFrequency 0.06, signFace 0.33, posterSunset 0.66, posterReel 0.66, shiftPoster 0.66, shiftPlaque 0.17, floor 0.08, wood 0.08, woodDark 0.08, crate 0.33, grille 0.08, spineAtlas 0.66, wallPanel 0.33, rugWoven 0.33, corkBoard 0.33, lampGlow 0.08, smpteBars 0.13, timecode 0.02, couchFabric 0.33, crtCasing 0.33, crtGlass 0.25, vcrDeck 0.17, vhsShell 0.08, metalCabinet 0.33, deskDetail 0.04, coneFalloff 0.02, cabinetAndManualDetail 0.17. The largest are the three posters and `spineAtlas` (0.66 each).
-**Measured runtime values** (measured by the project owner **before Tasks 23 to 30; not repeated since**, so they do not describe the smoothed look and movement, the reworked lamp glows, the lamps, manuals, lamp cones, desk pools, ceiling bloom strips, arcade floor glows, the open-book manual cards, the animated attract screens, cabinet and manual detail texture or notes counter. **Re-measuring is recommended**, because Tasks 24 and 25 add additive transparent layers, Task 26 adds anisotropic filtering (4x) on every texture and Task 27 adds a texture and a themed card, which add GPU cost (Task 28 adds no triangles, textures or lights). **Tasks 29.2 and 30.3 are the largest new runtime cost since this measurement:** the three attract textures are redrawn and uploaded up to 24 times per second since task 30.3, about 18.9 MB/s of uploads and 72 canvas redraws per second by arithmetic (not measured; it was about 9.4 MB/s at 12 Hz in task 29.2). **Re-measuring is strongly recommended now** because of these 24 Hz uploads; dev build, `?worldPerf=1` sampler, 60 s walkthrough across both rooms and all three arcade cabinets; raw output in `.kiro/specs/world-exploration/performance-log.md` section 4):
+**Measured runtime values** (measured by the project owner **before Tasks 23 to 35; not repeated since**, so they do not describe the direct mouse look, the retuned smoothing and walk speed, the cassette and fixture polish, the smoothed keyboard look and movement, the reworked lamp glows, the lamps, manuals, lamp cones, desk pools, ceiling bloom strips, arcade floor glows, the open-book manual cards, the animated attract screens, cabinet and manual detail texture or notes counter. **Re-measuring is recommended**, because Tasks 24 and 25 add additive transparent layers, Task 26 adds anisotropic filtering (4x) on every texture and Task 27 adds a texture and a themed card, which add GPU cost (Task 28 adds no triangles, textures or lights). **Tasks 29.2 and 30.3 are the largest new runtime cost since this measurement:** the three attract textures are redrawn and uploaded up to 24 times per second since task 30.3, about 18.9 MB/s of uploads and 72 canvas redraws per second by arithmetic (not measured; it was about 9.4 MB/s at 12 Hz in task 29.2). **Re-measuring is strongly recommended now**, because of these 24 Hz uploads and because the scene is now at the 20,000-triangle limit (19,988) with an estimated 403 draw calls; dev build, `?worldPerf=1` sampler, 60 s walkthrough across both rooms and all three arcade cabinets; raw output in `.kiro/specs/world-exploration/performance-log.md` section 4):
 
 | Metric | Measured value |
 | --- | --- |
@@ -376,7 +538,7 @@ Computed from declared geometry and source, **computed, not runtime-measured**. 
 
 Caveats:
 - Hardware/GPU, browser and version, OS, window resolution and date were **not provided**. The Reference_Hardware (integrated graphics at 1280x720) cannot be confirmed, so the median <= 20 ms and p95 <= 33 ms targets are met on the owner's machine only.
-- Triangles and draw calls describe the last rendered frame from one camera position, after frustum culling, with each instanced mesh counted as one call. They are not comparable one-to-one with the computed whole-scene figures above (19,154 triangles, 343 draw-call estimate, 32 declared textures now; the measurement predates Tasks 23 to 30, so the scene it measured had fewer declared textures and a different triangle count); the lower measured numbers are expected.
+- Triangles and draw calls describe the last rendered frame from one camera position, after frustum culling, with each instanced mesh counted as one call. They are not comparable one-to-one with the computed whole-scene figures above (19,132 triangles, 377 draw-call estimate, 32 declared textures now; the measurement predates Tasks 23 to 33, so the scene it measured had fewer declared textures and a different triangle count); the lower measured numbers are expected.
 - Textures 29 measured vs 30 declared at the time (32 declared now): `renderer.info.memory.textures` counts textures uploaded to the GPU so far. One declared texture may not have been uploaded yet or may be absent (likely explanation, not verified).
 - A median near 16.7 ms is consistent with a 60 Hz vsync cap, so frame time is likely limited by display refresh. The real headroom is unknown.
 - Dev build, which is slower than production.
@@ -406,16 +568,17 @@ npm test
 npm run build
 ```
 
-Fresh run for this README (task 30.4): `npm run typecheck` exit 0, `npm run build` exit 0 (106 modules transformed), `npm test` **32 test files, 888 tests, all passed** (exit 0; the `Test Files  32 passed (32)` and `Tests  888 passed (888)` lines appeared in each of the runs and no test timed out; a JSON-reporter run also counted 888 passed). The four CPU-heavy tests from task 24.3 still carry an explicit 30,000 ms per-test timeout. Details in `test-report.md`. Files under `src/world/` and their counts:
+Fresh run for this README (task 35.3): `npm run typecheck` exit 0, `npm run build` exit 0 (111 modules transformed), `npm test` **34 test files, 1,054 tests, all passed** (exit 0 in two full runs; both printed `Test Files  34 passed (34)` and `Tests  1054 passed (1054)`, and no test timed out). The four CPU-heavy tests from task 24.3 still carry an explicit 30,000 ms per-test timeout, and since task 34.3 so do the task 29.2 bounds-and-titles test and the 1.2 m lane test. Details in `test-report.md`. Files under `src/world/` and their counts:
 
 | Area | Files (tests) |
 | --- | --- |
-| Component | `WorldScene.test.ts` (50), `WorldScene.inputEnabled.test.ts` (8), `boundary.test.ts` (10) |
+| Component | `WorldScene.test.ts` (81), `WorldScene.inputEnabled.test.ts` (8), `boundary.test.ts` (10) |
 | Assets | `assets/assetManifest.test.ts` (22), `assets/assets.test.ts` (9), `scene/assetIntegration.test.ts` (6) |
 | Controller | `controller/useReducedMotion.test.ts` (8) |
-| Layout | `layout/roomLayout.test.ts` (33) |
-| Logic | `collision` (18), `frameStats` (5), `inputMode` (29), `inputMode.supplied` (17), `inputMode.fallback` (7), `inputMode.prop` (22), `inputState` (18), `look` (20), `movement` (15), `palette` (4), `palette.full` (13), `playerStep` (19), `smoothing` (6), `propState` (17), `archiveDocuments` (13), `targeting` (42), `targeting.bench` (1, informational) |
-| Scene | `effectsTiming` (20), `memoryShift` (16), `lampCoupling` (11), `modelDetail` (186), `proceduralTextures` (231) |
+| Layout | `layout/roomLayout.test.ts` (43) |
+| Logic | `collision` (18), `frameStats` (5), `inputMode` (29), `inputMode.supplied` (17), `inputMode.fallback` (7), `inputMode.prop` (24), `inputState` (21), `look` (20), `movement` (15), `palette` (4), `palette.full` (13), `playerStep` (24), `smoothing` (6), `propState` (24), `archiveDocuments` (13), `cardThemes` (1), `targeting` (54), `targeting.bench` (1, informational) |
+| Audio | `audio/worldAudio.test.ts` (43, fake audio context) |
+| Scene | `effectsTiming` (20), `memoryShift` (16), `lampCoupling` (11), `modelDetail` (238), `proceduralTextures` (231) |
 
 Outside `src/world/`: `src/App.test.ts` (8, stubbed `WorldScene`) and `src/core/gameReducer.test.ts` (4). Counts change when tests are added. Details, the 17 correctness properties and gaps: `.kiro/specs/world-exploration/test-report.md`.
 
@@ -433,10 +596,11 @@ See `.kiro/specs/world-exploration/proposals.md`. In short: P1 implemented; P3 a
 - Archive Document Card: on short windows (about 400 to 500 px tall) the card region is small (its content scrolls since task 28.1; see "Task 28" for the untested parts); the poster becomes targetable when the flag flips, slightly before its fade completes; closing on pointer-lock loss is wired but not testable in jsdom.
 - The requested 0.85 m lamp pool radius was not possible on the 0.8 m deep desk; since task 30.1 the pools are 24-segment discs of 0.19 m (banker) and 0.23 m (table), capped to the nearest desk edge.
 - Spawn gap (open item): the spawn (0, 3) is exactly 1.0 m from the desk edge and the south wall, so a 1.2 m disc around the spawn is not clear. The test asserts 0.99 m. This was not requested in the final instructions and is not fixed. The manual test log has no recorded result.
-- Frame time and renderer counts were measured once by the project owner before Tasks 23 to 30 (dev build, hardware not provided; see the Metrics section) and have not been repeated; re-measuring is strongly recommended, especially because of the 24 Hz animated attract texture uploads of task 30.3. First-render time is not measured, and the Reference_Hardware cannot be confirmed. The triangle margin below the 20,000 limit is only 846 (computed), and the texture margin below 8 MB is only about 0.30 MB (computed). Task 27 added 62 tests (738 to 800 in 31 files), task 28 added 24 (800 to 824), task 29 added 32 (824 to 856 in 31 files) and task 30 added 32 (856 to 888 in 32 files).
-- No GLB assets and no Blender run. The scene uses primitives only.
+- Frame time and renderer counts were measured once by the project owner before Tasks 23 to 35 (dev build, hardware not provided; see the Metrics section) and have not been repeated; re-measuring is strongly recommended, especially because of the 24 Hz animated attract texture uploads of task 30.3 and the 403 estimated draw calls (the scene is at 19,988 of 20,000 triangles). First-render time is not measured, and the Reference_Hardware cannot be confirmed. The triangle margin below the 20,000 limit is only 12, the draw-call margin below the `< 425` test limit is 21, and the texture margin below 8 MB is only about 0.30 MB (all computed). Task 27 added 62 tests (738 to 800 in 31 files), task 28 added 24 (800 to 824), task 29 added 32 (824 to 856 in 31 files), task 30 added 32 (856 to 888 in 32 files) and task 31 added 10 (888 to 898 in 32 files) task 32 added 42 (898 to 940 in 33 files: 26 in the new `worldAudio.test.ts`, 15 in `WorldScene.test.ts` and 1 in `inputState.test.ts`) and task 33 added 71 (940 to 1,011 in 34 files) task 34 added 24 (1,011 to 1,035 in 34 files) and task 35 added 19 (1,035 to 1,054 in 34 files).
+- No GLB assets and no Blender run. The scene uses primitives only. No audio files either: all sound is synthesised (task 32).
+- Audio (tasks 32 and 33) is **not verified by listening** and is still world-local: it must be reviewed with Developer 3 before merge (see "Task 32" and "Task 33"). Loudness balance between the five catalog entries, browser autoplay / resume behaviour and audio CPU cost are untested or unmeasured, and the `Effects` tick has no direct test. The record player (tasks 33 and 34) is **not verified visually or by listening**: platter spin, tonearm pose, cable corners, label-disc z-fighting, the sleeve fan, the jacket lean, the glow's visibility, the LED brightness, the look of the Hi-Fi table and the jacket colour swap on track selection were never seen, and the `Props.tsx` wiring is covered only by a weak source-text test and the `turntableTrack` prop test. The table is behind the player at spawn and appears only after turning around.
 - No restored-memory viewer component exists in the repo. The HUD shows progress booleans only.
 - `reducedDistortion` (P2) is not wired, so there is no in-game reduced-distortion link.
 - When `inputEnabled` is absent, the world cannot tell when a panel closed.
-- The production bundle is a single 1,323.12 kB JS chunk (381.53 kB gzip, task 30.4 build) per `performance-log.md`; no code splitting.
+- The production bundle is a single 1,358.15 kB JS chunk (393.74 kB gzip, task 35.3 build) per `performance-log.md`; no code splitting.
 - Optional property-based tests are not implemented.

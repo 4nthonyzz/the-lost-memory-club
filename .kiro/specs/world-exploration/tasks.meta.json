@@ -1571,6 +1571,233 @@
         "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
         "timestamp": 1795645609127
       }
+    ],
+    "31.1 Direct mouse look and faster, snappier movement": [
+      {
+        "executionId": "65c80338-1ca0-41f9-8ea7-4cdcec2f5994",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795646122459
+      },
+      {
+        "executionId": "65c80338-1ca0-41f9-8ea7-4cdcec2f5994",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795653783823
+      }
+    ],
+    "31.2 Desk cassette and ceiling fixture texture polish": [
+      {
+        "executionId": "65c80338-1ca0-41f9-8ea7-4cdcec2f5994",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795653784194
+      },
+      {
+        "executionId": "65c80338-1ca0-41f9-8ea7-4cdcec2f5994",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795654223769
+      }
+    ],
+    "31.3 Docs, metrics and verification": [
+      {
+        "executionId": "65c80338-1ca0-41f9-8ea7-4cdcec2f5994",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795654224096
+      },
+      {
+        "executionId": "65c80338-1ca0-41f9-8ea7-4cdcec2f5994",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795655772013
+      }
+    ],
+    "31. Crisp look, faster walk and fixture polish": [
+      {
+        "executionId": "65c80338-1ca0-41f9-8ea7-4cdcec2f5994",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795655772219
+      }
+    ],
+    "32.1 Web Audio engine: SFX and ambient music": [
+      {
+        "executionId": "d0b5d8a2-116b-47c5-9b77-da7d89dc9e2c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795656400384
+      },
+      {
+        "executionId": "d0b5d8a2-116b-47c5-9b77-da7d89dc9e2c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795656722579
+      }
+    ],
+    "32.2 Wire audio into the world and add the mute badge": [
+      {
+        "executionId": "d0b5d8a2-116b-47c5-9b77-da7d89dc9e2c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795656722056
+      },
+      {
+        "executionId": "d0b5d8a2-116b-47c5-9b77-da7d89dc9e2c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795657000114
+      }
+    ],
+    "32.3 Docs, metrics and verification": [
+      {
+        "executionId": "d0b5d8a2-116b-47c5-9b77-da7d89dc9e2c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795657000567
+      },
+      {
+        "executionId": "d0b5d8a2-116b-47c5-9b77-da7d89dc9e2c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795657556201
+      }
+    ],
+    "32. Procedural world audio": [
+      {
+        "executionId": "d0b5d8a2-116b-47c5-9b77-da7d89dc9e2c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795657556338
+      }
+    ],
+    "33.1 Turntable placement, model and triangle reclaim": [
+      {
+        "executionId": "06f7ad88-b1bc-40c9-933c-bcec0da0a6a0",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795658475604
+      },
+      {
+        "executionId": "06f7ad88-b1bc-40c9-933c-bcec0da0a6a0",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795659607841
+      }
+    ],
+    "33.2 Music catalog, crossfade and needle-drop SFX": [
+      {
+        "executionId": "06f7ad88-b1bc-40c9-933c-bcec0da0a6a0",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795659608123
+      },
+      {
+        "executionId": "06f7ad88-b1bc-40c9-933c-bcec0da0a6a0",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795659983679
+      }
+    ],
+    "33.3 Turntable catalog card, track keys and spin wiring": [
+      {
+        "executionId": "06f7ad88-b1bc-40c9-933c-bcec0da0a6a0",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795659984179
+      },
+      {
+        "executionId": "06f7ad88-b1bc-40c9-933c-bcec0da0a6a0",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795660580446
+      }
+    ],
+    "33.4 Docs, metrics and verification": [
+      {
+        "executionId": "06f7ad88-b1bc-40c9-933c-bcec0da0a6a0",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795660581108
+      },
+      {
+        "executionId": "06f7ad88-b1bc-40c9-933c-bcec0da0a6a0",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795661110818
+      }
+    ],
+    "33. Turntable and music catalog": [
+      {
+        "executionId": "06f7ad88-b1bc-40c9-933c-bcec0da0a6a0",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795661111104
+      }
+    ],
+    "34.1 Relocate the record player and build the Hi-Fi table": [
+      {
+        "executionId": "29f15491-0fc0-4459-85f3-5b42b3e2de94",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795661587239
+      },
+      {
+        "executionId": "29f15491-0fc0-4459-85f3-5b42b3e2de94",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795663725582
+      }
+    ],
+    "34.2 Now-playing jacket wiring": [
+      {
+        "executionId": "29f15491-0fc0-4459-85f3-5b42b3e2de94",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795663728900
+      },
+      {
+        "executionId": "29f15491-0fc0-4459-85f3-5b42b3e2de94",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795664059744
+      }
+    ],
+    "34.3 Docs, metrics and verification": [
+      {
+        "executionId": "29f15491-0fc0-4459-85f3-5b42b3e2de94",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795664062177
+      },
+      {
+        "executionId": "29f15491-0fc0-4459-85f3-5b42b3e2de94",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795665208717
+      }
+    ],
+    "34. Hi-Fi table relocation and record display": [
+      {
+        "executionId": "29f15491-0fc0-4459-85f3-5b42b3e2de94",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795665210610
+      }
+    ],
+    "35.1 Two-tier console model, floor speaker and raised budget tests": [
+      {
+        "executionId": "10866c62-37ab-4486-85fb-9a6103b557a6",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795695188574
+      },
+      {
+        "executionId": "10866c62-37ab-4486-85fb-9a6103b557a6",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795696536865
+      }
+    ],
+    "35.2 Playback state wiring for the new console": [
+      {
+        "executionId": "10866c62-37ab-4486-85fb-9a6103b557a6",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795696537174
+      },
+      {
+        "executionId": "10866c62-37ab-4486-85fb-9a6103b557a6",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795696665964
+      }
+    ],
+    "35.3 Docs, metrics and verification": [
+      {
+        "executionId": "10866c62-37ab-4486-85fb-9a6103b557a6",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795696666747
+      },
+      {
+        "executionId": "10866c62-37ab-4486-85fb-9a6103b557a6",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795697158745
+      }
+    ],
+    "35. Two-tier Hi-Fi console": [
+      {
+        "executionId": "10866c62-37ab-4486-85fb-9a6103b557a6",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795697159072
+      }
     ]
   }
 }

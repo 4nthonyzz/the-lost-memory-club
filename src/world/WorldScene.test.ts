@@ -5,11 +5,13 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 // The target source is controllable. usePlayerRig is mocked so no R3F frame loop is needed.
 // A Station id or a world-local prop id; the mock wraps it in the combined target type (task 23.2).
-type TargetId = 'vhs' | 'arcade' | 'desk-lamp-left' | 'desk-lamp-right' | 'manual-snake' | 'manual-maze' | 'manual-frequency' | 'desk-notebook' | 'cork-board' | 'poster-shift' | 'poster-archive';
+type TargetId = 'vhs' | 'arcade' | 'desk-lamp-left' | 'desk-lamp-right' | 'manual-snake' | 'manual-maze' | 'manual-frequency' | 'desk-notebook' | 'cork-board' | 'poster-shift' | 'poster-archive' | 'record-player';
 const h = vi.hoisted(() => ({
   target: null as TargetId | null,
   setTarget: null as ((id: TargetId | null) => void) | null,
   heldKeysRef: null as { current: { roles: ReadonlySet<string> } } | null,
+  // Last props the (mocked) Props component rendered with (task 34.2).
+  propsArgs: null as { turntablePlaying?: boolean; turntableTrack?: number } | null,
 }));
 
 vi.mock('./scene/WorldCanvas', () => ({
@@ -19,7 +21,12 @@ vi.mock('./scene/WorldCanvas', () => ({
 vi.mock('./controller/useFrameSampler', () => ({ FrameSamplerHost: () => null }));
 vi.mock('./scene/Lighting', () => ({ Lighting: () => null }));
 vi.mock('./scene/Effects', () => ({ Effects: () => null }));
-vi.mock('./scene/Props', () => ({ Props: () => null }));
+vi.mock('./scene/Props', () => ({
+  Props: (p: { turntablePlaying?: boolean; turntableTrack?: number }) => {
+    h.propsArgs = { turntablePlaying: p.turntablePlaying, turntableTrack: p.turntableTrack };
+    return null;
+  },
+}));
 vi.mock('./scene/Room', () => ({ Room: () => null }));
 vi.mock('./scene/Stations', () => ({ Stations: () => null }));
 vi.mock('@react-three/fiber', () => {
@@ -51,6 +58,8 @@ vi.mock('./controller/usePlayerRig', async () => {
 });
 
 import { WorldScene } from './WorldScene';
+import { __setWorldAudioFactoryForTests } from './audio/engineFactory';
+import type { WorldAudioEngine } from './audio/worldAudio';
 
 const originalGetContext = HTMLCanvasElement.prototype.getContext;
 const lockSpy = vi.fn();
@@ -850,5 +859,495 @@ describe('WorldScene open-book manuals (task 29.1)', () => {
     const { unmount } = open('manual-snake');
     unmount();
     expect(remove.mock.calls.filter((c) => c[0] === 'wheel')).toHaveLength(1);
+  });
+});
+
+describe('WorldScene procedural audio (task 32.2)', () => {
+  type Fake = { [K in keyof WorldAudioEngine]: ReturnType<typeof vi.fn> };
+  let fake: Fake;
+  let created: number;
+  let muted: boolean;
+  let track: number;
+  const sources = import.meta.glob(['./WorldScene.tsx', './audio/engineFactory.ts', './overlay/AudioBadge.tsx'], {
+    query: '?raw',
+    import: 'default',
+    eager: true,
+  }) as Record<string, string>;
+
+  beforeEach(() => {
+    muted = false;
+    track = 0;
+    created = 0;
+    fake = {
+      setTrack: vi.fn((i: number) => {
+        if (Number.isInteger(i) && i >= 0 && i <= 4) track = i;
+      }),
+      getTrack: vi.fn(() => track),
+      isPlaying: vi.fn(() => track !== 4),
+      playVinylNeedleDropSfx: vi.fn(),
+      unlock: vi.fn(),
+      setHidden: vi.fn(),
+      setDucked: vi.fn(),
+      setMuted: vi.fn(),
+      toggleMuted: vi.fn(() => {
+        muted = !muted;
+        return muted;
+      }),
+      isMuted: vi.fn(() => muted),
+      isUnlocked: vi.fn(() => true),
+      tick: vi.fn(),
+      playVhsInsertSfx: vi.fn(),
+      playArcadeCoinSfx: vi.fn(),
+      playLampSwitchSfx: vi.fn(),
+      playPageRustleSfx: vi.fn(),
+      dispose: vi.fn(),
+    };
+    __setWorldAudioFactoryForTests(() => {
+      created += 1;
+      return fake as unknown as WorldAudioEngine;
+    });
+  });
+  afterEach(() => __setWorldAudioFactoryForTests(null));
+
+  const badge = () => document.querySelector('.world-audio-button') as HTMLButtonElement;
+  const pressE = (wrapper: HTMLElement) => {
+    fireEvent.keyDown(wrapper, { code: 'KeyE', key: 'e' });
+    fireEvent.keyUp(wrapper, { code: 'KeyE', key: 'e' });
+  };
+
+  it('does not unlock on mount, focus or re-render; unlocks on the first click and on an accepted keydown', () => {
+    const onInspect = vi.fn();
+    const { rerender } = render(createElement(WorldScene, { onInspect, memoryShifted: false }));
+    const wrapper = document.querySelector('.world-wrapper') as HTMLElement;
+    wrapper.focus();
+    fireEvent.focus(wrapper);
+    rerender(createElement(WorldScene, { onInspect, memoryShifted: true }));
+    expect(fake.unlock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('canvas'));
+    expect(fake.unlock).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(wrapper, { code: 'KeyW', key: 'w' });
+    expect(fake.unlock).toHaveBeenCalledTimes(2);
+    const outside = document.createElement('input');
+    document.body.append(outside);
+    fireEvent.keyDown(outside, { code: 'KeyW', key: 'w' });
+    outside.remove();
+    expect(fake.unlock).toHaveBeenCalledTimes(2);
+  });
+
+  it('creates one engine per mount and disposes it on unmount', () => {
+    const { unmount } = renderWorld();
+    fireEvent.click(screen.getByTestId('canvas'));
+    expect(created).toBe(1);
+    expect(fake.dispose).not.toHaveBeenCalled();
+    unmount();
+    expect(fake.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('E on the CRT plays the insert sound and still calls onInspect once', () => {
+    h.target = 'vhs';
+    const { wrapper, onInspect } = renderWorld();
+    pressE(wrapper);
+    expect(fake.playVhsInsertSfx).toHaveBeenCalledTimes(1);
+    expect(fake.playArcadeCoinSfx).not.toHaveBeenCalled();
+    expect(onInspect).toHaveBeenCalledTimes(1);
+    expect(onInspect).toHaveBeenCalledWith('vhs');
+  });
+
+  it('E on the arcade cabinet plays the coin sound and still calls onInspect once', () => {
+    h.target = 'arcade';
+    const { wrapper, onInspect } = renderWorld();
+    pressE(wrapper);
+    expect(fake.playArcadeCoinSfx).toHaveBeenCalledTimes(1);
+    expect(fake.playVhsInsertSfx).not.toHaveBeenCalled();
+    expect(onInspect).toHaveBeenCalledWith('arcade');
+  });
+
+  it('the WebGL fallback buttons unlock, play the same sounds and call onInspect', () => {
+    setWebgl(false);
+    const { onInspect } = renderWorld();
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect the CRT television' }));
+    expect(fake.unlock).toHaveBeenCalledTimes(1);
+    expect(fake.playVhsInsertSfx).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Use the arcade cabinet' }));
+    expect(fake.playArcadeCoinSfx).toHaveBeenCalledTimes(1);
+    expect(onInspect).toHaveBeenNthCalledWith(1, 'vhs');
+    expect(onInspect).toHaveBeenNthCalledWith(2, 'arcade');
+  });
+
+  it('a lamp toggle plays the switch sound; closing nothing else plays', () => {
+    h.target = 'desk-lamp-left';
+    const { wrapper } = renderWorld();
+    pressE(wrapper);
+    pressE(wrapper);
+    expect(fake.playLampSwitchSfx).toHaveBeenCalledTimes(2);
+    expect(fake.playPageRustleSfx).not.toHaveBeenCalled();
+  });
+
+  it('opening a card rustles once; a real page switch rustles again; the active page and closing are silent', () => {
+    h.target = 'manual-snake';
+    const { wrapper } = renderWorld();
+    pressE(wrapper);
+    expect(fake.playPageRustleSfx).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(wrapper, { code: 'Digit1', key: '1' }); // already page 1
+    expect(fake.playPageRustleSfx).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(wrapper, { code: 'Digit2', key: '2' });
+    expect(fake.playPageRustleSfx).toHaveBeenCalledTimes(2);
+    fireEvent.keyDown(wrapper, { code: 'Digit2', key: '2' });
+    expect(fake.playPageRustleSfx).toHaveBeenCalledTimes(2);
+    fireEvent.click(document.getElementById('world-card-tab-1')!);
+    expect(fake.playPageRustleSfx).toHaveBeenCalledTimes(3);
+    fireEvent.click(document.getElementById('world-card-tab-1')!);
+    expect(fake.playPageRustleSfx).toHaveBeenCalledTimes(3);
+    pressE(wrapper); // closes the card
+    expect(document.querySelector('.world-card')).toBeNull();
+    expect(fake.playPageRustleSfx).toHaveBeenCalledTimes(3);
+    expect(fake.playLampSwitchSfx).not.toHaveBeenCalled();
+  });
+
+  it('KeyM toggles mute and the badge text, aria-pressed and label follow; it is prevented and never held', () => {
+    const { wrapper } = renderWorld();
+    expect(badge().textContent).toBe('AUDIO: ON [M]');
+    expect(badge().getAttribute('aria-pressed')).toBe('false');
+    expect(badge().getAttribute('aria-label')).toBe('Toggle audio (M)');
+    expect(fireEvent.keyDown(wrapper, { code: 'KeyM', key: 'm' })).toBe(false);
+    expect(fake.toggleMuted).toHaveBeenCalledTimes(1);
+    expect(badge().textContent).toBe('AUDIO: MUTED [M]');
+    expect(badge().getAttribute('aria-pressed')).toBe('true');
+    expect([...(h.heldKeysRef?.current.roles ?? [])]).not.toContain('mute');
+    fireEvent.keyDown(wrapper, { code: 'KeyM', key: 'm', repeat: true });
+    expect(fake.toggleMuted).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(wrapper, { code: 'KeyM', key: 'm' });
+    expect(badge().textContent).toBe('AUDIO: ON [M]');
+    expect(document.querySelector('.world-audio')?.getAttribute('role')).toBe('status');
+  });
+
+  it('KeyM works while a card is open and is ignored from inputs and outside the wrapper', () => {
+    h.target = 'manual-snake';
+    const { wrapper } = renderWorld();
+    pressE(wrapper);
+    fireEvent.keyDown(wrapper, { code: 'KeyM', key: 'm' });
+    expect(fake.toggleMuted).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('.world-card')).not.toBeNull();
+    const input = document.createElement('input');
+    document.body.append(input);
+    fireEvent.keyDown(input, { code: 'KeyM', key: 'm' });
+    fireEvent.keyDown(document.body, { code: 'KeyM', key: 'm' });
+    input.remove();
+    expect(fake.toggleMuted).toHaveBeenCalledTimes(1);
+  });
+
+  it('clicking the badge toggles mute and never requests pointer lock', () => {
+    renderWorld();
+    fireEvent.click(badge());
+    expect(fake.toggleMuted).toHaveBeenCalledTimes(1);
+    expect(badge().textContent).toBe('AUDIO: MUTED [M]');
+    expect(lockSpy).not.toHaveBeenCalled();
+    expect(fireEvent.mouseDown(badge())).toBe(false); // keeps the focus on the world
+  });
+
+  it('lists the audio key in the controls hint', () => {
+    renderWorld();
+    expect(screen.getByText('M: toggle audio')).toBeTruthy();
+  });
+
+  it('ducks while a station panel is open and restores on resume', () => {
+    h.target = 'vhs';
+    const { wrapper } = renderWorld();
+    expect(fake.setDucked).toHaveBeenLastCalledWith(false);
+    pressE(wrapper);
+    expect(fake.setDucked).toHaveBeenLastCalledWith(true);
+    fireEvent.keyUp(wrapper, { code: 'KeyE', key: 'e' });
+    fireEvent.keyDown(wrapper, { code: 'Enter', key: 'Enter' });
+    expect(fake.setDucked).toHaveBeenLastCalledWith(false);
+  });
+
+  it('follows a supplied inputEnabled prop', () => {
+    const onInspect = vi.fn();
+    const { rerender } = render(createElement(WorldScene, { onInspect, memoryShifted: false, inputEnabled: false }));
+    expect(fake.setDucked).toHaveBeenLastCalledWith(true);
+    rerender(createElement(WorldScene, { onInspect, memoryShifted: false, inputEnabled: true }));
+    expect(fake.setDucked).toHaveBeenLastCalledWith(false);
+    rerender(createElement(WorldScene, { onInspect, memoryShifted: false, inputEnabled: false }));
+    expect(fake.setDucked).toHaveBeenLastCalledWith(true);
+  });
+
+  it('visibilitychange forwards document.hidden and never unlocks; unmount removes the listener', () => {
+    const { unmount } = renderWorld();
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    try {
+      document.dispatchEvent(new Event('visibilitychange'));
+      expect(fake.setHidden).toHaveBeenLastCalledWith(true);
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+      document.dispatchEvent(new Event('visibilitychange'));
+      expect(fake.setHidden).toHaveBeenLastCalledWith(false);
+      expect(fake.unlock).not.toHaveBeenCalled();
+      unmount();
+      const calls = fake.setHidden.mock.calls.length;
+      document.dispatchEvent(new Event('visibilitychange'));
+      expect(fake.setHidden.mock.calls.length).toBe(calls);
+    } finally {
+      delete (document as { hidden?: boolean }).hidden;
+    }
+  });
+
+  it('introduces no timers in the audio wiring', () => {
+    for (const [name, src] of Object.entries(sources)) {
+      if (name.endsWith('WorldScene.tsx')) {
+        // The documented 3 s context-loss timer is the only one.
+        expect(src.match(/setTimeout\(/g)).toHaveLength(1);
+        expect(src).not.toMatch(/setInterval\(/);
+      } else {
+        expect(src).not.toMatch(/setTimeout|setInterval/);
+      }
+    }
+  });
+});
+
+describe('WorldScene turntable catalog card (task 33.3)', () => {
+  type Fake = { [K in keyof WorldAudioEngine]: ReturnType<typeof vi.fn> };
+  let fake: Fake;
+  let track: number;
+  let unlocked: boolean;
+  const TITLES = [
+    '01 // MIDNIGHT RENTAL (1994)',
+    '02 // NEON ARCADE LOBBY (1996)',
+    '03 // RAIN ON CRT GLASS (1997)',
+    '04 // STATIC & STARLIGHT (1998)',
+    '05 // STOP TURNTABLE (SILENT)',
+  ];
+
+  beforeEach(() => {
+    track = 0;
+    unlocked = true;
+    fake = {
+      unlock: vi.fn(),
+      setHidden: vi.fn(),
+      setDucked: vi.fn(),
+      setMuted: vi.fn(),
+      toggleMuted: vi.fn(() => false),
+      isMuted: vi.fn(() => false),
+      isUnlocked: vi.fn(() => unlocked),
+      setTrack: vi.fn((i: number) => {
+        track = i;
+      }),
+      getTrack: vi.fn(() => track),
+      isPlaying: vi.fn(() => unlocked && track !== 4),
+      tick: vi.fn(),
+      playVhsInsertSfx: vi.fn(),
+      playArcadeCoinSfx: vi.fn(),
+      playLampSwitchSfx: vi.fn(),
+      playPageRustleSfx: vi.fn(),
+      playVinylNeedleDropSfx: vi.fn(),
+      dispose: vi.fn(),
+    };
+    __setWorldAudioFactoryForTests(() => fake as unknown as WorldAudioEngine);
+  });
+  afterEach(() => __setWorldAudioFactoryForTests(null));
+
+  const card = () => document.querySelector('.world-card') as HTMLElement | null;
+  const rows = () => [...document.querySelectorAll<HTMLElement>('.world-track-row')];
+  const activeRow = () => rows().findIndex((r) => r.getAttribute('aria-selected') === 'true');
+  const prompt = () => document.querySelector('.world-prompt')?.textContent ?? '';
+  const counter = () => document.querySelector('.world-notes .world-chip')?.textContent ?? null;
+  const key = (wrapper: HTMLElement, code: string, init: KeyboardEventInit = {}) => fireEvent.keyDown(wrapper, { code, key: code, ...init });
+  const pressE = (wrapper: HTMLElement) => {
+    fireEvent.keyDown(wrapper, { code: 'KeyE', key: 'e' });
+    fireEvent.keyUp(wrapper, { code: 'KeyE', key: 'e' });
+  };
+  const open = () => {
+    h.target = 'record-player';
+    const r = renderWorld();
+    pressE(r.wrapper);
+    return r;
+  };
+
+  it('prompt toggles between the plain and the Now playing form', () => {
+    h.target = 'record-player';
+    renderWorld();
+    expect(prompt()).toBe('Press E to use 1990s Turntable · Now playing: 01 // MIDNIGHT RENTAL (1994)');
+    cleanup();
+    unlocked = false; // engine still locked: nothing is playing
+    renderWorld();
+    expect(prompt()).toBe('Press E to use 1990s Turntable');
+    cleanup();
+    unlocked = true;
+    track = 4; // stopped
+    renderWorld();
+    expect(prompt()).toBe('Press E to use 1990s Turntable');
+  });
+
+  it('passes the selected track to Props as turntableTrack (task 34.2): keys, row click, persistence, and the pre-unlock selection', () => {
+    const { wrapper } = open();
+    expect(h.propsArgs).toEqual({ turntablePlaying: true, turntableTrack: 0 });
+    key(wrapper, 'Digit3');
+    expect(h.propsArgs).toEqual({ turntablePlaying: true, turntableTrack: 2 });
+    key(wrapper, 'Digit5');
+    expect(h.propsArgs).toEqual({ turntablePlaying: false, turntableTrack: 4 }); // STOP: neutral jacket, not playing
+    fireEvent.mouseDown(rows()[1]);
+    fireEvent.click(rows()[1]);
+    expect(h.propsArgs).toEqual({ turntablePlaying: true, turntableTrack: 1 });
+    // Close and reopen: the selection persists and the card shows the same active row.
+    pressE(wrapper);
+    expect(card()).toBeNull();
+    expect(h.propsArgs?.turntableTrack).toBe(1);
+    pressE(wrapper);
+    expect(activeRow()).toBe(1);
+    expect(h.propsArgs?.turntableTrack).toBe(1);
+    expect(prompt()).toContain('Now playing: 02 // NEON ARCADE LOBBY (1996)');
+  });
+
+  it('drives the console state (task 35.2): Digit2 gives track 1 playing, Digit5 gives track 4 stopped, the needle drop sounds for tracks 0..3 only', () => {
+    const { wrapper } = open();
+    key(wrapper, 'Digit2');
+    expect(h.propsArgs).toEqual({ turntablePlaying: true, turntableTrack: 1 });
+    key(wrapper, 'Digit5');
+    expect(h.propsArgs).toEqual({ turntablePlaying: false, turntableTrack: 4 });
+    expect(fake.playVinylNeedleDropSfx).toHaveBeenCalledTimes(1); // only Digit2; STOP is silent
+    key(wrapper, 'Digit1');
+    key(wrapper, 'Digit3');
+    key(wrapper, 'Digit4');
+    expect(h.propsArgs).toEqual({ turntablePlaying: true, turntableTrack: 3 });
+    expect(fake.playVinylNeedleDropSfx).toHaveBeenCalledTimes(4); // tracks 1, 0, 2, 3
+    key(wrapper, 'Digit5');
+    expect(fake.playVinylNeedleDropSfx).toHaveBeenCalledTimes(4);
+  });
+
+  it('shows the selected track on the jacket before audio is unlocked while the playing flag stays false', () => {
+    unlocked = false;
+    track = 2;
+    renderWorld();
+    expect(h.propsArgs).toEqual({ turntablePlaying: false, turntableTrack: 2 });
+  });
+
+  it('keeps every other prompt unchanged', () => {
+    h.target = 'manual-snake';
+    renderWorld();
+    expect(prompt()).toBe('Press E to read: SNAKE.EXE Manual');
+  });
+
+  it('E opens the turntable card (data-theme turntable, header, five exact rows with BPM, footer) and never calls onInspect', () => {
+    const { onInspect } = open();
+    expect(card()?.getAttribute('data-theme')).toBe('turntable');
+    expect(card()?.querySelector('.world-card-title')?.textContent).toBe('1990s Turntable');
+    expect(rows().map((r) => r.querySelector('.world-track-title')?.textContent)).toEqual(TITLES);
+    expect(rows().map((r) => r.querySelector('.world-track-bpm')?.textContent)).toEqual(['78 BPM', '92 BPM', '72 BPM', '84 BPM', 'SILENT']);
+    expect(rows().every((r) => r.tagName === 'BUTTON' && r.getAttribute('tabindex') === '-1')).toBe(true);
+    expect(activeRow()).toBe(0);
+    expect(rows()[0].getAttribute('aria-current')).toBe('true');
+    expect(card()?.querySelector('.world-card-footer')?.textContent).toBe('Press 1-5 to select · E or move away to close');
+    expect(onInspect).not.toHaveBeenCalled();
+    expect(document.getElementById('world-card-tab-1')).toBeNull();
+  });
+
+  it('does not change NOTES READ and closes on E and on Esc', () => {
+    const { wrapper } = open();
+    expect(counter()).toBe('NOTES READ: 0 / 7');
+    pressE(wrapper);
+    expect(card()).toBeNull();
+    pressE(wrapper);
+    expect(card()).not.toBeNull();
+    expect(key(wrapper, 'Escape')).toBe(true);
+    expect(card()).toBeNull();
+    expect(counter()).toBe('NOTES READ: 0 / 7');
+  });
+
+  it('closes when a station is opened from the world', () => {
+    const { wrapper, onInspect } = open();
+    act(() => h.setTarget?.('vhs'));
+    pressE(wrapper);
+    expect(onInspect).toHaveBeenCalledWith('vhs');
+    expect(card()).toBeNull();
+  });
+
+  it('Digit3 selects track 2 with the needle drop; the same key again does nothing; the active row moves and the prompt follows', () => {
+    const { wrapper } = open();
+    expect(key(wrapper, 'Digit3')).toBe(false); // prevented while the card is open
+    expect(fake.setTrack).toHaveBeenCalledTimes(1);
+    expect(fake.setTrack).toHaveBeenCalledWith(2);
+    expect(fake.playVinylNeedleDropSfx).toHaveBeenCalledTimes(1);
+    expect(activeRow()).toBe(2);
+    expect(prompt()).toBe('Press E to use 1990s Turntable · Now playing: 03 // RAIN ON CRT GLASS (1997)');
+    key(wrapper, 'Digit3');
+    expect(fake.setTrack).toHaveBeenCalledTimes(1);
+    expect(fake.playVinylNeedleDropSfx).toHaveBeenCalledTimes(1);
+    key(wrapper, 'Digit3', { repeat: true });
+    expect(fake.setTrack).toHaveBeenCalledTimes(1);
+  });
+
+  it('Digit5 and Numpad5 select STOP without a needle drop and the prompt returns to the plain form', () => {
+    const { wrapper } = open();
+    key(wrapper, 'Numpad5');
+    expect(fake.setTrack).toHaveBeenCalledWith(4);
+    expect(fake.playVinylNeedleDropSfx).not.toHaveBeenCalled();
+    expect(activeRow()).toBe(4);
+    expect(prompt()).toBe('Press E to use 1990s Turntable');
+    key(wrapper, 'Digit2');
+    expect(fake.setTrack).toHaveBeenLastCalledWith(1);
+    expect(fake.playVinylNeedleDropSfx).toHaveBeenCalledTimes(1);
+    expect(activeRow()).toBe(1);
+  });
+
+  it('digit keys do not move the player or release pointer lock', () => {
+    const { wrapper } = open();
+    for (const code of ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5']) key(wrapper, code);
+    expect([...(h.heldKeysRef?.current.roles ?? [])]).toEqual([]);
+    expect(lockSpy).not.toHaveBeenCalled();
+  });
+
+  it('is ignored from outside the wrapper and from inputs', () => {
+    open();
+    const input = document.createElement('input');
+    document.body.append(input);
+    fireEvent.keyDown(input, { code: 'Digit3', key: '3' });
+    fireEvent.keyDown(document.body, { code: 'Digit3', key: '3' });
+    input.remove();
+    expect(fake.setTrack).not.toHaveBeenCalled();
+  });
+
+  it('clicking a row selects it and never requests pointer lock; the active row click does nothing', () => {
+    open();
+    fireEvent.mouseDown(rows()[3]);
+    fireEvent.click(rows()[3]);
+    expect(fake.setTrack).toHaveBeenCalledWith(3);
+    expect(fake.playVinylNeedleDropSfx).toHaveBeenCalledTimes(1);
+    expect(activeRow()).toBe(3);
+    fireEvent.click(rows()[3]);
+    expect(fake.setTrack).toHaveBeenCalledTimes(1);
+    expect(lockSpy).not.toHaveBeenCalled();
+    expect(card()).not.toBeNull();
+  });
+
+  it('before unlock the choice is still stored and shown, but the prompt stays plain', () => {
+    unlocked = false;
+    fake.unlock.mockImplementation(() => undefined); // the fake never unlocks
+    const { wrapper } = open();
+    key(wrapper, 'Digit4');
+    expect(fake.setTrack).toHaveBeenCalledWith(3);
+    expect(activeRow()).toBe(3);
+    expect(prompt()).toBe('Press E to use 1990s Turntable');
+  });
+
+  it('Digit1 and Digit2 still switch pages on a document card, and Digit3 does nothing there', () => {
+    h.target = 'manual-snake';
+    const { wrapper } = renderWorld();
+    pressE(wrapper);
+    expect(document.getElementById('world-card-tab-1')?.getAttribute('aria-selected')).toBe('true');
+    key(wrapper, 'Digit2');
+    expect(document.getElementById('world-card-tab-2')?.getAttribute('aria-selected')).toBe('true');
+    key(wrapper, 'Digit3');
+    key(wrapper, 'Digit5');
+    expect(document.getElementById('world-card-tab-2')?.getAttribute('aria-selected')).toBe('true');
+    expect(fake.setTrack).not.toHaveBeenCalled();
+    expect(fake.playVinylNeedleDropSfx).not.toHaveBeenCalled();
+    expect(counter()).toBe('NOTES READ: 1 / 7');
+  });
+
+  it('digits with no card open do nothing, are not prevented and do not move the player', () => {
+    h.target = 'record-player';
+    const { wrapper } = renderWorld();
+    for (const code of ['Digit1', 'Digit3', 'Digit5', 'Numpad4']) expect(key(wrapper, code)).toBe(true);
+    expect(fake.setTrack).not.toHaveBeenCalled();
+    expect([...(h.heldKeysRef?.current.roles ?? [])]).toEqual([]);
+    expect(card()).toBeNull();
   });
 });

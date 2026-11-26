@@ -46,7 +46,11 @@ const BLOCKED_EPSILON = 1e-6;
 /**
  * One frame of look and movement with exponential smoothing.
  * - 'inspecting': frozen. Velocity is 0 and the rendered look snaps to the target.
- * - Snap rule: 'inspecting' and a cleared input (snap flag: blur, CLEAR_INPUT, suspension) zero the velocity and\n *   put the rendered look on the target, so nothing glides or drifts. A normal key release decays velocity.\n * - Reduced motion: alpha is 1, identical to the pre-smoothing instantaneous behaviour.\n * - Otherwise the target look takes mouse and keyboard input, the rendered look approaches it
+ * - Snap rule: 'inspecting' and a cleared input (snap flag: blur, CLEAR_INPUT, suspension) zero the velocity and
+ *   put the rendered look on the target, so nothing glides or drifts. A normal key release decays velocity.
+ * - Reduced motion: alpha is 1, identical to the pre-smoothing instantaneous behaviour.
+ * - Mouse look applies 1:1 to both the target and the rendered look (no lag).
+ * - Otherwise the target look takes keyboard input, the rendered look approaches it
  *   (yaw along the shortest arc), the velocity approaches inputVector(rendered yaw) * WALK_SPEED,
  *   and velocity * dt goes through moveWithCollision. A blocked axis zeroes that velocity component.
  */
@@ -61,9 +65,14 @@ export function stepPlayer(i: PlayerStepInput): PlayerStepResult {
   const dt = clampDt(i.dt);
   const reduced = i.reducedMotion === true;
   let target = startTarget;
+  let renderedStart = startLook;
 
   if (i.mouseDelta.x !== 0 || i.mouseDelta.y !== 0) {
+    // Mouse look is 1:1: the same delta goes to BOTH the target and the rendered look, so aiming has no
+    // smoothing lag. Any keyboard-driven target/rendered difference in flight is preserved (each look is
+    // clamped and wrapped on its own; yaw damping takes the shortest arc).
     target = applyMouseLook(target, i.mouseDelta.x, i.mouseDelta.y);
+    renderedStart = applyMouseLook(renderedStart, i.mouseDelta.x, i.mouseDelta.y);
   }
 
   const lk = toLookKeys(i.keys);
@@ -74,7 +83,7 @@ export function stepPlayer(i: PlayerStepInput): PlayerStepResult {
   const lookAlpha = reduced ? 1 : smoothingAlpha(LOOK_SMOOTHING_LAMBDA, dt);
   const look: Look = reduced
     ? target
-    : { yaw: dampAngle(startLook.yaw, target.yaw, lookAlpha), pitch: dampScalar(startLook.pitch, target.pitch, lookAlpha) };
+    : { yaw: dampAngle(renderedStart.yaw, target.yaw, lookAlpha), pitch: dampScalar(renderedStart.pitch, target.pitch, lookAlpha) };
 
   const input = toMovementInput(i.keys);
   const moving = input.forward || input.backward || input.left || input.right;

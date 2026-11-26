@@ -179,3 +179,36 @@ describe('keys 1 and 2 while an Archive Document Card is open (task 27.2)', () =
     expect(state.eRepeatGuard).toBe(false);
   });
 });
+
+describe('keys 3, 4 and 5 while a card is open (task 33.3)', () => {
+  const trackKey = (role: 'track3' | 'track4' | 'track5', o: Partial<Extract<ModeEvent, { type: 'KEY_DOWN' }>> = {}): ModeEvent => ({
+    type: 'KEY_DOWN',
+    role,
+    code: role === 'track3' ? 'Digit3' : role === 'track4' ? 'Digit4' : 'Digit5',
+    repeat: false,
+    accepted: true,
+    hasTarget: false,
+    cardOpen: true,
+    ...o,
+  });
+
+  it('emit only CARD_TRACK 2..4 and leave the mode state untouched, locked or not', () => {
+    const active = reduceMode(initialModeState(), { type: 'LOCK_ACQUIRED' }).state;
+    for (const [role, index] of [['track3', 2], ['track4', 3], ['track5', 4]] as const) {
+      const r = reduceMode(active, trackKey(role));
+      expect(r.effects).toEqual([{ type: 'CARD_TRACK', index }]);
+      expect(r.state).toBe(active);
+    }
+    const pending = initialModeState();
+    expect(reduceMode(pending, trackKey('track4')).effects).toEqual([{ type: 'CARD_TRACK', index: 3 }]);
+  });
+
+  it('do nothing without an open card, on repeat, when not accepted or while inspecting', () => {
+    const active = reduceMode(initialModeState(), { type: 'LOCK_ACQUIRED' }).state;
+    expect(reduceMode(active, trackKey('track3', { cardOpen: false })).effects).toEqual([]);
+    expect(reduceMode(active, trackKey('track3', { cardOpen: undefined })).effects).toEqual([]);
+    expect(reduceMode(active, trackKey('track3', { repeat: true })).effects).toEqual([]);
+    expect(reduceMode(active, trackKey('track3', { accepted: false })).effects).toEqual([]);
+    expect(reduceMode(initialModeState(false), trackKey('track5')).effects).toEqual([]);
+  });
+});

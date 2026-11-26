@@ -111,9 +111,11 @@ function refreshNoise(n: NoiseResources): void {
 export interface EffectsProps {
   /** False pauses all animation and invalidation (world is inspecting). Default true. */
   active?: boolean
+  /** Called on every rendered frame (even when inactive) with the clock time, to schedule the ambient music. */
+  onAudioTick?: (elapsedSec: number) => void
 }
 
-export function Effects({ active = true }: EffectsProps) {
+export function Effects({ active = true, onAudioTick }: EffectsProps) {
   const scene = useThree((s) => s.scene)
   const invalidate = useThree((s) => s.invalidate)
   const frameloop = useThree((s) => s.frameloop)
@@ -178,7 +180,8 @@ export function Effects({ active = true }: EffectsProps) {
     [noise, dust],
   )
 
-  useFrame((_, dt) => {
+  useFrame((state, dt) => {
+    onAudioTick?.(state.clock.elapsedTime)
     if (!active) return
     const step = Number.isFinite(dt) && dt > 0 ? Math.min(dt, MAX_DT_SEC) : 0
     timeRef.current += step

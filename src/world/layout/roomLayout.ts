@@ -137,6 +137,25 @@ const ARCADE_FREQUENCY = prop('arcade-frequency', 'station', box(8.4, 9.2, 0.7, 
  */
 const CRT_STACK = prop('crt-stack', 'furniture', box(4.3, 4.9, -3.2, -2.6), 1.0, 3, true, undefined, { facing: '-x' });
 
+/**
+ * Hi-Fi listening table with the turntable, a record crate and a NOW PLAYING jacket stand (task 34.1; the walnut console of 33.1 moved here
+ * from the north wall at x 2.2..3.1). It is 1.25 m x 0.45 m, back against the south wall (z 4) at x -2.1..-0.85, front toward -z (into the room),
+ * directly east of the couch (couch x -3.9..-2.1, z 2.6..3.4; the table starts at the couch's east edge, 0.15 m further back). The prop height 0.95 m is
+ * the top of the LP sleeves; the table top is 0.62 m and the turntable 0.75 m. The table-top centre is about 4.1 m (3D) from the west light at
+ * (x -2.6, y 2.3, z 0.2), well inside its 8.5 m range, and 4.7 m from the CRT light. The 1.0125 m distance from the spawn clears the 0.99 m spawn
+ * disc, and the table touches no doorway lane, island walkway or bookcase walkway. Candidates beside the couch facing +x, in front of the couch and
+ * in the south-west corner were rejected (see task 34.1 notes): they block couch access, a tested reachable cell, or lose the wall-flush back faces.
+ */
+const RECORD_PLAYER = prop('record-player', 'furniture', box(-2.1, -0.85, 3.55, 4), 0.95, 3, true, undefined, { facing: '-z' });
+
+/**
+ * Floor loudspeaker (task 35.1): a 0.34 x 0.32 m, 0.96 m tall 3-way tower against the south wall (back on z 4), facing -z like the console. It stands on the couch side of
+ * the console, in the 0.6 m strip between the back of the couch (z 3.4) and the wall: x -2.49..-2.15, 0.05 m west of the console (x -2.1) and 0.28 m clear of the
+ * couch (z 3.4 against 3.68). The console and the couch stay exactly where they were, so the spawn disc, every walkway and lane, the bookcase walkways and the
+ * reachable cells in front of the console are untouched. Solid (floor-standing), not interactable.
+ */
+const LOUDSPEAKER = prop('loudspeaker', 'furniture', box(-2.49, -2.15, 3.68, 4), 0.96, 3, true, undefined, { facing: '-z' });
+
 const CHAIR = prop('abandoned-chair', 'furniture', box(2.9, 3.5, 1.9, 2.5), 0.9, 3);
 const COUCH = prop('couch', 'furniture', box(-3.9, -2.1, 2.6, 3.4), 0.9, 3);
 
@@ -208,6 +227,8 @@ const PROPS: readonly PropDef[] = Object.freeze([
   ARCADE_MAZE,
   ARCADE_FREQUENCY,
   CRT_STACK,
+  RECORD_PLAYER,
+  LOUDSPEAKER,
   CHAIR,
   COUCH,
   ...DETAILS,
@@ -338,14 +359,34 @@ function noteDefs(): InteractableDef[] {
 }
 
 /**
- * World-local interactable props (nine): the two desk lamps, the three manuals, then the desk notebook, the cork
- * board, the Memory_Shift poster and the Arcade_Area Club Archive Notice. Not Stations, not Colliders.
+ * Tasks 33.1 and 34.1: the record player. The anchor sits on the middle of its front face (the south-wall table faces -z, so the front face is
+ * z = box.minZ), so the player stands in the open floor in front of the table. The table is solid and its whole footprint (the crate end
+ * included) is the line-of-sight box; its own footprint is excluded from its line-of-sight test, like every other prop that sits on a
+ * Collider. Not a Station: it never reaches onInspect.
+ */
+function recordPlayerDef(): InteractableDef {
+  const b = RECORD_PLAYER.box;
+  return Object.freeze({
+    id: 'record-player' as const,
+    kind: 'turntable' as const,
+    anchor: Object.freeze({ x: (b.minX + b.maxX) / 2, z: RECORD_PLAYER.facing === '+z' ? b.maxZ : b.minZ }),
+    collider: b,
+    range: PROP_INTERACTION_RANGE,
+    height: 0.85,
+  });
+}
+
+/**
+ * World-local interactable props (ten): the two desk lamps, the three manuals, then the desk notebook, the cork
+ * board, the Memory_Shift poster, the Arcade_Area Club Archive Notice and the record player (33.1).
+ * Not Stations. Only the record player has a Collider (its own solid footprint).
  */
 export const INTERACTABLE_DEFS: readonly InteractableDef[] = Object.freeze([
   lampDef('desk-lamp-left'),
   lampDef('desk-lamp-right'),
   ...MANUAL_PLACEMENT.books.map((m) => manualDef(m.id, m.z)),
   ...noteDefs(),
+  recordPlayerDef(),
 ]);
 /** Rough triangle estimate: 12 per box (walls, props, floor, ceiling). */
 export function estimateTriangles(): number {

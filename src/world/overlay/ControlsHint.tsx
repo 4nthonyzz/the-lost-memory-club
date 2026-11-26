@@ -7,6 +7,7 @@ export const CONTROLS_LINES: readonly string[] = [
   'I J K L: look with the keyboard',
   'E: interact with a station',
   'Esc: release the mouse',
+  'M: toggle audio',
 ];
 
 export const STATUS_NOTE = 'Station messages, including why a station cannot be used yet, appear in the status line at the bottom of the screen.';

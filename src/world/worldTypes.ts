@@ -51,12 +51,14 @@ export type ManualId = 'manual-snake' | 'manual-maze' | 'manual-frequency';
 export type NoteId = 'desk-notebook' | 'cork-board' | 'poster-shift' | 'poster-archive';
 /** Props that open the Archive Document Card (seven in total; `poster-archive` is the Arcade_Area Club Archive Notice, task 25.2). */
 export type ReadableId = ManualId | NoteId;
-export type PropInteractableId = LampId | ReadableId;
+/** The walnut console with the Hi-Fi turntable (task 33.1). It is not a readable and not a lamp. */
+export type TurntableId = 'record-player';
+export type PropInteractableId = LampId | ReadableId | TurntableId;
 
 /** A world-local interactable prop (a lamp, an arcade manual book or another readable note). Layout data only. */
 export interface InteractableDef {
   id: PropInteractableId;
-  kind: 'lamp' | 'manual' | 'note';
+  kind: 'lamp' | 'manual' | 'note' | 'turntable';
   /** Point used for distance and cone tests. */
   anchor: Vec2;
   /**
