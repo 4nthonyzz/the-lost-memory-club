@@ -54,6 +54,8 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 
 - Approved scope change (procedural world audio), 2026-12-09: a zero-asset procedural Web Audio engine is added in `src/world/audio/` (`createWorldAudioEngine`). It is a silent no-op when `AudioContext` / `webkitAudioContext` is missing and accepts an injectable context factory for tests. The context is created or resumed only on a user gesture (click or keydown in the world wrapper), suspended while `document.hidden`, and closed on dispose. SFX: VHS insert (on `onInspect('vhs')`), arcade coin (on `onInspect('arcade')`), lamp switch, page rustle (card open and page 1 / 2). Click-to-inspect no longer exists (removed in M1), so station SFX fire on E and on the WebGL fallback buttons. Ambient late-night VHS-store music at about 78 BPM: the pad and tape hiss are continuously running nodes (they keep playing while the canvas uses `frameloop="demand"` during an open panel), and sparse bell notes are scheduled ahead from the existing `useFrame` using `audioCtx.currentTime` (no `setInterval` / `setTimeout`). Master BGM gain is about 0.15 and is ducked x0.4 while a station panel is open (gain ramp triggered by the mode change, not the frame loop). `KeyM` toggles mute, and a compact "AUDIO: ON [M]" / "AUDIO: MUTED [M]" badge shows the state. Coordination note: the game-foundation spec assigns audio effects to Developer 3, so this world-local engine must be reviewed with Developer 3 before merge so the game does not run two audio systems. Budgets unchanged: triangles 19,154 (at most 19,200), 4 lights, 32 textures (7.703 MiB), no new timers. `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged.
 
+- Approved scope change (turntable and music catalog), 2026-12-10: a world-only interactable `record-player` (not a `StationId`) with a solid collider is placed in a free corner of the main room, so every existing reachability, 1.2 m walkway, doorway-lane, island-clearance, spawn and line-of-sight test still passes. It is a multi-part walnut console and Hi-Fi turntable: plinth with feet, brushed steel deck, emissive track display (no light), pitch slider and power button, 12-inch platter with a coloured label that spins while a track plays and stops when stopped or under reduced motion, and a tonearm that rests on its cradle when stopped and sits on the record when playing. It reuses existing textures only (0 extra bytes). To stay within 19,200 triangles the pass may cull unseen floor-flush bottom faces and, if still needed, simplify the hidden console cables behind the CRT island; every reclaimed triangle is reported. A procedural `MUSIC_CATALOG` of 4 tracks plus a stop option is added: 01 MIDNIGHT RENTAL 78 BPM (the current loop), 02 NEON ARCADE LOBBY 92 BPM (FM chords and bass), 03 RAIN ON CRT GLASS 72 BPM (Rhodes-style chords with vinyl crackle), 04 STATIC & STARLIGHT 84 BPM (A-minor arpeggio with tape wow), 05 STOP. Tracks switch with an audio-clock crossfade (no timers); track 1 is the default on unlock. A needle-drop SFX (about 0.55 s) plays on track start. E on the record player opens a themed turntable catalog card (`data-theme` turntable). Keys 1-5 select a track while that card is open (on document cards, 1 and 2 still switch pages), and track rows are clickable without recapturing pointer lock. The Developer 3 audio review is still required. Budgets: triangles at most 19,200 (19,154 now), 4 lights, 32 textures (7.703 MiB), no new timers, no audio files. `StationId` stays `'vhs' | 'arcade'`; `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged.
+
 ## Tasks
 
 ### Milestone 1: Playable 3D room (primitives only)
@@ -1187,6 +1189,45 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: documentation and the spec folder only.
     - _Requirements: 14.11, 14.12, 15.3, 15.6_
 
+### Turntable and music catalog
+
+- [x] 33. Turntable and music catalog
+  - [x] 33.1 Turntable placement, model and triangle reclaim
+    - Files: `src/world/layout/roomLayout.ts`, `src/world/worldTypes.ts` (if needed), `src/world/scene/modelDetail.ts`, `src/world/scene/Props.tsx`, `src/world/scene/sharedResources.ts`, `src/world/scene/PartMeshes.tsx` (if needed); tests `src/world/layout/roomLayout.test.ts`, `src/world/scene/modelDetail.test.ts`, `src/world/logic/targeting.test.ts`.
+    - Add the `record-player` world prop (solid collider, free corner of the main room) and its multi-part walnut console and Hi-Fi turntable, using existing textures only. Cull unseen floor-flush bottom faces and, only if still needed, simplify the hidden console cables behind the CRT island. Report every reclaimed triangle.
+    - Acceptance: triangle estimate at most 19,200; lights at most 4; texture count 32 and memory unchanged; `record-player` is in `COLLIDERS` and targetable within range; spawn, 1.2 m walkways, doorway lanes, island clearance, reachability of both Stations and line-of-sight tests still pass; `StationId` unchanged; Memory_Shift tinting still works.
+    - Tests: `roomLayout.test.ts` (collider, placement, clearances, BFS reachability), `modelDetail.test.ts` (parts, reclaimed triangle count, budgets, disposal once and twice-safe), `targeting.test.ts` (record player targetable, nearest wins). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 32.3.
+    - Boundary: `src/world/` only; no new dependency; no GLB; `ASSET_MANIFEST` stays empty.
+    - _Requirements: 1.3, 1.4, 1.8, 6.1, 7.1, 7.2, 7.3, 9.8, 12.5, 13.8, 14.4, 14.5, 19.1_
+
+  - [x] 33.2 Music catalog, crossfade and needle-drop SFX
+    - Files: `src/world/audio/worldAudio.ts`, `src/world/audio/engineFactory.ts`, `src/world/audio/worldAudio.test.ts`.
+    - Add `MUSIC_CATALOG` (4 procedural tracks plus stop) and `setTrack(id)` with an audio-clock crossfade (no timers), default track 1 on unlock, and a needle-drop SFX of about 0.55 s. Mute, ducking, gesture-only start and dispose behavior are unchanged.
+    - Acceptance: no audio files, no new timers, no new dependency; the no-op engine never throws; track 1 matches the current loop; switching ramps gains on `currentTime`; stop silences BGM; mute and ducking still compose.
+    - Tests: `worldAudio.test.ts` with a fake context (catalog shape and BPMs, default track, crossfade gain ramps, stop, needle-drop, mute and ducking composition, no timers). Run `npm run typecheck`, `npm test`.
+    - Depends on: 33.1.
+    - Boundary: `src/world/audio/` only; no storage access; Developer 3 audio review still required.
+    - _Requirements: 10.1, 10.4, 13.1, 14.2, 14.4, 14.7, 15.1, 16.8, 16.9_
+
+  - [x] 33.3 Turntable catalog card, track keys and spin wiring
+    - Files: `src/world/logic/propState.ts`, `src/world/overlay/archiveDocuments.ts` or new `src/world/overlay/turntableCatalog.ts`, `src/world/overlay/cardThemes.ts`, `src/world/logic/inputState.ts`, `src/world/logic/inputMode.ts`, `src/world/controller/useWorldInput.ts`, `src/world/WorldScene.tsx`, `src/world/overlay/WorldInspectorCard.tsx`, `src/world/overlay/world.css`, `src/world/scene/Props.tsx` (spin and tonearm state); tests `src/world/logic/propState.test.ts`, `src/world/logic/inputState.test.ts`, `src/world/WorldScene.test.ts`, `src/world/scene/modelDetail.test.ts`.
+    - E on the record player opens the themed turntable catalog card (`data-theme` turntable). Keys 1-5 select a track while that card is open; on document cards 1 and 2 still switch pages. Track rows are clickable without requesting pointer lock. Selecting a track calls the audio engine, spins the platter and moves the tonearm onto the record; stop or reduced motion stops the spin and returns the tonearm to its cradle. No `onInspect`, no mode change, no input suspension; selected track is session-only (no storage).
+    - Acceptance: keys 1-5 are accepted only while the turntable card is open and keep the existing filtering; E, Esc and walking more than 2.6 m away close the card; platter spins only while a track plays and never under reduced motion; tonearm state matches; notes counter unchanged; `src/App.tsx` unchanged.
+    - Tests: `propState.test.ts` (turntable card open, close, track selection), `inputState.test.ts` (keys 1-5 role and filtering, document cards unchanged), `WorldScene.test.ts` (track keys and row clicks, no lock request, no `onInspect`, engine calls, spin and tonearm state, reduced motion), `modelDetail.test.ts` (spin and tonearm state parts, budgets). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 33.2.
+    - Boundary: `src/world/` only; `WorldSceneProps` and `onInspect` unchanged; no import from `src/arcade/` or `src/memories/`; the import-boundary test still passes.
+    - _Requirements: 7.5, 7.6, 7.7, 8.1, 10.4, 10.6, 11.12, 11.13, 11.14, 15.1, 15.2, 15.4, 16.6, 16.7, 16.8, 16.9, 20.2, 20.8_
+
+  - [x] 33.4 Docs, metrics and verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles (with reclaimed count), lights and texture memory, each labelled "computed, not runtime-measured". Document the turntable, catalog, keys 1-5 and the Developer 3 audio review requirement. Audio is tested only with a fake context, not by listening. Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final geometry and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 33.3.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional. The 17 property-based test sub-tasks can be skipped for a faster MVP. Tasks 16.2 and 16.3 are marked `*` because they must not be implemented without approval.
@@ -1276,7 +1317,11 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     { "id": 72, "tasks": ["31.3"] },
     { "id": 73, "tasks": ["32.1"] },
     { "id": 74, "tasks": ["32.2"] },
-    { "id": 75, "tasks": ["32.3"] }
+    { "id": 75, "tasks": ["32.3"] },
+    { "id": 76, "tasks": ["33.1"] },
+    { "id": 77, "tasks": ["33.2"] },
+    { "id": 78, "tasks": ["33.3"] },
+    { "id": 79, "tasks": ["33.4"] }
   ]
 }
 ```

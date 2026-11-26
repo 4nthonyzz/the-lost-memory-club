@@ -51,6 +51,8 @@ export interface UseWorldInputOptions {
   isCardOpen?: () => boolean;
   /** Called when key 1 or 2 is pressed while a card is open. Read through a ref. Never releases pointer lock. */
   onCardPage?: (page: 1 | 2) => void;
+  /** Called when key 3, 4 or 5 (index 2..4) is pressed while a card is open. Read through a ref. Never releases pointer lock. */
+  onCardTrack?: (index: 2 | 3 | 4) => void;
   /**
    * Scrolls the open card (ArrowUp / ArrowDown by a line, PageUp / PageDown by a page). Read through a ref. While a
    * card is open ArrowUp / ArrowDown call this instead of moving the player.
@@ -103,6 +105,7 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
   const onCloseCardRef = useRef(options.onCloseCard);
   const isCardOpenRef = useRef(options.isCardOpen);
   const onCardPageRef = useRef(options.onCardPage);
+  const onCardTrackRef = useRef(options.onCardTrack);
   const onCardScrollRef = useRef(options.onCardScroll);
   const onGestureRef = useRef(options.onGesture);
   const onToggleMuteRef = useRef(options.onToggleMute);
@@ -115,6 +118,7 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
   onCloseCardRef.current = options.onCloseCard;
   isCardOpenRef.current = options.isCardOpen;
   onCardPageRef.current = options.onCardPage;
+  onCardTrackRef.current = options.onCardTrack;
   onCardScrollRef.current = options.onCardScroll;
   onGestureRef.current = options.onGesture;
   onToggleMuteRef.current = options.onToggleMute;
@@ -171,6 +175,9 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
           case 'CARD_PAGE':
             onCardPageRef.current?.(effect.page);
             break;
+          case 'CARD_TRACK':
+            onCardTrackRef.current?.(effect.index);
+            break;
           case 'RELEASE_POINTER_LOCK':
             exitLock(doc);
             break;
@@ -216,9 +223,9 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
       if (accepted && e.code === 'Escape') onCloseCardRef.current?.();
 
       const cardOpen = isCardOpenRef.current?.() === true;
-      const isPageKey = role === 'page1' || role === 'page2';
+      const isPageKey = role === 'page1' || role === 'page2' || role === 'track3' || role === 'track4' || role === 'track5';
       const scroll = cardOpen ? cardScrollFor(e.code) : null;
-      // Keys claimed only while a card is open (1, 2, PageUp, PageDown).
+      // Keys claimed only while a card is open (1 to 5, PageUp, PageDown).
       const cardOnlyKey = isPageKey || role === 'scrollPageUp' || role === 'scrollPageDown';
       // Movement and look keys are held. E, the page keys and PageUp / PageDown are one-shot and are never held.
       // While a card is open, ArrowUp / ArrowDown scroll the card and are not held.
@@ -228,7 +235,7 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
       }
       if (accepted && scroll !== null && modeBefore !== 'inspecting') onCardScrollRef.current?.(scroll);
       // preventDefault only for used keys while not inspecting. Esc is never touched.
-      // Keys 1 and 2 are claimed only while a card is open.
+      // Keys 1 to 5 are claimed only while a card is open.
       if (accepted && role !== null && modeBefore !== 'inspecting' && e.code !== 'Escape' && (!cardOnlyKey || cardOpen)) {
         e.preventDefault();
       } else if (isMute) {

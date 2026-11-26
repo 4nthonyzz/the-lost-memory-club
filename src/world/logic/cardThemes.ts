@@ -26,6 +26,25 @@ export const CARD_PALETTES: Readonly<Record<DocTheme, CardPalette>> = Object.fre
   notice: { bg: '#e9e4d0', ink: '#1c1917', muted: '#44403c', pillBg: '#d6cfb4', pillInk: '#3b2a14', hlBg: '#f3ecc0' },
 });
 
+/**
+ * Turntable catalog card (task 33.3): a 1990s Hi-Fi look. Dark walnut surface with amber LCD text; the active track row
+ * sits on an emerald panel (hlBg) and keeps `ink` text. `frame` and `accent` are decorative only (borders, metal trim).
+ */
+export const TURNTABLE_PALETTE: CardPalette & { frame: string; accent: string; lcdBg: string; lcdInk: string; lcdActiveInk: string } =
+  Object.freeze({
+    bg: '#1c120a',
+    ink: '#ffd479',
+    muted: '#d8c3a0',
+    pillBg: '#2b1b0f',
+    pillInk: '#a7f3d0',
+    hlBg: '#0f3d2e',
+    frame: '#9ca3af',
+    accent: '#c0c6cf',
+    lcdBg: '#0b0f0c',
+    lcdInk: '#ffc24a',
+    lcdActiveInk: '#b9f6d6',
+  });
+
 /** Printed-paper colours of the open-book pages (manual themes only). */
 export interface BookPalette {
   /** Paper tint. */

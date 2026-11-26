@@ -13,6 +13,7 @@ import {
   reducePropInteract,
   reduceTargetChange,
   shouldCloseCard,
+  turntablePromptText,
 } from './propState';
 
 const propTarget = (id: string) => ({ type: 'prop' as const, prop: INTERACTABLE_DEFS.find((d) => d.id === id)! });
@@ -188,5 +189,64 @@ describe('card pages (task 27.2)', () => {
     const reopened = reducePropInteract(viaClose, 'desk-notebook');
     expect(reopened.cardPage).toBe(1);
     expect(reopened.read.size).toBe(1);
+  });
+});
+
+describe('turntable card state (task 33.3)', () => {
+  it('E on the record player opens the turntable card without touching the read set, lamps or message', () => {
+    const base = initialPropState();
+    const s = reducePropInteract(base, 'record-player');
+    expect(s.openCard).toBe('record-player');
+    expect(s.cardPage).toBe(1);
+    expect(s.read.size).toBe(0);
+    expect(s.message).toBeNull();
+    expect(s.lampOn).toEqual(base.lampOn);
+  });
+
+  it('does not change the read count, also after readable cards were read', () => {
+    let s = press(['manual-snake']);
+    s = reduceCloseCard(s);
+    const before = s.read;
+    s = reducePropInteract(s, 'record-player');
+    expect(s.read).toBe(before);
+    expect(s.read.size).toBe(1);
+    expect(READABLE_TOTAL).toBe(7);
+  });
+
+  it('E again closes it; another prop pressed while it is open also only closes it', () => {
+    const open = reducePropInteract(initialPropState(), 'record-player');
+    expect(reducePropInteract(open, 'record-player').openCard).toBeNull();
+    const other = reducePropInteract(open, 'manual-maze');
+    expect(other.openCard).toBeNull();
+    expect(other.read.size).toBe(0);
+  });
+
+  it('closes by the shared close reducer (Esc, pointer lock lost, distance, station opened, inspecting)', () => {
+    const open = reducePropInteract(initialPropState(), 'record-player');
+    expect(reduceCloseCard(open).openCard).toBeNull();
+    const anchor = INTERACTABLE_DEFS.find((d) => d.id === 'record-player')!.anchor;
+    expect(shouldCloseCard({ x: anchor.x, z: anchor.z + CARD_CLOSE_DISTANCE + 0.1 }, anchor)).toBe(true);
+    expect(shouldCloseCard({ x: anchor.x, z: anchor.z + 1 }, anchor)).toBe(false);
+  });
+
+  it('a document card page switch is unchanged and the turntable card has no pages', () => {
+    const doc = reducePropInteract(initialPropState(), 'manual-snake');
+    expect(reduceCardPage(doc, 2).cardPage).toBe(2);
+    const tt = reducePropInteract(initialPropState(), 'record-player');
+    expect(reduceCardPage(tt, 2)).toBe(tt);
+  });
+
+  it('prompt text: plain form when nothing plays, "Now playing" form with the catalog title otherwise', () => {
+    expect(turntablePromptText(null)).toBe('Press E to use 1990s Turntable');
+    expect(propPromptText('record-player', { 'desk-lamp-left': true, 'desk-lamp-right': true })).toBe('Press E to use 1990s Turntable');
+    expect(propPromptText('record-player', { 'desk-lamp-left': true, 'desk-lamp-right': true }, 0)).toBe(
+      'Press E to use 1990s Turntable · Now playing: 01 // MIDNIGHT RENTAL (1994)',
+    );
+    expect(turntablePromptText(3)).toBe('Press E to use 1990s Turntable · Now playing: 04 // STATIC & STARLIGHT (1998)');
+  });
+
+  it('target change clears no turntable message and keeps other prompts unchanged', () => {
+    expect(propTarget('record-player').prop.id).toBe('record-player');
+    expect(propPromptText('manual-snake', initialPropState().lampOn)).toBe('Press E to read: SNAKE.EXE Manual');
   });
 });

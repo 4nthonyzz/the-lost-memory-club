@@ -1,5 +1,5 @@
 /**
- * Procedural world audio (task 32.1). Zero assets, pure TypeScript: no React, no three.js,
+ * Procedural world audio (tasks 32.1 and 33.2). Zero assets, pure TypeScript: no React, no three.js,
  * no storage, no timers. Everything is synthesised with the Web Audio API.
  *
  * API
@@ -7,15 +7,25 @@
  *
  *   unlock()            Call from a user gesture. Creates the context on the first call (factory, or
  *                       window.AudioContext / webkitAudioContext), resumes it when suspended and starts the
- *                       ambient bed (pad + tape hiss) once.
+ *                       selected music track (default track 0) once.
  *   setHidden(hidden)   true suspends the context; false resumes it (only if unlocked and not muted).
  *   setDucked(ducked)   Ramps the BGM bus to 0.4x (or back to 1x) over 0.35 s.
  *   setMuted(muted) / toggleMuted() / isMuted()   Master gain ramp to 0 / 1 (toggleMuted returns the new state).
  *   isUnlocked()
- *   tick(elapsedSec)    Schedules sparse bell notes up to LOOKAHEAD_SEC ahead of ctx.currentTime. The argument
- *                       is accepted for call-site symmetry; the audio clock is the only time source used.
- *                       Idempotent per beat. No-op when locked, muted, hidden or not running.
- *   playVhsInsertSfx() / playArcadeCoinSfx() / playLampSwitchSfx() / playPageRustleSfx()
+ *   setTrack(index)     Selects a MUSIC_CATALOG entry (0..4). Invalid indices (non-integer, out of range) are
+ *                       ignored; selecting the active track is a no-op. Before unlock the selection is stored
+ *                       and applied on unlock. After unlock the switch is an audio-clock crossfade of
+ *                       CROSSFADE_SEC: the old track bus ramps to 0 and its voices are stopped with stop(end)
+ *                       and disconnected, the new track bus ramps from 0 to 1. Track 4 is silent (no music).
+ *   getTrack()          Selected track index (0 by default). Mute does not change it.
+ *   isPlaying()         true when a music track 0..3 is selected and the engine is unlocked. Mute, duck and
+ *                       hidden do not change it (the selection is playing but may be inaudible).
+ *   tick(elapsedSec)    Schedules the active track's notes up to LOOKAHEAD_SEC ahead of ctx.currentTime. The
+ *                       argument is accepted for call-site symmetry; the audio clock is the only time source.
+ *                       Idempotent per step, no backlog after a time jump. No-op when locked, muted, hidden,
+ *                       not running or when track 4 is selected.
+ *   playVhsInsertSfx() / playArcadeCoinSfx() / playLampSwitchSfx() / playPageRustleSfx() /
+ *   playVinylNeedleDropSfx()
  *   dispose()           Stops and disconnects every node, closes the context once, then every method is a no-op.
  *
  * Fallback: when no context can be created (no AudioContext, factory returns null or throws) every method
@@ -24,10 +34,15 @@
  * Node graph
  *   master gain (1) -> destination
  *   bgm gain (0.15) -> master      sfx gain (0.6) -> master
- *   pad: 5 chord notes x (sawtooth + triangle, detuned) -> padMix -> lowpass ~1100 Hz (slow LFO) -> bgm
- *        wow LFO (0.45 Hz, +-6 cents) -> every pad oscillator detune
- *   hiss: looping cached noise -> highpass 3500 Hz -> gain 0.008 -> bgm
- *   bells: note voices -> bellIn -> bgm (dry) and bellIn -> delay 0.38 s (feedback 0.3) -> wet 0.25 -> bgm
+ *   one track bus gain per started track -> bgm (crossfaded); every track voice ends in its track bus.
+ *   track 0: pad: 5 chord notes x (sawtooth + triangle, detuned) -> padMix -> lowpass ~1100 Hz (slow LFO)
+ *              wow LFO (0.45 Hz, +-6 cents) -> every pad oscillator detune
+ *            hiss: looping cached noise -> highpass 3500 Hz -> gain 0.008
+ *            bells: note voices -> bellIn -> bus (dry) and bellIn -> delay 0.38 s (feedback 0.3) -> wet 0.25 -> bus
+ *            Its continuous nodes (pad, LFOs, hiss) are stopped when the track is left and RECREATED when it is
+ *            selected again (simplest correct approach: no node is ever reused across a fade).
+ *   track 1: two-operator FM chord stabs (+ bass lowpass pulse)       track 2: Rhodes-style chords + vinyl crackle
+ *   track 3: sawtooth arpeggio -> lowpass -> feedback delay + soft pad
  *   SFX voices are short-lived: each oscillator or source is stopped with stop(t + dur) and disconnected on 'ended'.
  */
 
@@ -114,11 +129,18 @@ export interface WorldAudioEngine {
   toggleMuted(): boolean;
   isMuted(): boolean;
   isUnlocked(): boolean;
+  /** Selects a MUSIC_CATALOG index (0..4). Invalid indices are ignored; the same track is a no-op. */
+  setTrack(index: number): void;
+  /** Selected track index (default 0). Unaffected by mute. */
+  getTrack(): number;
+  /** True when a music track 0..3 is selected and the engine is unlocked (mute does not change this). */
+  isPlaying(): boolean;
   tick(elapsedSec: number): void;
   playVhsInsertSfx(): void;
   playArcadeCoinSfx(): void;
   playLampSwitchSfx(): void;
   playPageRustleSfx(): void;
+  playVinylNeedleDropSfx(): void;
   dispose(): void;
 }
 
@@ -135,6 +157,60 @@ export const DUCK_RAMP_SEC = 0.35;
 export const MUTE_RAMP_SEC = 0.08;
 export const SFX_BUS_GAIN = 0.6;
 export const HISS_GAIN = 0.008;
+/** Audio-clock crossfade length when the track changes. */
+export const CROSSFADE_SEC = 0.7;
+
+export interface MusicCatalogEntry {
+  readonly id: string;
+  readonly title: string;
+  readonly year: number;
+  readonly bpm: number;
+  readonly description: string;
+}
+
+export const MUSIC_CATALOG: readonly MusicCatalogEntry[] = Object.freeze([
+  Object.freeze({
+    id: 'midnight-rental',
+    title: '01 // MIDNIGHT RENTAL (1994)',
+    year: 1994,
+    bpm: 78,
+    description: 'D-Dorian tape pad with slow filter drift, tape hiss and sparse delayed bells.',
+  }),
+  Object.freeze({
+    id: 'neon-arcade-lobby',
+    title: '02 // NEON ARCADE LOBBY (1996)',
+    year: 1996,
+    bpm: 92,
+    description: 'Upbeat FM-synth chord stabs over a warm analog bass pulse.',
+  }),
+  Object.freeze({
+    id: 'rain-on-crt-glass',
+    title: '03 // RAIN ON CRT GLASS (1997)',
+    year: 1997,
+    bpm: 72,
+    description: 'Melancholic lo-fi electric-piano chords under soft vinyl crackle.',
+  }),
+  Object.freeze({
+    id: 'static-and-starlight',
+    title: '04 // STATIC & STARLIGHT (1998)',
+    year: 1998,
+    bpm: 84,
+    description: 'Dreamy A-minor synth-wave arpeggio through a feedback delay.',
+  }),
+  Object.freeze({
+    id: 'stop-turntable',
+    title: '05 // STOP TURNTABLE (SILENT)',
+    year: 0,
+    bpm: 0,
+    description: 'No music. Room sounds only.',
+  }),
+]);
+
+/** Titles in catalog order, for the turntable card. */
+export const MUSIC_TITLES: readonly string[] = Object.freeze(MUSIC_CATALOG.map((e) => e.title));
+export const MUSIC_TRACK_COUNT = MUSIC_CATALOG.length;
+/** Index of the silent entry. */
+export const SILENT_TRACK = 4;
 
 /** D-Dorian pad voicing: D3 A3 C4 E4 G4 (MIDI note numbers). */
 export const PAD_CHORD_MIDI: readonly number[] = [50, 57, 60, 64, 67];
@@ -146,6 +222,35 @@ export const PAD_CHORD_MIDI: readonly number[] = [50, 57, 60, 64, 67];
 export const BELL_PATTERN_MIDI: readonly number[] = [
   74, -1, 81, 77, -1, 79, -1, 72, 76, -1, -1, 81, 79, -1, 74, -1,
 ];
+
+interface ChordDef {
+  readonly notes: readonly number[];
+  readonly root: number;
+}
+
+/** Track 1, one chord per bar: Am7 - Fmaj7 - Cmaj7 - G6. */
+const FM_CHORDS: readonly ChordDef[] = [
+  { notes: [57, 60, 64, 67], root: 45 },
+  { notes: [53, 57, 60, 64], root: 41 },
+  { notes: [60, 64, 67, 71], root: 48 },
+  { notes: [55, 59, 62, 64], root: 43 },
+];
+
+/** Track 2, two bars each: Fmaj7 then Em9. */
+const RHODES_CHORDS: readonly (readonly number[])[] = [
+  [53, 57, 60, 64],
+  [52, 55, 59, 62, 66],
+];
+
+/** Track 3 arpeggio, one 4-note pattern per bar, played twice per bar as eighth notes. */
+const ARP_PATTERNS: readonly (readonly number[])[] = [
+  [57, 60, 64, 69],
+  [53, 57, 60, 65],
+  [60, 64, 67, 72],
+  [55, 59, 62, 67],
+];
+
+const SOFT_PAD_MIDI: readonly number[] = [45, 52, 57, 60];
 
 const MIN_GAIN = 0.0001;
 const NOISE_SEED = 0x4c4d43;
@@ -165,6 +270,14 @@ function mulberry32(seed: number): () => number {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+/** Deterministic hash of a step number to [0, 1). */
+function stepHash(n: number): number {
+  let x = (Math.imul(n + 1, 0x9e3779b1) ^ NOISE_SEED) >>> 0;
+  x = Math.imul(x ^ (x >>> 15), 0x85ebca6b) >>> 0;
+  x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35) >>> 0;
+  return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
 }
 
 const clampGain = (v: number): number => Math.min(1, Math.max(0, v));
@@ -203,11 +316,31 @@ interface Graph {
   master: GainNodeLike;
   bgm: GainNodeLike;
   sfx: GainNodeLike;
-  bellIn: GainNodeLike;
   noise: AudioBufferLike;
 }
 
 type StoppableSource = (OscillatorNodeLike | AudioBufferSourceNodeLike) & { stop(when?: number): void };
+
+/** Everything one started music track owns. */
+interface TrackState {
+  index: number;
+  bus: GainNodeLike;
+  /** Non-source nodes (gains, filters, delays) disconnected when the track is cleaned up. */
+  nodes: AudioNodeLike[];
+  /** Live voices of this track with their scheduled stop time (Infinity for continuous voices). */
+  voices: Map<StoppableSource, number>;
+  origin: number;
+  nextStep: number;
+  stepSec: number;
+  retiring: boolean;
+  endAt: number;
+  /** Primary note input (bells, chords, arpeggio, Rhodes). */
+  dest: GainNodeLike | null;
+  /** Secondary input (bass filter, crackle gain). */
+  dest2: AudioNodeLike | null;
+  /** Pitch-LFO depth node (cents) feeding note detune params. */
+  wow: GainNodeLike | null;
+}
 
 interface ToneSpec {
   type: string;
@@ -221,6 +354,9 @@ interface ToneSpec {
   release?: number;
   dest: AudioNodeLike;
   extras?: AudioNodeLike[];
+  owner?: TrackState;
+  /** Node whose output is added to the oscillator detune (pitch LFO). */
+  detuneSrc?: AudioNodeLike;
 }
 
 interface NoiseSpec {
@@ -233,6 +369,7 @@ interface NoiseSpec {
   f1?: number;
   q: number;
   dest: AudioNodeLike;
+  owner?: TrackState;
 }
 
 export function createWorldAudioEngine(options: WorldAudioEngineOptions = {}): WorldAudioEngine {
@@ -245,23 +382,34 @@ export function createWorldAudioEngine(options: WorldAudioEngineOptions = {}): W
   let muted = false;
   let hidden = false;
   let ducked = false;
-
-  let ambientOrigin = 0;
-  let nextBeat = 0;
+  let selected = 0;
+  let active: TrackState | null = null;
   let noiseCursor = 0;
 
   const persistent: AudioNodeLike[] = [];
-  const continuous: Array<{ stop(when?: number): void }> = [];
+  const states = new Set<TrackState>();
   const live = new Map<StoppableSource, AudioNodeLike[]>();
 
   // --- generic helpers ------------------------------------------------------
 
-  function track(src: StoppableSource, extras: AudioNodeLike[]): void {
+  function cleanupTrack(st: TrackState): void {
+    for (const n of st.nodes) safeDisconnect(n);
+    safeDisconnect(st.bus);
+    st.nodes.length = 0;
+    states.delete(st);
+  }
+
+  function track(src: StoppableSource, extras: AudioNodeLike[], owner: TrackState | undefined, stopAt: number): void {
     live.set(src, extras);
+    owner?.voices.set(src, stopAt);
     src.onended = () => {
       live.delete(src);
       safeDisconnect(src);
       for (const n of extras) safeDisconnect(n);
+      if (owner) {
+        owner.voices.delete(src);
+        if (owner.retiring && owner.voices.size === 0) cleanupTrack(owner);
+      }
     };
   }
 
@@ -297,7 +445,8 @@ export function createWorldAudioEngine(options: WorldAudioEngineOptions = {}): W
 
     osc.connect(amp);
     amp.connect(s.dest);
-    track(osc, [amp, ...(s.extras ?? [])]);
+    if (s.detuneSrc) s.detuneSrc.connect(osc.detune);
+    track(osc, [amp, ...(s.extras ?? [])], s.owner, s.t + s.dur);
     osc.start(s.t);
     osc.stop(s.t + s.dur);
     return osc;
@@ -322,7 +471,7 @@ export function createWorldAudioEngine(options: WorldAudioEngineOptions = {}): W
     src.connect(filter);
     filter.connect(amp);
     amp.connect(s.dest);
-    track(src, [filter, amp]);
+    track(src, [filter, amp], s.owner, s.t + s.dur);
 
     // Deterministic start offset inside the cached 1 s buffer (max 0.5 s; bursts are shorter).
     noiseCursor = (noiseCursor + 0.173) % 0.5;
@@ -342,44 +491,43 @@ export function createWorldAudioEngine(options: WorldAudioEngineOptions = {}): W
     return buffer;
   }
 
-  function startContinuous(src: OscillatorNodeLike | AudioBufferSourceNodeLike, when: number): void {
+  function startContinuous(st: TrackState, src: OscillatorNodeLike | AudioBufferSourceNodeLike, when: number): void {
     src.start(when);
-    continuous.push(src);
-    persistent.push(src);
+    track(src, [], st, Infinity);
   }
 
-  function startAmbient(graph: Graph): void {
-    const { ctx, bgm } = graph;
+  function makeTrackNode<T extends AudioNodeLike>(st: TrackState, node: T): T {
+    st.nodes.push(node);
+    return node;
+  }
+
+  function buildAmbient(graph: Graph, st: TrackState): void {
+    const { ctx } = graph;
     const t0 = ctx.currentTime;
-    ambientOrigin = t0;
-    nextBeat = 0;
 
     // Pad: detuned sawtooth + triangle per chord note, through a slowly modulated low-pass.
-    const padFilter = makeFilter(graph, 'lowpass', 1100, 0.5);
-    const padMix = ctx.createGain();
+    const padFilter = makeTrackNode(st, makeFilter(graph, 'lowpass', 1100, 0.5));
+    const padMix = makeTrackNode(st, ctx.createGain());
     padMix.gain.value = 0.045;
     padMix.connect(padFilter);
-    padFilter.connect(bgm);
-    persistent.push(padFilter, padMix);
+    padFilter.connect(st.bus);
 
     const filterLfo = ctx.createOscillator();
     filterLfo.type = 'sine';
     filterLfo.frequency.value = 0.07;
-    const filterLfoDepth = ctx.createGain();
+    const filterLfoDepth = makeTrackNode(st, ctx.createGain());
     filterLfoDepth.gain.value = 220;
     filterLfo.connect(filterLfoDepth);
     filterLfoDepth.connect(padFilter.frequency);
-    persistent.push(filterLfoDepth);
-    startContinuous(filterLfo, t0);
+    startContinuous(st, filterLfo, t0);
 
     const wow = ctx.createOscillator();
     wow.type = 'sine';
     wow.frequency.value = 0.45;
-    const wowDepth = ctx.createGain();
+    const wowDepth = makeTrackNode(st, ctx.createGain());
     wowDepth.gain.value = 6; // cents of tape-wow pitch drift
     wow.connect(wowDepth);
-    persistent.push(wowDepth);
-    startContinuous(wow, t0);
+    startContinuous(st, wow, t0);
 
     for (const midi of PAD_CHORD_MIDI) {
       const hz = midiToHz(midi);
@@ -394,7 +542,7 @@ export function createWorldAudioEngine(options: WorldAudioEngineOptions = {}): W
         osc.detune.value = cents;
         osc.connect(padMix);
         wowDepth.connect(osc.detune);
-        startContinuous(osc, t0);
+        startContinuous(st, osc, t0);
       }
     }
 
@@ -402,14 +550,172 @@ export function createWorldAudioEngine(options: WorldAudioEngineOptions = {}): W
     const hiss = ctx.createBufferSource();
     hiss.buffer = graph.noise;
     hiss.loop = true;
-    const hissFilter = makeFilter(graph, 'highpass', 3500, 0.7);
-    const hissGain = ctx.createGain();
+    const hissFilter = makeTrackNode(st, makeFilter(graph, 'highpass', 3500, 0.7));
+    const hissGain = makeTrackNode(st, ctx.createGain());
     hissGain.gain.value = HISS_GAIN;
     hiss.connect(hissFilter);
     hissFilter.connect(hissGain);
-    hissGain.connect(bgm);
-    persistent.push(hissFilter, hissGain);
-    startContinuous(hiss, t0);
+    hissGain.connect(st.bus);
+    startContinuous(st, hiss, t0);
+
+    // Bells: dry into the bus plus a feedback delay.
+    const bellIn = makeTrackNode(st, ctx.createGain());
+    bellIn.gain.value = 1;
+    const delay = makeTrackNode(st, ctx.createDelay(1));
+    delay.delayTime.value = 0.38;
+    const feedback = makeTrackNode(st, ctx.createGain());
+    feedback.gain.value = 0.3;
+    const wet = makeTrackNode(st, ctx.createGain());
+    wet.gain.value = 0.25;
+    bellIn.connect(st.bus);
+    bellIn.connect(delay);
+    delay.connect(feedback);
+    feedback.connect(delay);
+    delay.connect(wet);
+    wet.connect(st.bus);
+    st.dest = bellIn;
+  }
+
+  function buildFmLobby(graph: Graph, st: TrackState): void {
+    const { ctx } = graph;
+    const chordBus = makeTrackNode(st, ctx.createGain());
+    chordBus.gain.value = 0.8;
+    chordBus.connect(st.bus);
+    const bassFilter = makeTrackNode(st, makeFilter(graph, 'lowpass', 420, 1.1));
+    bassFilter.connect(st.bus);
+    st.dest = chordBus;
+    st.dest2 = bassFilter;
+  }
+
+  function buildRhodes(graph: Graph, st: TrackState): void {
+    const { ctx } = graph;
+    const t0 = ctx.currentTime;
+    // Chord bus doubles as the tremolo gain: base 0.85, LFO +-0.12 at 4.5 Hz.
+    const chordBus = makeTrackNode(st, ctx.createGain());
+    chordBus.gain.value = 0.85;
+    const chordLp = makeTrackNode(st, makeFilter(graph, 'lowpass', 2400, 0.6));
+    chordBus.connect(chordLp);
+    chordLp.connect(st.bus);
+    const lfo = ctx.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = 4.5;
+    const lfoDepth = makeTrackNode(st, ctx.createGain());
+    lfoDepth.gain.value = 0.12;
+    lfo.connect(lfoDepth);
+    lfoDepth.connect(chordBus.gain);
+    startContinuous(st, lfo, t0);
+    const crackleGain = makeTrackNode(st, ctx.createGain());
+    crackleGain.gain.value = 0.6;
+    crackleGain.connect(st.bus);
+    st.dest = chordBus;
+    st.dest2 = crackleGain;
+  }
+
+  function buildArp(graph: Graph, st: TrackState): void {
+    const { ctx } = graph;
+    const t0 = ctx.currentTime;
+    const beat = 60 / 84;
+
+    const arpIn = makeTrackNode(st, ctx.createGain());
+    const arpLp = makeTrackNode(st, makeFilter(graph, 'lowpass', 2400, 0.6));
+    arpIn.connect(arpLp);
+    arpLp.connect(st.bus);
+    // Dotted-eighth feedback delay.
+    const delay = makeTrackNode(st, ctx.createDelay(1));
+    delay.delayTime.value = beat * 0.75;
+    const feedback = makeTrackNode(st, ctx.createGain());
+    feedback.gain.value = 0.4;
+    const wet = makeTrackNode(st, ctx.createGain());
+    wet.gain.value = 0.35;
+    arpLp.connect(delay);
+    delay.connect(feedback);
+    feedback.connect(delay);
+    delay.connect(wet);
+    wet.connect(st.bus);
+
+    // Gentle tape wow: pitch LFO (cents) on arp and pad voices.
+    const wow = ctx.createOscillator();
+    wow.type = 'sine';
+    wow.frequency.value = 0.5;
+    const wowDepth = makeTrackNode(st, ctx.createGain());
+    wowDepth.gain.value = 8;
+    wow.connect(wowDepth);
+    startContinuous(st, wow, t0);
+
+    // Soft A-minor pad.
+    const padMix = makeTrackNode(st, ctx.createGain());
+    padMix.gain.value = 0.05;
+    const padLp = makeTrackNode(st, makeFilter(graph, 'lowpass', 700, 0.5));
+    padMix.connect(padLp);
+    padLp.connect(st.bus);
+    for (const midi of SOFT_PAD_MIDI) {
+      const osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.value = midiToHz(midi);
+      osc.connect(padMix);
+      wowDepth.connect(osc.detune);
+      startContinuous(st, osc, t0);
+    }
+    st.dest = arpIn;
+    st.wow = wowDepth;
+  }
+
+  function startTrack(graph: Graph, index: number, fadeIn: boolean): TrackState | null {
+    if (index < 0 || index >= SILENT_TRACK) return null;
+    const { ctx } = graph;
+    const now = ctx.currentTime;
+    const beat = 60 / MUSIC_CATALOG[index].bpm;
+    const bus = ctx.createGain();
+    bus.connect(graph.bgm);
+    if (fadeIn) {
+      bus.gain.value = 0;
+      bus.gain.setValueAtTime(0, now);
+      bus.gain.linearRampToValueAtTime(1, now + CROSSFADE_SEC);
+    } else {
+      bus.gain.value = 1;
+    }
+    const stepSec = index === 0 ? beat : index === 2 ? beat / 4 : beat / 2;
+    const st: TrackState = {
+      index,
+      bus,
+      nodes: [],
+      voices: new Map(),
+      origin: now,
+      nextStep: 0,
+      stepSec,
+      retiring: false,
+      endAt: 0,
+      dest: null,
+      dest2: null,
+      wow: null,
+    };
+    states.add(st);
+    if (index === 0) buildAmbient(graph, st);
+    else if (index === 1) buildFmLobby(graph, st);
+    else if (index === 2) buildRhodes(graph, st);
+    else buildArp(graph, st);
+    return st;
+  }
+
+  /** Fades a track out over the crossfade window and stops its voices at the end of it. */
+  function retireTrack(st: TrackState, now: number): void {
+    const end = now + CROSSFADE_SEC;
+    st.retiring = true;
+    st.endAt = end;
+    rampParam(st.bus.gain, 0, CROSSFADE_SEC, now);
+    for (const [src, stopAt] of st.voices) {
+      if (stopAt > end) {
+        src.stop(end);
+        st.voices.set(src, end);
+      }
+    }
+  }
+
+  /** Disconnects retired tracks that have no voices left (their 'ended' events may never have fired). */
+  function sweepRetired(now: number): void {
+    for (const st of Array.from(states)) {
+      if (st.retiring && st.voices.size === 0 && now >= st.endAt) cleanupTrack(st);
+    }
   }
 
   function build(ctx: AudioContextLike): Graph {
@@ -424,33 +730,20 @@ export function createWorldAudioEngine(options: WorldAudioEngineOptions = {}): W
     sfx.gain.value = SFX_BUS_GAIN;
     sfx.connect(master);
 
-    const bellIn = ctx.createGain();
-    bellIn.gain.value = 1;
-    const delay = ctx.createDelay(1);
-    delay.delayTime.value = 0.38;
-    const feedback = ctx.createGain();
-    feedback.gain.value = 0.3;
-    const wet = ctx.createGain();
-    wet.gain.value = 0.25;
-    bellIn.connect(bgm);
-    bellIn.connect(delay);
-    delay.connect(feedback);
-    feedback.connect(delay);
-    delay.connect(wet);
-    wet.connect(bgm);
-
-    persistent.push(master, bgm, sfx, bellIn, delay, feedback, wet);
-    return { ctx, master, bgm, sfx, bellIn, noise: buildNoiseBuffer(ctx) };
+    persistent.push(master, bgm, sfx);
+    return { ctx, master, bgm, sfx, noise: buildNoiseBuffer(ctx) };
   }
 
   function teardownAfterFailure(): void {
     const ctx = g?.ctx;
     g = null;
+    active = null;
     unlocked = false;
     failed = true;
     for (const n of persistent) safeDisconnect(n);
     persistent.length = 0;
-    continuous.length = 0;
+    for (const st of Array.from(states)) cleanupTrack(st);
+    live.clear();
     if (ctx) {
       try {
         swallow(ctx.close());
@@ -458,6 +751,111 @@ export function createWorldAudioEngine(options: WorldAudioEngineOptions = {}): W
         /* ignore */
       }
     }
+  }
+
+  // --- per-track note scheduling -------------------------------------------------
+
+  function fmNote(graph: Graph, st: TrackState, hz: number, t: number, dur: number, peak: number): void {
+    const { ctx } = graph;
+    const carrier = ctx.createOscillator();
+    carrier.type = 'sine';
+    carrier.frequency.value = hz;
+    const mod = ctx.createOscillator();
+    mod.type = 'sine';
+    mod.frequency.value = hz * 2; // 2:1 ratio
+    const modGain = ctx.createGain();
+    modGain.gain.setValueAtTime(hz * 1.8, t); // modulation depth in Hz, decays quickly
+    modGain.gain.exponentialRampToValueAtTime(hz * 0.15, t + dur * 0.8);
+    mod.connect(modGain);
+    modGain.connect(carrier.frequency);
+
+    const amp = ctx.createGain();
+    amp.gain.setValueAtTime(MIN_GAIN, t);
+    amp.gain.linearRampToValueAtTime(clampGain(peak), t + 0.008);
+    amp.gain.exponentialRampToValueAtTime(MIN_GAIN, t + dur);
+    carrier.connect(amp);
+    amp.connect(st.dest as GainNodeLike);
+
+    track(mod, [modGain], st, t + dur);
+    track(carrier, [amp], st, t + dur);
+    mod.start(t);
+    mod.stop(t + dur);
+    carrier.start(t);
+    carrier.stop(t + dur);
+  }
+
+  function scheduleBell(graph: Graph, st: TrackState, step: number, t: number): void {
+    if (step % 2 !== 0) return;
+    const midi = BELL_PATTERN_MIDI[(step / 2) % BELL_PATTERN_MIDI.length];
+    if (midi < 0) return;
+    const hz = midiToHz(midi);
+    const dest = st.dest as GainNodeLike;
+    tone(graph, { type: 'sine', f0: hz, t, dur: 1.2, peak: 0.5, attack: 0.005, dest, owner: st });
+    tone(graph, { type: 'sine', f0: hz * 2, t, dur: 0.9, peak: 0.14, attack: 0.004, dest, owner: st });
+    tone(graph, { type: 'sine', f0: hz * 3, t, dur: 0.6, peak: 0.07, attack: 0.003, dest, owner: st });
+  }
+
+  function scheduleFm(graph: Graph, st: TrackState, step: number, t: number): void {
+    const chord = FM_CHORDS[Math.floor(step / 8) % FM_CHORDS.length];
+    const inBar = step % 8;
+    if (inBar === 0 || inBar === 3 || inBar === 6) {
+      for (const midi of chord.notes) fmNote(graph, st, midiToHz(midi), t, inBar === 0 ? 0.55 : 0.4, 0.09);
+    }
+    if (inBar === 0 || inBar === 4) {
+      tone(graph, {
+        type: 'sawtooth',
+        f0: midiToHz(chord.root),
+        t,
+        dur: 0.55,
+        peak: 0.5,
+        attack: 0.012,
+        dest: st.dest2 as AudioNodeLike,
+        owner: st,
+      });
+    }
+  }
+
+  function scheduleRhodes(graph: Graph, st: TrackState, step: number, t: number): void {
+    const dest = st.dest as GainNodeLike;
+    if (step % 16 === 0) {
+      const chord = RHODES_CHORDS[Math.floor(step / 32) % RHODES_CHORDS.length];
+      for (const midi of chord) {
+        const hz = midiToHz(midi);
+        tone(graph, { type: 'sine', f0: hz, t, dur: 3.4, peak: 0.16, attack: 0.006, dest, owner: st });
+        tone(graph, { type: 'sine', f0: hz * 2, t, dur: 1.8, peak: 0.05, attack: 0.005, dest, owner: st });
+        tone(graph, { type: 'sine', f0: hz * 4, t, dur: 0.25, peak: 0.03, attack: 0.002, dest, owner: st });
+      }
+    }
+    // Vinyl crackle: sparse short clicks chosen by a hash of the sixteenth-note index.
+    const h = stepHash(step);
+    if (h < 0.16) {
+      noiseBurst(graph, {
+        t,
+        dur: 0.012,
+        peak: 0.05 + h * 0.4,
+        attack: 0.001,
+        filterType: 'highpass',
+        f0: 4000,
+        q: 0.7,
+        dest: st.dest2 as AudioNodeLike,
+        owner: st,
+      });
+    }
+  }
+
+  function scheduleArp(graph: Graph, st: TrackState, step: number, t: number): void {
+    const pattern = ARP_PATTERNS[Math.floor(step / 8) % ARP_PATTERNS.length];
+    tone(graph, {
+      type: 'sawtooth',
+      f0: midiToHz(pattern[step % 4]),
+      t,
+      dur: 0.42,
+      peak: 0.16,
+      attack: 0.01,
+      dest: st.dest as GainNodeLike,
+      owner: st,
+      detuneSrc: st.wow ?? undefined,
+    });
   }
 
   // --- public API -------------------------------------------------------------
@@ -478,7 +876,7 @@ export function createWorldAudioEngine(options: WorldAudioEngineOptions = {}): W
       try {
         g = build(ctx);
         unlocked = true;
-        startAmbient(g);
+        active = startTrack(g, selected, false);
       } catch {
         if (!g) {
           // build() failed before the graph was stored: close the context directly.
@@ -540,27 +938,42 @@ export function createWorldAudioEngine(options: WorldAudioEngineOptions = {}): W
     return muted;
   }
 
+  function setTrack(index: number): void {
+    if (disposed) return;
+    if (!Number.isInteger(index) || index < 0 || index >= MUSIC_TRACK_COUNT) return;
+    if (index === selected) return;
+    selected = index;
+    if (!g || !unlocked) return; // applied on unlock
+    try {
+      const now = g.ctx.currentTime;
+      if (active) retireTrack(active, now);
+      active = startTrack(g, index, true);
+    } catch {
+      active = null;
+    }
+  }
+
   function tick(_elapsedSec: number): void {
-    if (!g || disposed || !unlocked || muted || hidden) return;
-    const { ctx, bellIn } = g;
+    if (!g || disposed || !unlocked) return;
+    sweepRetired(g.ctx.currentTime);
+    if (muted || hidden || !active) return;
+    const { ctx } = g;
     if (ctx.state !== 'running') return;
 
+    const st = active;
     const now = ctx.currentTime;
-    const first = Math.max(Math.ceil((now - ambientOrigin) / BEAT_SEC - 1e-9), nextBeat);
-    const last = Math.floor((now + LOOKAHEAD_SEC - ambientOrigin) / BEAT_SEC);
+    const first = Math.max(Math.ceil((now - st.origin) / st.stepSec - 1e-9), st.nextStep);
+    const last = Math.floor((now + LOOKAHEAD_SEC - st.origin) / st.stepSec);
     if (last < first) return;
 
-    for (let beat = first; beat <= last; beat += 1) {
-      if (beat % 2 !== 0) continue;
-      const midi = BELL_PATTERN_MIDI[(beat / 2) % BELL_PATTERN_MIDI.length];
-      if (midi < 0) continue;
-      const t = Math.max(now, ambientOrigin + beat * BEAT_SEC);
-      const hz = midiToHz(midi);
-      tone(g, { type: 'sine', f0: hz, t, dur: 1.2, peak: 0.5, attack: 0.005, dest: bellIn });
-      tone(g, { type: 'sine', f0: hz * 2, t, dur: 0.9, peak: 0.14, attack: 0.004, dest: bellIn });
-      tone(g, { type: 'sine', f0: hz * 3, t, dur: 0.6, peak: 0.07, attack: 0.003, dest: bellIn });
+    for (let step = first; step <= last; step += 1) {
+      const t = Math.max(now, st.origin + step * st.stepSec);
+      if (st.index === 0) scheduleBell(g, st, step, t);
+      else if (st.index === 1) scheduleFm(g, st, step, t);
+      else if (st.index === 2) scheduleRhodes(g, st, step, t);
+      else if (st.index === 3) scheduleArp(g, st, step, t);
     }
-    nextBeat = last + 1;
+    st.nextStep = last + 1;
   }
 
   /** Returns the graph when an SFX may be scheduled now, else null. */
@@ -628,20 +1041,36 @@ export function createWorldAudioEngine(options: WorldAudioEngineOptions = {}): W
     noiseBurst(graph, { t, dur: 0.085, peak: 0.25, attack: 0.015, filterType: 'bandpass', f0: 1200, f1: 3000, q: 1.2, dest: graph.sfx });
   }
 
+  /** About 0.55 s: cue-lever click, stylus sub-thump (at +0.18 s), band-passed groove crackle (+0.25 s). */
+  function playVinylNeedleDropSfx(): void {
+    const graph = sfxGraph();
+    if (!graph) return;
+    const t = graph.ctx.currentTime + SFX_LEAD_SEC;
+    const { sfx } = graph;
+
+    // Cue-lever click: filtered noise transient plus a small high blip, about 20 ms.
+    noiseBurst(graph, { t, dur: 0.02, peak: 0.35, attack: 0.001, filterType: 'bandpass', f0: 1800, q: 1, dest: sfx });
+    tone(graph, { type: 'sine', f0: 2600, t, dur: 0.02, peak: 0.1, attack: 0.001, dest: sfx });
+
+    // Stylus touches the groove: sine 85 -> 45 Hz, 0.12 s.
+    tone(graph, { type: 'sine', f0: 85, f1: 45, t: t + 0.18, dur: 0.12, peak: 0.7, attack: 0.004, dest: sfx });
+
+    // Surface crackle: band-passed noise burst (2.8 kHz) with a few short spikes, fading over 0.3 s.
+    const tc = t + 0.25;
+    noiseBurst(graph, { t: tc, dur: 0.3, peak: 0.05, attack: 0.02, filterType: 'bandpass', f0: 2800, q: 1.2, dest: sfx });
+    for (const offset of [0.03, 0.11, 0.19]) {
+      noiseBurst(graph, { t: tc + offset, dur: 0.01, peak: 0.2, attack: 0.001, filterType: 'bandpass', f0: 3200, q: 1.5, dest: sfx });
+    }
+  }
+
   function dispose(): void {
     if (disposed) return;
     disposed = true;
     unlocked = false;
     const graph = g;
     g = null;
+    active = null;
     if (!graph) return;
-    for (const src of continuous) {
-      try {
-        src.stop();
-      } catch {
-        /* already stopped */
-      }
-    }
     for (const [src, extras] of live) {
       try {
         src.stop();
@@ -652,9 +1081,9 @@ export function createWorldAudioEngine(options: WorldAudioEngineOptions = {}): W
       for (const n of extras) safeDisconnect(n);
     }
     live.clear();
+    for (const st of Array.from(states)) cleanupTrack(st);
     for (const n of persistent) safeDisconnect(n);
     persistent.length = 0;
-    continuous.length = 0;
     try {
       swallow(graph.ctx.close());
     } catch {
@@ -670,11 +1099,15 @@ export function createWorldAudioEngine(options: WorldAudioEngineOptions = {}): W
     toggleMuted,
     isMuted: () => muted,
     isUnlocked: () => unlocked,
+    setTrack,
+    getTrack: () => selected,
+    isPlaying: () => unlocked && selected < SILENT_TRACK,
     tick,
     playVhsInsertSfx,
     playArcadeCoinSfx,
     playLampSwitchSfx,
     playPageRustleSfx,
+    playVinylNeedleDropSfx,
     dispose,
   };
 }

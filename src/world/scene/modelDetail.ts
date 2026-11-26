@@ -23,6 +23,7 @@ import {
   totalTextureMemoryBytes,
   type UvRect,
 } from './proceduralTextures'
+import { OPEN_BOTTOM_SAVED_TRIANGLES, cullFloorBottoms } from './floorCull'
 import { SHELF_IDS, shelfContents, shelfFrameParts } from './shelfModel'
 import type { geometries, materials } from './sharedResources'
 
@@ -83,6 +84,16 @@ export interface Part {
    * window, the +z face the spine label sticker, every other face the ribbed stripe. Zero extra triangles.
    */
   cassette?: boolean
+  /**
+   * Floor-flush box (task 33.1): the bottom face rests on the floor and is never visible, so the renderer uses a cached geometry
+   * without the -Y face (10 triangles instead of 12). Only set by `cullFloorBottoms` on a `box` part whose bottom is at y = 0.
+   */
+  openBottom?: boolean
+  /**
+   * Record player group (task 33.1): `platter` parts (platter, label, spindle) spin about the spindle axis, `tonearm` parts pivot
+   * as one arm pose, `static` parts never move. Lets Props.tsx and task 33.3 address each group separately.
+   */
+  turntableGroup?: 'static' | 'platter' | 'tonearm'
 }
 
 /** True when the part is rendered from a cached real-size geometry (mesh scale 1). */
@@ -90,12 +101,13 @@ export const isRealSizePart = (p: Part): boolean => Boolean(p.metric || p.metric
 
 /** Draw-call group of a part: geometry + material, plus the board size and the UV mapping for metric parts. */
 export function partGroupKey(p: Part): string {
-  if (!isRealSizePart(p)) return `${p.geo}|${p.mat}`
+  const ob = p.openBottom ? '|open' : ''
+  if (!isRealSizePart(p)) return `${p.geo}|${p.mat}${ob}`
   const size = p.scale.map((v) => Math.round(v * 1e4)).join(',')
   const aspect = p.metricAspect && p.metricAspect !== 1 ? `|a${p.metricAspect}` : ''
   const offset = p.metricOffset ? `|o${p.metricOffset.map((v) => Math.round(v * 1e4)).join(',')}` : ''
   const atlas = p.atlas ? `|w${p.atlas.rect.u0.toFixed(5)},${p.atlas.rect.v0.toFixed(5)}|f${p.atlas.faces.join('.')}` : ''
-  return `${p.geo}|${p.mat}|${size}${aspect}${offset}${atlas}${p.cassette ? '|cassette' : ''}`
+  return `${p.geo}|${p.mat}|${size}${aspect}${offset}${atlas}${p.cassette ? '|cassette' : ''}${ob}`
 }
 
 /**
@@ -118,6 +130,7 @@ export const GEOMETRY_TRIANGLES: Readonly<Record<GeometryKey, number>> = {
   collar: 8, // open square tube (4 radial segments, no caps): the banker's lamp brass end caps (25.1)
   disc: 24, // 24-segment circle: lamp halo, desk pool and the table lamp's inner glow (30.1)
   lampCone: 48, // open truncated cone, 24 radial segments, no caps: the volumetric lamp light (30.1)
+  platter: 96, // 24 radial segments: 48 side + 48 caps (the 12-inch record player platter, 33.1)
 }
 
 export const SCENE_TRIANGLE_BUDGET = 20000
@@ -248,7 +261,7 @@ export function mediaConsoleParts(box: Aabb): Part[] {
   const bodyH = CONSOLE_TOP - 0.02
   const doorW = (w / 2 - BAY_RIGHT_DX - CONSOLE_PANEL) / 2 - 0.01
   const doorX = cx + BAY_RIGHT_DX + CONSOLE_PANEL / 2 + 0.005 + doorW / 2
-  return [
+  return cullFloorBottoms([
     bx('woodDark', [cx, 0.04, cz], [w - 0.04, 0.08, d - 0.04]),
     bx('wood', [box.minX + CONSOLE_PANEL / 2, 0.38, cz], [CONSOLE_PANEL, 0.6, d]),
     bx('wood', [box.maxX - CONSOLE_PANEL / 2, 0.38, cz], [CONSOLE_PANEL, 0.6, d]),
@@ -262,7 +275,7 @@ export function mediaConsoleParts(box: Aabb): Part[] {
     bx('woodDark', [doorX + doorW + 0.02, 0.36, f + 0.004], [doorW, 0.56, 0.012]),
     bx('metal', [doorX + doorW / 2 - 0.04, 0.4, f + 0.016], [0.015, 0.1, 0.015]),
     bx('metal', [doorX + doorW / 2 + 0.06, 0.4, f + 0.016], [0.015, 0.1, 0.015]),
-  ]
+  ])
 }
 
 /** VCR on the console's lower shelf: front slot, partly inserted cassette, buttons, display strip, LED. */
@@ -345,8 +358,8 @@ function smoothPath(pts: readonly Vec3[]): Vec3[] {
  * (Rx * Ry * Rz) first tilts it by gamma about Z, then turns it by beta about Y so the axis follows the segment.
  * Each cylinder is a little longer than its segment so bends leave no gaps.
  */
-export function cablePathParts(path: readonly Vec3[], mat: MaterialKey, thick: number): Part[] {
-  const pts = smoothPath(path)
+export function cablePathParts(path: readonly Vec3[], mat: MaterialKey, thick: number, smooth = true): Part[] {
+  const pts = smooth ? smoothPath(path) : path
   const parts: Part[] = []
   for (let i = 0; i < pts.length - 1; i++) {
     const a = pts[i]
@@ -369,16 +382,19 @@ export function cablePathParts(path: readonly Vec3[], mat: MaterialKey, thick: n
  * monitor coax along the console top, a red power cable from the monitor and a black TV power cable. The
  * three that leave the top run over the back edge of the slab and down the back panel, a few centimetres
  * behind it. All stay within 5 cm of the console footprint. Shapes derive from the footprint only.
+ * Task 33.1 triangle reclaim: the grey monitor coax along the console top stays smoothed (seen from the front), while the three cables
+ * that drop behind the back panel are drawn along their raw control points (4 segments each instead of 9), which saves 15 segments
+ * (480 triangles) without touching any other detail.
  */
 export function consoleCableParts(box: Aabb): Part[] {
   const { cx } = centre(box)
   const z0 = box.minZ
   const p = (dx: number, y: number, dz: number): Vec3 => [cx + dx, y, z0 + dz]
   return [
-    ...cablePathParts([p(-0.15, 0.76, 0.075), p(-0.5, 0.725, 0), p(-0.5, 0.69, -0.03), p(-0.5, 0.2, -0.025), p(-0.45, 0.06, -0.02)], 'cableBlack', 0.018),
+    ...cablePathParts([p(-0.15, 0.76, 0.075), p(-0.5, 0.725, 0), p(-0.5, 0.69, -0.03), p(-0.5, 0.2, -0.025), p(-0.45, 0.06, -0.02)], 'cableBlack', 0.018, false),
     ...cablePathParts([p(0.15, 0.77, 0.075), p(0.28, 0.73, 0.1), p(0.45, 0.728, 0.13), p(0.6, 0.77, 0.152)], 'cableGrey', 0.016),
-    ...cablePathParts([p(0.77, 0.82, 0.152), p(0.82, 0.725, 0.04), p(0.82, 0.69, -0.03), p(0.82, 0.3, -0.03), p(0.7, 0.04, -0.02)], 'cableRed', 0.018),
-    ...cablePathParts([p(0, 0.74, 0.075), p(0.05, 0.72, 0), p(0.05, 0.69, -0.03), p(0.05, 0.3, -0.03), p(0.3, 0.04, -0.02)], 'cableBlack', 0.018),
+    ...cablePathParts([p(0.77, 0.82, 0.152), p(0.82, 0.725, 0.04), p(0.82, 0.69, -0.03), p(0.82, 0.3, -0.03), p(0.7, 0.04, -0.02)], 'cableRed', 0.018, false),
+    ...cablePathParts([p(0, 0.74, 0.075), p(0.05, 0.72, 0), p(0.05, 0.69, -0.03), p(0.05, 0.3, -0.03), p(0.3, 0.04, -0.02)], 'cableBlack', 0.018, false),
   ]
 }
 
@@ -449,7 +465,7 @@ export function filingCabinetParts(box: Aabb, height: number, variant = 0): Part
       bx('metal', [cx + 0.07, y - fh * 0.14, f + 0.018], [0.012, 0.012, 0.028]),
     )
   }
-  return parts
+  return cullFloorBottoms(parts)
 }
 
 /**
@@ -513,7 +529,7 @@ export function archiveBoxParts(box: Aabb, height: number): Part[] {
   }
   tapeStack(cx - w * 0.18, cz - d * 0.12, bigH + midH, Math.max(1, Math.floor(stackH / 0.024)), 0.25)
   tapeStack(cx + w * 0.26, cz - d * 0.25, 0, 2, 0.4)
-  return parts
+  return cullFloorBottoms(parts)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -923,7 +939,7 @@ export function arcadeCabinetParts(box: Aabb, height: number, game: ArcadeGameKi
     bx('grille', [0.3, 0.5, 0.004], [0.2, 0.3, 0.008]),
     atlasFront('cabinetPanel', [0, 0.075, 0.004], [w * 0.98, 0.13, 0.012], 'kick', 'plainSteel'),
   ]
-  return offset(local, [cx, 0, box.maxZ])
+  return cullFloorBottoms(offset(local, [cx, 0, box.maxZ]))
 }
 
 
@@ -958,7 +974,7 @@ export function crtStackParts(box: Aabb, height: number): Part[] {
       part('plane', 'screenOff', [cx + s, y, front + 0.0065], [mw * 0.68, h * 0.66, 1]),
     )
   })
-  return parts
+  return cullFloorBottoms(parts)
 }
 
 /** Stroke lettering for the sign. Since task 15.7 the sign shows a textured face; these boxes are the fallback when no canvas exists. */
@@ -1263,7 +1279,7 @@ export function crateParts(box: Aabb, height: number): Part[] {
       parts.push(bx('crateSlat', [px, (height - 0.03) / 2, pz], [post, height - 0.03, post]))
     }
   }
-  return parts
+  return cullFloorBottoms(parts)
 }
 
 /** Desk clutter heights in metres (task 22.2 part B). */
@@ -1288,7 +1304,7 @@ export function deskParts(box: Aabb, height: number): Part[] {
   const { cx, cz, w, d } = centre(box)
   const top = height
   const f = box.maxZ
-  return [
+  return cullFloorBottoms([
     wd('woodDark', [cx, (height - 0.06) / 2, cz], [w, height - 0.06, d]),
     wd('wood', [cx, top - 0.03, cz], [w + 0.1, 0.06, d + 0.1]),
     // Front: knee-space recess, drawer bank on the left, cabinet door on the right.
@@ -1341,7 +1357,162 @@ export function deskParts(box: Aabb, height: number): Part[] {
     deskTape([cx - 0.2, top + 0.015, cz + 0.05], [0.19, 0.03, 0.1]),
     deskTape([cx - 0.2, top + 0.045, cz + 0.05], [0.19, 0.03, 0.1]),
     bx('tapeLabel', [cx - 0.2, top + 0.0605, cz + 0.05], [0.1, 0.002, 0.06]),
+  ])
+}
+
+// ---------------------------------------------------------------------------------------------
+// Record player (task 33.1): walnut audio console with a Hi-Fi turntable. Station-free, world interactable "record-player".
+// Front faces +z at box.maxZ. Three addressable groups: static (console, plinth, controls, cradle), platter (spins about the
+// spindle axis) and tonearm (two poses). Task 33.3 spins the platter and switches the pose; nothing here animates.
+// ---------------------------------------------------------------------------------------------
+
+/** BoxGeometry face index of the +y (upward) face. */
+const BOX_FACE_TOP = 2
+
+export interface TurntableState {
+  /** True while a track plays: the tonearm sits on the record and the display shows its emerald tone. */
+  playing: boolean
+}
+
+/** 12-inch record: 0.30 m diameter. */
+export const TURNTABLE_PLATTER_DIAMETER = 0.3
+/** Height of the console body top slab above the floor, and the plinth, deck plate and record tops. */
+export const TURNTABLE_CABINET_TOP = 0.62
+const TT_FOOT_H = 0.012
+const TT_PLINTH_H = 0.05
+const TT_DECK_T = 0.004
+const TT_RECORD_T = 0.012
+/** Top of the brushed steel deck plate: the surface everything on the turntable rests on. */
+export const TURNTABLE_DECK_Y = TURNTABLE_CABINET_TOP + TT_FOOT_H + TT_PLINTH_H + TT_DECK_T
+/** Height of the tonearm tube above the floor and the tube length from the pivot to the headshell. */
+const TT_ARM_Y = TURNTABLE_DECK_Y + 0.026
+const TT_ARM_TUBE = 0.27
+/** Tonearm yaw about the pivot post, measured from +x toward +z in the floor plane: parked on the cradle, and on the record groove. */
+export const TURNTABLE_ARM_ANGLE = Object.freeze({ stopped: (125 * Math.PI) / 180, playing: (157.5 * Math.PI) / 180 })
+/** Platter speed: a 12-inch LP turns at 33 1/3 RPM. */
+export const TURNTABLE_RPM = 100 / 3
+/** The same speed in radians per second (about 3.49). */
+export const TURNTABLE_SPIN_RAD_PER_SEC = (TURNTABLE_RPM * 2 * Math.PI) / 60
+
+/**
+ * Platter angle after `dt` seconds (task 33.3). It advances only while a track plays and motion is allowed; stopped or under reduced
+ * motion the angle is returned unchanged (the platter simply stays where it is). `dt` is clamped to `maxDt` so a long stall never jumps.
+ */
+export function advancePlatterAngle(angle: number, dt: number, playing: boolean, reducedMotion: boolean, maxDt = 0.1): number {
+  if (!playing || reducedMotion || !(dt > 0)) return angle
+  return (angle + TURNTABLE_SPIN_RAD_PER_SEC * Math.min(dt, maxDt)) % (2 * Math.PI)
+}
+
+/** Distance from the pivot to the stylus along the arm, in metres. */
+const TT_STYLUS_T = 0.3
+
+/** Fixed points of the turntable in world coordinates, derived from the console footprint. */
+export function turntableLayout(box: Aabb) {
+  const { cx, cz, w, d } = centre(box)
+  const pz = cz + 0.01 // plinth centre z
+  return {
+    /** Platter axis at deck height: the centre the platter group spins about. */
+    spindle: [cx - 0.12, TURNTABLE_DECK_Y, pz] as Vec3,
+    /** Tonearm base post at deck height. */
+    pivot: [cx + 0.28, TURNTABLE_DECK_Y, pz - 0.145] as Vec3,
+    cx,
+    cz,
+    pz,
+    w,
+    d,
+  }
+}
+
+/** Stylus position (x, z) of the tonearm in a pose: used by tests to check it rests on the cradle side or on the record. */
+export function turntableStylusXZ(box: Aabb, state: TurntableState): readonly [number, number] {
+  const { pivot } = turntableLayout(box)
+  const a = state.playing ? TURNTABLE_ARM_ANGLE.playing : TURNTABLE_ARM_ANGLE.stopped
+  return [pivot[0] + TT_STYLUS_T * Math.cos(a), pivot[2] + TT_STYLUS_T * Math.sin(a)]
+}
+
+/**
+ * The record player in three groups. `platter` parts are LOCAL to the spindle (the group is placed at `spindle` and rotated about y),
+ * `static` and `tonearm` parts are in world coordinates. `turntableParts` merges them into world coordinates for counting and tests.
+ */
+export function turntableGroups(box: Aabb, state: TurntableState = { playing: false }) {
+  const L = turntableLayout(box)
+  const { cx, cz, pz, w, d } = L
+  const tag = (g: NonNullable<Part['turntableGroup']>, parts: Part[]): Part[] => parts.map((p) => ({ ...p, turntableGroup: g }))
+  const top = TURNTABLE_CABINET_TOP
+  const plinthW = w - 0.06
+  const plinthD = d - 0.05
+  const plinthY0 = top + TT_FOOT_H
+  const deckY = TURNTABLE_DECK_Y
+
+  // Walnut console: kick plinth, two side panels, back, top slab, a middle shelf and four LP sleeves in the lower bay.
+  const cabinet: Part[] = [
+    wd('woodDark', [cx, 0.03, cz + 0.01], [w - 0.04, 0.06, d - 0.06]),
+    wd('woodDark', [box.minX + 0.02, 0.32, cz], [0.04, 0.52, d]),
+    wd('woodDark', [box.maxX - 0.02, 0.32, cz], [0.04, 0.52, d]),
+    wd('woodDark', [cx, 0.32, box.minZ + 0.01], [w - 0.08, 0.52, 0.02]),
+    wd('woodDark', [cx, top - 0.02, cz], [w, 0.04, d]),
+    wd('woodDark', [cx, 0.4, box.minZ + 0.02 + (d - 0.06) / 2], [w - 0.08, 0.02, d - 0.06]),
   ]
+  const sleeveMats = ['spineA', 'spineB', 'spineC', 'cardboardDark'] as const
+  sleeveMats.forEach((m, i) =>
+    cabinet.push(bx(m, [box.minX + 0.06 + i * 0.022, 0.215, box.minZ + 0.185], [0.018, 0.31, 0.31], i === 3 ? [0, 0, 0.14] : undefined)),
+  )
+
+  // Isolation feet, plinth, deck plate and controls.
+  const feet = ([-1, 1] as const).flatMap((sx) =>
+    ([-1, 1] as const).map((sz) => bx('bezel', [cx + sx * (plinthW / 2 - 0.04), top + TT_FOOT_H / 2, pz + sz * (plinthD / 2 - 0.04)], [0.03, TT_FOOT_H, 0.03])),
+  )
+  const steel = { rect: FIXTURE_STEEL_UV, faces: [BOX_FACE_TOP], plain: FIXTURE_STEEL_UV }
+  const controls: Part[] = [
+    wd('woodDark', [cx, plinthY0 + TT_PLINTH_H / 2, pz], [plinthW, TT_PLINTH_H, plinthD]),
+    { ...bx('fixtureHousing', [cx, deckY - TT_DECK_T / 2, pz], [w - 0.1, TT_DECK_T, d - 0.09]), atlas: steel },
+    // Track-indicator display: dark bezel with an emissive window (basic material, no light), amber idle and emerald while playing.
+    bx('bezel', [cx + 0.24, deckY + 0.003, pz + 0.145], [0.1, 0.006, 0.04]),
+    bx(state.playing ? 'trackDisplayOn' : 'trackDisplay', [cx + 0.24, deckY + 0.0075, pz + 0.145], [0.08, 0.003, 0.026]),
+    // Pitch slider (silver knob in a dark slot) and the round power button.
+    bx('bezel', [cx + 0.37, deckY + 0.0015, pz], [0.012, 0.003, 0.1]),
+    bx('labelSlot', [cx + 0.37, deckY + 0.007, pz + 0.02], [0.022, 0.008, 0.012]),
+    part('cylinderLow', 'metal', [cx + 0.37, deckY + 0.006, pz + 0.16], [0.026, 0.012, 0.026]),
+  ]
+
+  // Tonearm in the chosen pose, pivoting about the base post. dir = (cos a, sin a) in (x, z); a box along local x is rotated by -a about y.
+  const a = state.playing ? TURNTABLE_ARM_ANGLE.playing : TURNTABLE_ARM_ANGLE.stopped
+  const [px, , pvz] = L.pivot
+  const along = (t: number, y: number): Vec3 => [px + t * Math.cos(a), y, pvz + t * Math.sin(a)]
+  const armRot: Vec3 = [0, -a, 0]
+  const tonearm: Part[] = [
+    part('cylinderLow', 'tapeSlotMetal', [px, deckY + 0.011, pvz], [0.04, 0.022, 0.04]),
+    bx('tapeSlotMetal', along(TT_ARM_TUBE / 2, TT_ARM_Y), [TT_ARM_TUBE, 0.008, 0.008], armRot),
+    bx('tapeSlotMetal', along(-0.025, TT_ARM_Y), [0.05, 0.007, 0.007], armRot),
+    bx('metal', along(-0.065, TT_ARM_Y), [0.03, 0.022, 0.022], armRot),
+    // Headshell (angled 15 degrees off the arm) and the cartridge under it, whose stylus touches the record in the playing pose.
+    bx('tapeSlotMetal', along(TT_ARM_TUBE + 0.02, TT_ARM_Y + 0.001), [0.04, 0.006, 0.016], [0, -a - 0.26, 0]),
+    bx('bezel', along(TT_STYLUS_T, TT_ARM_Y - 0.008), [0.016, 0.012, 0.012], armRot),
+  ]
+  // Cradle: a small post that holds the arm tube in the stopped pose, centred under the tube at that pose.
+  const rest = TURNTABLE_ARM_ANGLE.stopped
+  const cradle = bx('metal', [px + (TT_ARM_TUBE) * Math.cos(rest), deckY + 0.011, pvz + TT_ARM_TUBE * Math.sin(rest)], [0.014, 0.022, 0.014])
+
+  // Platter group, local to the spindle axis: 0.30 m vinyl, a thin coloured label disc on top and the spindle.
+  const platter: Part[] = [
+    part('platter', 'vinyl', [0, TT_RECORD_T / 2, 0], [TURNTABLE_PLATTER_DIAMETER, TT_RECORD_T, TURNTABLE_PLATTER_DIAMETER]),
+    part('disc', 'recordLabel', [0, TT_RECORD_T + 0.002, 0], [0.1, 0.1, 1], [-HALF_PI, 0, 0]),
+    part('cylinderLow', 'metal', [0, TT_RECORD_T + 0.01, 0], [0.006, 0.016, 0.006]),
+  ]
+
+  return {
+    static: tag('static', cullFloorBottoms([...cabinet, ...feet, ...controls, cradle])),
+    platter: tag('platter', platter),
+    tonearm: tag('tonearm', tonearm),
+    spindle: L.spindle,
+    pivot: L.pivot,
+  }
+}
+
+/** Whole record player in world coordinates (platter at rest, angle 0). `box` is the console footprint, front at +z. */
+export function turntableParts(box: Aabb, state: TurntableState = { playing: false }): Part[] {
+  const g = turntableGroups(box, state)
+  return [...g.static, ...offset(g.platter, g.spindle), ...g.tonearm]
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1458,8 +1629,11 @@ export function doorDetailParts(): Part[] {
 // Counting helpers (pure)
 // ---------------------------------------------------------------------------------------------
 
+/** Triangles of one part: its shared geometry, minus the two faces of the culled -Y face of a floor-flush box (33.1). */
+export const partTriangles = (p: Part): number => GEOMETRY_TRIANGLES[p.geo] - (p.openBottom ? OPEN_BOTTOM_SAVED_TRIANGLES : 0)
+
 export function countTriangles(parts: readonly Part[]): number {
-  return parts.reduce((n, p) => n + GEOMETRY_TRIANGLES[p.geo], 0)
+  return parts.reduce((n, p) => n + partTriangles(p), 0)
 }
 
 /** Draw calls after grouping by geometry + material (one InstancedMesh or Mesh per group). */
@@ -1523,6 +1697,7 @@ export function declaredObjects(): Array<{ name: string; parts: Part[]; extraTri
     { name: 'desk', parts: deskParts(prop('reception-desk').box, prop('reception-desk').height) },
     { name: 'armchair', parts: armchairParts(prop('abandoned-chair').box) },
     { name: 'couch', parts: couchParts(prop('couch').box) },
+    { name: 'record-player', parts: turntableParts(prop('record-player').box, { playing: false }) },
     { name: 'crate-a', parts: crateParts(prop('crate-a').box, prop('crate-a').height) },
     { name: 'crate-b', parts: crateParts(prop('crate-b').box, prop('crate-b').height) },
     { name: 'trim', parts: trimParts() },

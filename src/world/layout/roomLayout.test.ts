@@ -193,11 +193,11 @@ describe('roomLayout', () => {
     for (const p of ROOM.props) expect(COLLIDERS.includes(p.box)).toBe(p.solid);
   });
 
-  it('counts Colliders: 9 walls, 4 door frames and 15 solid props (three cabinets replace the cabinet and its companion)', () => {
+  it('counts Colliders: 9 walls, 4 door frames and 16 solid props (three cabinets replace the cabinet and its companion, plus the 33.1 record player)', () => {
     expect(ROOM.walls).toHaveLength(9);
-    expect(ROOM.props.filter((p) => p.solid)).toHaveLength(15);
-    expect(COLLIDERS).toHaveLength(9 + 4 + 15);
-    for (const id of [...CABINET_IDS, 'crt-stack', 'crt-vhs', 'filing-cabinet-a', 'filing-cabinet-b']) {
+    expect(ROOM.props.filter((p) => p.solid)).toHaveLength(16); // 33.1: the record player is the 16th solid prop
+    expect(COLLIDERS).toHaveLength(9 + 4 + 16);
+    for (const id of [...CABINET_IDS, 'crt-stack', 'crt-vhs', 'filing-cabinet-a', 'filing-cabinet-b', 'record-player']) {
       expect(COLLIDERS).toContain(prop(id).box);
     }
   });
@@ -490,6 +490,60 @@ describe('roomLayout', () => {
     expect(a.maxZ).toBeLessThanOrEqual(prop('arcade-maze').box.minZ);
     expect(b.minZ).toBeGreaterThanOrEqual(prop('arcade-maze').box.maxZ);
     expect(b.maxZ).toBeLessThanOrEqual(prop('arcade-frequency').box.minZ);
+  });
+});
+
+describe('record player (task 33.1)', () => {
+  const rp = prop('record-player');
+  const overlapXZ = (a: Aabb, b: Aabb) => a.minX < b.maxX && a.maxX > b.minX && a.minZ < b.maxZ && a.maxZ > b.minZ;
+
+  it('is a solid 0.9 x 0.45 x 0.75 m console against the north wall, facing +z, inside the main room', () => {
+    expect(rp.kind).toBe('furniture');
+    expect(rp.solid).toBe(true);
+    expect(rp.facing).toBe('+z');
+    expect(rp.height).toBeCloseTo(0.75);
+    expect(rp.box).toEqual({ minX: 2.2, maxX: 3.1, minZ: -4, maxZ: -3.55 });
+    expect(rp.box.maxX - rp.box.minX).toBeCloseTo(0.9);
+    expect(rp.box.maxZ - rp.box.minZ).toBeCloseTo(0.45);
+    expect(COLLIDERS).toContain(rp.box);
+    // Inside the main room (x -5..5 between the west wall and the east wall line, z -4..4), touching only the north wall.
+    expect(rp.box.minX).toBeGreaterThanOrEqual(-4.6);
+    expect(rp.box.maxX).toBeLessThanOrEqual(4.85);
+    expect(rp.box.minZ).toBeGreaterThanOrEqual(-4);
+    expect(rp.box.maxZ).toBeLessThanOrEqual(4);
+    const wallHits = ROOM.walls.filter((w) => overlapXZ(w, rp.box));
+    expect(wallHits).toHaveLength(0);
+  });
+
+  it('overlaps no other floor-standing prop footprint (only elevated wall items hang above it)', () => {
+    for (const p of ROOM.props) {
+      if (p === rp || !overlapXZ(p.box, rp.box)) continue;
+      expect(p.elevation ?? 0, p.id).toBeGreaterThanOrEqual(rp.height);
+    }
+  });
+
+  it('stays clear of the doorways, the west bookcases, the spawn disc and the island walkways', () => {
+    for (const d of ROOM.doors) expect(distToBox({ x: (d.opening.minX + d.opening.maxX) / 2, z: (d.opening.minZ + d.opening.maxZ) / 2 }, rp.box)).toBeGreaterThan(2);
+    for (const id of ['shelf-a', 'shelf-b']) expect(prop(id).box.maxX).toBeLessThan(rp.box.minX - 6);
+    expect(distToBox(ROOM.start, rp.box)).toBeGreaterThan(2.9);
+    const island = prop('crt-vhs').box;
+    const gap = Math.hypot(Math.max(island.minX - rp.box.maxX, rp.box.minX - island.maxX, 0), Math.max(island.minZ - rp.box.maxZ, rp.box.minZ - island.maxZ, 0));
+    expect(gap).toBeGreaterThanOrEqual(1.2);
+  });
+
+  it('is reachable: many cells within 2.2 m in front of the anchor, and the corner beside it is not sealed off', () => {
+    const def = INTERACTABLE_DEFS.find((d) => d.id === 'record-player')!;
+    expect(def.anchor.x).toBeCloseTo(2.65, 9);
+    expect(def.anchor.z).toBe(-3.55);
+    const cells = reachableCells(ROOM.start);
+    // Cells straight in front of the console (across its width) within the 2.2 m interaction range.
+    const front = cells.filter((c) => c.z > def.anchor.z && Math.abs(c.x - def.anchor.x) <= 0.45 && Math.hypot(c.x - def.anchor.x, c.z - def.anchor.z) <= 2.2);
+    expect(front.length).toBeGreaterThan(20);
+    // The closest cell stops one player radius in front of the console.
+    expect(Math.min(...front.map((c) => c.z - def.anchor.z))).toBeGreaterThanOrEqual(PLAYER_RADIUS - 1e-9);
+    // East of the console, toward the CRT stack and the corner archive boxes, the floor is still walkable.
+    expect(cells.some((c) => Math.abs(c.x - 3.6) < 1e-6 && Math.abs(c.z + 3.0) < 1e-6)).toBe(true);
+    expect(cells.some((c) => Math.abs(c.x - 1.8) < 1e-6 && Math.abs(c.z + 3.5) < 1e-6)).toBe(true);
   });
 });
 

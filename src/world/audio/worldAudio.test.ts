@@ -4,7 +4,9 @@ import {
   BELL_PATTERN_MIDI,
   BEAT_SEC,
   BGM_BASE_GAIN,
+  CROSSFADE_SEC,
   LOOKAHEAD_SEC,
+  MUSIC_CATALOG,
   createWorldAudioEngine,
   midiToHz,
   type AudioContextLike,
@@ -193,6 +195,9 @@ describe('worldAudio fallback (no context)', () => {
     e.playArcadeCoinSfx()
     e.playLampSwitchSfx()
     e.playPageRustleSfx()
+    e.playVinylNeedleDropSfx()
+    e.setTrack(2)
+    e.setTrack(9)
     e.setMuted(true)
     e.toggleMuted()
     e.dispose()
@@ -203,6 +208,8 @@ describe('worldAudio fallback (no context)', () => {
     const e = createWorldAudioEngine({ contextFactory: () => null })
     expect(() => calls(e)).not.toThrow()
     expect(e.isUnlocked()).toBe(false)
+    expect(e.isPlaying()).toBe(false)
+    expect(e.getTrack()).toBe(2)
   })
 
   it('is a silent no-op when the factory throws', () => {
@@ -568,5 +575,325 @@ describe('worldAudio determinism', () => {
     expect(code).not.toMatch(/\b(setInterval|setTimeout|requestAnimationFrame)\b/)
     expect(code).not.toMatch(/from\s*['"](react|three|@react-three)/)
     expect(code).not.toMatch(/localStorage|sessionStorage|indexedDB/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Task 33.2: music catalog, crossfade, tracks 1-4 and the needle-drop SFX.
+// ---------------------------------------------------------------------------
+
+type Engine = ReturnType<typeof createWorldAudioEngine>
+
+/** Advances the fake audio clock and ticks the engine at every whole step. */
+function run(ctx: FakeContext, engine: Engine, from: number, to: number, stepSec = 0.5) {
+  for (let t = from; t <= to + 1e-9; t += stepSec) {
+    ctx.currentTime = t
+    engine.tick(t)
+  }
+}
+
+const sortedStarts = (oscs: FakeOsc[]) =>
+  Array.from(new Set(oscs.map((o) => o.startTime!.toFixed(6))))
+    .map(Number)
+    .sort((a, b) => a - b)
+
+const diffs = (xs: number[]) => xs.slice(1).map((x, i) => x - xs[i])
+
+describe('worldAudio music catalog', () => {
+  it('has five entries with the exact titles and BPMs', () => {
+    expect(MUSIC_CATALOG.map((e) => e.title)).toEqual([
+      '01 // MIDNIGHT RENTAL (1994)',
+      '02 // NEON ARCADE LOBBY (1996)',
+      '03 // RAIN ON CRT GLASS (1997)',
+      '04 // STATIC & STARLIGHT (1998)',
+      '05 // STOP TURNTABLE (SILENT)',
+    ])
+    expect(MUSIC_CATALOG.map((e) => e.bpm)).toEqual([78, 92, 72, 84, 0])
+  })
+
+  it('selects track 0 by default after unlock', () => {
+    const { engine } = setup()
+    expect(engine.getTrack()).toBe(0)
+    expect(engine.isPlaying()).toBe(false)
+    engine.unlock()
+    expect(engine.getTrack()).toBe(0)
+    expect(engine.isPlaying()).toBe(true)
+    engine.setMuted(true)
+    expect(engine.isPlaying()).toBe(true)
+  })
+})
+
+describe('worldAudio setTrack and crossfade', () => {
+  it('ramps the old and new track buses over the crossfade and stops the old voices at its end', () => {
+    const { ctx, engine, oscBase, srcBase } = unlocked()
+    ctx.currentTime = 5
+    const gainBase = ctx.gains.length
+    const oldBus = ctx.gains[3]
+    engine.setTrack(1)
+    const end = 5 + CROSSFADE_SEC
+    expect(engine.getTrack()).toBe(1)
+
+    const oldRamp = oldBus.gain.events.filter((e) => e.kind === 'lin').pop()!
+    expect(oldRamp.value).toBe(0)
+    expect(near(oldRamp.time, end, 1e-9)).toBe(true)
+    const newBus = ctx.gains[gainBase]
+    expect(newBus.gain.events.some((e) => e.kind === 'set' && e.value === 0 && e.time === 5)).toBe(true)
+    const newRamp = newBus.gain.events.filter((e) => e.kind === 'lin').pop()!
+    expect(newRamp.value).toBe(1)
+    expect(near(newRamp.time, end, 1e-9)).toBe(true)
+    expect(CROSSFADE_SEC).toBeGreaterThanOrEqual(0.6)
+    expect(CROSSFADE_SEC).toBeLessThanOrEqual(0.8)
+
+    const oldOscs = ctx.oscs.slice(0, oscBase)
+    const oldSources = ctx.sources.slice(0, srcBase)
+    for (const v of [...oldOscs, ...oldSources]) expect(near(v.stopTime!, end, 1e-9)).toBe(true)
+
+    // Once every old voice ended, the old bus is disconnected.
+    expect(oldBus.disconnected).toBe(0)
+    for (const v of [...oldOscs, ...oldSources]) v.onended!()
+    expect(oldBus.disconnected).toBeGreaterThanOrEqual(1)
+  })
+
+  it('is a no-op when the same track is selected again', () => {
+    const { ctx, engine } = unlocked()
+    engine.setTrack(0)
+    const counts = [ctx.gains.length, ctx.oscs.length, ctx.sources.length]
+    expect([ctx.gains.length, ctx.oscs.length, ctx.sources.length]).toEqual(counts)
+    expect(ctx.oscs.every((o) => o.stopTime === undefined)).toBe(true)
+    engine.setTrack(2)
+    const after = [ctx.gains.length, ctx.oscs.length]
+    engine.setTrack(2)
+    expect([ctx.gains.length, ctx.oscs.length]).toEqual(after)
+  })
+
+  it('ignores invalid indices', () => {
+    const { ctx, engine } = unlocked()
+    const gains = ctx.gains.length
+    for (const bad of [-1, 5, 99, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) engine.setTrack(bad)
+    expect(engine.getTrack()).toBe(0)
+    expect(ctx.gains).toHaveLength(gains)
+    expect(ctx.oscs.every((o) => o.stopTime === undefined)).toBe(true)
+  })
+
+  it('stores a selection made before unlock and applies it on unlock', () => {
+    const { ctx, engine } = setup()
+    engine.setTrack(2)
+    expect(engine.getTrack()).toBe(2)
+    expect(ctx.oscs).toHaveLength(0)
+    engine.unlock()
+    expect(engine.getTrack()).toBe(2)
+    expect(engine.isPlaying()).toBe(true)
+    // Track 2 has no tape hiss loop and starts its 4.5 Hz tremolo LFO; the track-0 pad is absent.
+    expect(ctx.sources.filter((s) => s.loop)).toHaveLength(0)
+    expect(ctx.oscs.some((o) => o.frequency.value === 4.5)).toBe(true)
+    expect(ctx.oscs.some((o) => o.type === 'sawtooth')).toBe(false)
+  })
+
+  it('recreates the track-0 pad and hiss when switching back', () => {
+    const { ctx, engine, oscBase } = unlocked()
+    ctx.currentTime = 1
+    engine.setTrack(1)
+    ctx.currentTime = 3
+    engine.setTrack(0)
+    expect(ctx.oscs.length).toBeGreaterThanOrEqual(oscBase * 2)
+    expect(ctx.sources.filter((s) => s.loop)).toHaveLength(2)
+    expect(ctx.sources.filter((s) => s.loop && s.stopTime === undefined)).toHaveLength(1)
+  })
+})
+
+describe('worldAudio track 1 (FM lobby, 92 BPM)', () => {
+  it('schedules FM voices and bass pulses on the 92 BPM grid', () => {
+    const { ctx, engine, oscBase } = unlocked()
+    engine.setTrack(1)
+    run(ctx, engine, 0, 8)
+    const fresh = ctx.oscs.slice(oscBase)
+    const bass = fresh.filter((o) => o.type === 'sawtooth')
+    expect(bass.length).toBeGreaterThanOrEqual(4)
+    const beat = 60 / 92
+    for (const d of diffs(sortedStarts(bass))) expect(near(d / (2 * beat), Math.round(d / (2 * beat)), 1e-6)).toBe(true)
+    // Bass roots follow Am7 - Fmaj7 - Cmaj7 - G6 (A2, F2, C3, G2).
+    const roots = new Set([45, 41, 48, 43].map(midiToHz))
+    expect(bass.every((o) => roots.has(o.frequency.values()[0]))).toBe(true)
+
+    // FM: a modulator gain feeds a carrier frequency param.
+    const carriers = new Set<unknown>(fresh.map((o) => o.frequency))
+    const modGains = ctx.gains.filter((gn) => gn.connections.some((c) => carriers.has(c)))
+    expect(modGains.length).toBeGreaterThan(0)
+    // Chord stabs start on eighth-note grid points.
+    const sines = fresh.filter((o) => o.type === 'sine')
+    expect(sines.length).toBeGreaterThan(0)
+    for (const o of sines) {
+      const k = o.startTime! / (beat / 2)
+      expect(near(k, Math.round(k), 1e-6)).toBe(true)
+    }
+  })
+
+  it('never schedules a step twice and skips the backlog after a time jump', () => {
+    const { ctx, engine, oscBase } = unlocked()
+    engine.setTrack(1)
+    ctx.currentTime = 0
+    engine.tick(0)
+    const count = ctx.oscs.length
+    expect(count).toBeGreaterThan(oscBase)
+    engine.tick(0)
+    engine.tick(0.1)
+    expect(ctx.oscs).toHaveLength(count)
+    for (const o of ctx.oscs.slice(oscBase)) expect(o.startTime!).toBeLessThanOrEqual(LOOKAHEAD_SEC)
+
+    ctx.currentTime = 100
+    engine.tick(100)
+    const added = ctx.oscs.slice(count)
+    expect(added.length).toBeGreaterThan(0)
+    for (const o of added) {
+      expect(o.startTime!).toBeGreaterThanOrEqual(100)
+      expect(o.startTime!).toBeLessThanOrEqual(100 + LOOKAHEAD_SEC)
+    }
+  })
+})
+
+describe('worldAudio track 2 (Rhodes and crackle, 72 BPM)', () => {
+  it('strikes Fmaj7 then Em9 chords every 4 beats and adds vinyl crackle clicks', () => {
+    const { ctx, engine, oscBase, srcBase } = unlocked()
+    engine.setTrack(2)
+    run(ctx, engine, 0, 30)
+    const fresh = ctx.oscs.slice(oscBase)
+    const roots = fresh.filter(
+      (o) => o.type === 'sine' && (hasFreq(o, midiToHz(53)) || hasFreq(o, midiToHz(52))) && o.startTime! < 14,
+    )
+    const starts = sortedStarts(roots)
+    expect(starts.length).toBeGreaterThanOrEqual(4)
+    const bar = (60 / 72) * 4
+    for (const d of diffs(starts)) expect(near(d, bar, 1e-6)).toBe(true)
+    // The chord changes after two bars: F3 first, E3 later.
+    expect(find(fresh, midiToHz(53))[0].startTime!).toBeLessThan(find(fresh, midiToHz(52))[0].startTime!)
+    // Each chord note carries a soft 2x partial.
+    expect(find(fresh, midiToHz(53) * 2).length).toBeGreaterThan(0)
+
+    const clicks = ctx.sources.slice(srcBase).filter((s) => !s.loop && s.stopTime! - s.startTime! < 0.02)
+    expect(clicks.length).toBeGreaterThan(0)
+    const filter = clicks[0].connections[0] as FakeFilter
+    expect(filter.type).toBe('highpass')
+  })
+})
+
+describe('worldAudio track 3 (arpeggio, 84 BPM)', () => {
+  it('schedules eighth-note arpeggio notes through a feedback delay with pitch wow', () => {
+    const { ctx, engine, oscBase } = unlocked()
+    engine.setTrack(3)
+    run(ctx, engine, 0, 6)
+    const fresh = ctx.oscs.slice(oscBase)
+    const arp = fresh.filter((o) => o.type === 'sawtooth')
+    expect(arp.length).toBeGreaterThanOrEqual(8)
+    const eighth = 60 / 84 / 2
+    for (const d of diffs(sortedStarts(arp))) expect(near(d, eighth, 1e-6)).toBe(true)
+    // First bar is Am: A3 C4 E4 A4.
+    const firstBar = arp.slice(0, 4).map((o) => o.frequency.values()[0])
+    expect(firstBar.map((f) => Math.round(f))).toEqual([57, 60, 64, 69].map((m) => Math.round(midiToHz(m))))
+    // Feedback delay is fed by the arp filter and loops back on itself.
+    expect(ctx.delays.length).toBeGreaterThanOrEqual(1)
+    const delay = ctx.delays[ctx.delays.length - 1]
+    expect(ctx.filters.some((f) => f.connections.includes(delay))).toBe(true)
+    expect(ctx.gains.some((gn) => gn.connections.includes(delay))).toBe(true)
+    // Pitch LFO (wow) feeds the voices' detune params.
+    const detunes = new Set<unknown>(arp.map((o) => o.detune))
+    expect(ctx.gains.some((gn) => gn.connections.some((c) => detunes.has(c)))).toBe(true)
+  })
+})
+
+describe('worldAudio track 4 (silent)', () => {
+  it('fades the music out, schedules nothing on tick and keeps SFX working', () => {
+    const { ctx, engine, oscBase, srcBase } = unlocked()
+    ctx.currentTime = 2
+    engine.setTrack(4)
+    expect(engine.getTrack()).toBe(4)
+    expect(engine.isPlaying()).toBe(false)
+    expect(ctx.oscs.slice(0, oscBase).every((o) => near(o.stopTime!, 2 + CROSSFADE_SEC, 1e-9))).toBe(true)
+    run(ctx, engine, 2, 12)
+    expect(ctx.oscs).toHaveLength(oscBase)
+    expect(ctx.sources).toHaveLength(srcBase)
+    engine.playLampSwitchSfx()
+    expect(ctx.sources).toHaveLength(srcBase + 1)
+    expect(ctx.oscs.length).toBeGreaterThan(oscBase)
+  })
+
+  it('creates no music when selected before unlock', () => {
+    const { ctx, engine } = setup()
+    engine.setTrack(4)
+    engine.unlock()
+    expect(ctx.oscs).toHaveLength(0)
+    expect(ctx.sources).toHaveLength(0)
+    expect(engine.isPlaying()).toBe(false)
+  })
+})
+
+describe('worldAudio mixer with a non-default track', () => {
+  it('ducks the BGM bus and mutes the master', () => {
+    const { ctx, engine } = unlocked()
+    engine.setTrack(2)
+    ctx.currentTime = 5
+    engine.setDucked(true)
+    const down = ctx.gains[1].gain.events.filter((e) => e.kind === 'lin').pop()!
+    expect(down.value).toBeCloseTo(BGM_BASE_GAIN * 0.4)
+    engine.setMuted(true)
+    expect(ctx.gains[0].gain.events.filter((e) => e.kind === 'lin').pop()!.value).toBe(0)
+    const before = ctx.oscs.length
+    run(ctx, engine, 5, 8)
+    expect(ctx.oscs).toHaveLength(before)
+    expect(engine.getTrack()).toBe(2)
+    expect(engine.isPlaying()).toBe(true)
+  })
+
+  it('stops every voice of every track on dispose', () => {
+    const { ctx, engine } = unlocked()
+    for (const [i, track] of [1, 2, 3, 0].entries()) {
+      engine.setTrack(track)
+      run(ctx, engine, i * 3, i * 3 + 2)
+    }
+    engine.dispose()
+    expect(ctx.oscs.every((o) => o.stopCalls >= 1 && o.disconnected >= 1)).toBe(true)
+    expect(ctx.sources.every((s) => s.stopCalls >= 1 && s.disconnected >= 1)).toBe(true)
+    expect(ctx.gains.every((gn) => gn.disconnected >= 1)).toBe(true)
+    expect(ctx.calls.close).toBe(1)
+  })
+})
+
+describe('worldAudio vinyl needle drop', () => {
+  it('schedules a click, a falling sub-thump and a band-passed crackle burst within about 0.55 s', () => {
+    const { ctx, engine, oscBase, srcBase } = unlocked()
+    ctx.currentTime = 10
+    engine.playVinylNeedleDropSfx()
+    const oscs = ctx.oscs.slice(oscBase)
+    const sources = ctx.sources.slice(srcBase)
+
+    expect(find(oscs, 2600)).toHaveLength(1)
+    const thump = oscs.find((o) => o.type === 'sine' && o.frequency.events.some((e) => e.kind === 'set' && e.value >= 70 && e.value <= 90))!
+    expect(thump).toBeDefined()
+    const drop = thump.frequency.events.find((e) => e.kind === 'exp')!
+    expect(drop.value).toBeLessThanOrEqual(50)
+    expect(near(thump.stopTime! - thump.startTime!, 0.12, 0.005)).toBe(true)
+    expect(near(thump.startTime! - 10, 0.185, 0.01)).toBe(true)
+
+    const burst = sources.find((s) => near(s.stopTime! - s.startTime!, 0.3, 0.01))!
+    expect(burst).toBeDefined()
+    const bp = burst.connections[0] as FakeFilter
+    expect(bp.type).toBe('bandpass')
+    expect(bp.frequency.value).toBeGreaterThanOrEqual(2000)
+    expect(bp.frequency.value).toBeLessThanOrEqual(4000)
+    expect(sources.filter((s) => s.stopTime! - s.startTime! <= 0.021).length).toBeGreaterThanOrEqual(3)
+
+    const all = [...oscs, ...sources]
+    expect(all.every((v) => v.stopTime !== undefined)).toBe(true)
+    const total = Math.max(...all.map((v) => v.stopTime!)) - Math.min(...all.map((v) => v.startTime!))
+    expect(near(total, 0.55, 0.03)).toBe(true)
+  })
+
+  it('does nothing while muted or locked', () => {
+    const locked = setup()
+    locked.engine.playVinylNeedleDropSfx()
+    expect(locked.ctx.sources).toHaveLength(0)
+    const { ctx, engine, srcBase } = unlocked()
+    engine.setMuted(true)
+    engine.playVinylNeedleDropSfx()
+    expect(ctx.sources).toHaveLength(srcBase)
   })
 })

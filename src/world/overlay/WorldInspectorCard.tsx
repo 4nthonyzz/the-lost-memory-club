@@ -12,16 +12,30 @@ import {
   type DocBlock,
   type DocTheme,
 } from '../logic/archiveDocuments';
-import { BOOK_PALETTES, CARD_PALETTES } from '../logic/cardThemes';
-import type { ReadableId } from '../worldTypes';
+import { MUSIC_CATALOG } from '../audio/worldAudio';
+import { BOOK_PALETTES, CARD_PALETTES, TURNTABLE_PALETTE } from '../logic/cardThemes';
+import type { ReadableId, TurntableId } from '../worldTypes';
+import {
+  TURNTABLE_CARD_TAG,
+  TURNTABLE_CARD_TITLE,
+  TURNTABLE_FOOTER_HINT,
+  trackBpmLabel,
+  turntableStatusText,
+} from './turntableCatalog';
 
 export interface WorldInspectorCardProps {
-  /** The readable prop whose card is open, or null/undefined when no card is open. */
-  id?: ReadableId | null;
+  /** The prop whose card is open ('record-player' opens the turntable catalog card), or null/undefined when no card is open. */
+  id?: ReadableId | TurntableId | null;
   /** Visible page. Defaults to page 1. */
   page?: CardPage;
   /** Called when a page button is clicked (pointer not locked). Keys 1 and 2 are handled by the world input. */
   onPage?: (page: CardPage) => void;
+  /** Turntable card: the selected track index (0..4). Defaults to 0. */
+  track?: number;
+  /** Turntable card: the index of the track that is really playing, or null when none is. */
+  playingTrack?: number | null;
+  /** Turntable card: called when a track row is clicked. Keys 1 to 5 are handled by the world input. */
+  onTrack?: (index: number) => void;
 }
 
 const SVG_PROPS = {
@@ -138,8 +152,9 @@ const ART: Readonly<Record<DocTheme, () => ReactElement>> = {
  * Keys 1 and 2 switch pages and are handled by the world input.
  * It closes on E, Esc or by walking away.
  */
-export function WorldInspectorCard({ id = null, page = 1, onPage }: WorldInspectorCardProps) {
+export function WorldInspectorCard({ id = null, page = 1, onPage, track = 0, playingTrack = null, onTrack }: WorldInspectorCardProps) {
   if (id === null) return null;
+  if (id === 'record-player') return <TurntableCard track={track} playingTrack={playingTrack} onTrack={onTrack} />;
   return <OpenCard id={id} page={page} onPage={onPage} />;
 }
 
@@ -345,6 +360,113 @@ function OpenCard({ id, page, onPage }: { id: ReadableId; page: CardPage; onPage
             <p className="world-card-footer">{ARCHIVE_FOOTER_HINT}</p>
           </>
         )}
+      </section>
+    </div>
+  );
+}
+
+/**
+ * Turntable catalog card (task 33.3). Same non-modal, non-trapping card as the documents (one scroll container, wheel and
+ * scrollbar, the region around it ignores the pointer). The five track rows are buttons with tabIndex -1: they are clickable
+ * with the mouse, never take keyboard focus and a click never requests pointer lock (the wrapper click handler skips clicks
+ * inside [data-world-card]). Keys 1 to 5 select a track and are handled by the world input.
+ */
+function TurntableCard({ track, playingTrack, onTrack }: { track: number; playingTrack: number | null; onTrack?: (index: number) => void }) {
+  const cardRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const onWheel = (e: WheelEvent) => {
+      const el = cardRef.current;
+      if (!el) return;
+      e.preventDefault();
+      const unit = e.deltaMode === 1 ? LINE_PX : e.deltaMode === 2 ? el.clientHeight : 1;
+      el.scrollTop += e.deltaY * unit;
+    };
+    window.addEventListener('wheel', onWheel, { passive: false });
+    return () => window.removeEventListener('wheel', onWheel);
+  }, []);
+  // Presses and clicks on the card never reach the wrapper. Buttons are left alone so React's handlers run; the wrapper
+  // ignores BUTTON targets and anything inside [data-world-card].
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return undefined;
+    const stop = (e: Event) => {
+      const target = e.target as Element | null;
+      if (target?.closest?.('button')) return;
+      e.stopPropagation();
+    };
+    el.addEventListener('mousedown', stop);
+    el.addEventListener('click', stop);
+    return () => {
+      el.removeEventListener('mousedown', stop);
+      el.removeEventListener('click', stop);
+    };
+  }, []);
+  const p = TURNTABLE_PALETTE;
+  const style = {
+    '--card-bg': p.bg,
+    '--card-ink': p.ink,
+    '--card-muted': p.muted,
+    '--card-pill-bg': p.pillBg,
+    '--card-pill-ink': p.pillInk,
+    '--card-hl-bg': p.hlBg,
+    '--card-accent': p.accent,
+    '--card-frame': p.frame,
+    '--lcd-bg': p.lcdBg,
+    '--lcd-ink': p.lcdInk,
+    '--lcd-active-ink': p.lcdActiveInk,
+  } as CSSProperties;
+  // Keep keyboard focus on the world wrapper when a row is pressed, so E and 1 to 5 keep working.
+  const keepFocus = (e: MouseEvent) => e.preventDefault();
+  return (
+    <div className="world-card-region">
+      <section
+        className="world-card world-card--turntable"
+        ref={cardRef}
+        data-world-card="true"
+        role="region"
+        aria-label={TURNTABLE_CARD_TITLE}
+        aria-live="polite"
+        data-card-id="record-player"
+        data-theme="turntable"
+        style={style}
+      >
+        <header className="world-card-head">
+          <svg {...SVG_PROPS}>
+            <circle cx="36" cy="20" r="17" fill="none" stroke="var(--card-accent)" strokeWidth="2" />
+            <circle cx="36" cy="20" r="11" fill="none" stroke="var(--card-muted)" strokeWidth="1" />
+            <circle cx="36" cy="20" r="4" fill="var(--card-ink)" />
+            <path d="M104 6 L84 22 L70 18" fill="none" stroke="var(--card-accent)" strokeWidth="2.5" strokeLinejoin="round" />
+            <circle cx="104" cy="6" r="3" fill="var(--card-accent)" />
+          </svg>
+          <div className="world-card-heading">
+            <p className="world-card-tag">{TURNTABLE_CARD_TAG}</p>
+            <h2 className="world-card-title">{TURNTABLE_CARD_TITLE}</h2>
+          </div>
+        </header>
+        <ul className="world-card-pills" aria-label="Turntable status">
+          <li className="world-pill world-pill-status">{turntableStatusText(playingTrack)}</li>
+        </ul>
+        <div className="world-track-list" role="listbox" aria-label="Track list">
+          {MUSIC_CATALOG.map((entry, i) => (
+            <button
+              key={entry.id}
+              type="button"
+              role="option"
+              className="world-track-row"
+              data-track-index={i}
+              data-active={track === i ? 'true' : 'false'}
+              aria-selected={track === i}
+              aria-current={track === i ? 'true' : undefined}
+              tabIndex={-1}
+              onMouseDown={keepFocus}
+              onClick={() => onTrack?.(i)}
+            >
+              <span className="world-track-title">{entry.title}</span>
+              <span className="world-track-bpm">{trackBpmLabel(entry)}</span>
+            </button>
+          ))}
+        </div>
+        <p className="world-card-footer">{TURNTABLE_FOOTER_HINT}</p>
       </section>
     </div>
   );

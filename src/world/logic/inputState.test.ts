@@ -10,6 +10,8 @@ import {
   toMovementInput,
   type HeldKeys,
   type KeyTargetInfo,
+  type KeyRole,
+  trackIndexForRole,
 } from './inputState';
 
 const ok: KeyTargetInfo = { tagName: 'DIV', isContentEditable: false, insideWorldWrapper: true };
@@ -36,7 +38,7 @@ describe('keyRole', () => {
     expect(keyRole('Numpad1')).toBe('page1');
     expect(keyRole('Digit2')).toBe('page2');
     expect(keyRole('Numpad2')).toBe('page2');
-    expect(keyRole('Digit3')).toBeNull();
+    expect(keyRole('Digit6')).toBeNull();
     expect(isActionRole('page1')).toBe(true);
     expect(isActionRole('page2')).toBe(true);
     expect(isActionRole('interact')).toBe(true);
@@ -134,5 +136,23 @@ describe('mute key (task 32.2)', () => {
     expect(isKeyEventAccepted(ok)).toBe(true);
     expect(isKeyEventAccepted({ ...ok, tagName: 'INPUT' })).toBe(false);
     expect(isKeyEventAccepted({ ...ok, insideWorldWrapper: false })).toBe(false);
+  });
+});
+
+describe('turntable track keys (task 33.3)', () => {
+  it('maps Digit3..5 and Numpad3..5 to one-shot track roles, never held', () => {
+    for (const [n, role] of [[3, 'track3'], [4, 'track4'], [5, 'track5']] as const) {
+      expect(keyRole(`Digit${n}`)).toBe(role);
+      expect(keyRole(`Numpad${n}`)).toBe(role);
+      expect(isActionRole(role)).toBe(true);
+    }
+    expect(keyRole('Digit0')).toBeNull();
+    expect(keyRole('Digit6')).toBeNull();
+  });
+
+  it('maps the five digit roles to track indices 0..4 and everything else to null', () => {
+    expect(['page1', 'page2', 'track3', 'track4', 'track5'].map((r) => trackIndexForRole(r as KeyRole))).toEqual([0, 1, 2, 3, 4]);
+    expect(trackIndexForRole('interact')).toBeNull();
+    expect(trackIndexForRole(null)).toBeNull();
   });
 });

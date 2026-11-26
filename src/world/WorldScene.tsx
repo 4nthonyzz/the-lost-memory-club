@@ -2,7 +2,7 @@ import { Component, useCallback, useEffect, useRef, useState, type ErrorInfo, ty
 import { useThree } from '@react-three/fiber';
 import type { StationId } from '../core/contracts';
 import { createWorldAudio } from './audio/engineFactory';
-import type { WorldAudioEngine } from './audio/worldAudio';
+import { SILENT_TRACK, type WorldAudioEngine } from './audio/worldAudio';
 import { FrameSamplerHost } from './controller/useFrameSampler';
 import { usePlayerRig } from './controller/usePlayerRig';
 import { useWorldInput, type WorldInput } from './controller/useWorldInput';
@@ -13,6 +13,7 @@ import {
   reduceCardPage,
   reduceCloseCard,
   reducePropInteract,
+  isTurntableCard,
   reduceTargetChange,
   type PropState,
 } from './logic/propState';
@@ -151,14 +152,31 @@ function WorldInteractive({
   const [propState, setPropState] = useState<PropState>(initialPropState);
   // Audio is a side effect only: it never changes what the world sends to onInspect.
   const [audioMuted, setAudioMuted] = useState(false);
-  const onGesture = useCallback(() => getAudio().unlock(), [getAudio]);
+  // React mirror of the audio engine's track selection and playing state, so the card, the prompt and the 3D model re-render.
+  // Playing means a music track 0..3 is selected AND the engine is unlocked (engine.isPlaying()); mute does not change it.
+  const [audioTrack, setAudioTrack] = useState<{ track: number; playing: boolean }>({ track: 0, playing: false });
+  const syncAudioTrack = useCallback(() => {
+    const audio = getAudio();
+    const next = { track: audio.getTrack(), playing: audio.isPlaying() };
+    setAudioTrack((prev) => (prev.track === next.track && prev.playing === next.playing ? prev : next));
+  }, [getAudio]);
+  const onGesture = useCallback(() => {
+    getAudio().unlock();
+    syncAudioTrack();
+  }, [getAudio, syncAudioTrack]);
+  // Initialise the mirror from the engine after mount (never during render, so the engine is not created while rendering).
+  useEffect(() => {
+    syncAudioTrack();
+  }, [syncAudioTrack]);
   const onToggleMute = useCallback(() => {
     const audio = getAudio();
     audio.unlock();
     setAudioMuted(audio.toggleMuted());
-  }, [getAudio]);
+    syncAudioTrack();
+  }, [getAudio, syncAudioTrack]);
   const cardOpenRef = useRef(false);
   const cardPageRef = useRef<CardPage>(1);
+  const turntableOpenRef = useRef(false);
   const onPropInteract = useCallback(
     (id: PropInteractableId) => {
       const audio = getAudio();
@@ -166,6 +184,8 @@ function WorldInteractive({
         // E closes the open card: silent.
       } else if (id === 'desk-lamp-left' || id === 'desk-lamp-right') {
         audio.playLampSwitchSfx();
+      } else if (id === 'record-player') {
+        // Opening the turntable catalog card is silent (no page to turn).
       } else {
         audio.playPageRustleSfx();
         cardPageRef.current = 1;
@@ -180,6 +200,7 @@ function WorldInteractive({
   const closeCard = useCallback(() => {
     cardAnchorRef.current = null;
     cardOpenRef.current = false;
+    turntableOpenRef.current = false;
     cardPageRef.current = 1;
     setPropState((s) => reduceCloseCard(s));
   }, []);
@@ -194,6 +215,31 @@ function WorldInteractive({
     },
     [getAudio],
   );
+  // Selects a turntable track (keys 1 to 5 or a row click). Selecting the active track does nothing (no SFX). The needle-drop
+  // SFX plays only when a music track (0..3) starts; STOP (index 4) lifts the needle silently: the engine just fades the music out.
+  const selectTrack = useCallback(
+    (index: number) => {
+      if (!cardOpenRef.current || !turntableOpenRef.current) return;
+      const audio = getAudio();
+      if (audio.getTrack() === index) return;
+      audio.setTrack(index);
+      // A row click is a user gesture too (the wrapper skips clicks inside the card); unlock after the selection, so the chosen track starts.
+      audio.unlock();
+      if (index !== SILENT_TRACK) audio.playVinylNeedleDropSfx();
+      syncAudioTrack();
+    },
+    [getAudio, syncAudioTrack],
+  );
+  // Digits 1 and 2 switch a document page, or select tracks 1 and 2 on the turntable card.
+  const onCardPageOrTrack = useCallback(
+    (page: CardPage) => {
+      if (turntableOpenRef.current) selectTrack(page - 1);
+      else onCardPage(page);
+    },
+    [onCardPage, selectTrack],
+  );
+  // Digits 3 to 5 select tracks on the turntable card only; on a document card they do nothing.
+  const onCardTrack = useCallback((index: 2 | 3 | 4) => selectTrack(index), [selectTrack]);
   const getCardAnchor = useCallback(() => cardAnchorRef.current, []);
   const isCardOpen = useCallback(() => cardOpenRef.current, []);
   const onCardScroll = useCallback((s: CardScroll) => {
@@ -224,7 +270,8 @@ function WorldInteractive({
     onPropInteract,
     onCloseCard: closeCard,
     isCardOpen,
-    onCardPage,
+    onCardPage: onCardPageOrTrack,
+    onCardTrack,
     onCardScroll,
     inputEnabled,
     onGesture,
@@ -247,6 +294,7 @@ function WorldInteractive({
   const { releaseCardArrows } = input;
   useEffect(() => {
     cardOpenRef.current = openCard !== null;
+    turntableOpenRef.current = isTurntableCard(openCard);
     cardPageRef.current = 1;
     cardAnchorRef.current = openCard === null ? null : (INTERACTABLE_DEFS.find((d) => d.id === openCard)?.anchor ?? null);
     // ArrowUp / ArrowDown scroll the card now, so movement they were driving stops.
@@ -275,7 +323,7 @@ function WorldInteractive({
       <WorldCanvas frameloop={input.mode === 'inspecting' ? 'demand' : 'always'}>
         <Lighting memoryShifted={memoryShifted} lampsOn={countLampsOn(propState.lampOn, DESK_LAMPS.map((l) => l.id))} />
         <Room />
-        <Props lampOn={propState.lampOn} />
+        <Props lampOn={propState.lampOn} turntablePlaying={audioTrack.playing} />
         <Stations />
         <Effects active={input.mode !== 'inspecting'} onAudioTick={onAudioTick} />
         <FrameSamplerHost />
@@ -290,7 +338,7 @@ function WorldInteractive({
           onContextRestored={clearTimer}
         />
       </WorldCanvas>
-      <WorldOverlay mode={input.mode} target={target} lampOn={propState.lampOn} message={propState.message} card={propState.openCard} cardPage={propState.cardPage} onCardPage={onCardPage} notesRead={propState.read.size} canResume={inputEnabled === undefined} keyboardLookHint={input.keyboardLookHint} audioMuted={audioMuted} onToggleAudio={onToggleMute} />
+      <WorldOverlay mode={input.mode} target={target} lampOn={propState.lampOn} message={propState.message} card={propState.openCard} cardPage={propState.cardPage} onCardPage={onCardPage} track={audioTrack.track} playingTrack={audioTrack.playing ? audioTrack.track : null} onTrack={selectTrack} notesRead={propState.read.size} canResume={inputEnabled === undefined} keyboardLookHint={input.keyboardLookHint} audioMuted={audioMuted} onToggleAudio={onToggleMute} />
     </div>
   );
 }

@@ -137,6 +137,14 @@ const ARCADE_FREQUENCY = prop('arcade-frequency', 'station', box(8.4, 9.2, 0.7, 
  */
 const CRT_STACK = prop('crt-stack', 'furniture', box(4.3, 4.9, -3.2, -2.6), 1.0, 3, true, undefined, { facing: '-x' });
 
+/**
+ * Walnut audio console with a Hi-Fi turntable on top (task 33.1), 0.9 m x 0.45 m x 0.75 m, back against the north wall at
+ * x 2.2..3.1, front toward +z. The spot is the free stretch of north wall between the poster-north / island zone (x <= 1.5, the island
+ * is 1.45 m south of this box) and the archive boxes in the north-east corner (x >= 4.1). It is 3.1 m from the east wall, so it
+ * touches no doorway lane, and far from the west bookcases, the spawn disc (3.0 m from the spawn) and the island walkways.
+ */
+const RECORD_PLAYER = prop('record-player', 'furniture', box(2.2, 3.1, -4, -3.55), 0.75, 3, true, undefined, { facing: '+z' });
+
 const CHAIR = prop('abandoned-chair', 'furniture', box(2.9, 3.5, 1.9, 2.5), 0.9, 3);
 const COUCH = prop('couch', 'furniture', box(-3.9, -2.1, 2.6, 3.4), 0.9, 3);
 
@@ -208,6 +216,7 @@ const PROPS: readonly PropDef[] = Object.freeze([
   ARCADE_MAZE,
   ARCADE_FREQUENCY,
   CRT_STACK,
+  RECORD_PLAYER,
   CHAIR,
   COUCH,
   ...DETAILS,
@@ -338,14 +347,33 @@ function noteDefs(): InteractableDef[] {
 }
 
 /**
- * World-local interactable props (nine): the two desk lamps, the three manuals, then the desk notebook, the cork
- * board, the Memory_Shift poster and the Arcade_Area Club Archive Notice. Not Stations, not Colliders.
+ * Task 33.1: the record player. The anchor sits on the middle of its front (+z) face, so the player stands in the open floor in front
+ * of the console. The console is solid; its own footprint is excluded from its line-of-sight test, like every other prop that sits on
+ * a Collider. Not a Station: it never reaches onInspect.
+ */
+function recordPlayerDef(): InteractableDef {
+  const b = RECORD_PLAYER.box;
+  return Object.freeze({
+    id: 'record-player' as const,
+    kind: 'turntable' as const,
+    anchor: Object.freeze({ x: (b.minX + b.maxX) / 2, z: b.maxZ }),
+    collider: b,
+    range: PROP_INTERACTION_RANGE,
+    height: 0.85,
+  });
+}
+
+/**
+ * World-local interactable props (ten): the two desk lamps, the three manuals, then the desk notebook, the cork
+ * board, the Memory_Shift poster, the Arcade_Area Club Archive Notice and the record player (33.1).
+ * Not Stations. Only the record player has a Collider (its own solid footprint).
  */
 export const INTERACTABLE_DEFS: readonly InteractableDef[] = Object.freeze([
   lampDef('desk-lamp-left'),
   lampDef('desk-lamp-right'),
   ...MANUAL_PLACEMENT.books.map((m) => manualDef(m.id, m.z)),
   ...noteDefs(),
+  recordPlayerDef(),
 ]);
 /** Rough triangle estimate: 12 per box (walls, props, floor, ceiling). */
 export function estimateTriangles(): number {

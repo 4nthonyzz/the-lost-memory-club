@@ -1,7 +1,7 @@
 /** Reception desk, bookcases with instanced books and tapes, furniture and environmental details. Sizes come from ROOM props. */
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
-import type { Mesh } from 'three'
+import type { Group, Mesh } from 'three'
 import { AssetModel } from '../assets/AssetModel'
 import { ROOM, type PropDef } from '../layout/roomLayout'
 import type { Aabb } from '../worldTypes'
@@ -20,10 +20,13 @@ import {
   deskParts,
   type DeskLampKind,
   type Part,
+  advancePlatterAngle,
   posterParts,
+  turntableGroups,
   shelfFrameParts,
   shelfContents,
 } from './modelDetail'
+import { useReducedMotion } from '../controller/useReducedMotion'
 import { assetPlacement } from './assetPlacement'
 import { BookMeshes, PartMeshes } from './PartMeshes'
 import { Block } from './Room'
@@ -128,6 +131,33 @@ export function Couch({ box }: { box: Aabb }) {
   return <PartMeshes parts={parts} />
 }
 
+/**
+ * Walnut console with the Hi-Fi turntable (task 33.1). Three separately addressable groups: the static console and controls, the
+ * platter group (placed at the spindle axis, so rotating it about y spins the record) and the tonearm. While `playing` the platter spins at
+ * 33 1/3 RPM in useFrame (TURNTABLE_SPIN_RAD_PER_SEC), the tonearm sits on the record and the display is emerald; stopped, the tonearm
+ * rests on its cradle and the display is amber. Under reduced motion nothing spins; the pose still switches instantly. There is no invalidate
+ * loop: the frame loop is the existing one (it is idle in 'demand' mode while a station panel is open, so the spin pauses there too).
+ */
+export function RecordPlayer({ box, playing = false, platterRef }: { box: Aabb; playing?: boolean; platterRef?: RefObject<Group | null> }) {
+  const groups = useMemo(() => turntableGroups(box, { playing }), [box, playing])
+  const own = useRef<Group>(null)
+  const ref = platterRef ?? own
+  const reduced = useReducedMotion()
+  useFrame((_, dt) => {
+    const g = ref.current
+    if (g) g.rotation.y = advancePlatterAngle(g.rotation.y, dt, playing, reduced)
+  })
+  return (
+    <group>
+      <PartMeshes parts={groups.static} />
+      <group ref={ref} position={[groups.spindle[0], groups.spindle[1], groups.spindle[2]]}>
+        <PartMeshes parts={groups.platter} />
+      </group>
+      <PartMeshes parts={groups.tonearm} />
+    </group>
+  )
+}
+
 export function Crate({ box, height }: { box: Aabb; height: number }) {
   const parts = useMemo(() => crateParts(box, height), [box, height])
   return <PartMeshes parts={parts} />
@@ -226,11 +256,12 @@ function ArcadeAreaDressing() {
   )
 }
 
-/** `lampOn` is the world-local lamp state (task 23.2). Absent means both lamps are on. */
-export function Props({ lampOn }: { lampOn?: Readonly<Record<string, boolean>> } = {}) {
+/** `lampOn` is the world-local lamp state (task 23.2). Absent means both lamps are on. `turntablePlaying` is true while a music track really plays (task 33.3). */
+export function Props({ lampOn, turntablePlaying = false }: { lampOn?: Readonly<Record<string, boolean>>; turntablePlaying?: boolean } = {}) {
   const desk = propById('reception-desk')
   const chair = propById('abandoned-chair')
   const couch = propById('couch')
+  const recordPlayer = propById('record-player')
   return (
     <group>
       <ShiftDressing />
@@ -245,6 +276,7 @@ export function Props({ lampOn }: { lampOn?: Readonly<Record<string, boolean>> }
       })}
       <AssetModel id="armchair" {...assetPlacement(chair.box)} fallback={<Armchair box={chair.box} />} />
       <AssetModel id="couch" {...assetPlacement(couch.box)} fallback={<Couch box={couch.box} />} />
+      <RecordPlayer box={recordPlayer.box} playing={turntablePlaying} />
       <Details />
       <ArcadeAreaDressing />
     </group>

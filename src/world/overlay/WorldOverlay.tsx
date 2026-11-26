@@ -11,7 +11,7 @@ import { WorldInspectorCard } from './WorldInspectorCard';
 import { WorldMessage } from './WorldMessage';
 import type { CardPage } from '../logic/archiveDocuments';
 import type { WorldMessage as WorldMessageData } from '../logic/propState';
-import type { InteractionTarget, LampId, ReadableId } from '../worldTypes';
+import type { InteractionTarget, LampId, ReadableId, TurntableId } from '../worldTypes';
 import './world.css';
 
 export type OverlayMode = 'capturePending' | 'active' | 'inspecting';
@@ -23,12 +23,18 @@ export interface WorldOverlayProps {
   lampOn?: Readonly<Record<LampId, boolean>>;
   /** Message from a world-local prop. Absent means none. */
   message?: WorldMessageData | null;
-  /** Readable prop whose Archive Document Card is open. Absent means none. */
-  card?: ReadableId | null;
+  /** Prop whose card is open ('record-player' is the turntable catalog card). Absent means none. */
+  card?: ReadableId | TurntableId | null;
   /** Visible page of the open card. Absent means page 1. */
   cardPage?: CardPage;
   /** Called by the card's page buttons. Absent leaves the buttons inert. */
   onCardPage?: (page: CardPage) => void;
+  /** Turntable: the selected track index (0..4). Absent means 0. */
+  track?: number;
+  /** Turntable: the index of the track that is really playing, or null/absent when none is (used by the prompt and the card). */
+  playingTrack?: number | null;
+  /** Turntable: called when a track row is clicked. Absent leaves the rows inert. */
+  onTrack?: (index: number) => void;
   /** Distinct readable props read this session. Absent hides the notes counter. */
   notesRead?: number;
   /** True when the notice may name the click/Enter resume action. */
@@ -41,13 +47,13 @@ export interface WorldOverlayProps {
 }
 
 /** Rendered inside the World_Wrapper; never covers the App status line. */
-export function WorldOverlay({ mode, target = null, lampOn, message = null, card = null, cardPage = 1, onCardPage, notesRead, canResume = true, keyboardLookHint = false, audioMuted = false, onToggleAudio }: WorldOverlayProps) {
+export function WorldOverlay({ mode, target = null, lampOn, message = null, card = null, cardPage = 1, onCardPage, track = 0, playingTrack = null, onTrack, notesRead, canResume = true, keyboardLookHint = false, audioMuted = false, onToggleAudio }: WorldOverlayProps) {
   const inspecting = mode === 'inspecting';
   return (
     <div className="world-overlay">
       <WorldMessage message={inspecting ? null : message} />
-      <WorldInspectorCard id={inspecting ? null : card} page={cardPage} onPage={onCardPage} />
-      <InteractionPrompt target={inspecting ? null : target} lampOn={lampOn} />
+      <WorldInspectorCard id={inspecting ? null : card} page={cardPage} onPage={onCardPage} track={track} playingTrack={playingTrack} onTrack={onTrack} />
+      <InteractionPrompt target={inspecting ? null : target} lampOn={lampOn} playingTrack={playingTrack} />
       {inspecting ? null : <Crosshair />}
       {mode === 'capturePending' ? <CaptureOverlay /> : null}
       {inspecting ? <PanelOpenNotice canResume={canResume} /> : null}

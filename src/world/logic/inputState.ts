@@ -15,6 +15,9 @@ export type KeyRole =
   | 'interact'
   | 'page1'
   | 'page2'
+  | 'track3'
+  | 'track4'
+  | 'track5'
   | 'scrollPageUp'
   | 'scrollPageDown'
   | 'mute';
@@ -37,21 +40,51 @@ const ROLE_BY_CODE: Readonly<Record<string, KeyRole>> = {
   Numpad1: 'page1',
   Digit2: 'page2',
   Numpad2: 'page2',
+  Digit3: 'track3',
+  Numpad3: 'track3',
+  Digit4: 'track4',
+  Numpad4: 'track4',
+  Digit5: 'track5',
+  Numpad5: 'track5',
   PageUp: 'scrollPageUp',
   PageDown: 'scrollPageDown',
   KeyM: 'mute',
 };
 
-/** Roles that are one-shot actions, never held (interact, the card page keys, PageUp / PageDown and mute). */
+/** Roles that are one-shot actions, never held (interact, the card page and track keys, PageUp / PageDown and mute). */
 export function isActionRole(role: KeyRole): boolean {
   return (
     role === 'interact' ||
     role === 'page1' ||
     role === 'page2' ||
+    role === 'track3' ||
+    role === 'track4' ||
+    role === 'track5' ||
     role === 'scrollPageUp' ||
     role === 'scrollPageDown' ||
     role === 'mute'
   );
+}
+
+/**
+ * Index (0..4) of the turntable track a digit role selects while the turntable card is open: keys 1..5 map to tracks 0..4.
+ * Null for every other role.
+ */
+export function trackIndexForRole(role: KeyRole | null): number | null {
+  switch (role) {
+    case 'page1':
+      return 0;
+    case 'page2':
+      return 1;
+    case 'track3':
+      return 2;
+    case 'track4':
+      return 3;
+    case 'track5':
+      return 4;
+    default:
+      return null;
+  }
 }
 
 /** A request to scroll the open Archive Document Card: one line step or one page, up (-1) or down (1). */

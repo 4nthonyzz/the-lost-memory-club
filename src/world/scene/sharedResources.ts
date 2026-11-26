@@ -6,6 +6,7 @@
 import {
   AdditiveBlending,
   BoxGeometry,
+  type BufferGeometry,
   CanvasTexture,
   CircleGeometry,
   DoubleSide,
@@ -50,6 +51,9 @@ import {
 /** Radial segments of every round lamp glow surface and light cone (task 30.1). */
 const LAMP_RADIAL_SEGMENTS = 24
 
+/** Radial segments of the record player platter (task 33.1). */
+export const TURNTABLE_PLATTER_SEGMENTS = 24
+
 export const geometries = {
   /** Unit box; size it with mesh `scale`. */
   box: new BoxGeometry(1, 1, 1),
@@ -75,6 +79,11 @@ export const geometries = {
    * Scale uniformly by 4 x the wanted top radius.
    */
   lampCone: new CylinderGeometry(0.25, 0.5, 1, LAMP_RADIAL_SEGMENTS, 1, true),
+  /**
+   * Record player platter (task 33.1): unit-height cylinder of diameter 1 with 24 radial segments (96 triangles). The 12-inch
+   * (0.30 m) vinyl is this geometry scaled by [0.30, thickness, 0.30]. Shared and cached like every other unit geometry.
+   */
+  platter: new CylinderGeometry(0.5, 0.5, 1, TURNTABLE_PLATTER_SEGMENTS),
 }
 
 /**
@@ -343,6 +352,15 @@ export const materials = {
     depthWrite: false,
     side: DoubleSide,
   }),
+  /**
+   * 33.1 record player. Flat colours only, no texture: black vinyl, the coloured centre label, and the track-indicator display. The
+   * display is an emissive MeshBasicMaterial (no light): warm amber while idle, emerald while a track plays (swapped per mesh, so each
+   * state keeps its own material).
+   */
+  vinyl: lambert('#0b0b0f'),
+  recordLabel: lambert('#d2542f'),
+  trackDisplay: new MeshBasicMaterial({ color: '#ffb347' }),
+  trackDisplayOn: new MeshBasicMaterial({ color: '#3ddc97' }),
   /** Screens: tinted only by the Memory_Shift blend. They never read lock state. */
   crtScreen: new MeshBasicMaterial({ color: BASE_CRT_SCREEN_COLOR }),
   /** Per-cabinet screens: flat game colours are the no-canvas fallback; with a canvas the attract texture is attached and the base becomes white. Tinted by Memory_Shift. */
@@ -544,6 +562,31 @@ export function cassetteBoxGeometry(w: number, h: number, d: number): BoxGeometr
   woodBoxCache.set(key, g)
   return g
 }
+
+/** BoxGeometry face order is +x, -x, +y, -y, +z, -z, six indices per face: the -Y face owns indices 18..23. */
+const BOX_BOTTOM_INDEX_START = 18
+const BOX_FACE_INDEX_COUNT = 6
+const openBottomCache = new Map<BufferGeometry, BufferGeometry>()
+
+/**
+ * Copy of a box geometry without its -Y face (task 33.1): used by floor-flush boxes whose bottom is never visible. The copy keeps every
+ * UV of the source, so metric, atlas and cassette mappings are unchanged on the other five faces (10 triangles). Cached per source
+ * geometry and disposed once by disposeSharedResources(). `source` must be a BoxGeometry (indexed, 12 triangles).
+ */
+export function openBottomBoxGeometry(source: BufferGeometry): BufferGeometry {
+  const cached = openBottomCache.get(source)
+  if (cached) return cached
+  const index = source.getIndex()
+  if (!index || index.count !== 36) throw new Error('openBottomBoxGeometry needs an indexed 12-triangle box')
+  const kept = Array.from(index.array).filter((_, i) => i < BOX_BOTTOM_INDEX_START || i >= BOX_BOTTOM_INDEX_START + BOX_FACE_INDEX_COUNT)
+  const g = source.clone()
+  g.setIndex(kept)
+  openBottomCache.set(source, g)
+  return g
+}
+
+/** Number of live cached open-bottom box geometries (tests and reports). */
+export const openBottomBoxCount = (): number => openBottomCache.size
 
 /** Number of live cached cassette geometries (tests and reports). */
 export const cassetteBoxCount = (): number => [...woodBoxCache.keys()].filter((k) => k.startsWith('cassette|')).length
@@ -812,6 +855,8 @@ export function disposeSharedResources(): void {
   wallGeometryCache.clear()
   for (const g of woodBoxCache.values()) g.dispose()
   woodBoxCache.clear()
+  for (const g of openBottomCache.values()) g.dispose()
+  openBottomCache.clear()
   for (const m of Object.values(materials)) m.dispose()
   disposeTextures()
 }

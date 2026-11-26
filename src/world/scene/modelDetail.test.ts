@@ -127,6 +127,16 @@ const TASK_28_2_TRIANGLES = -36
  * table halo dropped (-2), both bulbs sphere 80 -> low cylinder 32 (-96). Total +38 (19,116 -> 19,154).
  */
 const TASK_30_1_TRIANGLES = 38
+
+/**
+ * Task 33.1: record player and triangle reclaim. The turntable console costs 526 triangles (19,154 + 526 = 19,680); culling the unseen -Y face of
+ * 34 floor-flush boxes of the existing models saves 68 (19,612); simplifying the hidden console cables saves 15 segments x 32 = 480 (19,132).
+ * Net -22 (19,154 -> 19,132).
+ */
+const TASK_33_1_TURNTABLE = 526
+const TASK_33_1_CULLED_EXISTING = -68
+const TASK_33_1_CABLES = -480
+const TASK_33_1_TRIANGLES = TASK_33_1_TURNTABLE + TASK_33_1_CULLED_EXISTING + TASK_33_1_CABLES
 /** Task 27.1: cabinetAndManualDetail, 256 x 128 mipmapped (estimate 174,326 bytes), added on top of the older memory caps below. */
 const TASK_27_1_TEXTURE_BYTES = Math.round(256 * 128 * 4 * 1.33)
 
@@ -706,8 +716,8 @@ describe('arcade manuals on the west bookcase (task 23.2)', () => {
     expect(report.totalTriangles - TASK_24_BASELINE).toBeLessThanOrEqual(100 + TASK_26_1_TRIANGLES)
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(8 * 1048576)
-    // Eight interactables, none of them solid or adding geometry (the notes reuse existing parts).
-    expect(INTERACTABLE_DEFS).toHaveLength(9) // 25.2 adds the Club Archive Notice
+    // Nine of the ten interactables add no geometry (the notes reuse existing parts); the tenth is the 33.1 record player.
+    expect(INTERACTABLE_DEFS).toHaveLength(10) // 25.2 adds the Club Archive Notice, 33.1 the record player
     console.info(`[24.2] triangles ${report.totalTriangles} (delta from 19042 ${report.totalTriangles - TASK_24_BASELINE}), texture memory ${(report.textureMemoryBytes / 1048576).toFixed(3)} MiB`)
   })
 })
@@ -1274,7 +1284,7 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
       const report = sceneDetailReport()
       console.info(`[30.1] triangles ${report.totalTriangles} (delta ${TASK_30_1_TRIANGLES} from 19116)`)
       expect(report.totalTriangles).toBeLessThanOrEqual(19200)
-      expect(report.totalTriangles).toBe(19116 + TASK_30_1_TRIANGLES)
+      expect(report.totalTriangles).toBe(19116 + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES)
       expect(M3_LIGHT_COUNT).toBe(4)
       expect(report.textureCount).toBe(32)
       expect(report.textureMemoryBytes / 1048576).toBeCloseTo(7.703, 3)
@@ -1335,7 +1345,7 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
       const report = sceneDetailReport()
       expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
       expect(report.totalTriangles - 19042).toBeLessThanOrEqual(82 + TASK_26_1_TRIANGLES) // 25.1 adds 18 (caps +16, liner +2); 25.2 adds 6 (three glow decals)
-      expect(report.totalTriangles - 19042).toBe(82 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES)
+      expect(report.totalTriangles - 19042).toBe(82 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES)
       expect(report.textureCount).toBe(32)
       expect(report.textureMemoryBytes / 1048576).toBeCloseTo(7.537 + TASK_27_1_TEXTURE_BYTES / 1048576, 2) // 7.521 + coneFalloff 0.016
       expect(report.textureMemoryBytes).toBeLessThanOrEqual(8 * 1048576)
@@ -2149,7 +2159,7 @@ describe('task 22.1: media island, armchair and VHS shells', () => {
     // Task 23.1 replaced the two old desk lamps (470 triangles) with two new ones (352): -118.
     // Task 23.2 replaced 7 ordinary books on shelf-b (-84) with 3 manuals and 3 spine bands (+72): -12.
     // Task 24.1: two lamp cones (+48) and five ceiling bloom strips (+10) = +58.
-    expect(report.totalTriangles).toBe(19128 - 72 + 116 - 118 - 12 + 58 + 18 + 6 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES) // 27.1: -36 (three cream manual band boxes) // 25.1: +16 brass caps, +2 liner; 25.2: +6 floor glow decals; 26.1: +64 coffee discs
+    expect(report.totalTriangles).toBe(19128 - 72 + 116 - 118 - 12 + 58 + 18 + 6 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES) // 27.1: -36 (three cream manual band boxes) // 25.1: +16 brass caps, +2 liner; 25.2: +6 floor glow decals; 26.1: +64 coffee discs
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
   })
 
@@ -2659,7 +2669,7 @@ describe('task 25.1: lamp craft, soft cones, richer pools, notebook move', () =>
     const report = sceneDetailReport()
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
     expect(report.totalTriangles - 19100).toBeLessThanOrEqual(24 + TASK_26_1_TRIANGLES) // 25.2 adds 6 more
-    expect(report.totalTriangles - 19100).toBe(24 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES)
+    expect(report.totalTriangles - 19100).toBe(24 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES)
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(MAX_LIGHTS).toBe(4)
     expect(report.textureCount).toBe(32)
@@ -2737,7 +2747,7 @@ describe('task 25.2 arcade floor glow decals', () => {
     const report = sceneDetailReport()
     expect(report.objects.map((o) => o.name)).toContain('arcade-floor-glow')
     expect(report.objects.find((o) => o.name === 'arcade-floor-glow')!.triangles).toBe(6)
-    expect(report.totalTriangles).toBe(19118 + 6 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES)
+    expect(report.totalTriangles).toBe(19118 + 6 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES)
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(report.textureCount).toBe(32)
@@ -2808,7 +2818,7 @@ describe('task 26.1: anisotropy, VCR chassis and mug detail', () => {
   it('keeps the budgets: at most 19,200 triangles (computed), 4 lights, 32 textures within 7.85 MB', () => {
     const report = sceneDetailReport()
     expect(report.totalTriangles).toBeLessThanOrEqual(19200)
-    expect(report.totalTriangles - 19124).toBe(TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES)
+    expect(report.totalTriangles - 19124).toBe(TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES)
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(report.textureCount).toBe(32)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.85 * 1048576)
@@ -2993,7 +3003,7 @@ describe('task 27.1: cabinet front detail and manual spines (cabinetAndManualDet
     const report = sceneDetailReport()
     expect(report.totalTriangles).toBeLessThanOrEqual(19200)
     expect(report.totalTriangles - 19188).toBeLessThanOrEqual(TASK_30_1_TRIANGLES)
-    expect(report.totalTriangles - 19188).toBe(TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES)
+    expect(report.totalTriangles - 19188).toBe(TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES)
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(MAX_LIGHTS).toBe(4)
     expect(report.textureCount).toBe(32)
@@ -3167,7 +3177,7 @@ describe('task 28.2: protruding manual volumes with spine and cover art', () => 
     expect(BEFORE_28_2).toBe(19152)
     expect(report.totalTriangles).toBeLessThanOrEqual(19200)
     // The manuals add no triangles; the wider volumes displace three ordinary books, so the total can only go down.
-    expect(report.totalTriangles - BEFORE_28_2).toBe(TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES)
+    expect(report.totalTriangles - BEFORE_28_2).toBe(TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES)
     expect(report.totalTriangles - BEFORE_28_2).toBeLessThanOrEqual(TASK_30_1_TRIANGLES)
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(MAX_LIGHTS).toBe(4)
@@ -3259,7 +3269,7 @@ describe('task 29.2: animated attract screens in the shared resources', () => {
     const report = sceneDetailReport()
     expect(report.textureCount).toBe(32)
     expect(report.textureMemoryBytes / 1048576).toBeCloseTo(7.703, 3)
-    expect(report.totalTriangles).toBe(19116 + TASK_30_1_TRIANGLES)
+    expect(report.totalTriangles).toBe(19116 + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES)
     expect(report.totalTriangles).toBeLessThanOrEqual(19200)
     expect(M3_LIGHT_COUNT).toBe(4)
     setCanvasFactory(() => fakeCanvas())
@@ -3480,8 +3490,8 @@ describe('task 31.2: desk cassette and ceiling fixture texture polish', () => {
 
   it('budgets: triangles unchanged at 19,154 (at most 19,200), 4 lights, 32 textures, 7.703 MiB, every texture and cached geometry disposed once', () => {
     const report = sceneDetailReport()
-    expect(report.totalTriangles).toBe(19116 + TASK_30_1_TRIANGLES)
-    expect(report.totalTriangles).toBe(19154)
+    expect(report.totalTriangles).toBe(19116 + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES)
+    expect(report.totalTriangles).toBe(19154 + TASK_33_1_TRIANGLES)
     expect(report.totalTriangles).toBeLessThanOrEqual(19200)
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(MAX_LIGHTS).toBe(4)
@@ -3502,5 +3512,420 @@ describe('task 31.2: desk cassette and ceiling fixture texture polish', () => {
     disposeSharedResources()
     for (const s of [...geoSpies, ...texSpies]) expect(s).toHaveBeenCalledTimes(1)
     expect(liveTextureCount()).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------------------------
+// Task 33.1: record player model, floor-flush bottom face culling and the console cable reclaim
+// ---------------------------------------------------------------------------------------------
+import { FLOOR_FLUSH_TOLERANCE, OPEN_BOTTOM_SAVED_TRIANGLES, cullFloorBottoms, isFloorFlushBox } from './floorCull'
+import {
+  TURNTABLE_ARM_ANGLE,
+  TURNTABLE_CABINET_TOP,
+  TURNTABLE_DECK_Y,
+  TURNTABLE_PLATTER_DIAMETER,
+  countTriangles,
+  partTriangles,
+  turntableGroups,
+  turntableParts,
+  turntableStylusXZ,
+} from './modelDetail'
+import { TURNTABLE_PLATTER_SEGMENTS, openBottomBoxCount, openBottomBoxGeometry } from './sharedResources'
+
+describe('task 33.1: record player model', () => {
+  afterEach(() => setCanvasFactory(null))
+  const rp = () => prop('record-player')
+  const parts = (playing = false) => turntableParts(rp().box, { playing })
+  const extent = (p: Part) => {
+    const size: Vec3 = p.geo === 'plane' || p.geo === 'disc' ? [p.scale[0], p.scale[1], 0] : p.scale
+    const h = orientedHalfExtents(size, p.rot ?? [0, 0, 0])
+    return { minX: p.pos[0] - h[0], maxX: p.pos[0] + h[0], minY: p.pos[1] - h[1], maxY: p.pos[1] + h[1], minZ: p.pos[2] - h[2], maxZ: p.pos[2] + h[2] }
+  }
+  const hexOf = (c: { getHexString(): string }) => `#${c.getHexString()}`
+
+  it('has every listed part: walnut stand with metric UVs, four rubber feet, plinth, steel deck plate, display, slider, power button, platter, label, spindle and tonearm', () => {
+    const all = parts()
+    // Walnut cabinet and plinth: woodDark boards with metric UVs.
+    const walnut = all.filter((p) => p.mat === 'woodDark')
+    expect(walnut.length).toBeGreaterThanOrEqual(7)
+    expect(walnut.every((p) => p.geo === 'box' && p.metric === true)).toBe(true)
+    // Four small dark rubber feet under the plinth corners.
+    const feet = all.filter((p) => p.mat === 'bezel' && p.scale[0] === 0.03 && p.scale[2] === 0.03)
+    expect(feet).toHaveLength(4)
+    expect(new Set(feet.map((p) => p.pos[1])).size).toBe(1)
+    expect(feet[0].pos[1] - feet[0].scale[1] / 2).toBeCloseTo(TURNTABLE_CABINET_TOP, 9)
+    // Plinth (woodDark) resting on the feet.
+    const plinth = walnut.find((p) => Math.abs(p.scale[1] - 0.05) < 1e-9)!
+    expect(plinth).toBeDefined()
+    expect(plinth.pos[1] - plinth.scale[1] / 2).toBeCloseTo(feet[0].pos[1] + feet[0].scale[1] / 2, 9)
+    // Brushed steel deck plate: the metalCabinet steel stripe window, as used for the fixture housings.
+    const deck = all.find((p) => p.mat === 'fixtureHousing')!
+    expect(deck.atlas!.rect).toEqual(FIXTURE_STEEL_UV)
+    expect(deck.atlas!.plain).toEqual(FIXTURE_STEEL_UV)
+    expect(deck.atlas!.faces).toEqual([2])
+    expect(deck.pos[1] + deck.scale[1] / 2).toBeCloseTo(TURNTABLE_DECK_Y, 9)
+    expect(deck.pos[1] - deck.scale[1] / 2).toBeCloseTo(plinth.pos[1] + plinth.scale[1] / 2, 9)
+    // Emissive track indicator (amber when idle), pitch slider (silver knob in a slot) and the round power button.
+    expect(all.filter((p) => p.mat === 'trackDisplay')).toHaveLength(1)
+    expect(all.filter((p) => p.mat === 'trackDisplayOn')).toHaveLength(0)
+    expect(all.some((p) => p.mat === 'labelSlot' && p.geo === 'box')).toBe(true)
+    expect(all.some((p) => p.mat === 'bezel' && p.scale[0] === 0.012 && p.scale[2] === 0.1)).toBe(true)
+    const button = all.find((p) => p.mat === 'metal' && p.geo === 'cylinderLow' && p.scale[0] === 0.026)!
+    expect(button).toBeDefined()
+    // Platter: a 24-segment 0.30 m vinyl, a thin coloured label disc and a spindle, all in the platter group.
+    const platter = all.filter((p) => p.turntableGroup === 'platter')
+    expect(platter.map((p) => p.geo).sort()).toEqual(['cylinderLow', 'disc', 'platter'])
+    const vinyl = platter.find((p) => p.geo === 'platter')!
+    expect(vinyl.mat).toBe('vinyl')
+    expect(vinyl.scale[0]).toBeCloseTo(TURNTABLE_PLATTER_DIAMETER, 9)
+    expect(vinyl.scale[2]).toBeCloseTo(TURNTABLE_PLATTER_DIAMETER, 9)
+    expect(platter.find((p) => p.geo === 'disc')!.mat).toBe('recordLabel')
+    expect(platter.find((p) => p.geo === 'cylinderLow')!.scale[1]).toBeGreaterThan(0.01)
+    // Angled metallic tonearm: post, tube, rear stub, counterweight, headshell and cartridge.
+    const arm = all.filter((p) => p.turntableGroup === 'tonearm')
+    expect(arm).toHaveLength(6)
+    expect(arm.filter((p) => p.mat === 'tapeSlotMetal').length).toBeGreaterThanOrEqual(4)
+    expect(arm.some((p) => p.rot && Math.abs(p.rot[1]) > 0.1)).toBe(true)
+    expect(all.every((p) => p.turntableGroup !== undefined)).toBe(true)
+  })
+
+  it('platter geometry: a shared cylinder of diameter 1 with 24 radial segments, so the 0.30 m disc is 0.30 m wide and 96 triangles', () => {
+    expect(TURNTABLE_PLATTER_SEGMENTS).toBeGreaterThanOrEqual(24)
+    expect(geometries.platter.parameters.radialSegments).toBeGreaterThanOrEqual(24)
+    expect(geometries.platter.parameters.radiusTop * 2).toBeCloseTo(1, 9)
+    expect(geometries.platter.parameters.radiusTop * 2 * TURNTABLE_PLATTER_DIAMETER).toBeCloseTo(0.3, 9)
+    expect(GEOMETRY_TRIANGLES.platter).toBe(96)
+    // Scaled by the part, the vinyl is 0.30 m across.
+    const vinyl = parts().find((p) => p.geo === 'platter')!
+    geometries.platter.computeBoundingBox()
+    const box = geometries.platter.boundingBox!
+    expect((box.max.x - box.min.x) * vinyl.scale[0]).toBeCloseTo(0.3, 9)
+    expect((box.max.z - box.min.z) * vinyl.scale[2]).toBeCloseTo(0.3, 9)
+  })
+
+  it('exposes the platter and the tonearm as separate groups: the platter is local to the spindle axis, so a group at the spindle can spin it', () => {
+    const g = turntableGroups(rp().box, { playing: false })
+    expect(g.static.every((p) => p.turntableGroup === 'static')).toBe(true)
+    expect(g.platter.every((p) => p.turntableGroup === 'platter')).toBe(true)
+    expect(g.tonearm.every((p) => p.turntableGroup === 'tonearm')).toBe(true)
+    for (const p of g.platter) {
+      expect(p.pos[0]).toBe(0)
+      expect(p.pos[2]).toBe(0)
+    }
+    expect(g.spindle[1]).toBeCloseTo(TURNTABLE_DECK_Y, 9)
+    // The vinyl rests on the deck plate: its bottom is at the spindle height.
+    const vinyl = g.platter.find((p) => p.geo === 'platter')!
+    expect(g.spindle[1] + vinyl.pos[1] - vinyl.scale[1] / 2).toBeCloseTo(TURNTABLE_DECK_Y, 9)
+    // Merged world parts equal static + shifted platter + tonearm.
+    expect(parts()).toHaveLength(g.static.length + g.platter.length + g.tonearm.length)
+    const merged = parts().filter((p) => p.turntableGroup === 'platter')
+    expect(merged.every((p, i) => Math.abs(p.pos[0] - (g.platter[i].pos[0] + g.spindle[0])) < 1e-12)).toBe(true)
+    // Rotating the platter group about y never leaves the footprint: the vinyl is a circle of radius 0.15 about the spindle.
+    const b = rp().box
+    expect(g.spindle[0] - 0.15).toBeGreaterThan(b.minX)
+    expect(g.spindle[0] + 0.15).toBeLessThan(b.maxX)
+    expect(g.spindle[2] - 0.15).toBeGreaterThan(b.minZ)
+    expect(g.spindle[2] + 0.15).toBeLessThan(b.maxZ)
+  })
+
+  it('the tonearm has a stopped pose on its cradle and a playing pose on the record groove, and both stay inside the footprint', () => {
+    const b = rp().box
+    const g = turntableGroups(b, { playing: false })
+    expect(TURNTABLE_ARM_ANGLE.stopped).not.toBe(TURNTABLE_ARM_ANGLE.playing)
+    const stopped = turntableGroups(b, { playing: false }).tonearm
+    const playing = turntableGroups(b, { playing: true }).tonearm
+    expect(stopped).toHaveLength(playing.length)
+    expect(stopped.map((p) => p.pos)).not.toEqual(playing.map((p) => p.pos))
+    // Same arm, same heights: only the yaw about the pivot post changes.
+    expect(stopped.map((p) => p.pos[1])).toEqual(playing.map((p) => p.pos[1]))
+    expect(stopped.map((p) => p.geo)).toEqual(playing.map((p) => p.geo))
+    for (const pose of [stopped, playing]) {
+      for (const p of pose) {
+        const e = extent(p)
+        expect(e.minX, p.mat).toBeGreaterThanOrEqual(b.minX)
+        expect(e.maxX, p.mat).toBeLessThanOrEqual(b.maxX)
+        expect(e.minZ, p.mat).toBeGreaterThanOrEqual(b.minZ)
+        expect(e.maxZ, p.mat).toBeLessThanOrEqual(b.maxZ)
+        expect(e.minY, p.mat).toBeGreaterThanOrEqual(TURNTABLE_DECK_Y - 1e-9)
+        expect(e.maxY, p.mat).toBeLessThanOrEqual(rp().height)
+      }
+    }
+    // Stopped: the stylus is outside the 0.15 m record and the tube rests on the cradle (a static part). Playing: the stylus is on the groove.
+    const [sx, sz] = g.spindle.filter((_, i) => i !== 1) as [number, number]
+    const rStopped = Math.hypot(turntableStylusXZ(b, { playing: false })[0] - sx, turntableStylusXZ(b, { playing: false })[1] - sz)
+    const rPlaying = Math.hypot(turntableStylusXZ(b, { playing: true })[0] - sx, turntableStylusXZ(b, { playing: true })[1] - sz)
+    expect(rStopped).toBeGreaterThan(TURNTABLE_PLATTER_DIAMETER / 2)
+    expect(rPlaying).toBeLessThan(TURNTABLE_PLATTER_DIAMETER / 2)
+    expect(rPlaying).toBeGreaterThan(0.05) // outside the centre label (0.10 m across)
+    const tube = (pose: Part[]) => pose.find((p) => p.mat === 'tapeSlotMetal' && p.scale[0] > 0.2)!
+    const cradle = g.static.find((p) => p.mat === 'metal' && p.scale[0] === 0.014)!
+    const t = tube(stopped)
+    // The cradle top touches the tube underside, and the tube end is above it (within the cradle width).
+    expect(cradle.pos[1] + cradle.scale[1] / 2).toBeCloseTo(t.pos[1] - t.scale[1] / 2, 9)
+    const endX = t.pos[0] + (t.scale[0] / 2) * Math.cos(TURNTABLE_ARM_ANGLE.stopped)
+    const endZ = t.pos[2] + (t.scale[0] / 2) * Math.sin(TURNTABLE_ARM_ANGLE.stopped)
+    expect(Math.hypot(endX - cradle.pos[0], endZ - cradle.pos[2])).toBeLessThan(0.01)
+    // The cartridge touches the record top in the playing pose and hangs above the deck in the stopped pose.
+    const recordTop = g.spindle[1] + g.platter.find((p) => p.geo === 'platter')!.scale[1]
+    const cartridge = (pose: Part[]) => pose.find((p) => p.mat === 'bezel')!
+    expect(cartridge(playing).pos[1] - cartridge(playing).scale[1] / 2).toBeCloseTo(recordTop, 9)
+    expect(cartridge(stopped).pos[1] - cartridge(stopped).scale[1] / 2).toBeGreaterThan(TURNTABLE_DECK_Y)
+    // The display changes tone only, not the part count.
+    expect(parts(true).filter((p) => p.mat === 'trackDisplayOn')).toHaveLength(1)
+    expect(parts(true)).toHaveLength(parts(false).length)
+  })
+
+  it('everything stays inside the console footprint, above the floor, below the prop height and rests on the console top without overlap of stacked boards', () => {
+    const b = rp().box
+    for (const pose of [false, true]) {
+      for (const p of parts(pose)) {
+        const e = extent(p)
+        const where = `${p.mat} ${p.geo} at ${p.pos.map((v) => v.toFixed(3)).join(',')}`
+        expect(e.minX, where).toBeGreaterThanOrEqual(b.minX - 1e-9)
+        expect(e.maxX, where).toBeLessThanOrEqual(b.maxX + 1e-9)
+        expect(e.minZ, where).toBeGreaterThanOrEqual(b.minZ - 1e-9)
+        expect(e.maxZ, where).toBeLessThanOrEqual(b.maxZ + 1e-9)
+        expect(e.minY, where).toBeGreaterThanOrEqual(-1e-9)
+        expect(e.maxY, where).toBeLessThanOrEqual(rp().height + 1e-9)
+      }
+    }
+    // The top slab (0.04 thick, top at 0.62) carries the feet; the slab spans the whole footprint.
+    const slab = parts().find((p) => p.mat === 'woodDark' && Math.abs(p.scale[1] - 0.04) < 1e-9 && Math.abs(p.scale[0] - 0.9) < 1e-6)!
+    expect(slab.pos[1] + slab.scale[1] / 2).toBeCloseTo(TURNTABLE_CABINET_TOP, 9)
+    expect(slab.scale[2]).toBeCloseTo(b.maxZ - b.minZ, 9)
+  })
+
+  it('costs exactly 526 triangles: static 282, platter group 152, tonearm 92 (the floor-flush kick plinth loses its bottom face)', () => {
+    const g = turntableGroups(rp().box)
+    expect(countTriangles(g.static)).toBe(282)
+    expect(countTriangles(g.platter)).toBe(152)
+    expect(countTriangles(g.tonearm)).toBe(92)
+    expect(countTriangles(parts())).toBe(TASK_33_1_TURNTABLE)
+    expect(countTriangles(parts(true))).toBe(TASK_33_1_TURNTABLE)
+    const obj = sceneDetailReport().objects.find((o) => o.name === 'record-player')!
+    expect(obj.triangles).toBe(TASK_33_1_TURNTABLE)
+    // The kick plinth is the one open-bottom board of the console.
+    expect(parts().filter((p) => p.openBottom)).toHaveLength(1)
+  })
+
+  it('the display is an emissive MeshBasicMaterial (amber idle, emerald playing) and the player adds no light and no texture', () => {
+    expect(materials.trackDisplay.type).toBe('MeshBasicMaterial')
+    expect(materials.trackDisplayOn.type).toBe('MeshBasicMaterial')
+    expect(hexOf(materials.trackDisplay.color)).toBe('#ffb347')
+    expect(hexOf(materials.trackDisplayOn.color)).toBe('#3ddc97')
+    for (const key of ['vinyl', 'recordLabel', 'trackDisplay', 'trackDisplayOn'] as const) expect(materials[key].map).toBeNull()
+    expect(M3_LIGHT_COUNT).toBe(4)
+    expect(MAX_LIGHTS).toBe(4)
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    // Only the existing 32 textures: the new materials stay flat colours, and the report has the same texture memory as before 33.1.
+    expect(liveTextureCount()).toBe(32)
+    for (const key of ['vinyl', 'recordLabel', 'trackDisplay', 'trackDisplayOn'] as const) expect(materials[key].map).toBeNull()
+    expect(materials.fixtureHousing.map).toBe(getSharedTexture('metalCabinet'))
+    expect(materials.woodDark.map).toBe(getSharedTexture('woodDark'))
+    const report = sceneDetailReport()
+    expect(report.textureCount).toBe(32)
+    expect(report.textureMemoryBytes / 1048576).toBeCloseTo(7.703, 3)
+    const used = new Set(parts().map((p) => p.mat))
+    for (const key of used) expect(materials[key], key).toBeDefined()
+  })
+
+  it('every new geometry is cached and disposed exactly once (open-bottom boxes, the metric boards under them and the platter per disposal call)', () => {
+    const open = parts().filter((p) => p.openBottom)
+    expect(open.length).toBeGreaterThan(0)
+    const bases = open.map((p) => woodBoxGeometry(p.scale[0], p.scale[1], p.scale[2]))
+    const variants = bases.map((g) => openBottomBoxGeometry(g))
+    // Cached: the same source gives the same variant; a second request creates nothing new.
+    bases.forEach((g, i) => expect(openBottomBoxGeometry(g)).toBe(variants[i]))
+    expect(openBottomBoxCount()).toBeGreaterThanOrEqual(new Set(variants).size)
+    const unit = openBottomBoxGeometry(geometries.box)
+    expect(openBottomBoxGeometry(geometries.box)).toBe(unit)
+    const spies = [...new Set([...variants, unit, ...bases])].map((g) => vi.spyOn(g, 'dispose'))
+    const platterSpy = vi.spyOn(geometries.platter, 'dispose')
+    disposeSharedResources()
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+    expect(platterSpy).toHaveBeenCalledTimes(1)
+    disposeSharedResources()
+    // Twice-safe: the caches were cleared on the first call, so none of the cached geometries is disposed again.
+    for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
+    expect(openBottomBoxCount()).toBe(0)
+    expect(woodBoxCount()).toBe(0)
+  })
+})
+
+describe('task 33.1: floor-flush bottom face culling', () => {
+  afterEach(() => setCanvasFactory(null))
+  const culledNames = [
+    'media-console',
+    'filing-cabinet-a',
+    'filing-cabinet-b',
+    'archive-boxes-nw',
+    'archive-boxes-ne',
+    'archive-boxes-sw',
+    'arcade-snake',
+    'arcade-maze',
+    'arcade-frequency',
+    'crt-stack',
+    'desk',
+    'record-player',
+    'crate-a',
+    'crate-b',
+    'shelf-a',
+    'shelf-b',
+    'shelf-c',
+  ]
+
+  it('the open-bottom geometry has no -Y face: 10 triangles, none of them facing down, other faces and UVs unchanged', () => {
+    const g = woodBoxGeometry(0.8, 0.6, 0.4)
+    const open = openBottomBoxGeometry(g)
+    expect(open).not.toBe(g)
+    expect(g.getIndex()!.count / 3).toBe(12)
+    expect(open.getIndex()!.count / 3).toBe(GEOMETRY_TRIANGLES.box - OPEN_BOTTOM_SAVED_TRIANGLES)
+    const normal = open.getAttribute('normal')
+    const index = open.getIndex()!
+    for (let i = 0; i < index.count; i++) expect(normal.getY(index.getX(i))).toBeGreaterThan(-0.5)
+    // The five remaining faces are exactly the source faces: the same triangles, with the same UV rows.
+    const faceOf = (idx: number) => Math.floor(idx / 4)
+    const used = new Set(Array.from(index.array).map(faceOf))
+    expect([...used].sort()).toEqual([0, 1, 2, 4, 5])
+    expect(open.getAttribute('uv').array).toEqual(g.getAttribute('uv').array)
+    expect(open.getAttribute('position').array).toEqual(g.getAttribute('position').array)
+    // The unit box variant (plain parts) loses its bottom face too.
+    const unit = openBottomBoxGeometry(geometries.box)
+    expect(unit.getIndex()!.count / 3).toBe(10)
+    expect(geometries.box.getIndex()!.count / 3).toBe(12)
+    expect(() => openBottomBoxGeometry(geometries.plane)).toThrow()
+  })
+
+  it('only floor-flush boxes carry openBottom: bottom at y = 0 within 1 mm, no tilt, and every such box of the culled objects has it', () => {
+    let flagged = 0
+    for (const o of declaredObjects()) {
+      for (const p of o.parts) {
+        if (p.openBottom) {
+          flagged++
+          expect(p.geo, o.name).toBe('box')
+          expect(Math.abs(p.pos[1] - p.scale[1] / 2), `${o.name} ${p.mat}`).toBeLessThanOrEqual(FLOOR_FLUSH_TOLERANCE)
+          expect(Math.abs(p.rot?.[0] ?? 0) + Math.abs(p.rot?.[2] ?? 0), o.name).toBe(0)
+          expect(partTriangles(p)).toBe(10)
+        } else if (culledNames.includes(o.name)) {
+          // No floor-flush box is left uncut in the objects the pass covers.
+          expect(isFloorFlushBox(p), `${o.name} ${p.mat} at ${p.pos.join(',')}`).toBe(false)
+        }
+      }
+    }
+    // 34 boxes of the existing models plus the new console kick plinth.
+    expect(flagged).toBe(35)
+    const savedExisting = declaredObjects()
+      .filter((o) => o.name !== 'record-player')
+      .reduce((n, o) => n + o.parts.filter((p) => p.openBottom).length * OPEN_BOTTOM_SAVED_TRIANGLES, 0)
+    expect(savedExisting).toBe(-TASK_33_1_CULLED_EXISTING)
+  })
+
+  it('cullFloorBottoms flags only unrotated or yaw-rotated boxes on the floor, leaves other parts untouched and is idempotent', () => {
+    const box = (pos: Vec3, scale: Vec3, rot?: Vec3): Part => ({ geo: 'box', mat: 'wood', pos, scale, ...(rot ? { rot } : {}) })
+    const onFloor = box([0, 0.2, 0], [1, 0.4, 1])
+    const yawed = box([0, 0.2, 0], [1, 0.4, 1], [0, 0.5, 0])
+    const tilted = box([0, 0.2, 0], [1, 0.4, 1], [0.3, 0, 0])
+    const raised = box([0, 0.5, 0], [1, 0.4, 1])
+    const almost = box([0, 0.2005, 0], [1, 0.4, 1])
+    const cylinder: Part = { geo: 'cylinderLow', mat: 'wood', pos: [0, 0.2, 0], scale: [1, 0.4, 1] }
+    const out = cullFloorBottoms([onFloor, yawed, tilted, raised, almost, cylinder])
+    expect(out.map((p) => Boolean(p.openBottom))).toEqual([true, true, false, false, true, false])
+    expect(out[3]).toBe(raised)
+    expect(out[5]).toBe(cylinder)
+    expect(cullFloorBottoms(out).map((p) => Boolean(p.openBottom))).toEqual([true, true, false, false, true, false])
+    expect(onFloor.openBottom).toBeUndefined()
+    // Draw-call groups separate the open variant from the closed one, and the saving is two triangles per box.
+    expect(partGroupKey(out[0])).not.toBe(partGroupKey(onFloor))
+    expect(partTriangles(out[0])).toBe(10)
+    expect(partTriangles(onFloor)).toBe(12)
+  })
+})
+
+describe('task 33.1: console cable reclaim and budgets', () => {
+  const crt = () => prop('crt-vhs')
+
+  it('the console cables keep the smoothed top run and draw the three back-panel runs along their raw control points (19 segments, was 34)', () => {
+    const cables = consoleCableParts(crt().box)
+    expect(cables).toHaveLength(19)
+    expect(cables.every((p) => p.geo === 'cylinderLow')).toBe(true)
+    expect(cables.filter((p) => p.mat === 'cableGrey')).toHaveLength(7)
+    expect(cables.filter((p) => p.mat === 'cableRed')).toHaveLength(4)
+    expect(cables.filter((p) => p.mat === 'cableBlack')).toHaveLength(8)
+    expect(countTriangles(cables)).toBe(19 * GEOMETRY_TRIANGLES.cylinderLow)
+    expect(34 * GEOMETRY_TRIANGLES.cylinderLow - countTriangles(cables)).toBe(-TASK_33_1_CABLES)
+    // The default of cablePathParts is still the smoothed path.
+    expect(cablePathParts([[0, 1, 0], [1, 1, 0], [1, 0, 0]], 'cableBlack', 0.02)).toHaveLength(5)
+    expect(cablePathParts([[0, 1, 0], [1, 1, 0], [1, 0, 0]], 'cableBlack', 0.02, false)).toHaveLength(2)
+    const report = sceneDetailReport()
+    expect(report.objects.find((o) => o.name === 'console-cables')!.triangles).toBe(608)
+  })
+
+  it('totals: 19,132 triangles (net -22 from 19,154), at most 19,200 and 20,000, 4 lights, 32 textures, 7.703 MiB, record player present', () => {
+    const report = sceneDetailReport()
+    expect(TASK_33_1_TRIANGLES).toBe(-22)
+    expect(report.totalTriangles).toBe(19154 + TASK_33_1_TRIANGLES)
+    expect(report.totalTriangles).toBe(19132)
+    expect(report.totalTriangles).toBeLessThanOrEqual(19200)
+    expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
+    expect(report.objects.map((o) => o.name)).toContain('record-player')
+    expect(M3_LIGHT_COUNT).toBe(4)
+    expect(report.textureCount).toBe(32)
+    expect(report.textureMemoryBytes / 1048576).toBeCloseTo(7.703, 3)
+    expect(report.totalDrawCalls).toBeLessThan(400)
+  })
+
+  it('the record player is a solid console with a world interactable, not a Station', () => {
+    expect(COLLIDERS).toContain(prop('record-player').box)
+    expect(INTERACTABLE_DEFS.find((d) => d.id === 'record-player')!.kind).toBe('turntable')
+    expect(STATION_DEFS.some((s) => (s.id as string) === 'record-player')).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------------------------
+// Task 33.3: platter spin rate, tonearm pose and display material follow `playing`
+// ---------------------------------------------------------------------------------------------
+import { TURNTABLE_RPM, TURNTABLE_SPIN_RAD_PER_SEC, advancePlatterAngle } from './modelDetail'
+
+describe('task 33.3: turntable spin and pose', () => {
+  const box = () => prop('record-player').box
+  const propsSource = Object.values(
+    import.meta.glob('./Props.tsx', { query: '?raw', import: 'default', eager: true }) as Record<string, string>,
+  )[0]
+
+  it('spins at 33 1/3 RPM (about 3.49 rad/s)', () => {
+    expect(TURNTABLE_RPM).toBeCloseTo(33.3333, 4)
+    expect(TURNTABLE_SPIN_RAD_PER_SEC).toBeCloseTo((100 / 3) * (Math.PI / 30), 9)
+    expect(TURNTABLE_SPIN_RAD_PER_SEC).toBeCloseTo(3.4907, 3)
+    // One second of playing advances the angle by exactly that rate; 1.8 s is one full turn (60 / 33.33).
+    expect(advancePlatterAngle(0, 0.05, true, false)).toBeCloseTo(TURNTABLE_SPIN_RAD_PER_SEC * 0.05, 9)
+  })
+
+  it('does not advance while stopped, under reduced motion or for a non-positive dt; a long stall is clamped', () => {
+    expect(advancePlatterAngle(1, 0.016, false, false)).toBe(1)
+    expect(advancePlatterAngle(1, 0.016, true, true)).toBe(1)
+    expect(advancePlatterAngle(1, 0, true, false)).toBe(1)
+    expect(advancePlatterAngle(1, -1, true, false)).toBe(1)
+    expect(advancePlatterAngle(0, 5, true, false)).toBeCloseTo(TURNTABLE_SPIN_RAD_PER_SEC * 0.1, 9)
+    expect(advancePlatterAngle(6.2, 0.1, true, false)).toBeLessThan(2 * Math.PI)
+  })
+
+  it('the tonearm moves from the cradle pose to the record pose and the display switches from amber to emerald with `playing`', () => {
+    const stopped = turntableGroups(box(), { playing: false })
+    const playing = turntableGroups(box(), { playing: true })
+    expect(turntableStylusXZ(box(), { playing: false })).not.toEqual(turntableStylusXZ(box(), { playing: true }))
+    expect(TURNTABLE_ARM_ANGLE.playing).not.toBe(TURNTABLE_ARM_ANGLE.stopped)
+    expect(stopped.static.some((p) => p.mat === 'trackDisplay')).toBe(true)
+    expect(stopped.static.some((p) => p.mat === 'trackDisplayOn')).toBe(false)
+    expect(playing.static.some((p) => p.mat === 'trackDisplayOn')).toBe(true)
+    expect(playing.static.some((p) => p.mat === 'trackDisplay')).toBe(false)
+    expect(stopped.tonearm).not.toEqual(playing.tonearm)
+  })
+
+  it('Props passes the playing flag to RecordPlayer, which spins the platter in useFrame and honours reduced motion', () => {
+    expect(propsSource).toContain('turntablePlaying')
+    expect(propsSource).toMatch(/<RecordPlayer[^>]*playing=\{turntablePlaying\}/)
+    expect(propsSource).toContain('advancePlatterAngle(g.rotation.y, dt, playing, reduced)')
+    expect(propsSource).toContain('useReducedMotion()')
   })
 })

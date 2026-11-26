@@ -34,7 +34,7 @@ export type ModeEvent =
       targetKind?: 'station' | 'prop' | null;
       /** Id of the targeted prop when 	argetKind is 'prop'. */
       targetPropId?: PropInteractableId | null;
-      /** True while an Archive Document Card is open. E with no target then closes it; 1 and 2 switch its page. Omitted means false. */
+      /** True while an Archive Document Card is open. E with no target then closes it; 1 and 2 switch its page (or select tracks 1 and 2 on the turntable card); 3, 4 and 5 select tracks. Omitted means false. */
       cardOpen?: boolean;
     }
   | { type: 'KEY_UP'; role: KeyRole | null }
@@ -46,6 +46,7 @@ export type ModeEffect =
   | { type: 'PROP_INTERACT'; id: PropInteractableId }
   | { type: 'CLOSE_CARD' }
   | { type: 'CARD_PAGE'; page: 1 | 2 }
+  | { type: 'CARD_TRACK'; index: 2 | 3 | 4 }
   | { type: 'RELEASE_POINTER_LOCK' }
   | { type: 'REQUEST_POINTER_LOCK' }
   | { type: 'CLEAR_INPUT' }
@@ -140,6 +141,13 @@ function keyDown(s: ModeState, e: Extract<ModeEvent, { type: 'KEY_DOWN' }>): Mod
   if (e.role === 'page1' || e.role === 'page2') {
     if (s.mode === 'inspecting' || !e.cardOpen) return none(s);
     return { state: s, effects: [{ type: 'CARD_PAGE', page: e.role === 'page1' ? 1 : 2 }] };
+  }
+
+  // Keys 3, 4 and 5 select turntable tracks 2..4 while a card is open. The world ignores them unless the open card is the turntable.
+  if (e.role === 'track3' || e.role === 'track4' || e.role === 'track5') {
+    if (s.mode === 'inspecting' || !e.cardOpen) return none(s);
+    const index = e.role === 'track3' ? 2 : e.role === 'track4' ? 3 : 4;
+    return { state: s, effects: [{ type: 'CARD_TRACK', index }] };
   }
 
   const isEnter = e.code === 'Enter';
