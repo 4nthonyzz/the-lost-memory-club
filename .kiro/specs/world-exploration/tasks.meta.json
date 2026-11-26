@@ -1571,6 +1571,49 @@
         "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
         "timestamp": 1795645609127
       }
+    ],
+    "31.1 Direct mouse look and faster, snappier movement": [
+      {
+        "executionId": "65c80338-1ca0-41f9-8ea7-4cdcec2f5994",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795646122459
+      },
+      {
+        "executionId": "65c80338-1ca0-41f9-8ea7-4cdcec2f5994",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795653783823
+      }
+    ],
+    "31.2 Desk cassette and ceiling fixture texture polish": [
+      {
+        "executionId": "65c80338-1ca0-41f9-8ea7-4cdcec2f5994",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795653784194
+      },
+      {
+        "executionId": "65c80338-1ca0-41f9-8ea7-4cdcec2f5994",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795654223769
+      }
+    ],
+    "31.3 Docs, metrics and verification": [
+      {
+        "executionId": "65c80338-1ca0-41f9-8ea7-4cdcec2f5994",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795654224096
+      },
+      {
+        "executionId": "65c80338-1ca0-41f9-8ea7-4cdcec2f5994",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795655772013
+      }
+    ],
+    "31. Crisp look, faster walk and fixture polish": [
+      {
+        "executionId": "65c80338-1ca0-41f9-8ea7-4cdcec2f5994",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795655772219
+      }
     ]
   }
 }

@@ -50,6 +50,8 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 
 - Approved scope change (lamp fix, smooth motion, 24 Hz attract), 2026-12-07: the `desk-lamp-right` square glow/cone artefact is removed (round, radially faded glow and pool geometry with at least 24 segments, cone top tucked inside the shade's bottom opening, pool flat just above the desk). Camera look (yaw/pitch, lambda about 32) and movement velocity (lambda about 20) use frame-rate-independent exponential smoothing `1 - exp(-lambda * dt)`, bypassed (alpha = 1) under reduced motion; collision, bounds and pointer-lock behaviour are unchanged. The attract-screen redraw throttle rises from 12 Hz to 24 Hz (estimated texture uploads about 18.8 MB/s, not measured) with faster, interpolated motion, and every brightness pulse keeps at most 3 direction changes per rolling second. Budgets: triangles at most 19,200 (currently 19,116), at most 4 lights, 32 textures, texture memory at most 7.85 MB (7.703 MiB). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged. The earlier 12 Hz redraw wording in the open-book/attract scope change and in task 29.2 is superseded by this bullet.
 
+- Approved scope change (crisp look, faster walk, cassette and fixture polish), 2026-12-08: mouse look deltas apply 1:1 to both the target and the rendered look (no smoothing lag on mouse). Keyboard look (I/J/K/L; the arrow keys move, they do not turn) keeps exponential smoothing with `LOOK_SMOOTHING_LAMBDA` 42. `WALK_SPEED` rises about 15% (2.5 -> about 2.9 m/s; the earlier approved initial value 2.5 is superseded) and `MOVE_SMOOTHING_LAMBDA` goes from 20 to 28. Collision substeps, bounds, snap on blur / inspect / clear input and the reduced-motion bypass are unchanged. The loose desk VHS cassette uses a satin charcoal shell (`#2a2d36`) with the existing `vhsShell` texture; the ceiling fluorescent bars get diffuser and end-cap detail from existing textures. Budgets: triangles at most 19,200 (currently 19,154; 0 extra), at most 4 lights, 32 textures, texture memory at most 7.85 MB (7.703 MiB; 0 extra bytes). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged. The earlier smoothing wording (look lambda about 32 for mouse and movement lambda about 20) in the 2026-12-07 bullet and in task 30.2 is superseded by this bullet.
+
 ## Tasks
 
 ### Milestone 1: Playable 3D room (primitives only)
@@ -1123,6 +1125,36 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: documentation and the spec folder only.
     - _Requirements: 14.11, 14.12, 15.3, 15.6_
 
+### Crisp look, faster walk and fixture polish
+
+- [x] 31. Crisp look, faster walk and fixture polish
+  - [x] 31.1 Direct mouse look and faster, snappier movement
+    - Files: `src/world/logic/constants.ts`, `src/world/logic/playerStep.ts`, `src/world/controller/usePlayerRig.ts`; tests `src/world/logic/playerStep.test.ts`, `src/world/logic/smoothing.test.ts`, `src/world/logic/movement.test.ts`, `src/world/logic/collision.test.ts`.
+    - Apply mouse look deltas 1:1 to both the target and the rendered look (no smoothing lag). Keep exponential smoothing for keyboard look (I/J/K/L) with `LOOK_SMOOTHING_LAMBDA` 42. Raise `WALK_SPEED` from 2.5 to about 2.9 m/s and `MOVE_SMOOTHING_LAMBDA` from 20 to 28. Collision substeps, bounds, snap on blur / inspect / clear input and the reduced-motion bypass are unchanged.
+    - Acceptance: a mouse delta moves the rendered look immediately by the same angle; keyboard look still converges smoothly with lambda 42; walk speed is about 2.9 m/s at full input; movement lambda is 28; position stays valid (no overlap, inside bounds, no tunneling at the new speed with `MAX_STEP`); pitch within 80 degrees; yaw finite and wrapped; reduced motion bypasses smoothing; snap on blur, inspect and clear input still works; no pointer-lock change.
+    - Tests: `playerStep.test.ts` (mouse look 1:1, keyboard smoothing with lambda 42, snap cases, reduced-motion bypass), `smoothing.test.ts` (alpha formula and convergence for lambda 28 and 42, frame-rate consistency), `movement.test.ts` (new `WALK_SPEED`, diagonal normalization), `collision.test.ts` (no tunneling at the new speed times `DT_MAX`). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 30.4.
+    - Boundary: `src/world/` only; pure logic stays free of React, three.js and DOM; `WorldSceneProps` and `onInspect` unchanged.
+    - _Requirements: 3.1, 3.2, 3.3, 3.6, 3.10, 3.11, 4.2, 4.3, 4.4, 4.5, 5.3, 6.2, 6.4, 6.5, 6.6, 10.4, 10.6, 13.1, 13.2_
+
+  - [x] 31.2 Desk cassette and ceiling fixture texture polish
+    - Files: `src/world/scene/sharedResources.ts`, `src/world/scene/modelDetail.ts`, `src/world/scene/Room.tsx`, `src/world/scene/PartMeshes.tsx` (if needed), `src/world/scene/proceduralTextures.ts` (only if an in-place redraw is required); tests `src/world/scene/modelDetail.test.ts`, `src/world/scene/proceduralTextures.test.ts`.
+    - Give the loose desk VHS cassette a satin charcoal shell (`#2a2d36`) using the existing `vhsShell` texture. Add diffuser and end-cap detail to the ceiling fluorescent bars using existing textures.
+    - Acceptance: triangle estimate at most 19,200 (0 extra from 19,154); lights at most 4; texture count 32; texture memory at most 7.85 MB (0 extra bytes); no new texture; each texture disposed exactly once (twice-safe); colliders and Station anchors unchanged; Memory_Shift tinting still works.
+    - Tests: `modelDetail.test.ts` (cassette colour and texture, fixture parts, budgets, disposal once and twice-safe, colliders unchanged); `proceduralTextures.test.ts` (determinism and sizes, only if a redraw changed). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 31.1.
+    - Boundary: render-only; `src/world/` only; no new dependency; no GLB; `ASSET_MANIFEST` stays empty.
+    - _Requirements: 1.3, 1.4, 1.8, 9.1, 9.2, 9.8, 12.5, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 31.3 Docs, metrics and verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, lights and texture memory, each labelled "computed, not runtime-measured". Document direct mouse look, the new walk speed and smoothing constants, and the cassette and fixture polish. Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final geometry, constants and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 31.2.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional. The 17 property-based test sub-tasks can be skipped for a faster MVP. Tasks 16.2 and 16.3 are marked `*` because they must not be implemented without approval.
@@ -1206,7 +1238,10 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     { "id": 66, "tasks": ["30.1"] },
     { "id": 67, "tasks": ["30.2"] },
     { "id": 68, "tasks": ["30.3"] },
-    { "id": 69, "tasks": ["30.4"] }
+    { "id": 69, "tasks": ["30.4"] },
+    { "id": 70, "tasks": ["31.1"] },
+    { "id": 71, "tasks": ["31.2"] },
+    { "id": 72, "tasks": ["31.3"] }
   ]
 }
 ```

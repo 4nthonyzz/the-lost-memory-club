@@ -78,10 +78,15 @@ export interface Part {
    * with a billboard) or the desk light `pool`. Sprite and pool use a never-drawn material while the lamp is off.
    */
   lampRole?: 'bulb' | 'inner' | 'sprite' | 'pool' | 'cone' | 'shade' | 'liner'
+  /**
+   * Desk cassette (task 31.2): real-size box (mesh scale 1) from `cassetteBoxGeometry`: the top face shows the vhsShell label strip and reel
+   * window, the +z face the spine label sticker, every other face the ribbed stripe. Zero extra triangles.
+   */
+  cassette?: boolean
 }
 
 /** True when the part is rendered from a cached real-size geometry (mesh scale 1). */
-export const isRealSizePart = (p: Part): boolean => Boolean(p.metric || p.metricFabric || p.metricRepeat || p.atlas)
+export const isRealSizePart = (p: Part): boolean => Boolean(p.metric || p.metricFabric || p.metricRepeat || p.atlas || p.cassette)
 
 /** Draw-call group of a part: geometry + material, plus the board size and the UV mapping for metric parts. */
 export function partGroupKey(p: Part): string {
@@ -90,7 +95,7 @@ export function partGroupKey(p: Part): string {
   const aspect = p.metricAspect && p.metricAspect !== 1 ? `|a${p.metricAspect}` : ''
   const offset = p.metricOffset ? `|o${p.metricOffset.map((v) => Math.round(v * 1e4)).join(',')}` : ''
   const atlas = p.atlas ? `|w${p.atlas.rect.u0.toFixed(5)},${p.atlas.rect.v0.toFixed(5)}|f${p.atlas.faces.join('.')}` : ''
-  return `${p.geo}|${p.mat}|${size}${aspect}${offset}${atlas}`
+  return `${p.geo}|${p.mat}|${size}${aspect}${offset}${atlas}${p.cassette ? '|cassette' : ''}`
 }
 
 /**
@@ -128,6 +133,11 @@ const bx = (mat: MaterialKey, pos: Vec3, scale: Vec3, rot?: Vec3) => part('box',
  * cassette length (x), so the reels window, label and flap sit on the top face undistorted and the ribs on the sides.
  */
 const tape = (mat: 'tapeBlack' | 'tapeBlue', pos: Vec3, scale: Vec3, rot?: Vec3): Part => ({ ...bx(mat, pos, scale, rot), metricRepeat: scale[0] })
+/**
+ * Loose desk cassette (task 31.2): a tapeBlack tape whose faces show chosen vhsShell windows (see `cassetteBoxGeometry`). The unused
+ * `metricRepeat` keeps the older "one tile per cassette length" assertions valid; the cassette geometry takes precedence.
+ */
+const deskTape = (pos: Vec3, scale: Vec3, rot?: Vec3): Part => ({ ...tape('tapeBlack', pos, scale, rot), cassette: true })
 /** Unrotated wood board with metric UVs (long boards: grain tiles instead of stretching). */
 const wd = (mat: 'wood' | 'woodDark', pos: Vec3, scale: Vec3): Part => ({ geo: 'box', mat, pos, scale, metric: true })
 
@@ -1270,6 +1280,8 @@ export const NOTE_PAGE_H = 0.01
  */
 export const NOTE_DX = -0.58
 export const NOTE_DZ = 0.02
+/** Task 31.2: x offset from the desk centre of the loose cassette in front of the archive box (was 0.75). */
+export const DESK_CASSETTE_DX = 0.82
 
 /** Reception desk (front on the +z side; the two lamps are `deskLampParts`): panelled front, drawers, bell, book and archive box. */
 export function deskParts(box: Aabb, height: number): Part[] {
@@ -1323,10 +1335,11 @@ export function deskParts(box: Aabb, height: number): Part[] {
     },
     bx('metal', [cx + NOTE_DX - 0.0243, top + NOTE_COVER_H + NOTE_PAGE_H + 0.003, cz + NOTE_DZ - 0.095], [0.15, 0.006, 0.008], [0, 0.25, 0]),
     part('cylinderLow', 'spineC', [cx + NOTE_DX + 0.25, top + 0.006, cz + NOTE_DZ + 0.2], [0.01, 0.16, 0.01], [0, 0.5, HALF_PI]),
-    tape('tapeBlack', [cx + 0.75, top + 0.015, cz + 0.2], [0.19, 0.03, 0.1], [0, -0.5, 0]),
+    // Task 31.2: moved from cx + 0.75 to cx + 0.82 so the rotated cassette clears the archive box (its back corner used to poke 0.01 m into it).
+    deskTape([cx + DESK_CASSETTE_DX, top + 0.015, cz + 0.2], [0.19, 0.03, 0.1], [0, -0.5, 0]),
     // Two loose tapes with labels.
-    tape('tapeBlack', [cx - 0.2, top + 0.015, cz + 0.05], [0.19, 0.03, 0.1]),
-    tape('tapeBlack', [cx - 0.2, top + 0.045, cz + 0.05], [0.19, 0.03, 0.1]),
+    deskTape([cx - 0.2, top + 0.015, cz + 0.05], [0.19, 0.03, 0.1]),
+    deskTape([cx - 0.2, top + 0.045, cz + 0.05], [0.19, 0.03, 0.1]),
     bx('tapeLabel', [cx - 0.2, top + 0.0605, cz + 0.05], [0.1, 0.002, 0.06]),
   ]
 }
@@ -1339,6 +1352,15 @@ export const FIXTURE_LENGTH = 1.2
 export const FIXTURE_WIDTH = 0.22
 /** The bloom strip hangs this far below the ceiling: 8 mm under the tube bottom (tube bottom is 0.072 m down). */
 export const CEILING_BLOOM_DROP = 0.08
+/** BoxGeometry face index of the -y (downward) face, the one the room sees on a ceiling fixture. */
+const BOX_FACE_BOTTOM = 3
+/** Task 31.2: the plain brushed-steel stripe of metalCabinet (rows 238..251), inset one texel (1/256) from every edge. */
+export const FIXTURE_STEEL_UV: UvRect = Object.freeze({
+  u0: 1 / 256,
+  u1: 1 - 1 / 256,
+  v0: CABINET_PLAIN_V[0] + 1 / 256,
+  v1: CABINET_PLAIN_V[1] - 1 / 256,
+})
 
 /** Ceiling fixture centres, derived from the main-room and arcade-area extents in the layout. */
 export function fixtureCentres(): Array<readonly [number, number]> {
@@ -1364,9 +1386,11 @@ export function fixtureCentres(): Array<readonly [number, number]> {
 /** Housings are metal; the tube is an emissive box on a MeshBasicMaterial. Neither is a light. */
 export function ceilingFixtureParts(cx: number, cz: number): Part[] {
   const y = ROOM.height
+  const steel = { rect: FIXTURE_STEEL_UV, faces: [BOX_FACE_BOTTOM], plain: FIXTURE_STEEL_UV }
   return [
-    bx('metal', [cx, y - 0.03, cz], [FIXTURE_LENGTH, 0.06, FIXTURE_WIDTH]),
-    bx('fluorescent', [cx, y - 0.066, cz], [FIXTURE_LENGTH - 0.1, 0.012, FIXTURE_WIDTH - 0.08]),
+    // Task 31.2: steel housing (its 5 cm end margins are the end caps) and the diffuser tube both sample the brushed-steel stripe of metalCabinet.
+    { ...bx('fixtureHousing', [cx, y - 0.03, cz], [FIXTURE_LENGTH, 0.06, FIXTURE_WIDTH]), atlas: steel },
+    { ...bx('fluorescent', [cx, y - 0.066, cz], [FIXTURE_LENGTH - 0.1, 0.012, FIXTURE_WIDTH - 0.08]), atlas: steel },
     // Task 24.1: faint additive bloom strip just below the tube (2 triangles), facing down. Room.tsx skips it without the glow texture.
     part('plane', 'ceilingBloom', [cx, y - CEILING_BLOOM_DROP, cz], [FIXTURE_LENGTH + 0.5, FIXTURE_WIDTH + 0.5, 1], [HALF_PI, 0, 0]),
   ]

@@ -2172,7 +2172,7 @@ describe('task 22.1: media island, armchair and VHS shells', () => {
     expect(hex('armchairBody')).toBe('#3d5a4c')
     expect(hex('armchairCushion')).toBe('#4f7561')
     expect(hex('vcrDeck')).toBe(VCR_CHASSIS_COLOR)
-    expect(hex('tapeBlack')).toBe('#15151a')
+    expect(hex('tapeBlack')).toBe('#2a2d36') // 31.2: satin charcoal (was #15151a)
     expect(hex('tapeBlue')).toBe('#2a4aa0')
     for (const k of ['armchairBody', 'armchairCushion', 'vcrDeck', 'tapeBlack', 'tapeBlue'] as const) expect(materials[k].map).toBeNull()
   })
@@ -3279,5 +3279,228 @@ describe('task 29.2: animated attract screens in the shared resources', () => {
       const samples = Array.from({ length: rate * 20 }, (_, k) => mazePhotoPulse(k / rate, i))
       for (let s = 0; s + rate <= samples.length; s += 24) expect(countDirectionChanges(samples.slice(s, s + rate + 1))).toBeLessThanOrEqual(3)
     }
+  })
+})
+
+import { Color as ThreeColor } from 'three'
+import { DESK_CASSETTE_DX, FIXTURE_STEEL_UV } from './modelDetail'
+import { CABINET_PLAIN_V as STEEL_PLAIN_V } from './proceduralTextures'
+import { VHS_SHELL_REGIONS, cassetteBoxCount, cassetteBoxGeometry, vhsShellUvRect } from './sharedResources'
+
+describe('task 31.2: desk cassette and ceiling fixture texture polish', () => {
+  afterEach(() => setCanvasFactory(null))
+  const desk = () => prop('reception-desk')
+  const deskAll = () => deskParts(desk().box, desk().height)
+  const cassettes = () => deskAll().filter((p) => p.cassette)
+  const hexOf = (c: { getHexString(): string }) => `#${c.getHexString()}`
+
+  it('the three desk cassettes use tapeBlack: flat fallback #2a2d36, textured multiplier lifted so base x multiplier is about #2a2d36', () => {
+    expect(cassettes()).toHaveLength(3)
+    for (const p of cassettes()) {
+      expect(p.mat).toBe('tapeBlack')
+      expect(p.geo).toBe('box')
+    }
+    setCanvasFactory(null)
+    ensureSharedTextures()
+    expect(hexOf(materials.tapeBlack.color)).toBe('#2a2d36')
+    expect(materials.tapeBlack.map).toBeNull()
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    expect(materials.tapeBlack.map).toBe(getSharedTexture('vhsShell'))
+    expect(hexOf(materials.tapeBlack.color)).toBe('#474b54')
+    // The vhsShell base is #a4a4ac; its product with the multiplier lands on the charcoal target in linear light.
+    const base = new ThreeColor('#a4a4ac')
+    const target = new ThreeColor('#2a2d36')
+    const m = materials.tapeBlack.color
+    expect(base.r * m.r).toBeCloseTo(target.r, 2)
+    expect(base.g * m.g).toBeCloseTo(target.g, 2)
+    expect(base.b * m.b).toBeCloseTo(target.b, 2)
+    // The multiplier is lighter than the old #303038, so the white label sticker (about #e6e2d2) is no longer near-black.
+    expect(m.r).toBeGreaterThan(new ThreeColor('#303038').r)
+    expect(m.r).toBeLessThan(0.1)
+    disposeSharedResources()
+    expect(hexOf(materials.tapeBlack.color)).toBe('#2a2d36')
+  })
+
+  it('the cassette faces sample UV windows inside the vhsShell label, window and spine-label regions, upright', () => {
+    const [p] = cassettes()
+    const g = cassetteBoxGeometry(p.scale[0], p.scale[1], p.scale[2])
+    const uv = g.getAttribute('uv')
+    const pos = g.getAttribute('position')
+    const top = vhsShellUvRect(VHS_SHELL_REGIONS.top)
+    const front = vhsShellUvRect(VHS_SHELL_REGIONS.front)
+    const plain = vhsShellUvRect(VHS_SHELL_REGIONS.plain)
+    const inside = (i: number, r: { u0: number; u1: number; v0: number; v1: number }) =>
+      uv.getX(i) >= r.u0 - 1e-9 && uv.getX(i) <= r.u1 + 1e-9 && uv.getY(i) >= r.v0 - 1e-9 && uv.getY(i) <= r.v1 + 1e-9
+    for (let i = 0; i < uv.count; i++) {
+      const face = Math.floor(i / 4)
+      expect(inside(i, face === 2 ? top : face === 4 ? front : plain), `vertex ${i} face ${face}`).toBe(true)
+    }
+    // Pixel regions: the top window holds the label strip (rows 72..86), the reel window (rows 88..108) and the flap seam (row 69);
+    // the front holds the ARCHIVE sticker (rows 111..124, x 14..114).
+    const [tx0, ty0, tx1, ty1] = VHS_SHELL_REGIONS.top
+    expect([tx0 <= 12, tx1 >= 116, ty0 <= 69, ty1 >= 108]).toEqual([true, true, true, true])
+    const [fx0, fy0, fx1, fy1] = VHS_SHELL_REGIONS.front
+    expect([fx0 <= 14, fx1 >= 114, fy0 <= 111, fy1 >= 124]).toEqual([true, true, true, true])
+    // Exact rectangles (0.5 px inset, canvas top is v = 1).
+    expect(top).toEqual({ u0: 10.5 / 128, u1: 117.5 / 128, v0: 1 - 108.5 / 128, v1: 1 - 61.5 / 128 })
+    expect(front).toEqual({ u0: 12.5 / 128, u1: 115.5 / 128, v0: 1 - 125.5 / 128, v1: 1 - 109.5 / 128 })
+    // Upright: on the top face u grows with +x and v grows toward -z (the far edge is the top of the label); on the front face v grows with +y.
+    const grows = (face: number, a: 'x' | 'y' | 'z', c: 'u' | 'v') => {
+      const idx = [0, 1, 2, 3].map((k) => face * 4 + k)
+      const lo = idx.reduce((m, i) => (pos[`get${a.toUpperCase()}` as 'getX'](i) < pos[`get${a.toUpperCase()}` as 'getX'](m) ? i : m))
+      const hi = idx.reduce((m, i) => (pos[`get${a.toUpperCase()}` as 'getX'](i) > pos[`get${a.toUpperCase()}` as 'getX'](m) ? i : m))
+      return (c === 'u' ? uv.getX(hi) - uv.getX(lo) : uv.getY(hi) - uv.getY(lo)) > 0
+    }
+    expect(grows(2, 'x', 'u')).toBe(true)
+    expect(grows(2, 'z', 'v')).toBe(false)
+    expect(grows(4, 'x', 'u')).toBe(true)
+    expect(grows(4, 'y', 'v')).toBe(true)
+    // Cached by size: the same geometry is shared and counted once.
+    expect(cassetteBoxGeometry(p.scale[0], p.scale[1], p.scale[2])).toBe(g)
+    expect(cassetteBoxCount()).toBe(1)
+    const spy = vi.spyOn(g, 'dispose')
+    disposeSharedResources()
+    disposeSharedResources()
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(cassetteBoxCount()).toBe(0)
+  })
+
+  it('the loose cassette rests on the desk top, stays inside its footprint and overlaps no other desk part', () => {
+    const parts = deskAll()
+    const top = desk().height
+    const slab = parts[1]
+    const c = parts.find((p) => p.cassette && p.rot)!
+    expect(c.pos[0] - desk().box.minX).toBeGreaterThan(0)
+    expect(c.pos[0]).toBeCloseTo((desk().box.minX + desk().box.maxX) / 2 + DESK_CASSETTE_DX, 9)
+    expect(c.pos[1] - c.scale[1] / 2).toBeCloseTo(top, 9)
+    type P2 = readonly [number, number]
+    const corners = (q: Part): P2[] => {
+      const th = q.rot?.[1] ?? 0
+      const cs = Math.cos(th)
+      const sn = Math.sin(th)
+      return ([[-1, -1], [1, -1], [1, 1], [-1, 1]] as const).map(([a, b]) => {
+        const x = (a * q.scale[0]) / 2
+        const z = (b * q.scale[2]) / 2
+        return [q.pos[0] + x * cs + z * sn, q.pos[2] - x * sn + z * cs] as P2
+      })
+    }
+    const cc = corners(c)
+    for (const [x, z] of cc) {
+      expect(x).toBeGreaterThan(slab.pos[0] - slab.scale[0] / 2)
+      expect(x).toBeLessThan(slab.pos[0] + slab.scale[0] / 2)
+      expect(z).toBeGreaterThan(slab.pos[2] - slab.scale[2] / 2)
+      expect(z).toBeLessThan(slab.pos[2] + slab.scale[2] / 2)
+    }
+    const axes = (poly: P2[]) => [0, 1].map((i) => [poly[i + 1][1] - poly[i][1], poly[i][0] - poly[i + 1][0]] as P2)
+    const project = (poly: P2[], a: P2) => {
+      const d = poly.map((p) => p[0] * a[0] + p[1] * a[1])
+      return [Math.min(...d), Math.max(...d)] as const
+    }
+    const overlapsPoly = (poly: P2[]) =>
+      [...axes(cc), ...axes(poly)].every((a) => {
+        const [a0, a1] = project(cc, a)
+        const [b0, b1] = project(poly, a)
+        return a0 < b1 - 1e-9 && b0 < a1 - 1e-9
+      })
+    let checked = 0
+    for (const q of parts) {
+      if (q === c || q.rot?.[0] || q.rot?.[2]) continue
+      const lo = q.pos[1] - q.scale[1] / 2
+      const hi = q.pos[1] + q.scale[1] / 2
+      if (!(lo < c.pos[1] + c.scale[1] / 2 - 1e-9 && hi > c.pos[1] - c.scale[1] / 2 + 1e-9)) continue
+      checked++
+      if (q.geo === 'box') expect(overlapsPoly(corners(q)), `${q.mat} at ${q.pos.map((v) => v.toFixed(3)).join(',')}`).toBe(false)
+      else {
+        // Upright round part: distance from its centre to the cassette rectangle must exceed its radius.
+        const th = c.rot![1]
+        const dx = q.pos[0] - c.pos[0]
+        const dz = q.pos[2] - c.pos[2]
+        const lx = Math.abs(dx * Math.cos(th) - dz * Math.sin(th))
+        const lz = Math.abs(dx * Math.sin(th) + dz * Math.cos(th))
+        const gap = Math.hypot(Math.max(0, lx - c.scale[0] / 2), Math.max(0, lz - c.scale[2] / 2))
+        expect(gap, `${q.geo} ${q.mat}`).toBeGreaterThanOrEqual(q.scale[0] / 2 - 1e-9)
+      }
+    }
+    expect(checked).toBeGreaterThanOrEqual(1) // at least the archive box and its slat are compared
+  })
+
+  it('ceiling fixtures: same three parts, tube and housing sample the brushed-steel stripe of metalCabinet, bloom strip unchanged', () => {
+    const centres = fixtureCentres()
+    expect(centres).toHaveLength(5)
+    // The steel window lies inside rows 238..251 of metalCabinet and keeps a one-texel inset.
+    expect(FIXTURE_STEEL_UV.v0).toBeGreaterThan(STEEL_PLAIN_V[0])
+    expect(FIXTURE_STEEL_UV.v1).toBeLessThan(STEEL_PLAIN_V[1])
+    expect(FIXTURE_STEEL_UV.u0).toBeGreaterThan(0)
+    expect(FIXTURE_STEEL_UV.u1).toBeLessThan(1)
+    for (const [x, z] of centres) {
+      const parts = ceilingFixtureParts(x, z)
+      expect(parts).toHaveLength(3)
+      expect(parts.reduce((n, p) => n + GEOMETRY_TRIANGLES[p.geo], 0)).toBe(26)
+      const housing = parts.find((p) => p.mat === 'fixtureHousing')!
+      const tube = parts.find((p) => p.mat === 'fluorescent')!
+      const bloom = parts.find((p) => p.mat === 'ceilingBloom')!
+      for (const p of [housing, tube]) {
+        expect(p.atlas!.rect).toEqual(FIXTURE_STEEL_UV)
+        expect(p.atlas!.plain).toEqual(FIXTURE_STEEL_UV)
+        expect(p.atlas!.faces).toEqual([3]) // the downward face
+        const g = atlasBoxGeometry(p.scale[0], p.scale[1], p.scale[2], p.atlas!.rect, p.atlas!.faces, p.atlas!.plain)
+        const uv = g.getAttribute('uv')
+        for (let i = 0; i < uv.count; i++) {
+          expect(uv.getX(i)).toBeGreaterThanOrEqual(FIXTURE_STEEL_UV.u0 - 1e-9)
+          expect(uv.getX(i)).toBeLessThanOrEqual(FIXTURE_STEEL_UV.u1 + 1e-9)
+          expect(uv.getY(i)).toBeGreaterThanOrEqual(FIXTURE_STEEL_UV.v0 - 1e-9)
+          expect(uv.getY(i)).toBeLessThanOrEqual(FIXTURE_STEEL_UV.v1 + 1e-9)
+        }
+      }
+      // End caps: the steel housing extends 5 cm beyond the tube at each end and 4 cm at each side.
+      expect((housing.scale[0] - tube.scale[0]) / 2).toBeCloseTo(0.05, 9)
+      expect((housing.scale[2] - tube.scale[2]) / 2).toBeCloseTo(0.04, 9)
+      expect(bloom.pos[1]).toBeCloseTo(ROOM.height - CEILING_BLOOM_DROP, 9)
+      expect(bloom.pos[1]).toBeLessThan(tube.pos[1] - tube.scale[1] / 2)
+      expect(bloom.rot).toEqual([Math.PI / 2, 0, 0])
+    }
+    expect(materials.fluorescent.type).toBe('MeshBasicMaterial')
+    expect(materials.fixtureHousing.type).toBe('MeshLambertMaterial')
+    setCanvasFactory(null)
+    ensureSharedTextures()
+    expect(hexOf(materials.fluorescent.color)).toBe('#e8f4ff')
+    expect(hexOf(materials.fixtureHousing.color)).toBe('#777c86')
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    const steel = getSharedTexture('metalCabinet')
+    expect(materials.fluorescent.map).toBe(steel)
+    expect(materials.fixtureHousing.map).toBe(steel)
+    expect(hexOf(materials.fluorescent.color)).toBe('#eef6ff')
+    expect(materials.ceilingBloom.map).toBe(getSharedTexture('lampGlow'))
+    disposeSharedResources()
+    expect(hexOf(materials.fluorescent.color)).toBe('#e8f4ff')
+    expect(materials.fluorescent.map).toBeNull()
+  })
+
+  it('budgets: triangles unchanged at 19,154 (at most 19,200), 4 lights, 32 textures, 7.703 MiB, every texture and cached geometry disposed once', () => {
+    const report = sceneDetailReport()
+    expect(report.totalTriangles).toBe(19116 + TASK_30_1_TRIANGLES)
+    expect(report.totalTriangles).toBe(19154)
+    expect(report.totalTriangles).toBeLessThanOrEqual(19200)
+    expect(M3_LIGHT_COUNT).toBe(4)
+    expect(MAX_LIGHTS).toBe(4)
+    expect(report.textureCount).toBe(32)
+    expect(report.textureMemoryBytes / 1048576).toBeCloseTo(7.703, 3)
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    expect(liveTextureCount()).toBe(32)
+    const geos = [
+      ...cassettes().map((p) => cassetteBoxGeometry(p.scale[0], p.scale[1], p.scale[2])),
+      ...ceilingFixtureParts(0, 0)
+        .filter((p) => p.atlas)
+        .map((p) => atlasBoxGeometry(p.scale[0], p.scale[1], p.scale[2], p.atlas!.rect, p.atlas!.faces, p.atlas!.plain)),
+    ]
+    const geoSpies = [...new Set(geos)].map((g) => vi.spyOn(g, 'dispose'))
+    const texSpies = TEXTURE_IDS.map((id) => vi.spyOn(getSharedTexture(id)!, 'dispose'))
+    disposeSharedResources()
+    disposeSharedResources()
+    for (const s of [...geoSpies, ...texSpies]) expect(s).toHaveBeenCalledTimes(1)
+    expect(liveTextureCount()).toBe(0)
   })
 })

@@ -7,11 +7,13 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 import { Color, Object3D, type InstancedMesh } from 'three'
 import { instanceColour, isRealSizePart, partGroupKey, type BookInstance, type Part } from './modelDetail'
 import { FABRIC_METRES_PER_REPEAT } from './proceduralTextures'
-import { atlasBoxGeometry, ensureSharedTextures, geometries, manualGeometries, materials, metricBoxGeometry, spineGeometries, woodBoxGeometry } from './sharedResources'
+import { atlasBoxGeometry, cassetteBoxGeometry, ensureSharedTextures, geometries, manualGeometries, materials, metricBoxGeometry, spineGeometries, woodBoxGeometry } from './sharedResources'
 
 /** Metric wood boards use a cached real-size geometry and unit mesh scale; every other part scales the unit geometry. */
 const geometryOf = (p: Part) =>
-  p.atlas
+  p.cassette
+    ? cassetteBoxGeometry(p.scale[0], p.scale[1], p.scale[2])
+    : p.atlas
     ? atlasBoxGeometry(p.scale[0], p.scale[1], p.scale[2], p.atlas.rect, p.atlas.faces, p.atlas.plain)
     : p.metric
     ? woodBoxGeometry(p.scale[0], p.scale[1], p.scale[2])

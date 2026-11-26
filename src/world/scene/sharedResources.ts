@@ -178,7 +178,7 @@ export const materials = {
   posterReel: lambert('#0c3a44'),
   doorFrame: lambert('#3b2a1d'),
   /** VHS cassettes. Flat colours are the no-canvas fallback; with the vhsShell texture the multiplier is a lifted tone of the same hue (task 22.1). */
-  tapeBlack: lambert('#15151a'),
+  tapeBlack: lambert('#2a2d36'),
   tapeBlue: lambert('#2a4aa0'),
   tapeLabel: lambert('#d8d2b8'),
   cabinet: lambert('#5a1f7a'),
@@ -196,6 +196,8 @@ export const materials = {
   btnOrange: lambert('#e87a2a'),
   bulb: new MeshBasicMaterial({ color: '#fff2c0' }),
   fluorescent: new MeshBasicMaterial({ color: '#e8f4ff' }),
+  /** 31.2 steel housing and end caps of the ceiling fixtures (brushed metalCabinet stripe when textured; flat #777c86 otherwise). */
+  fixtureHousing: lambert('#777c86'),
   trim: lambert('#2a2230'),
   skirting: lambert('#1f1a26'),
   /** 22.1 armchair upholstery. Flat colours are the previous green armchair; with couchFabric the slate/teal multiplier applies. Tinted by Memory_Shift. */
@@ -494,6 +496,58 @@ export function atlasBoxGeometry(w: number, h: number, d: number, rect: UvRect, 
   return g
 }
 
+/** Pixel rectangles of the 128 x 128 vhsShell canvas (x0, y0 inclusive to x1, y1 exclusive) that the desk cassette shows (task 31.2). */
+export const VHS_SHELL_REGIONS = Object.freeze({
+  /** Top face (0.19 x 0.1 m): dust flap, handwritten label strip and the reel window (108 x 48 px, 2.25:1 for a 1.9:1 face). */
+  top: [10, 61, 118, 109] as readonly [number, number, number, number],
+  /** Front face (0.19 x 0.03 m): the white "ARCHIVE" spine label sticker (104 x 17 px). */
+  front: [12, 109, 116, 126] as readonly [number, number, number, number],
+  /** Every other face: the ribbed stripe below the label. */
+  plain: [0, 125, 128, 128] as readonly [number, number, number, number],
+})
+
+const VHS_SHELL_SIZE = 128
+
+/** UV rectangle of a vhsShell pixel region, inset half a texel (canvas top is v = 1). */
+export function vhsShellUvRect(px: readonly [number, number, number, number]): UvRect {
+  return {
+    u0: (px[0] + 0.5) / VHS_SHELL_SIZE,
+    u1: (px[2] - 0.5) / VHS_SHELL_SIZE,
+    v0: 1 - (px[3] - 0.5) / VHS_SHELL_SIZE,
+    v1: 1 - (px[1] + 0.5) / VHS_SHELL_SIZE,
+  }
+}
+
+/**
+ * Real-size desk cassette box (task 31.2): the top face (+y, face 2) shows the label strip and reel window, the front face (+z, face 4)
+ * the spine label, and every other face the ribbed stripe. Native BoxGeometry orientation is kept (on +y, v grows toward -z; on +z, v grows
+ * toward +y), so the text reads upright for a player standing on the +z side. Cached with the metric boxes, disposed once.
+ */
+export function cassetteBoxGeometry(w: number, h: number, d: number): BoxGeometry {
+  const sx = round4(w)
+  const sy = round4(h)
+  const sz = round4(d)
+  const key = `cassette|${sx},${sy},${sz}`
+  const cached = woodBoxCache.get(key)
+  if (cached) return cached
+  const g = new BoxGeometry(sx, sy, sz)
+  const uv = g.getAttribute('uv')
+  const top = vhsShellUvRect(VHS_SHELL_REGIONS.top)
+  const front = vhsShellUvRect(VHS_SHELL_REGIONS.front)
+  const plain = vhsShellUvRect(VHS_SHELL_REGIONS.plain)
+  for (let i = 0; i < uv.count; i++) {
+    const face = Math.floor(i / 4)
+    const r = face === 2 ? top : face === BOX_FACE_FRONT ? front : plain
+    uv.setXY(i, r.u0 + uv.getX(i) * (r.u1 - r.u0), r.v0 + uv.getY(i) * (r.v1 - r.v0))
+  }
+  uv.needsUpdate = true
+  woodBoxCache.set(key, g)
+  return g
+}
+
+/** Number of live cached cassette geometries (tests and reports). */
+export const cassetteBoxCount = (): number => [...woodBoxCache.keys()].filter((k) => k.startsWith('cassette|')).length
+
 /** Number of live cached atlas-window box geometries (tests and reports). */
 export const atlasBoxCount = (): number => [...woodBoxCache.keys()].filter((k) => k.startsWith('atlas|')).length
 
@@ -672,8 +726,16 @@ const TEXTURE_BINDINGS: readonly TextureBinding[] = [
   { material: 'filingGreyB', texture: 'metalCabinet', color: '#8c9081', fallbackColor: '#7a7d70' },
   { material: 'filingDarkB', texture: 'metalCabinet', color: '#747865', fallbackColor: '#656858' },
   { material: 'filingCard', texture: 'metalCabinet', color: '#ffffff', fallbackColor: '#d8d2b8' },
+  /** 31.2 ceiling fixtures: the light brushed-steel stripe of metalCabinet. Housing: lit steel close to the old #777c86; tube: emissive cool white #eef6ff (flat fallback is the old #e8f4ff). */
+  { material: 'fixtureHousing', texture: 'metalCabinet', color: '#9298a3', fallbackColor: '#777c86' },
+  { material: 'fluorescent', texture: 'metalCabinet', color: '#eef6ff', fallbackColor: '#e8f4ff' },
   /** The shell texture is light neutral plastic; the multiplier sets black or navy and keeps a little detail contrast. */
-  { material: 'tapeBlack', texture: 'vhsShell', color: '#303038', fallbackColor: '#15151a' },
+  /**
+   * 31.2: the satin charcoal shell is #2a2d36 (the flat fallback). The vhsShell base is #a4a4ac (linear about 0.37), so the multiplier is
+   * lifted to #474b54 (linear 0.063, 0.071, 0.089): base times multiplier is about #2a2d36 and the white label sticker stays readable.
+   * The old #303038 multiplier rendered the shell near #1b1b1f and the label near #22.
+   */
+  { material: 'tapeBlack', texture: 'vhsShell', color: '#474b54', fallbackColor: '#2a2d36' },
   { material: 'tapeBlue', texture: 'vhsShell', color: '#4476f8', fallbackColor: '#2a4aa0' },
   /** The glass texture carries the look, so the multiplier is white; Memory_Shift tints it from there. */
   { material: 'crtScreen', texture: 'crtGlass', color: crtScreenBaseColor(true), fallbackColor: crtScreenBaseColor(false) },
