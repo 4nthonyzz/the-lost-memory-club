@@ -23,6 +23,7 @@ import {
   advancePlatterAngle,
   posterParts,
   hifiTableGroups,
+  speakerParts,
   shelfFrameParts,
   shelfContents,
 } from './modelDetail'
@@ -133,8 +134,8 @@ export function Couch({ box }: { box: Aabb }) {
 }
 
 /**
- * The Hi-Fi table body (tasks 33.1, 34.1), in the prop-local frame. Three separately addressable groups: the static table (walnut table, turntable controls,
- * record crate with four LP sleeves, NOW PLAYING jacket stand, front LED bar and tabletop glow), the platter group (placed at the spindle axis, so rotating
+ * The two-tier Hi-Fi console body (tasks 33.1, 34.1, 35.1), in the prop-local frame. Three separately addressable groups: the static console (steel posts, walnut top and shelf,
+ * turntable controls and open dust cover, NOW PLAYING jacket stand, cassettes, brass lamp, LP rack, receiver, record crate, front LED bar and tabletop glow), the platter group (placed at the spindle axis, so rotating
  * it about y spins the record) and the tonearm. While `playing` the platter spins at 33 1/3 RPM in useFrame (TURNTABLE_SPIN_RAD_PER_SEC), the tonearm sits
  * on the record, the display is emerald, the LED bar is bright and the glow is stronger; stopped, the tonearm rests on its cradle, the display is amber and the
  * LED and glow are dim. `track` selects the jacket colour (0..3 = the four records, anything else = neutral STOP). Under reduced motion nothing spins; the
@@ -166,7 +167,7 @@ function HifiTable({ box, playing, track, wallBack, platterRef }: { box: Aabb; p
   )
 }
 
-/** The record player on its layout footprint: the Hi-Fi table faces `facing` (-z for the south-wall spot, 34.1). `track` defaults to 4 (neutral jacket). */
+/** The record player on its layout footprint: the Hi-Fi console faces `facing` (-z for the south-wall spot, 34.1). `track` defaults to 4 (neutral jacket). */
 export function RecordPlayer({
   box,
   facing,
@@ -185,6 +186,14 @@ export function RecordPlayer({
     <Faced box={box} facing={facing}>
       {(local) => <HifiTable box={local} playing={playing} track={track} wallBack={wallBack} platterRef={platterRef} />}
     </Faced>
+  )
+}
+
+/** The floor loudspeaker (task 35.1) beside the console, on its layout footprint, facing -z. Static: it never animates. */
+export function Loudspeaker({ box, height, facing }: { box: Aabb; height: number; facing?: Facing }) {
+  const wallBack = useMemo(() => backAgainstWall(box, facing, ROOM.walls), [box, facing])
+  return (
+    <Faced box={box} facing={facing}>{(local) => <PartMeshes parts={speakerParts(local, height, wallBack)} />}</Faced>
   )
 }
 
@@ -300,6 +309,7 @@ export function Props({
   const chair = propById('abandoned-chair')
   const couch = propById('couch')
   const recordPlayer = propById('record-player')
+  const loudspeaker = propById('loudspeaker')
   return (
     <group>
       <ShiftDressing />
@@ -315,6 +325,7 @@ export function Props({
       <AssetModel id="armchair" {...assetPlacement(chair.box)} fallback={<Armchair box={chair.box} />} />
       <AssetModel id="couch" {...assetPlacement(couch.box)} fallback={<Couch box={couch.box} />} />
       <RecordPlayer box={recordPlayer.box} facing={recordPlayer.facing} playing={turntablePlaying} track={turntableTrack} />
+      <Loudspeaker box={loudspeaker.box} height={loudspeaker.height} facing={loudspeaker.facing} />
       <Details />
       <ArcadeAreaDressing />
     </group>

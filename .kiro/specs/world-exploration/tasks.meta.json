@@ -1755,6 +1755,49 @@
         "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
         "timestamp": 1795665210610
       }
+    ],
+    "35.1 Two-tier console model, floor speaker and raised budget tests": [
+      {
+        "executionId": "10866c62-37ab-4486-85fb-9a6103b557a6",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795695188574
+      },
+      {
+        "executionId": "10866c62-37ab-4486-85fb-9a6103b557a6",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795696536865
+      }
+    ],
+    "35.2 Playback state wiring for the new console": [
+      {
+        "executionId": "10866c62-37ab-4486-85fb-9a6103b557a6",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795696537174
+      },
+      {
+        "executionId": "10866c62-37ab-4486-85fb-9a6103b557a6",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795696665964
+      }
+    ],
+    "35.3 Docs, metrics and verification": [
+      {
+        "executionId": "10866c62-37ab-4486-85fb-9a6103b557a6",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795696666747
+      },
+      {
+        "executionId": "10866c62-37ab-4486-85fb-9a6103b557a6",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795697158745
+      }
+    ],
+    "35. Two-tier Hi-Fi console": [
+      {
+        "executionId": "10866c62-37ab-4486-85fb-9a6103b557a6",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795697159072
+      }
     ]
   }
 }

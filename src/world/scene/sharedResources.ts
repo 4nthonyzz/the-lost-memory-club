@@ -390,6 +390,19 @@ export const materials = {
   hifiLedOff: new MeshBasicMaterial({ color: '#5c3912' }),
   hifiGlowOn: hifiGlowMaterial(0.25),
   hifiGlowOff: hifiGlowMaterial(0.07),
+  /**
+   * 35.1 two-tier console. Flat colours only, no new texture. `sleeveTint` is white: every LP sleeve, stacked record and crate record is one instance of it with its own
+   * colour. `hifiDustCover` is the clear acrylic lid (opacity 0.18, slight blue tint, no depth write). The small brass lamp has a dark double-sided shade and an
+   * emissive amber bulb (MeshBasicMaterial, no light). The receiver dial and display are MeshBasicMaterial pairs swapped per mesh: bright while a track plays, dim while stopped.
+   */
+  sleeveTint: lambert('#ffffff'),
+  hifiDustCover: new MeshLambertMaterial({ color: '#b9d4ff', transparent: true, opacity: 0.18, depthWrite: false }),
+  hifiLampShade: new MeshLambertMaterial({ color: '#23242b', side: DoubleSide }),
+  hifiLampBulb: new MeshBasicMaterial({ color: '#ffb347' }),
+  receiverDialOn: new MeshBasicMaterial({ color: '#ffd27a' }),
+  receiverDialOff: new MeshBasicMaterial({ color: '#4a3a1c' }),
+  receiverDisplayOn: new MeshBasicMaterial({ color: '#5df2a8' }),
+  receiverDisplayOff: new MeshBasicMaterial({ color: '#1d4634' }),
   /** Screens: tinted only by the Memory_Shift blend. They never read lock state. */
   crtScreen: new MeshBasicMaterial({ color: BASE_CRT_SCREEN_COLOR }),
   /** Per-cabinet screens: flat game colours are the no-canvas fallback; with a canvas the attract texture is attached and the base becomes white. Tinted by Memory_Shift. */

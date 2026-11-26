@@ -1,6 +1,6 @@
 # World Exploration: Test Report
 
-Task 15.1, counts refreshed by task 34.3. Requirements 13.2, 13.10, 13.11, 13.14, 15.6. Related: `design.md` (Correctness Properties), `manual-test-log.md`, `tasks.md`.
+Task 15.1, counts refreshed by task 35.3. Requirements 13.2, 13.10, 13.11, 13.14, 15.6. Related: `design.md` (Correctness Properties), `manual-test-log.md`, `tasks.md`.
 
 ## Result of the audit run
 
@@ -8,10 +8,12 @@ Command: `npm test` (Vitest, `vite.config.ts`: `environment: 'node'`, `include: 
 
 ```
 Test Files  34 passed (34)
-     Tests  1035 passed (1035)
+     Tests  1054 passed (1054)
 ```
 
-**Task 34.3 run log (current state, 1,035 tests in 34 files).** Step 0, test fixes: `proceduralTextures.test.ts` "task 29.2 ... keeps every draw coordinate inside the canvas and keeps the titles on every sampled frame" had timed out at the 5,000 ms default even when the file ran alone (about 11.8 s with a raised timeout). It sampled 3 screens x 80 time points = 240 frames before, and still does (the test now also asserts `frames === 240`). The extra cost came from one `expect` call with a formatted message per draw call; the likely cause is the per-call `expect` (I did not profile the original, but the test now takes about 0.5 s, 524 ms in the standalone run). It now collects violations in one pass, asserts once that the list is empty, and carries an explicit 30,000 ms timeout, as task 24.3 did for other heavy tests. Assertions are unchanged in meaning (bounds on `fillRect`, `strokeRect`, `moveTo`, `lineTo`, `arc` and `fillText` coordinates, and every title present on every frame). `roomLayout.test.ts` "keeps a 1.2 m wide lane ..." had failed once in a full run during 34.1; its original failure message was not captured. Three standalone runs before the change passed (the test took 0.6 to 1.1 s alone), so no genuine nondeterminism was found (it has no randomness or clock) and the failure is inferred to be a timeout under load. The test now collects too-narrow samples, asserts once, keeps the 1.2 m threshold (`gap >= 0.6 - 1e-6` per sample and `narrowest * 2 >= 1.2 - 1e-6`) unchanged and has a 30,000 ms timeout; three standalone runs after the change passed (`Tests  39 passed (39)`, exit 0 each time). Step 1: `npm run typecheck` exited 0 (`tsc --noEmit`, no output). `npm test` was run twice and exited 0 both times; run 1 printed `Test Files  34 passed (34)` and `Tests  1035 passed (1035)` (`Duration  39.76s`), run 2 printed the same two lines (`Duration  47.77s`). `npm run build` exited 0 (`tsc --noEmit && vite build`, Vite v7.3.8, 111 modules transformed, built in 15.03 s, no missing-export error; `dist/assets/index-CYaus8yo.css` 14.70 kB (3.63 kB gzip), `dist/assets/index--2iESuUi.js` 1,353.59 kB (391.89 kB gzip); PowerShell wraps Vite's chunk-size warning in a `NativeCommandError` record, which is only the warning). `npx vitest run src/world/scene/modelDetail.test.ts` printed `Test Files  1 passed (1)` and `Tests  228 passed (228)` (exit 0) with `[18.3] computed triangles: 19196 (detail 18954 + base 242), draw-call estimate: 390, textures 32, texture memory estimate 7.70 MB, lights 4 (computed, not runtime-measured)`, `[28.2] triangles 19196 (delta 44), textures 32, texture memory 7.703 MiB (computed)` and `[30.1] triangles 19196 (delta 38 from 19116)`. `npx vitest run src/world/logic/targeting.bench.test.ts` printed `Tests  1 passed (1)` and the informational line `measured total 18.61 ms; computed 0.930 us/call`, 252 reachable cells x 16 yaws, 4 stations, 29 colliders, 1401 calls returned a station (no threshold). All numbers are computed, not runtime-measured.
+**Task 35.3 run log (current state, 1,054 tests in 34 files).** `npm run typecheck` exited 0 (`tsc --noEmit`, no output). `npm test` ran twice and exited 0 both times; each run printed `Test Files  34 passed (34)` and `Tests  1054 passed (1054)` (durations 15.86 s and 15.22 s); no test timed out, so no file needed a standalone re-run. `npm run build` exited 0 (`tsc --noEmit && vite build`, Vite v7.3.8, 111 modules transformed, built in 6.22 s, no missing-export error; `dist/assets/index-Cem8ypvU.js` 1,358.15 kB, 393.74 kB gzip; CSS 14.70 kB). PowerShell wrapped Vite's chunk-size warning (stderr) in a `NativeCommandError` record; it is only the warning. `npx vitest run src/world/scene/modelDetail.test.ts` printed 238 tests passed (`[18.2]` and `[18.3]` report 19,988 triangles, 403 draw calls, 32 textures, 7.70 MB, 4 lights). `npx vitest run src/world/logic/targeting.bench.test.ts` printed `[targeting bench] method: performance.now around 20000 calls, 252 reachable cells x 16 yaws, 4 stations, 30 colliders. measured total 21.73 ms; computed 1.087 us/call; 1401 calls returned a station. No threshold applied.` No source change was needed in task 35.3. All numbers are computed, not runtime-measured.
+
+**Task 34.3 run log (history, 1,035 tests in 34 files).** Step 0, test fixes: `proceduralTextures.test.ts` "task 29.2 ... keeps every draw coordinate inside the canvas and keeps the titles on every sampled frame" had timed out at the 5,000 ms default even when the file ran alone (about 11.8 s with a raised timeout). It sampled 3 screens x 80 time points = 240 frames before, and still does (the test now also asserts `frames === 240`). The extra cost came from one `expect` call with a formatted message per draw call; the likely cause is the per-call `expect` (I did not profile the original, but the test now takes about 0.5 s, 524 ms in the standalone run). It now collects violations in one pass, asserts once that the list is empty, and carries an explicit 30,000 ms timeout, as task 24.3 did for other heavy tests. Assertions are unchanged in meaning (bounds on `fillRect`, `strokeRect`, `moveTo`, `lineTo`, `arc` and `fillText` coordinates, and every title present on every frame). `roomLayout.test.ts` "keeps a 1.2 m wide lane ..." had failed once in a full run during 34.1; its original failure message was not captured. Three standalone runs before the change passed (the test took 0.6 to 1.1 s alone), so no genuine nondeterminism was found (it has no randomness or clock) and the failure is inferred to be a timeout under load. The test now collects too-narrow samples, asserts once, keeps the 1.2 m threshold (`gap >= 0.6 - 1e-6` per sample and `narrowest * 2 >= 1.2 - 1e-6`) unchanged and has a 30,000 ms timeout; three standalone runs after the change passed (`Tests  39 passed (39)`, exit 0 each time). Step 1: `npm run typecheck` exited 0 (`tsc --noEmit`, no output). `npm test` was run twice and exited 0 both times; run 1 printed `Test Files  34 passed (34)` and `Tests  1035 passed (1035)` (`Duration  39.76s`), run 2 printed the same two lines (`Duration  47.77s`). `npm run build` exited 0 (`tsc --noEmit && vite build`, Vite v7.3.8, 111 modules transformed, built in 15.03 s, no missing-export error; `dist/assets/index-CYaus8yo.css` 14.70 kB (3.63 kB gzip), `dist/assets/index--2iESuUi.js` 1,353.59 kB (391.89 kB gzip); PowerShell wraps Vite's chunk-size warning in a `NativeCommandError` record, which is only the warning). `npx vitest run src/world/scene/modelDetail.test.ts` printed `Test Files  1 passed (1)` and `Tests  228 passed (228)` (exit 0) with `[18.3] computed triangles: 19196 (detail 18954 + base 242), draw-call estimate: 390, textures 32, texture memory estimate 7.70 MB, lights 4 (computed, not runtime-measured)`, `[28.2] triangles 19196 (delta 44), textures 32, texture memory 7.703 MiB (computed)` and `[30.1] triangles 19196 (delta 38 from 19116)`. `npx vitest run src/world/logic/targeting.bench.test.ts` printed `Tests  1 passed (1)` and the informational line `measured total 18.61 ms; computed 0.930 us/call`, 252 reachable cells x 16 yaws, 4 stations, 29 colliders, 1401 calls returned a station (no threshold). All numbers are computed, not runtime-measured.
 
 **Task 33.4 run log (history, 1,011 tests in 34 files).** `npm run typecheck` exited 0 (`tsc --noEmit`, no output). `npm run build` exited 0 (`tsc --noEmit && vite build`, Vite v7.3.8, 111 modules transformed, built in 5.13 s, no missing-export error; `dist/assets/index-CYaus8yo.css` 14.70 kB (3.63 kB gzip), `dist/assets/index--6hpb-_K.js` 1,348.43 kB (390.09 kB gzip); PowerShell wraps Vite's chunk-size warning in a `NativeCommandError` record, which is only the warning). `npm test` was run four times and exited 0 every time; each run printed `Test Files  34 passed (34)` and `Tests  1011 passed (1011)` (durations 17.30 s, 14.70 s, 11.68 s and 13.89 s); no test timed out, so `proceduralTextures.test.ts` (231 tests; it had timed out once in the full suite during task 33.3 and passed alone) needed neither a re-run nor a new timeout. `npx vitest run src/world/scene/modelDetail.test.ts` printed 209 tests passed and the computed lines recorded in `performance-log.md` (19,132 triangles, 377 draw calls, 32 textures, 7.703 MiB, 4 lights). `npx vitest run src/world/logic/targeting.bench.test.ts` printed `measured total 16.01 ms; computed 0.801 us/call` for 251 reachable cells x 16 yaws, 4 stations and 29 colliders (informational, no threshold). All computed, not runtime-measured.
 
@@ -58,14 +60,14 @@ These numbers describe the repository at the time of the audit. They change when
 | --- | --- |
 | `src/App.test.ts` | 8 |
 | `src/core/gameReducer.test.ts` | 4 |
-| `src/world/WorldScene.test.ts` | 80 |
+| `src/world/WorldScene.test.ts` | 81 |
 | `src/world/WorldScene.inputEnabled.test.ts` | 8 |
 | `src/world/boundary.test.ts` | 10 |
 | `src/world/audio/worldAudio.test.ts` | 43 (fake audio context) |
 | `src/world/assets/assetManifest.test.ts` | 22 |
 | `src/world/assets/assets.test.ts` | 9 |
 | `src/world/controller/useReducedMotion.test.ts` | 8 |
-| `src/world/layout/roomLayout.test.ts` | 39 |
+| `src/world/layout/roomLayout.test.ts` | 43 |
 | `src/world/logic/archiveDocuments.test.ts` | 13 |
 | `src/world/logic/cardThemes.test.ts` | 1 |
 | `src/world/logic/collision.test.ts` | 18 |
@@ -82,15 +84,15 @@ These numbers describe the repository at the time of the audit. They change when
 | `src/world/logic/playerStep.test.ts` | 24 |
 | `src/world/logic/smoothing.test.ts` | 6 |
 | `src/world/logic/propState.test.ts` | 24 |
-| `src/world/logic/targeting.test.ts` | 50 |
+| `src/world/logic/targeting.test.ts` | 54 |
 | `src/world/logic/targeting.bench.test.ts` | 1 (informational timing, asserts no speed) |
 | `src/world/scene/assetIntegration.test.ts` | 6 |
 | `src/world/scene/effectsTiming.test.ts` | 20 |
 | `src/world/scene/lampCoupling.test.ts` | 11 |
 | `src/world/scene/memoryShift.test.ts` | 16 |
-| `src/world/scene/modelDetail.test.ts` | 228 |
+| `src/world/scene/modelDetail.test.ts` | 238 |
 | `src/world/scene/proceduralTextures.test.ts` | 231 |
-| **Total** | **1,035 in 34 files** |
+| **Total** | **1,054 in 34 files** |
 
 New test areas since the audit (polish pass, tasks 18.1 to 18.3), all computed from declared data, none visual: island media console and 1.2 m walkway clearance (`roomLayout.test.ts`), north-wall filing cabinets and bulletin board, book and shelf counts, triangle budget below 20,000, texture memory within 8 MB, at most 4 lights, disposal of all textures and wall geometries (`modelDetail.test.ts`), new procedural textures (`proceduralTextures.test.ts`), and memory-shift tint of the new materials (`memoryShift.test.ts`). Which exact tests were added by which task is not itemized here.
 
@@ -161,7 +163,27 @@ New test areas from task 33 (record player, five-track music, turntable card), c
 
 New test areas from task 34 (Hi-Fi listening table, wall-flush face culling, now-playing jacket), computed from declared data and mocked components, **not verified visually**. 24 tests were added (1,011 to 1,035 in 34 files): `modelDetail.test.ts` +19 (209 to 228), `WorldScene.test.ts` +2 (78 to 80), `roomLayout.test.ts` +2 (37 to 39) and `targeting.test.ts` +1 (49 to 50); `proceduralTextures.test.ts` stays at 231. Covered: the record-player box, anchor (-1.475, 3.55), facing -z and whole-table line-of-sight box; the table part triangle counts (638), the 24 culled wall-flush faces (-48), the exact totals 19,196 triangles and 390 draw calls (below 400), 4 lights, 32 textures and 7.703 MiB; the jacket colour mapping and the `turntableTrack` prop passed from `WorldScene` (keys 1 to 5, STOP neutral, selection before unlock, playing flag unchanged). Not covered: how the table, sleeve fan, jacket lean, glow and LED look; the jacket colour swap at runtime; sound.
 
-## Task 34.3 verification evidence (computed from source and tests, **not verified visually**)
+New test areas from task 35 (two-tier Hi-Fi console, floor loudspeaker, raised caps, playback wiring), computed from declared data and mocked components, **not verified visually or by listening**. 19 tests were added (1,035 to 1,054 in 34 files): `modelDetail.test.ts` +10 (228 to 238), `roomLayout.test.ts` +4 (39 to 43), `targeting.test.ts` +4 (50 to 54) and `WorldScene.test.ts` +1 (80 to 81); `proceduralTextures.test.ts` stays at 231. Covered: the unchanged console box, the loudspeaker box x -2.49..-2.15, z 3.68..4 (solid, not interactable), the new caps (`TRIANGLE_CAP` 20,000, `DRAW_CALL_CAP` 425), the exact totals 19,988 triangles and 403 draw calls, console 1,250 / 34 and loudspeaker 180 / 5, 4 lights, 32 textures and 7.703 MiB, the dust cover and tonearm clearance, the per-part playback wiring (track keys, STOP, glow 0.25 and 0.07) and that `onInspect` is not called. Not covered: how the console, dust cover, label bands, per-instance colour tint and loudspeaker look; sound.
+
+## Task 35.3 verification evidence (computed from source and tests, **not verified visually**)
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Lights | 4 (1 ambient + 3 point) | `scene/Lighting.tsx:14` (`M3_LIGHT_COUNT = 4`), declarations at `:51-54`; `scene/modelDetail.ts:171` (`MAX_LIGHTS = 4`); `expect(M3_LIGHT_COUNT).toBe(4)` at `modelDetail.test.ts:3896` and `:4749` |
+| Triangles | 19,988, at most 20,000 | `[18.3]` line of the `modelDetail.test.ts` output; `modelDetail.test.ts:159` (`TRIANGLE_CAP = 20000`), `:3892-3893` and `:4742-4743` (`toBe(19988)`, `toBeLessThanOrEqual(TRIANGLE_CAP)`) |
+| Draw calls | 403, below 425 | `[18.2]` line; `modelDetail.test.ts:160` (`DRAW_CALL_CAP = 425`), `:4744-4745` (`toBe(403)`, `toBeLessThan(DRAW_CALL_CAP)`), `:200`, `:3899` |
+| Texture memory | 7.703 MiB (8,076,989 bytes), at most 7.85 MB; 32 textures | `[28.2]` line; `modelDetail.test.ts:2845`, `:3031` and `:3206` (`toBeLessThanOrEqual(7.85 * 1048576)`) |
+| Timers | one, the documented 3 s context-restore timeout; none elsewhere | non-test search of `src/world` for `setTimeout` and `setInterval`: only `WorldScene.tsx:263` (ref type) and `:317` (`setTimeout(onFail, CONTEXT_RESTORE_TIMEOUT_MS)`, the constant is 3000 at `:41`) |
+| Storage | none in `src/world` | non-test search for `localStorage`, `sessionStorage` and `indexedDB`: no matches |
+| `StationId` | unchanged, `'vhs' \| 'arcade'` | `src/core/contracts.ts:7` (file not modified) |
+| `onInspect` | called only for stations, never for the record player or the loudspeaker | `controller/useWorldInput.ts:166` (`target.type === 'station'`); `WorldScene.tsx:255` (`inspectStation`) and `:353` (WebGL fallback buttons); the record player goes through `onPropInteract` (`useWorldInput.ts:170`); `scene/Props.tsx` has no `onInspect`; the loudspeaker is not interactable (`layout/roomLayout.ts`, `LOUDSPEAKER`) |
+| `requestPointerLock` | only from a click on the capture overlay or Enter / E on it | `logic/inputMode.ts:81` and `:195` (the only two `REQUEST_POINTER_LOCK` effects), performed at `controller/useWorldInput.ts:190-192` (`requestLock` is defined at `controller/usePointerLock.ts:21`; the only `requestPointerLock` call is `usePointerLock.ts:28`); no other non-test caller in `src/world`, so card, row and badge interactions never request it |
+| `ASSET_MANIFEST` | still `Object.freeze({})` | `assets/assetManifest.ts:20` |
+| Binary assets | no `.glb`, `.gltf`, `.mp3`, `.wav` or `.ogg` under `public/` or `src/` | directory search |
+| Files outside `src/world/` | no changes | `git status --short -- src/App.tsx src/core src/arcade src/memories src/ui src/styles.css vite.config.ts package.json package-lock.json tools docs` printed nothing; the full `git status --short` lists only `.kiro/specs/world-exploration/` and `src/world/` paths |
+| Encoding | no BOM, replacement character, mojibake sequence or control character | byte-level scan of every file under `src/world/` and `.kiro/specs/world-exploration/` (103 files): 0 findings before the doc edits; rescanned after them |
+
+## Task 34.3 verification evidence (history; superseded by the table above)
 
 | Check | Result | Evidence |
 | --- | --- | --- |

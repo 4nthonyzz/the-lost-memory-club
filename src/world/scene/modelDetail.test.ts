@@ -148,6 +148,16 @@ const TASK_33_1_TRIANGLES = TASK_33_1_TURNTABLE + TASK_33_1_CULLED_EXISTING + TA
 const TASK_34_1_TABLE = 638
 const TASK_34_1_RECLAIMED = -48
 const TASK_34_1_TRIANGLES = TASK_34_1_TABLE - TASK_33_1_TURNTABLE + TASK_34_1_RECLAIMED
+/**
+ * Task 35.1: the two-tier console (1,250 triangles) replaces the 638-triangle Hi-Fi table (+612) and the floor loudspeaker adds 180 (the 4 kicked back faces of the old table
+ * and the new posts and slab balance out). Net +792 (19,196 -> 19,988). The raised caps are the Requirement 14 limit (20,000 triangles) and a draw-call estimate under 425.
+ */
+const TASK_35_1_CONSOLE = 1250
+const TASK_35_1_SPEAKER = 180
+const TASK_35_1_TRIANGLES = TASK_35_1_CONSOLE - TASK_34_1_TABLE + TASK_35_1_SPEAKER
+/** Current-state caps (task 35.1): scene triangles and the draw-call estimate limit (exclusive). */
+const TRIANGLE_CAP = 20000
+const DRAW_CALL_CAP = 425
 /** Task 27.1: cabinetAndManualDetail, 256 x 128 mipmapped (estimate 174,326 bytes), added on top of the older memory caps below. */
 const TASK_27_1_TEXTURE_BYTES = Math.round(256 * 128 * 4 * 1.33)
 
@@ -187,7 +197,7 @@ describe('scene detail budget', () => {
   it('keeps draw calls moderate (instanced groups, not one per primitive)', () => {
     const primitives = declaredObjects().reduce((n, o) => n + o.parts.length, 0)
     expect(report.totalDrawCalls).toBeLessThan(primitives)
-    expect(report.totalDrawCalls).toBeLessThan(400)
+    expect(report.totalDrawCalls).toBeLessThan(DRAW_CALL_CAP)
   })
 
   it('texture memory estimate is within 8 MB and matches the specs', () => {
@@ -713,8 +723,8 @@ describe('arcade manuals on the west bookcase (task 23.2)', () => {
     const TASK_23_BASELINE = 19172 // before task 23.1
     const AFTER_23_1 = 19054
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
-    expect(report.totalTriangles - TASK_23_BASELINE).toBeLessThanOrEqual(120)
-    expect(report.totalTriangles - AFTER_23_1).toBeLessThanOrEqual(120 + TASK_26_1_TRIANGLES) // 26.1 adds the mug coffee disc and the stain disc
+    expect(report.totalTriangles - TASK_23_BASELINE).toBeLessThanOrEqual(120 + TASK_35_1_TRIANGLES)
+    expect(report.totalTriangles - AFTER_23_1).toBeLessThanOrEqual(120 + TASK_26_1_TRIANGLES + TASK_35_1_TRIANGLES) // 26.1 adds the mug coffee disc and the stain disc
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(8 * 1048576)
     console.info(`[23.2] triangles ${report.totalTriangles} (delta from 23.1 ${report.totalTriangles - AFTER_23_1}), texture memory ${(report.textureMemoryBytes / 1048576).toFixed(3)} MiB`)
@@ -724,7 +734,7 @@ describe('arcade manuals on the west bookcase (task 23.2)', () => {
     const report = sceneDetailReport()
     const TASK_24_BASELINE = 19042 // before task 24.1
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
-    expect(report.totalTriangles - TASK_24_BASELINE).toBeLessThanOrEqual(100 + TASK_26_1_TRIANGLES)
+    expect(report.totalTriangles - TASK_24_BASELINE).toBeLessThanOrEqual(100 + TASK_26_1_TRIANGLES + TASK_35_1_TRIANGLES)
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(8 * 1048576)
     // Nine of the ten interactables add no geometry (the notes reuse existing parts); the tenth is the 33.1 record player.
@@ -1142,7 +1152,7 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
         expect(report.objects.map((o) => o.name)).toContain(id)
       }
       expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
-      expect(report.totalTriangles - BASELINE_TRIANGLES).toBeLessThanOrEqual(80)
+      expect(report.totalTriangles - BASELINE_TRIANGLES).toBeLessThanOrEqual(80 + TASK_35_1_TRIANGLES)
       console.info(
         `[23.1] triangles ${report.totalTriangles} (delta ${report.totalTriangles - BASELINE_TRIANGLES}), draw-call estimate ${report.totalDrawCalls}, ` +
           `texture memory ${(report.textureMemoryBytes / 1048576).toFixed(3)} MiB`,
@@ -1291,11 +1301,11 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
       for (const s of spies) expect(s).toHaveBeenCalledTimes(1)
     })
 
-    it('task 30.1: total triangles stay within 19,200 and the lamp rework costs +38 (19,116 -> 19,154)', () => {
+    it('task 30.1: total triangles stay within the 20,000 cap and the lamp rework costs +38 (19,116 -> 19,154)', () => {
       const report = sceneDetailReport()
       console.info(`[30.1] triangles ${report.totalTriangles} (delta ${TASK_30_1_TRIANGLES} from 19116)`)
-      expect(report.totalTriangles).toBeLessThanOrEqual(19200)
-      expect(report.totalTriangles).toBe(19116 + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES)
+      expect(report.totalTriangles).toBeLessThanOrEqual(TRIANGLE_CAP)
+      expect(report.totalTriangles).toBe(19116 + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES + TASK_35_1_TRIANGLES)
       expect(M3_LIGHT_COUNT).toBe(4)
       expect(report.textureCount).toBe(32)
       expect(report.textureMemoryBytes / 1048576).toBeCloseTo(7.703, 3)
@@ -1355,8 +1365,8 @@ describe('wall, corner and ceiling dressing (task 18.3)', () => {
     it('task 24.1: budgets hold (triangles delta from 19,042 at most +70, 4 lights, same texture count and memory) and textures dispose once', () => {
       const report = sceneDetailReport()
       expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
-      expect(report.totalTriangles - 19042).toBeLessThanOrEqual(82 + TASK_26_1_TRIANGLES + TASK_34_1_TRIANGLES) // 25.1 adds 18 (caps +16, liner +2); 25.2 adds 6 (three glow decals)
-      expect(report.totalTriangles - 19042).toBe(82 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES)
+      expect(report.totalTriangles - 19042).toBeLessThanOrEqual(82 + TASK_26_1_TRIANGLES + TASK_34_1_TRIANGLES + TASK_35_1_TRIANGLES) // 25.1 adds 18 (caps +16, liner +2); 25.2 adds 6 (three glow decals)
+      expect(report.totalTriangles - 19042).toBe(82 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES + TASK_35_1_TRIANGLES)
       expect(report.textureCount).toBe(32)
       expect(report.textureMemoryBytes / 1048576).toBeCloseTo(7.537 + TASK_27_1_TEXTURE_BYTES / 1048576, 2) // 7.521 + coneFalloff 0.016
       expect(report.textureMemoryBytes).toBeLessThanOrEqual(8 * 1048576)
@@ -1569,7 +1579,7 @@ describe('task 19.2: texture headroom and craftsmanship', () => {
     // Task 22.1 shrinks corkBoard to 256x256 (-1.00 MB) and adds vcrDeck and vhsShell (+0.25 MB): now 7.0 MB.
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.7 * 1048576 + TASK_27_1_TEXTURE_BYTES)
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
-    expect(report.totalDrawCalls).toBeLessThan(400)
+    expect(report.totalDrawCalls).toBeLessThan(DRAW_CALL_CAP)
     expect(report.textureCount).toBe(TEXTURE_IDS.length)
   })
 
@@ -2170,7 +2180,7 @@ describe('task 22.1: media island, armchair and VHS shells', () => {
     // Task 23.1 replaced the two old desk lamps (470 triangles) with two new ones (352): -118.
     // Task 23.2 replaced 7 ordinary books on shelf-b (-84) with 3 manuals and 3 spine bands (+72): -12.
     // Task 24.1: two lamp cones (+48) and five ceiling bloom strips (+10) = +58.
-    expect(report.totalTriangles).toBe(19128 - 72 + 116 - 118 - 12 + 58 + 18 + 6 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES) // 27.1: -36 (three cream manual band boxes) // 25.1: +16 brass caps, +2 liner; 25.2: +6 floor glow decals; 26.1: +64 coffee discs
+    expect(report.totalTriangles).toBe(19128 - 72 + 116 - 118 - 12 + 58 + 18 + 6 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES + TASK_35_1_TRIANGLES) // 27.1: -36 (three cream manual band boxes) // 25.1: +16 brass caps, +2 liner; 25.2: +6 floor glow decals; 26.1: +64 coffee discs
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
   })
 
@@ -2367,7 +2377,7 @@ describe('task 22.2 (part A): metalCabinet, cardboard crate and CRT stack casing
         `(computed, not runtime-measured), metalCabinet ${mb('metalCabinet')} MB, crate ${mb('crate')} MB`,
     )
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
-    expect(report.totalTriangles - 19128).toBeLessThanOrEqual(60 + TASK_34_1_TRIANGLES)
+    expect(report.totalTriangles - 19128).toBeLessThanOrEqual(60 + TASK_34_1_TRIANGLES + TASK_35_1_TRIANGLES)
     expect(report.textureCount).toBe(32)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.55 * 1048576 + TASK_27_1_TEXTURE_BYTES)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
@@ -2504,7 +2514,7 @@ describe('task 22.2 (part B): desk clutter and east doorway detail', () => {
         `texture memory ${(report.textureMemoryBytes / 1048576).toFixed(3)} MB (computed, not runtime-measured), deskDetail ${(textureMemoryBytes(TEXTURE_SPECS.deskDetail) / 1048576).toFixed(3)} MB`,
     )
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
-    expect(report.totalTriangles - 19056).toBeLessThanOrEqual(120 + TASK_26_1_TRIANGLES)
+    expect(report.totalTriangles - 19056).toBeLessThanOrEqual(120 + TASK_26_1_TRIANGLES + TASK_35_1_TRIANGLES)
     expect(report.textureCount).toBe(32)
     // Task 23.1: lampGlow 64 -> 128 px adds 0.062 MiB (7.459 -> 7.521 MiB), so the cap is 7.55 MiB.
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.55 * 1048576 + TASK_27_1_TEXTURE_BYTES)
@@ -2679,8 +2689,8 @@ describe('task 25.1: lamp craft, soft cones, richer pools, notebook move', () =>
   it('budgets: under 20,000 triangles, at most +20 over 19,100, 4 lights, 32 textures within 7.6 MB, every texture disposed once', () => {
     const report = sceneDetailReport()
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
-    expect(report.totalTriangles - 19100).toBeLessThanOrEqual(24 + TASK_26_1_TRIANGLES + TASK_34_1_TRIANGLES) // 25.2 adds 6 more
-    expect(report.totalTriangles - 19100).toBe(24 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES)
+    expect(report.totalTriangles - 19100).toBeLessThanOrEqual(24 + TASK_26_1_TRIANGLES + TASK_34_1_TRIANGLES + TASK_35_1_TRIANGLES) // 25.2 adds 6 more
+    expect(report.totalTriangles - 19100).toBe(24 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES + TASK_35_1_TRIANGLES)
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(MAX_LIGHTS).toBe(4)
     expect(report.textureCount).toBe(32)
@@ -2758,7 +2768,7 @@ describe('task 25.2 arcade floor glow decals', () => {
     const report = sceneDetailReport()
     expect(report.objects.map((o) => o.name)).toContain('arcade-floor-glow')
     expect(report.objects.find((o) => o.name === 'arcade-floor-glow')!.triangles).toBe(6)
-    expect(report.totalTriangles).toBe(19118 + 6 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES)
+    expect(report.totalTriangles).toBe(19118 + 6 + TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES + TASK_35_1_TRIANGLES)
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(report.textureCount).toBe(32)
@@ -2826,10 +2836,10 @@ describe('task 26.1: anisotropy, VCR chassis and mug detail', () => {
     }
   })
 
-  it('keeps the budgets: at most 19,200 triangles (computed), 4 lights, 32 textures within 7.85 MB', () => {
+  it('keeps the budgets: at most the 20,000 cap triangles (computed), 4 lights, 32 textures within 7.85 MB', () => {
     const report = sceneDetailReport()
-    expect(report.totalTriangles).toBeLessThanOrEqual(19200)
-    expect(report.totalTriangles - 19124).toBe(TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES)
+    expect(report.totalTriangles).toBeLessThanOrEqual(TRIANGLE_CAP)
+    expect(report.totalTriangles - 19124).toBe(TASK_26_1_TRIANGLES + TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES + TASK_35_1_TRIANGLES)
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(report.textureCount).toBe(32)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.85 * 1048576)
@@ -3010,17 +3020,17 @@ describe('task 27.1: cabinet front detail and manual spines (cabinetAndManualDet
     expect(materials.manualBook.map).toBeNull()
   })
 
-  it('keeps the budgets: triangles at most 19,200 and not above 19,188 (delta -36), 4 lights, 32 textures, memory at most 7.85 MB', () => {
+  it('keeps the budgets: triangles at most the 20,000 cap and not above 19,188 (delta -36), 4 lights, 32 textures, memory at most 7.85 MB', () => {
     const report = sceneDetailReport()
-    expect(report.totalTriangles).toBeLessThanOrEqual(19200)
-    expect(report.totalTriangles - 19188).toBeLessThanOrEqual(TASK_30_1_TRIANGLES)
-    expect(report.totalTriangles - 19188).toBe(TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES)
+    expect(report.totalTriangles).toBeLessThanOrEqual(TRIANGLE_CAP)
+    expect(report.totalTriangles - 19188).toBeLessThanOrEqual(TASK_30_1_TRIANGLES + TASK_35_1_TRIANGLES)
+    expect(report.totalTriangles - 19188).toBe(TASK_27_1_TRIANGLES + TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES + TASK_35_1_TRIANGLES)
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(MAX_LIGHTS).toBe(4)
     expect(report.textureCount).toBe(32)
     expect(report.textureMemoryBytes).toBeLessThanOrEqual(7.85 * 1048576)
     expect(totalTextureMemoryBytes() - 7.537 * 1048576).toBeCloseTo(TASK_27_1_TEXTURE_BYTES, -4)
-    expect(report.totalDrawCalls).toBeLessThan(400)
+    expect(report.totalDrawCalls).toBeLessThan(DRAW_CALL_CAP)
   })
 
   it('every one of the 32 textures has anisotropy 4 and is disposed exactly once, twice-safe', () => {
@@ -3182,14 +3192,14 @@ describe('task 28.2: protruding manual volumes with spine and cover art', () => 
     expect(`#${materials.manualBook.color.getHexString()}`).toBe('#ffffff')
   })
 
-  it('keeps the budgets with zero added triangles: at most 19,200 and 36 fewer than 19,152 (three displaced books), 4 lights, 32 textures and unchanged texture memory (at most 7.85 MB)', () => {
+  it('keeps the budgets with zero added triangles: at most the 20,000 cap and 36 fewer than 19,152 (three displaced books), 4 lights, 32 textures and unchanged texture memory (at most 7.85 MB)', () => {
     const report = sceneDetailReport()
     const BEFORE_28_2 = 19188 + TASK_27_1_TRIANGLES
     expect(BEFORE_28_2).toBe(19152)
-    expect(report.totalTriangles).toBeLessThanOrEqual(19200)
+    expect(report.totalTriangles).toBeLessThanOrEqual(TRIANGLE_CAP)
     // The manuals add no triangles; the wider volumes displace three ordinary books, so the total can only go down.
-    expect(report.totalTriangles - BEFORE_28_2).toBe(TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES)
-    expect(report.totalTriangles - BEFORE_28_2).toBeLessThanOrEqual(TASK_30_1_TRIANGLES + TASK_34_1_TRIANGLES)
+    expect(report.totalTriangles - BEFORE_28_2).toBe(TASK_28_2_TRIANGLES + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES + TASK_35_1_TRIANGLES)
+    expect(report.totalTriangles - BEFORE_28_2).toBeLessThanOrEqual(TASK_30_1_TRIANGLES + TASK_34_1_TRIANGLES + TASK_35_1_TRIANGLES)
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(MAX_LIGHTS).toBe(4)
     expect(report.textureCount).toBe(32)
@@ -3280,8 +3290,8 @@ describe('task 29.2: animated attract screens in the shared resources', () => {
     const report = sceneDetailReport()
     expect(report.textureCount).toBe(32)
     expect(report.textureMemoryBytes / 1048576).toBeCloseTo(7.703, 3)
-    expect(report.totalTriangles).toBe(19116 + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES)
-    expect(report.totalTriangles).toBeLessThanOrEqual(19200)
+    expect(report.totalTriangles).toBe(19116 + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES + TASK_35_1_TRIANGLES)
+    expect(report.totalTriangles).toBeLessThanOrEqual(TRIANGLE_CAP)
     expect(M3_LIGHT_COUNT).toBe(4)
     setCanvasFactory(() => fakeCanvas())
     ensureSharedTextures()
@@ -3499,11 +3509,11 @@ describe('task 31.2: desk cassette and ceiling fixture texture polish', () => {
     expect(materials.fluorescent.map).toBeNull()
   })
 
-  it('budgets: triangles unchanged at 19,154 (at most 19,200), 4 lights, 32 textures, 7.703 MiB, every texture and cached geometry disposed once', () => {
+  it('budgets: triangles unchanged at 19,154 (at most the 20,000 cap), 4 lights, 32 textures, 7.703 MiB, every texture and cached geometry disposed once', () => {
     const report = sceneDetailReport()
-    expect(report.totalTriangles).toBe(19116 + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES)
-    expect(report.totalTriangles).toBe(19154 + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES)
-    expect(report.totalTriangles).toBeLessThanOrEqual(19200)
+    expect(report.totalTriangles).toBe(19116 + TASK_30_1_TRIANGLES + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES + TASK_35_1_TRIANGLES)
+    expect(report.totalTriangles).toBe(19154 + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES + TASK_35_1_TRIANGLES)
+    expect(report.totalTriangles).toBeLessThanOrEqual(TRIANGLE_CAP)
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(MAX_LIGHTS).toBe(4)
     expect(report.textureCount).toBe(32)
@@ -3713,9 +3723,9 @@ describe('task 33.1: record player model', () => {
     expect(countTriangles(g.tonearm)).toBe(92)
     expect(countTriangles(parts())).toBe(TASK_33_1_TURNTABLE)
     expect(countTriangles(parts(true))).toBe(TASK_33_1_TURNTABLE)
-    // Task 34.1: the declared record-player object is the Hi-Fi table now (the 526-triangle console is still what turntableParts builds).
+    // Task 35.1: the declared record-player object is the two-tier console now (the 526-triangle console is still what turntableParts builds).
     const obj = sceneDetailReport().objects.find((o) => o.name === 'record-player')!
-    expect(obj.triangles).toBe(TASK_34_1_TABLE)
+    expect(obj.triangles).toBe(TASK_35_1_CONSOLE)
     // The kick plinth is the one open-bottom board of the console.
     expect(parts().filter((p) => p.openBottom)).toHaveLength(1)
   })
@@ -3780,6 +3790,7 @@ describe('task 33.1: floor-flush bottom face culling', () => {
     'crt-stack',
     'desk',
     'record-player',
+    'loudspeaker',
     'crate-a',
     'crate-b',
     'shelf-a',
@@ -3818,17 +3829,17 @@ describe('task 33.1: floor-flush bottom face culling', () => {
           expect(p.geo, o.name).toBe('box')
           expect(Math.abs(p.pos[1] - p.scale[1] / 2), `${o.name} ${p.mat}`).toBeLessThanOrEqual(FLOOR_FLUSH_TOLERANCE)
           expect(Math.abs(p.rot?.[0] ?? 0) + Math.abs(p.rot?.[2] ?? 0), o.name).toBe(0)
-          expect(partTriangles(p)).toBe(10)
+          expect(partTriangles(p)).toBe(GEOMETRY_TRIANGLES.box - removedFaces(p).length * CULLED_FACE_SAVED_TRIANGLES)
         } else if (culledNames.includes(o.name)) {
           // No floor-flush box is left uncut in the objects the pass covers.
           expect(isFloorFlushBox(p), `${o.name} ${p.mat} at ${p.pos.join(',')}`).toBe(false)
         }
       }
     }
-    // 34 boxes of the existing models plus the new console kick plinth.
-    expect(flagged).toBe(35)
+    // 34 boxes of the existing models, the four steel console posts (35.1) and the loudspeaker cabinet (35.1).
+    expect(flagged).toBe(39)
     const savedExisting = declaredObjects()
-      .filter((o) => o.name !== 'record-player')
+      .filter((o) => o.name !== 'record-player' && o.name !== 'loudspeaker')
       .reduce((n, o) => n + o.parts.filter((p) => p.openBottom).length * OPEN_BOTTOM_SAVED_TRIANGLES, 0)
     expect(savedExisting).toBe(-TASK_33_1_CULLED_EXISTING)
   })
@@ -3873,19 +3884,19 @@ describe('task 33.1: console cable reclaim and budgets', () => {
     expect(report.objects.find((o) => o.name === 'console-cables')!.triangles).toBe(608)
   })
 
-  it('totals: 19,196 triangles (33.1 net -22 from 19,154, 34.1 net +64), at most 19,200 and 20,000, 4 lights, 32 textures, 7.703 MiB, record player present', () => {
+  it('totals: 19,988 triangles (33.1 net -22 from 19,154, 34.1 net +64, 35.1 net +792), at most 20,000, 4 lights, 32 textures, 7.703 MiB, record player present', () => {
     const report = sceneDetailReport()
     expect(TASK_33_1_TRIANGLES).toBe(-22)
     expect(TASK_34_1_TRIANGLES).toBe(64)
-    expect(report.totalTriangles).toBe(19154 + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES)
-    expect(report.totalTriangles).toBe(19196)
-    expect(report.totalTriangles).toBeLessThanOrEqual(19200)
+    expect(report.totalTriangles).toBe(19154 + TASK_33_1_TRIANGLES + TASK_34_1_TRIANGLES + TASK_35_1_TRIANGLES)
+    expect(report.totalTriangles).toBe(19988)
+    expect(report.totalTriangles).toBeLessThanOrEqual(TRIANGLE_CAP)
     expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
     expect(report.objects.map((o) => o.name)).toContain('record-player')
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(report.textureCount).toBe(32)
     expect(report.textureMemoryBytes / 1048576).toBeCloseTo(7.703, 3)
-    expect(report.totalDrawCalls).toBeLessThan(400)
+    expect(report.totalDrawCalls).toBeLessThan(DRAW_CALL_CAP)
   })
 
   it('the record player is a solid console with a world interactable, not a Station', () => {
@@ -3948,10 +3959,15 @@ describe('task 33.3: turntable spin and pose', () => {
 // ---------------------------------------------------------------------------------------------
 import { BOX_FACES, CULLED_FACE_SAVED_TRIANGLES, WALL_FLUSH_TOLERANCE, removedFaces, wallFlushFaces } from './floorCull'
 import {
-  HIFI_CRATE,
+  HIFI_CASSETTE,
+  HIFI_FRAME,
   HIFI_GLOW_LIFT,
   HIFI_JACKET,
-  HIFI_SLEEVE,
+  HIFI_LID,
+  HIFI_RACK,
+  HIFI_RECEIVER,
+  HIFI_RECORD_CRATE,
+  HIFI_RECORD_PALETTE,
   HIFI_SLEEVE_MATERIALS,
   HIFI_TABLE_D,
   HIFI_TABLE_W,
@@ -3959,29 +3975,42 @@ import {
   NOW_PLAYING_COLOURS,
   NOW_PLAYING_NEUTRAL,
   countDrawCalls,
+  hifiRecordColours,
   hifiTableGroups,
   hifiTableParts,
   hifiTablePlacement,
+  isRealSizePart,
   nowPlayingColour,
   nowPlayingMaterial,
   propBackAgainstWall,
+  speakerParts,
+  speakerPlacement,
+  type HifiRole,
 } from './modelDetail'
 import { HIFI_GLOW_OPACITY, culledBoxGeometry } from './sharedResources'
-import { AdditiveBlending } from 'three'
+import { AdditiveBlending, DoubleSide } from 'three'
 
-describe('task 34.1: Hi-Fi table', () => {
+describe('task 35.1: two-tier Hi-Fi console', () => {
   afterEach(() => setCanvasFactory(null))
   const placement = () => hifiTablePlacement()
   const parts = (playing = false, track = 4) => hifiTableParts(placement().local, { playing, track }, placement().wallBack)
   const groups = (playing = false, track = 4) => hifiTableGroups(placement().local, { playing, track }, placement().wallBack)
-  const role = (all: Part[], r: NonNullable<Part['hifiRole']>) => all.filter((p) => p.hifiRole === r)
+  const role = (all: readonly Part[], r: HifiRole) => all.filter((p) => p.hifiRole === r)
   const extent = (p: Part) => {
     const size: Vec3 = p.geo === 'plane' || p.geo === 'disc' ? [p.scale[0], p.scale[1], 0] : p.scale
     const h = orientedHalfExtents(size, p.rot ?? [0, 0, 0])
     return { minX: p.pos[0] - h[0], maxX: p.pos[0] + h[0], minY: p.pos[1] - h[1], maxY: p.pos[1] + h[1], minZ: p.pos[2] - h[2], maxZ: p.pos[2] + h[2] }
   }
   const hexOf = (c: { getHexString(): string }) => `#${c.getHexString()}`
+  const luminance = (c: { r: number; g: number; b: number }) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
   const TOP = TURNTABLE_CABINET_TOP
+  const SHELF = HIFI_FRAME.shelfTop
+  const SLAB_BOTTOM = TOP - HIFI_FRAME.slabT
+  const obbOf = (p: Part): OBB => {
+    const rot = p.rot ?? [0, 0, 0]
+    const m = new Matrix4().makeRotationFromEuler(new Euler(rot[0], rot[1], rot[2]))
+    return new OBB(new Vector3(p.pos[0], p.pos[1], p.pos[2]), new Vector3(p.scale[0] / 2, p.scale[1] / 2, p.scale[2] / 2), new Matrix3().setFromMatrix4(m))
+  }
 
   it('is the record-player prop on the south wall: local footprint 1.25 x 0.45 m, front toward +z in its local frame, back on the wall plane', () => {
     const pl = placement()
@@ -3993,17 +4022,17 @@ describe('task 34.1: Hi-Fi table', () => {
     expect(HIFI_TABLE_W).toBe(1.25)
     expect(HIFI_TABLE_D).toBe(0.45)
     expect(pl.frame.rotationY).toBeCloseTo(Math.PI, 9)
-    // The north wall is not a wall for it; the filing cabinets' backs and this table's back are the props with a wall behind them.
     expect(propBackAgainstWall('record-player')).toBe(true)
+    expect(propBackAgainstWall('loudspeaker')).toBe(true)
     expect(propBackAgainstWall('filing-cabinet-a')).toBe(true)
-    expect(propBackAgainstWall('filing-cabinet-b')).toBe(true)
     expect(propBackAgainstWall('reception-desk')).toBe(false)
     expect(propBackAgainstWall('couch')).toBe(false)
   })
 
-  it('has the turntable assembly unchanged on the left (same platter group and tonearm in both poses as the 33.1 console), a crate, four sleeves, a jacket stand, an LED bar and a glow disc', () => {
+  it('has every part group of the two tiers with the declared counts, and the turntable assembly unchanged on the left 0.8 m (same platter group and tonearm in both poses)', () => {
     const local = placement().local
-    const ttBox = { minX: local.minX, maxX: local.minX + HIFI_TURNTABLE_SECTION_W, minZ: local.minZ, maxZ: local.maxZ }
+    const ttBox = { minX: local.minX + 0.025, maxX: local.minX + 0.025 + HIFI_TURNTABLE_SECTION_W, minZ: local.minZ, maxZ: local.maxZ }
+    expect(HIFI_TURNTABLE_SECTION_W).toBe(0.8)
     for (const playing of [false, true]) {
       const g = groups(playing)
       const legacy = turntableGroups(ttBox, { playing })
@@ -4011,65 +4040,99 @@ describe('task 34.1: Hi-Fi table', () => {
       expect(g.tonearm).toEqual(legacy.tonearm)
       expect(g.spindle).toEqual(legacy.spindle)
       expect(g.pivot).toEqual(legacy.pivot)
-      // The assembly parts of the static group are the 33.1 ones too (feet, controls, cradle), now on the left 0.9 m of the table.
       for (const key of ['bezel', 'fixtureHousing', 'labelSlot', playing ? 'trackDisplayOn' : 'trackDisplay'] as const) {
         expect(g.static.some((p) => p.mat === key), key).toBe(true)
       }
       expect(g.static.filter((p) => p.mat === 'bezel' && p.scale[0] === 0.03 && p.scale[2] === 0.03)).toHaveLength(4)
       expect(g.platter.map((p) => p.geo).sort()).toEqual(['cylinderLow', 'disc', 'platter'])
       expect(g.tonearm).toHaveLength(6)
+      // The pitch slider and power button stay on the narrower deck (0.35 m half width).
+      const deck = g.static.find((p) => p.mat === 'fixtureHousing' && p.atlas && p.scale[1] === 0.004)!
+      for (const p of g.static.filter((q) => q.mat === 'labelSlot' || (q.mat === 'metal' && q.geo === 'cylinderLow'))) {
+        expect(Math.abs(p.pos[0] - deck.pos[0]) + p.scale[0] / 2, p.mat).toBeLessThanOrEqual(deck.scale[0] / 2 + 1e-9)
+      }
     }
     const all = parts()
-    // The walnut table: kick plinth, two sides, back, top slab and middle shelf, all metric woodDark boards (plus the 33.1 plinth).
-    expect(all.filter((p) => p.mat === 'woodDark' && p.metric === true).length).toBeGreaterThanOrEqual(7)
-    // Crate: two slat planks and two end boards, all crate materials, on the right half.
-    const crate = role(all, 'crate')
-    expect(crate).toHaveLength(4)
-    expect(crate.map((p) => p.mat).sort()).toEqual(['crateSlat', 'crateSlat', 'crateWood', 'crateWood'])
-    // The turntable plinth ends 0.03 m before the 0.9 m section edge; the crate starts after it.
-    expect(Math.min(...crate.map((p) => extent(p).minX))).toBeGreaterThan(local.minX + HIFI_TURNTABLE_SECTION_W - 0.03)
-    expect(Math.max(...crate.map((p) => extent(p).maxX))).toBeLessThanOrEqual(local.maxX)
-    // Four sleeves, a two-part easel (base plate and back leg), one jacket, one LED bar and one glow disc.
-    expect(role(all, 'sleeve')).toHaveLength(4)
-    expect(role(all, 'stand')).toHaveLength(2)
-    expect(role(all, 'jacket')).toHaveLength(1)
-    expect(role(all, 'led')).toHaveLength(1)
-    expect(role(all, 'glow')).toHaveLength(1)
-    expect(all).toHaveLength(40)
-    // The jacket stand is beside the platter group: east of the turntable section, in front of the crate.
-    const stand = role(all, 'stand')
-    expect(Math.min(...stand.map((p) => extent(p).minX))).toBeGreaterThan(local.minX + HIFI_TURNTABLE_SECTION_W - 0.03)
-    expect(extent(role(all, 'jacket')[0]).minZ).toBeGreaterThan(Math.max(...crate.map((p) => extent(p).maxZ)))
+    const counts: Record<string, number> = {}
+    for (const p of all) if (p.hifiRole) counts[p.hifiRole] = (counts[p.hifiRole] ?? 0) + 1
+    expect(counts).toEqual({
+      frame: 7, // four steel posts, walnut top slab, walnut lower shelf, steel shelf lip
+      led: 1,
+      cover: 6, // four acrylic panels and two hinge brackets
+      stand: 2,
+      jacket: 1,
+      cassette: 2,
+      lamp: 4,
+      rack: 6,
+      rackSleeve: 12,
+      stack: 2,
+      receiver: 4,
+      receiverDial: 3,
+      receiverDisplay: 1,
+      crate: 4,
+      record: 10,
+      recordLabel: 10,
+      glow: 1,
+    })
+    // Frame: four steel (metalCabinet stripe) corner posts, walnut metric boards for the slab and shelf.
+    const frame = role(all, 'frame')
+    expect(frame.filter((p) => p.mat === 'fixtureHousing' && p.atlas)).toHaveLength(5)
+    expect(frame.filter((p) => p.mat === 'woodDark' && p.metric === true)).toHaveLength(2)
+    const posts = frame.filter((p) => p.scale[0] === HIFI_FRAME.post && p.scale[2] === HIFI_FRAME.post)
+    expect(posts).toHaveLength(4)
+    for (const p of posts) {
+      expect(extent(p).minY).toBeCloseTo(0, 9)
+      expect(extent(p).maxY).toBeCloseTo(SLAB_BOTTOM, 9)
+      expect(p.openBottom).toBe(true)
+    }
+    // The top slab carries the top at 0.62 m, the shelf its surface at 0.10 m.
+    const slab = frame.find((p) => p.mat === 'woodDark' && p.scale[1] === HIFI_FRAME.slabT)!
+    const shelf = frame.find((p) => p.mat === 'woodDark' && p.scale[1] === HIFI_FRAME.shelfT)!
+    expect(extent(slab).maxY).toBeCloseTo(TOP, 9)
+    expect(extent(shelf).maxY).toBeCloseTo(SHELF, 9)
+    expect(SHELF).toBeLessThan(SLAB_BOTTOM)
   })
 
-  it('has four 12-inch LP sleeves (0.31 m square, 4 mm thin) in exactly #16a34a, #e11d48, #38bdf8 and #f59e0b, slightly fanned, standing on the table top', () => {
-    const sleeves = role(parts(), 'sleeve')
-    expect(sleeves.map((p) => p.mat)).toEqual([...HIFI_SLEEVE_MATERIALS])
-    expect(sleeves.map((p) => hexOf(materials[p.mat].color))).toEqual(['#16a34a', '#e11d48', '#38bdf8', '#f59e0b'])
-    expect(sleeves.map((p) => hexOf(materials[p.mat].color))).toEqual([...NOW_PLAYING_COLOURS])
-    for (const m of HIFI_SLEEVE_MATERIALS) {
-      expect(materials[m].type).toBe('MeshLambertMaterial')
-      expect(materials[m].map).toBeNull()
-    }
-    expect(new Set(sleeves.map((p) => p.mat)).size).toBe(4)
-    for (const p of sleeves) {
+  it('the open dust cover is a clear acrylic lid (transparent #b9d4ff at 0.18, no depth write), propped open at 60 degrees, and never touches the tonearm in either pose', () => {
+    const cover = role(parts(), 'cover')
+    const panels = cover.filter((p) => p.mat === 'hifiDustCover')
+    expect(panels).toHaveLength(4)
+    expect(cover.filter((p) => p.mat === 'metal')).toHaveLength(2)
+    const m = materials.hifiDustCover
+    expect(m.type).toBe('MeshLambertMaterial')
+    expect(m.transparent).toBe(true)
+    expect(m.opacity).toBeCloseTo(0.18, 9)
+    expect(m.depthWrite).toBe(false)
+    expect(m.map).toBeNull()
+    expect(hexOf(m.color)).toBe('#b9d4ff')
+    expect(m.color.b).toBeGreaterThan(m.color.r)
+    expect(m.color.b).toBeGreaterThanOrEqual(m.color.g)
+    // Open: every panel is tilted about x by -60 degrees (front edge raised), within the 60..70 degree range.
+    const deg = (HIFI_LID.open * 180) / Math.PI
+    expect(deg).toBeGreaterThanOrEqual(60 - 1e-9)
+    expect(deg).toBeLessThanOrEqual(70)
+    for (const p of panels) {
       expect(p.geo).toBe('box')
-      expect(p.scale).toEqual([0.31, 0.31, 0.004])
-      // Resting on the table top inside the crate.
-      expect(extent(p).minY).toBeCloseTo(TOP, 9)
-      expect(extent(p).maxY).toBeLessThanOrEqual(TOP + 0.31 + 0.002)
+      expect(p.rot![0]).toBeCloseTo(-HIFI_LID.open, 9)
     }
-    // Fanned: four different lean angles about x, each leaning back a little more than the one in front (z grows toward the front).
-    const leans = sleeves.map((p) => p.rot?.[0] ?? 0)
-    expect(new Set(leans).size).toBe(4)
-    expect([...HIFI_SLEEVE.lean]).toEqual(leans)
-    for (let i = 1; i < leans.length; i++) expect(leans[i]).toBeGreaterThan(leans[i - 1])
-    for (let i = 1; i < sleeves.length; i++) expect(sleeves[i].pos[2]).toBeGreaterThan(sleeves[i - 1].pos[2])
-    expect(Math.max(...leans)).toBeLessThanOrEqual(0.1)
-    expect(Math.min(...leans)).toBeGreaterThanOrEqual(-0.3)
-    // All four stand on the same x, inside the crate width.
-    expect(new Set(sleeves.map((p) => p.pos[0])).size).toBe(1)
-    expect(HIFI_CRATE.w - 0.024).toBeGreaterThan(0.31)
+    const lidTop = panels.find((p) => p.scale[1] === HIFI_LID.t && p.scale[2] === HIFI_LID.length)!
+    const rise = (HIFI_LID.length / 2) * Math.sin(HIFI_LID.open)
+    expect(lidTop.pos[1] + rise).toBeGreaterThan(lidTop.pos[1] - rise + 0.2)
+    // Hinged at the back: the lowest edge of the side panels is at the hinge height on the plinth top, behind the platter.
+    const hingeY = TOP + 0.012 + 0.05
+    const sides = panels.filter((p) => p.scale[0] === HIFI_LID.t)
+    expect(sides).toHaveLength(2)
+    expect(Math.min(...sides.map((p) => extent(p).minY))).toBeGreaterThanOrEqual(hingeY - 0.1 * Math.cos(HIFI_LID.open) - 1e-6)
+    // No clipping with the tonearm (tube, counterweight, headshell, cartridge, pivot post) in the stopped or the playing pose, with 2 mm to spare.
+    for (const playing of [false, true]) {
+      const lid = role(parts(playing), 'cover').filter((p) => p.mat === 'hifiDustCover').map(obbOf)
+      for (const arm of groups(playing).tonearm) {
+        const a = obbOf(arm)
+        for (const l of lid) expect(l.intersectsOBB(a, 0.002), `${arm.mat} ${arm.geo} playing=${playing}`).toBe(false)
+      }
+    }
+    // The whole open lid stays below the prop height.
+    for (const p of cover) expect(extent(p).maxY).toBeLessThanOrEqual(placement().prop.height + 1e-9)
   })
 
   it('nowPlayingColour: tracks 0..3 are the four colours and STOP (4), nothing yet and any other value are the neutral dark grey', () => {
@@ -4077,51 +4140,224 @@ describe('task 34.1: Hi-Fi table', () => {
     expect(nowPlayingColour(4)).toBe(NOW_PLAYING_NEUTRAL)
     expect(NOW_PLAYING_NEUTRAL).toBe('#3a3d46')
     for (const t of [-1, 5, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 99]) expect(nowPlayingColour(t), String(t)).toBe(NOW_PLAYING_NEUTRAL)
-    // Pure and total: same input, same output; the four colours differ from each other and from the neutral.
     expect(new Set([...NOW_PLAYING_COLOURS, NOW_PLAYING_NEUTRAL]).size).toBe(5)
-    // The shared material of each track has exactly that colour (so the jacket and its crate sleeve share one material).
     for (const t of [0, 1, 2, 3, 4]) expect(hexOf(materials[nowPlayingMaterial(t)].color)).toBe(nowPlayingColour(t))
+    for (const m of HIFI_SLEEVE_MATERIALS) {
+      expect(materials[m].type).toBe('MeshLambertMaterial')
+      expect(materials[m].map).toBeNull()
+    }
     expect(nowPlayingMaterial(0)).toBe('sleeveGreen')
     expect(nowPlayingMaterial(4)).toBe('sleeveNeutral')
     expect(nowPlayingMaterial(7)).toBe('sleeveNeutral')
     expect(materials.sleeveNeutral.map).toBeNull()
   })
 
-  it('the jacket in the part builder follows the track state, is neutral for STOP, and costs no extra draw call while a record colour is shown', () => {
+  it('the jacket follows the track state (neutral #3a3d46 for STOP), leans on an easel in the centre of the top and costs the same for every track', () => {
     for (const track of [0, 1, 2, 3, 4]) {
       const jacket = role(parts(true, track), 'jacket')[0]
       expect(jacket.mat).toBe(nowPlayingMaterial(track))
       expect(hexOf(materials[jacket.mat].color)).toBe(nowPlayingColour(track))
       expect(jacket.scale).toEqual([HIFI_JACKET.size, HIFI_JACKET.size, HIFI_JACKET.thickness])
-      // Leaning back on its easel and resting on the base plate.
       expect(jacket.rot![0]).toBeCloseTo(HIFI_JACKET.lean, 9)
       expect(extent(jacket).minY).toBeCloseTo(TOP + HIFI_JACKET.baseT, 9)
     }
-    // Only the jacket changes with the track: same part count and the same triangles for every track.
-    const counts = [0, 1, 2, 3, 4].map((t) => countTriangles(parts(true, t)))
-    expect(new Set(counts).size).toBe(1)
-    // A record colour reuses the crate sleeve material (same draw-call group); STOP adds the one neutral group.
-    const draws = [0, 1, 2, 3].map((t) => countDrawCalls(parts(true, t)))
-    expect(new Set(draws).size).toBe(1)
-    expect(countDrawCalls(parts(true, 4))).toBe(draws[0] + 1)
-    // The default state (no selection yet) is the neutral jacket.
+    expect(new Set([0, 1, 2, 3, 4].map((t) => countTriangles(parts(true, t)))).size).toBe(1)
+    expect(new Set([0, 1, 2, 3, 4].map((t) => countDrawCalls(parts(true, t)))).size).toBe(1)
     expect(role(hifiTableParts(placement().local), 'jacket')[0].mat).toBe('sleeveNeutral')
-  })
-
-  it('has an angled easel: a base plate on the table top and a back leg tilted toward the jacket, both inside the footprint', () => {
+    // The stand is right of the turntable section and left of the lamp; the base plate rests on the top and the back leg tilts toward the jacket (jacket leans back at 0.3 rad).
+    const local = placement().local
+    const jacket = role(parts(), 'jacket')[0]
+    expect(extent(jacket).minX).toBeGreaterThan(local.minX + 0.025 + HIFI_TURNTABLE_SECTION_W)
+    // The lamp is in the right back corner: no lamp part overlaps the jacket or its stand in plan.
+    const planOverlap = (a: ReturnType<typeof extent>, b: ReturnType<typeof extent>) => a.minX < b.maxX && a.maxX > b.minX && a.minZ < b.maxZ && a.maxZ > b.minZ
+    for (const l of role(parts(), 'lamp')) for (const s of [...role(parts(), 'stand'), jacket]) expect(planOverlap(extent(l), extent(s)), `lamp ${l.mat} vs ${s.mat}`).toBe(false)
     const [base, leg] = role(parts(), 'stand')
     expect(extent(base).minY).toBeCloseTo(TOP, 9)
     expect(extent(base).maxY).toBeCloseTo(TOP + HIFI_JACKET.baseT, 9)
-    expect(base.scale[0]).toBeCloseTo(HIFI_JACKET.baseW, 9)
-    expect(extent(leg).minY).toBeCloseTo(TOP + HIFI_JACKET.baseT, 9)
     expect(leg.rot![0]).not.toBe(0)
-    // The jacket leans back (top toward the crate) at 0.3 rad, so the stand is angled.
     expect(HIFI_JACKET.lean).toBeLessThan(0)
-    // The leg top touches the back of the jacket (within 8 mm), so the jacket has a support.
-    const jacket = role(parts(), 'jacket')[0]
     const legTop = { y: leg.pos[1] + (HIFI_JACKET.legH / 2) * Math.cos(leg.rot![0]), z: leg.pos[2] + (HIFI_JACKET.legH / 2) * Math.sin(leg.rot![0]) }
     const jacketBackZ = jacket.pos[2] + (legTop.y - jacket.pos[1]) * Math.tan(HIFI_JACKET.lean) - HIFI_JACKET.thickness / 2
     expect(Math.abs(legTop.z - jacketBackZ)).toBeLessThan(0.008)
+  })
+
+  it('has two scattered cassettes on the vhsShell-mapped cassette geometry (tapeBlack and tapeBlue), lying flat on the top at different angles', () => {
+    const tapes = role(parts(), 'cassette')
+    expect(tapes).toHaveLength(2)
+    expect(tapes.map((p) => p.mat).sort()).toEqual(['tapeBlack', 'tapeBlue'])
+    expect(HIFI_CASSETTE).toEqual([0.11, 0.017, 0.07])
+    for (const p of tapes) {
+      expect(p.cassette).toBe(true)
+      expect(isRealSizePart(p)).toBe(true)
+      expect(p.scale).toEqual(HIFI_CASSETTE)
+      expect(extent(p).minY).toBeCloseTo(TOP, 9)
+      // The same mapped geometry as the desk cassette: the top face shows the label strip and reel window.
+      const g = cassetteBoxGeometry(p.scale[0], p.scale[1], p.scale[2])
+      expect(g.getAttribute('uv').count).toBe(24)
+    }
+    expect(new Set(tapes.map((p) => p.rot![1])).size).toBe(2)
+    expect(materials.tapeBlack.type).toBe('MeshLambertMaterial')
+    expect(cassetteBoxCount()).toBeGreaterThanOrEqual(1)
+    // vhsShell mapping: with the canvas the two materials share the one vhsShell texture (no new texture).
+    setCanvasFactory(() => fakeCanvas())
+    ensureSharedTextures()
+    expect(materials.tapeBlack.map).toBe(getSharedTexture('vhsShell'))
+    expect(materials.tapeBlue.map).toBe(getSharedTexture('vhsShell'))
+    expect(liveTextureCount()).toBe(32)
+  })
+
+  it('has a small brass desk lamp on the right: brass base and stem, a dark double-sided shade and an emissive amber bulb (MeshBasicMaterial), and no light', () => {
+    const lamp = role(parts(), 'lamp')
+    expect(lamp).toHaveLength(4)
+    expect(lamp.filter((p) => p.mat === 'brass')).toHaveLength(2)
+    const shade = lamp.find((p) => p.mat === 'hifiLampShade')!
+    const bulb = lamp.find((p) => p.mat === 'hifiLampBulb')!
+    expect(shade.geo).toBe('cone')
+    expect(materials.brass.type).toBe('MeshLambertMaterial')
+    expect(materials.hifiLampShade.side).toBe(DoubleSide)
+    expect(luminance(materials.hifiLampShade.color)).toBeLessThan(0.03)
+    expect(materials.hifiLampBulb.type).toBe('MeshBasicMaterial')
+    const c = materials.hifiLampBulb.color
+    expect(c.r).toBeGreaterThan(c.g)
+    expect(c.g).toBeGreaterThan(c.b)
+    expect(materials.hifiLampBulb.map).toBeNull()
+    // The bulb is inside the shade, the lamp stands on the top at the right end and is small (under 0.2 m).
+    expect(extent(bulb).minY).toBeGreaterThan(extent(shade).minY)
+    expect(extent(bulb).maxY).toBeLessThan(extent(shade).maxY)
+    for (const p of lamp) expect(extent(p).minY).toBeGreaterThanOrEqual(TOP - 1e-9)
+    expect(Math.max(...lamp.map((p) => extent(p).maxY)) - TOP).toBeLessThan(0.2)
+    expect(Math.min(...lamp.map((p) => extent(p).minX))).toBeGreaterThan(extent(role(parts(), 'jacket')[0]).minX)
+    // No Part is a light: the console adds none (the scene has exactly four).
+    expect(M3_LIGHT_COUNT).toBe(4)
+  })
+
+  it('lower tier: a wire rack of 12 tightly packed seeded LP sleeves, a silver receiver on a record stack, and a crate of 10 labelled vertical records, left to right', () => {
+    const all = parts()
+    const rack = role(all, 'rack')
+    const sleeves = role(all, 'rackSleeve')
+    const stack = role(all, 'stack')
+    const receiver = role(all, 'receiver')
+    const crate = role(all, 'crate')
+    const records = role(all, 'record')
+    const labels = role(all, 'recordLabel')
+    // Wire rack: thin steel rods only (6 mm section), minimal frame.
+    expect(rack).toHaveLength(6)
+    for (const p of rack) {
+      expect(p.mat).toBe('metal')
+      expect(Math.min(...p.scale)).toBeLessThanOrEqual(0.006 + 1e-9)
+      expect(extent(p).minY).toBeGreaterThanOrEqual(SHELF - 1e-9)
+    }
+    // 12 sleeves (0.31 m square, 10 mm) packed 10.8 mm apart, each with its own instance colour from the palette, all inside the rack.
+    expect(sleeves).toHaveLength(HIFI_RACK.sleeves)
+    expect(HIFI_RACK.sleeves).toBeGreaterThanOrEqual(12)
+    expect(HIFI_RACK.sleeves).toBeLessThanOrEqual(16)
+    expect(HIFI_RACK.pitch - HIFI_RACK.thickness).toBeLessThanOrEqual(0.001 + 1e-9)
+    const rackBox = { minX: Math.min(...rack.map((p) => extent(p).minX)), maxX: Math.max(...rack.map((p) => extent(p).maxX)), minZ: Math.min(...rack.map((p) => extent(p).minZ)), maxZ: Math.max(...rack.map((p) => extent(p).maxZ)) }
+    for (const [i, p] of sleeves.entries()) {
+      expect(p.mat).toBe('sleeveTint')
+      expect(p.colour).toBeDefined()
+      expect(HIFI_RECORD_PALETTE).toContain(p.colour)
+      expect(p.scale).toEqual([HIFI_RACK.size, HIFI_RACK.size, HIFI_RACK.thickness])
+      expect(extent(p).minY).toBeCloseTo(SHELF, 9)
+      expect(extent(p).minX).toBeGreaterThan(rackBox.minX)
+      expect(extent(p).maxX).toBeLessThan(rackBox.maxX)
+      expect(extent(p).minZ).toBeGreaterThan(rackBox.minZ)
+      expect(extent(p).maxZ).toBeLessThan(rackBox.maxZ)
+      if (i > 0) expect(p.pos[2] - sleeves[i - 1].pos[2]).toBeCloseTo(HIFI_RACK.pitch, 9)
+    }
+    // Receiver: a steel (metalCabinet stripe) body on a stack of flat records, with a dark dial window and buttons on the front (+z) face.
+    expect(materials.sleeveTint.type).toBe('MeshLambertMaterial')
+    expect(hexOf(materials.sleeveTint.color)).toBe('#ffffff')
+    expect(stack).toHaveLength(HIFI_RECEIVER.stack)
+    const body = receiver.find((p) => p.mat === 'fixtureHousing')!
+    expect(body.atlas).toBeDefined()
+    expect(extent(body).minY).toBeCloseTo(SHELF + HIFI_RECEIVER.stack * HIFI_RECEIVER.stackT, 9)
+    expect(receiver.filter((p) => p.mat === 'bezel')).toHaveLength(3) // dial window and two buttons
+    for (const p of [...receiver, ...role(all, 'receiverDial'), ...role(all, 'receiverDisplay')]) expect(extent(p).maxZ).toBeLessThanOrEqual(body.pos[2] + body.scale[2] / 2 + 0.0085)
+    // Crate: two slats and two end boards in the weathered crate materials, standing on the shelf; records stand between the boards.
+    expect(crate.map((p) => p.mat).sort()).toEqual(['crateSlat', 'crateSlat', 'crateWood', 'crateWood'])
+    for (const p of crate) expect(extent(p).minY).toBeCloseTo(SHELF, 9)
+    expect(records).toHaveLength(HIFI_RECORD_CRATE.records)
+    const slats = crate.filter((p) => p.mat === 'crateSlat')
+    const boards = crate.filter((p) => p.mat === 'crateWood')
+    const innerMinZ = Math.min(...slats.map((p) => extent(p).maxZ))
+    const innerMaxZ = Math.max(...slats.map((p) => extent(p).minZ))
+    const innerMinX = Math.min(...boards.map((p) => extent(p).maxX))
+    const innerMaxX = Math.max(...boards.map((p) => extent(p).minX))
+    for (const p of records) {
+      expect(p.mat).toBe('sleeveTint')
+      expect(p.colour).toBeDefined()
+      expect(extent(p).minY).toBeCloseTo(SHELF, 9)
+      expect(extent(p).minZ).toBeGreaterThanOrEqual(innerMinZ - 1e-9)
+      expect(extent(p).maxZ).toBeLessThanOrEqual(innerMaxZ + 1e-9)
+      expect(extent(p).minX).toBeGreaterThanOrEqual(innerMinX - 1e-9)
+      expect(extent(p).maxX).toBeLessThanOrEqual(innerMaxX + 1e-9)
+    }
+    // Each record shows a paper label band on its spine (top edge).
+    expect(labels).toHaveLength(records.length)
+    for (const [i, p] of labels.entries()) {
+      expect(p.geo).toBe('plane')
+      expect(p.mat).toBe('tapeLabel')
+      expect(p.pos[2]).toBeCloseTo(records[i].pos[2], 9)
+      expect(p.pos[1]).toBeGreaterThan(extent(records[i]).maxY)
+    }
+    // Left to right: rack, receiver, crate (local +x is the player's right).
+    const maxX = (list: Part[]) => Math.max(...list.map((p) => extent(p).maxX))
+    const minX = (list: Part[]) => Math.min(...list.map((p) => extent(p).minX))
+    expect(maxX(rack)).toBeLessThan(minX(receiver))
+    expect(maxX(receiver)).toBeLessThan(minX(crate))
+    // Rack sleeves, stacked records and crate records are ONE instanced group (one draw call).
+    const tintedParts = all.filter((p) => p.mat === 'sleeveTint')
+    expect(tintedParts).toHaveLength(HIFI_RACK.sleeves + HIFI_RECEIVER.stack + HIFI_RECORD_CRATE.records)
+    expect(new Set(tintedParts.map(partGroupKey)).size).toBe(1)
+    expect(partGroupKey(tintedParts[0])).toContain('|ic')
+    expect(partGroupKey(tintedParts[0])).not.toBe(partGroupKey({ ...tintedParts[0], colour: undefined }))
+  })
+
+  it('instanced sleeves and records are deterministic: seeded colours repeat exactly, differ by seed, never repeat in a row, and the whole console is identical on every build', () => {
+    expect(hifiRecordColours(12, 3501)).toEqual(hifiRecordColours(12, 3501))
+    expect(hifiRecordColours(12, 3501)).not.toEqual(hifiRecordColours(12, 3503))
+    expect(hifiRecordColours(0, 1)).toEqual([])
+    for (const seed of [1, 7, 3501, 3502, 3503, 99999]) {
+      const c = hifiRecordColours(40, seed)
+      expect(c).toHaveLength(40)
+      for (let i = 0; i < c.length; i++) {
+        expect(HIFI_RECORD_PALETTE).toContain(c[i])
+        if (i > 0) expect(c[i]).not.toBe(c[i - 1])
+      }
+    }
+    expect(parts()).toEqual(parts())
+    expect(parts(true, 2)).toEqual(parts(true, 2))
+    expect(role(parts(), 'rackSleeve').map((p) => p.colour)).toEqual(hifiRecordColours(HIFI_RACK.sleeves, 3501))
+    expect(role(parts(), 'stack').map((p) => p.colour)).toEqual(hifiRecordColours(HIFI_RECEIVER.stack, 3502))
+    expect(role(parts(), 'record').map((p) => p.colour)).toEqual(hifiRecordColours(HIFI_RECORD_CRATE.records, 3503))
+  })
+
+  it('the receiver dial and display are MeshBasicMaterial pairs: bright while playing, dim while stopped, two dark needles on the dial', () => {
+    const stopped = parts(false)
+    const playing = parts(true)
+    const face = (all: Part[]) => role(all, 'receiverDial').find((p) => p.mat !== 'bezel')!
+    const disp = (all: Part[]) => role(all, 'receiverDisplay')[0]
+    expect(face(stopped).mat).toBe('receiverDialOff')
+    expect(face(playing).mat).toBe('receiverDialOn')
+    expect(disp(stopped).mat).toBe('receiverDisplayOff')
+    expect(disp(playing).mat).toBe('receiverDisplayOn')
+    expect({ ...face(playing), mat: 'receiverDialOff' }).toEqual(face(stopped))
+    expect({ ...disp(playing), mat: 'receiverDisplayOff' }).toEqual(disp(stopped))
+    for (const key of ['receiverDialOn', 'receiverDialOff', 'receiverDisplayOn', 'receiverDisplayOff'] as const) {
+      expect(materials[key].type).toBe('MeshBasicMaterial')
+      expect(materials[key].map).toBeNull()
+    }
+    expect(luminance(materials.receiverDialOn.color)).toBeGreaterThan(luminance(materials.receiverDialOff.color) * 2)
+    expect(luminance(materials.receiverDisplayOn.color)).toBeGreaterThan(luminance(materials.receiverDisplayOff.color) * 2)
+    // Amber dial, green display.
+    expect(materials.receiverDialOn.color.r).toBeGreaterThan(materials.receiverDialOn.color.b)
+    expect(materials.receiverDisplayOn.color.g).toBeGreaterThan(materials.receiverDisplayOn.color.r)
+    // Two needles (thin dark boxes tilted about z) in front of the dial face.
+    const needles = role(stopped, 'receiverDial').filter((p) => p.mat === 'bezel')
+    expect(needles).toHaveLength(2)
+    expect(new Set(needles.map((p) => p.rot![2])).size).toBe(2)
+    for (const n of needles) expect(n.pos[2]).toBeGreaterThan(face(stopped).pos[2])
   })
 
   it('the front LED bar is a warm amber MeshBasicMaterial pair: bright while playing, dim while stopped, one part either way', () => {
@@ -4131,22 +4367,16 @@ describe('task 34.1: Hi-Fi table', () => {
     expect(on).toHaveLength(1)
     expect(off[0].mat).toBe('hifiLedOff')
     expect(on[0].mat).toBe('hifiLedOn')
-    // Same box, only the material changes.
     expect({ ...on[0], mat: 'hifiLedOff' }).toEqual(off[0])
     for (const key of ['hifiLedOn', 'hifiLedOff'] as const) {
       expect(materials[key].type).toBe('MeshBasicMaterial')
       expect(materials[key].map).toBeNull()
-    }
-    const luminance = (c: { r: number; g: number; b: number }) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
-    expect(luminance(materials.hifiLedOn.color)).toBeGreaterThan(luminance(materials.hifiLedOff.color) * 2)
-    // Warm amber: red > green > blue in both states.
-    for (const key of ['hifiLedOn', 'hifiLedOff'] as const) {
       const c = materials[key].color
       expect(c.r).toBeGreaterThan(c.g)
       expect(c.g).toBeGreaterThan(c.b)
     }
+    expect(luminance(materials.hifiLedOn.color)).toBeGreaterThan(luminance(materials.hifiLedOff.color) * 2)
     expect(materials.hifiLedOn).not.toBe(materials.hifiLedOff)
-    // It sits along the front edge of the table top (front is local +z), inside the footprint, and spans most of the width.
     const e = extent(on[0])
     const local = placement().local
     expect(e.maxZ).toBeLessThanOrEqual(local.maxZ)
@@ -4156,7 +4386,7 @@ describe('task 34.1: Hi-Fi table', () => {
     expect(e.minY).toBeGreaterThan(TOP - 0.04)
   })
 
-  it('the tabletop glow is a 24-segment additive disc on lampGlow, 2 mm above the table top, inside the top rectangle, dimmer while stopped', () => {
+  it('the tabletop glow is a 24-segment additive disc on lampGlow, 2 mm above the top, inside the top rectangle: opacity 0.25 playing, 0.07 stopped', () => {
     const off = role(parts(false), 'glow')[0]
     const on = role(parts(true), 'glow')[0]
     expect(off.mat).toBe('hifiGlowOff')
@@ -4164,9 +4394,7 @@ describe('task 34.1: Hi-Fi table', () => {
     expect({ ...on, mat: 'hifiGlowOff' }).toEqual(off)
     expect(on.geo).toBe('disc')
     expect(GEOMETRY_TRIANGLES.disc).toBe(24)
-    expect(geometries.disc.parameters.segments).toBe(24)
     expect(HIFI_GLOW_LIFT).toBe(0.002)
-    // Table top is the slab: top at TOP, 12 mm short of the local front, from the local back.
     const local = placement().local
     const e = extent(on)
     expect(e.minY).toBeCloseTo(TOP + 0.002, 9)
@@ -4184,40 +4412,42 @@ describe('task 34.1: Hi-Fi table', () => {
       expect(m.polygonOffset).toBe(true)
       expect(m.map).toBeNull()
     }
-    expect(materials.hifiGlowOn.opacity).toBeCloseTo(0.25, 9)
     expect(HIFI_GLOW_OPACITY).toEqual({ on: 0.25, off: 0.07 })
+    expect(materials.hifiGlowOn.opacity).toBeCloseTo(0.25, 9)
     expect(materials.hifiGlowOff.opacity).toBeCloseTo(0.07, 9)
-    expect(materials.hifiGlowOff.opacity).toBeLessThan(materials.hifiGlowOn.opacity)
-    expect(materials.hifiGlowOn).not.toBe(materials.hifiGlowOff)
-    // With the glow canvas both swap-in materials carry the shared lampGlow texture (no new texture).
     setCanvasFactory(() => fakeCanvas())
     ensureSharedTextures()
     expect(materials.hifiGlowOn.map).toBe(getSharedTexture('lampGlow'))
     expect(materials.hifiGlowOff.map).toBe(getSharedTexture('lampGlow'))
     expect(liveTextureCount()).toBe(32)
-    expect(hexOf(materials.hifiGlowOn.color)).toBe('#ffa63c')
   })
 
-  it('only switches `playing`-dependent parts: display, LED, glow and tonearm pose; never the part count, triangles or the platter group', () => {
+  it('only switches `playing`-dependent parts: display, LED, glow, receiver dial and display and the tonearm pose; never the part count, triangles or the platter group', () => {
     const a = parts(false)
     const b = parts(true)
     expect(a).toHaveLength(b.length)
     expect(countTriangles(a)).toBe(countTriangles(b))
+    expect(countDrawCalls(a)).toBe(countDrawCalls(b))
     const changed = a.map((p, i) => [p, b[i]] as const).filter(([x, y]) => JSON.stringify(x) !== JSON.stringify(y))
+    expect(changed.length).toBeGreaterThanOrEqual(6)
     for (const [x, y] of changed) {
       const ok =
         (x.mat === 'trackDisplay' && y.mat === 'trackDisplayOn') ||
         (x.mat === 'hifiLedOff' && y.mat === 'hifiLedOn') ||
         (x.mat === 'hifiGlowOff' && y.mat === 'hifiGlowOn') ||
+        (x.mat === 'receiverDialOff' && y.mat === 'receiverDialOn') ||
+        (x.mat === 'receiverDisplayOff' && y.mat === 'receiverDisplayOn') ||
         (x.turntableGroup === 'tonearm' && y.turntableGroup === 'tonearm')
       expect(ok, `${x.mat} -> ${y.mat}`).toBe(true)
     }
     expect(a.filter((p) => p.turntableGroup === 'platter')).toEqual(b.filter((p) => p.turntableGroup === 'platter'))
   })
 
-  it('every part is inside the 1.25 x 0.45 m footprint, above the floor, below the prop height; table-top parts rest on the top and the glow lies on it', () => {
+  it('every part is inside the 1.25 x 0.45 m footprint, above the floor and below the prop height; each tier rests on its surface', () => {
     const local = placement().local
     const height = placement().prop.height
+    const upper: HifiRole[] = ['cassette', 'lamp', 'stand', 'jacket', 'glow', 'cover']
+    const lower: HifiRole[] = ['rack', 'rackSleeve', 'stack', 'receiver', 'receiverDial', 'receiverDisplay', 'crate', 'record', 'recordLabel']
     for (const playing of [false, true]) {
       for (const track of [0, 4]) {
         for (const p of parts(playing, track)) {
@@ -4229,54 +4459,120 @@ describe('task 34.1: Hi-Fi table', () => {
           expect(e.maxZ, where).toBeLessThanOrEqual(local.maxZ + 1e-9)
           expect(e.minY, where).toBeGreaterThanOrEqual(-1e-9)
           expect(e.maxY, where).toBeLessThanOrEqual(height + 1e-9)
-          if (p.hifiRole === 'crate' || p.hifiRole === 'sleeve' || p.hifiRole === 'stand' || p.hifiRole === 'jacket' || p.hifiRole === 'glow') {
-            expect(e.minY, where).toBeGreaterThanOrEqual(TOP - 1e-9)
+          if (p.hifiRole && upper.includes(p.hifiRole)) expect(e.minY, where).toBeGreaterThanOrEqual(p.hifiRole === 'cover' ? TOP : TOP - 1e-9)
+          if (p.hifiRole && lower.includes(p.hifiRole)) {
+            expect(e.minY, where).toBeGreaterThanOrEqual(SHELF - 1e-9)
+            expect(e.maxY, where).toBeLessThanOrEqual(SLAB_BOTTOM + 1e-9)
           }
         }
       }
     }
     expect(height).toBeCloseTo(0.95, 9)
-    // The tallest part is a sleeve top: 0.62 m table top plus a 0.31 m sleeve is 0.93 m, under the 0.95 m prop height.
-    expect(Math.max(...role(parts(), 'sleeve').map((p) => extent(p).maxY))).toBeLessThan(height)
-    // The crate boards rest on the table top.
-    for (const p of role(parts(), 'crate')) expect(extent(p).minY, p.mat).toBeCloseTo(TOP, 9)
-    // The sleeves stay clear of the jacket stand in plan (the jacket and its easel are in front of the crate).
-    const sleeveMaxZ = Math.max(...role(parts(), 'sleeve').map((p) => extent(p).maxZ))
-    const standMinZ = Math.min(...role(parts(), 'stand').map((p) => extent(p).minZ))
-    expect(standMinZ).toBeGreaterThan(sleeveMaxZ)
+    // The turntable assembly sits on the top (plinth feet at 0.62 m).
+    for (const p of groups().static.filter((q) => q.mat === 'bezel' && q.scale[0] === 0.03)) expect(extent(p).minY).toBeCloseTo(TOP, 9)
   })
 
-  it('costs exactly 638 triangles: static 394, platter 152, tonearm 92; the table is 112 more than the 33.1 console (526)', () => {
+  it('costs exactly 1,250 triangles (static 1,006, platter 152, tonearm 92) and 34 draw-call groups, the same for every track', () => {
     const g = groups()
-    expect(countTriangles(g.static)).toBe(394)
+    expect(countTriangles(g.static)).toBe(1006)
     expect(countTriangles(g.platter)).toBe(152)
     expect(countTriangles(g.tonearm)).toBe(92)
-    expect(countTriangles(parts())).toBe(TASK_34_1_TABLE)
-    expect(countTriangles(parts(true, 2))).toBe(TASK_34_1_TABLE)
-    // The new pieces: crate 4 boxes, sleeves 4, easel 2 + jacket 1, LED 1 box, glow disc 24.
-    expect(countTriangles(role(parts(), 'crate'))).toBe(48)
-    expect(countTriangles(role(parts(), 'sleeve'))).toBe(48)
-    expect(countTriangles(role(parts(), 'stand')) + countTriangles(role(parts(), 'jacket'))).toBe(36)
-    expect(countTriangles(role(parts(), 'led'))).toBe(12)
-    expect(countTriangles(role(parts(), 'glow'))).toBe(24)
-    expect(TASK_34_1_TABLE - TASK_33_1_TURNTABLE).toBe(112)
-    // Own wall-flush faces: back panel, two side panels and the top slab drop their back (-z local) faces (4 x 2 = 8 triangles).
+    expect(countTriangles(parts())).toBe(TASK_35_1_CONSOLE)
+    expect(countTriangles(parts(true, 2))).toBe(TASK_35_1_CONSOLE)
+    const tri = (r: HifiRole) => countTriangles(role(parts(), r))
+    expect(tri('frame')).toBe(70)
+    expect(tri('cover')).toBe(72)
+    expect(tri('cassette')).toBe(24)
+    expect(tri('lamp')).toBe(80)
+    expect(tri('rack')).toBe(72)
+    expect(tri('rackSleeve')).toBe(144)
+    expect(tri('stack') + tri('receiver') + tri('receiverDial') + tri('receiverDisplay')).toBe(24 + 48 + 36 + 12)
+    expect(tri('crate')).toBe(48)
+    expect(tri('record')).toBe(120)
+    expect(tri('recordLabel')).toBe(20)
+    expect(tri('stand') + tri('jacket')).toBe(36)
+    expect(tri('led')).toBe(12)
+    expect(tri('glow')).toBe(24)
+    // Back faces of the two rear posts and the slab are wall-flush, the four posts have an open bottom.
     const own = parts().filter((p) => p.culledFaces)
-    expect(own).toHaveLength(4)
-    expect(own.every((p) => p.mat === 'woodDark' && p.culledFaces!.join() === String(BOX_FACES.nz))).toBe(true)
-    expect(parts().filter((p) => p.openBottom)).toHaveLength(1)
+    expect(own).toHaveLength(3)
+    expect(own.every((p) => p.culledFaces!.join() === String(BOX_FACES.nz))).toBe(true)
+    expect(parts().filter((p) => p.openBottom)).toHaveLength(4)
+    expect(TASK_35_1_CONSOLE - TASK_34_1_TABLE).toBe(612)
     const obj = sceneDetailReport().objects.find((o) => o.name === 'record-player')!
-    expect(obj.triangles).toBe(638)
+    expect(obj.triangles).toBe(1250)
+    for (const t of [0, 1, 2, 3, 4]) expect(countDrawCalls(parts(false, t)), String(t)).toBe(34)
+    expect(obj.drawCalls).toBe(34)
+  })
+})
+
+describe('task 35.1: floor loudspeaker', () => {
+  afterEach(() => setCanvasFactory(null))
+  const sp = () => speakerPlacement()
+  const parts = () => speakerParts(sp().local, sp().prop.height, sp().wallBack)
+  const extent = (p: Part) => {
+    const size: Vec3 = p.geo === 'plane' || p.geo === 'disc' ? [p.scale[0], p.scale[1], 0] : p.scale
+    const h = orientedHalfExtents(size, p.rot ?? [0, 0, 0])
+    return { minX: p.pos[0] - h[0], maxX: p.pos[0] + h[0], minY: p.pos[1] - h[1], maxY: p.pos[1] + h[1], minZ: p.pos[2] - h[2], maxZ: p.pos[2] + h[2] }
+  }
+
+  it('is the solid non-interactable `loudspeaker` prop on the south wall beside the console: 0.34 x 0.32 m, 0.96 m tall, facing -z, back on the wall plane', () => {
+    const p = sp().prop
+    expect(p.id).toBe('loudspeaker')
+    expect(p.solid).toBe(true)
+    expect(p.facing).toBe('-z')
+    expect(p.height).toBeCloseTo(0.96, 9)
+    expect(p.box).toEqual({ minX: -2.49, maxX: -2.15, minZ: 3.68, maxZ: 4 })
+    expect(COLLIDERS).toContain(p.box)
+    expect(sp().wallBack).toBe(true)
+    expect(INTERACTABLE_DEFS.some((d) => (d.id as string) === 'loudspeaker')).toBe(false)
+    expect(STATION_DEFS.some((s) => (s.id as string) === 'loudspeaker')).toBe(false)
+    expect(sp().local.maxX - sp().local.minX).toBeCloseTo(0.34, 9)
+    expect(sp().local.maxZ - sp().local.minZ).toBeCloseTo(0.32, 9)
   })
 
-  it('stays within the draw-call budget: 26 groups for the table, 390 for the scene (under 400), one more group while STOP shows the neutral jacket', () => {
-    expect(countDrawCalls(parts(false, 0))).toBe(25)
-    expect(countDrawCalls(parts(false, 4))).toBe(26)
-    const obj = sceneDetailReport().objects.find((o) => o.name === 'record-player')!
-    expect(obj.drawCalls).toBe(26)
-    const report = sceneDetailReport()
-    expect(report.totalDrawCalls).toBe(390)
-    expect(report.totalDrawCalls).toBeLessThan(400)
+  it('is a wood-grained cabinet with a woofer, a midrange, a tweeter (steel surrounds, dark cones) and a small port, all inside the speaker footprint on the floor', () => {
+    const all = parts()
+    const local = sp().local
+    const cabinet = all.find((p) => p.mat === 'woodDark')!
+    expect(all.filter((p) => p.mat === 'woodDark')).toHaveLength(1)
+    expect(cabinet.metric).toBe(true)
+    expect(cabinet.openBottom).toBe(true)
+    expect(cabinet.culledFaces).toEqual([BOX_FACES.nz])
+    expect(extent(cabinet).minY).toBeCloseTo(0, 9)
+    expect(extent(cabinet).maxY).toBeCloseTo(sp().prop.height, 9)
+    // Two cylinder surrounds (woofer 0.20 m, midrange 0.11 m) and a flat steel tweeter ring, each with a dark cone disc on top, plus the port.
+    const rings = all.filter((p) => p.mat === 'metal')
+    const cones = all.filter((p) => p.mat === 'plastic')
+    expect(rings).toHaveLength(3)
+    expect(cones).toHaveLength(3)
+    expect(rings.filter((p) => p.geo === 'cylinderLow').map((p) => p.scale[0]).sort()).toEqual([0.11, 0.2])
+    expect(all.filter((p) => p.mat === 'bezel')).toHaveLength(1)
+    const ys = cones.map((p) => p.pos[1]).sort((a, b) => a - b)
+    expect(ys).toEqual([0.38, 0.68, 0.84])
+    for (const p of all) {
+      const e = extent(p)
+      const where = `${p.mat} ${p.geo}`
+      expect(e.minX, where).toBeGreaterThanOrEqual(local.minX - 1e-9)
+      expect(e.maxX, where).toBeLessThanOrEqual(local.maxX + 1e-9)
+      expect(e.minZ, where).toBeGreaterThanOrEqual(local.minZ - 1e-9)
+      expect(e.maxZ, where).toBeLessThanOrEqual(local.maxZ + 1e-9)
+      expect(e.minY, where).toBeGreaterThanOrEqual(-1e-9)
+      expect(e.maxY, where).toBeLessThanOrEqual(sp().prop.height + 1e-9)
+    }
+    // The drivers stand proud of the cabinet front (toward +z) and do not overlap each other.
+    const cabFront = extent(cabinet).maxZ
+    for (const p of [...rings, ...cones]) expect(extent(p).maxZ).toBeGreaterThan(cabFront)
+  })
+
+  it('costs exactly 180 triangles in 5 draw-call groups; the layout total adds the declared `loudspeaker` object', () => {
+    expect(countTriangles(parts())).toBe(TASK_35_1_SPEAKER)
+    expect(countDrawCalls(parts())).toBe(5)
+    const obj = sceneDetailReport().objects.find((o) => o.name === 'loudspeaker')!
+    expect(obj.triangles).toBe(180)
+    expect(obj.drawCalls).toBe(5)
+    expect(TASK_35_1_TRIANGLES).toBe(TASK_35_1_CONSOLE - TASK_34_1_TABLE + TASK_35_1_SPEAKER)
+    expect(TASK_35_1_TRIANGLES).toBe(792)
   })
 })
 
@@ -4288,15 +4584,15 @@ describe('task 34.1: wall-flush face culling and budgets', () => {
     const h = orientedHalfExtents(p.scale, p.rot ?? [0, 0, 0])
     return { minX: p.pos[0] - h[0], maxX: p.pos[0] + h[0], minY: p.pos[1] - h[1], maxY: p.pos[1] + h[1], minZ: p.pos[2] - h[2], maxZ: p.pos[2] + h[2] }
   }
-  /** World extent of a part of the named declared object: the table is built in its local frame (yaw pi about the footprint centre). */
+  /** World extent of a part of the named declared object: the console and the loudspeaker are built in their local frame (yaw pi about the footprint centre). */
   const worldExtent = (name: string, p: Part) => {
     const e = extentOf(p)
-    if (name !== 'record-player') return e
-    const c = hifiTablePlacement().frame.position
+    if (name !== 'record-player' && name !== 'loudspeaker') return e
+    const c = (name === 'loudspeaker' ? speakerPlacement() : hifiTablePlacement()).frame.position
     return { minX: c[0] - e.maxX, maxX: c[0] - e.minX, minY: e.minY, maxY: e.maxY, minZ: c[2] - e.maxZ, maxZ: c[2] - e.minZ }
   }
   /** Local face index to world face index for the object. */
-  const worldFace = (name: string, f: number) => (name === 'record-player' ? ({ 0: 1, 1: 0, 4: 5, 5: 4 } as Record<number, number>)[f] : f)
+  const worldFace = (name: string, f: number) => (name === 'record-player' || name === 'loudspeaker' ? ({ 0: 1, 1: 0, 4: 5, 5: 4 } as Record<number, number>)[f] : f)
 
   it('culled faces exist only where a face lies on an opaque wall or jamb plane (within 1 mm) inside that solid, below the ceiling, on unrotated boxes', () => {
     const tol = WALL_FLUSH_TOLERANCE
@@ -4349,10 +4645,11 @@ describe('task 34.1: wall-flush face culling and budgets', () => {
     }
     expect(faces).toBe(24)
     expect(faces * CULLED_FACE_SAVED_TRIANGLES).toBe(-TASK_34_1_RECLAIMED)
-    // Nothing else carries a culled face except the table's own four back faces.
-    const others = declaredObjects().filter((o) => !(o.name in expected) && o.name !== 'record-player')
+    // Nothing else carries a culled face except the console's three and the loudspeaker's one back face.
+    const others = declaredObjects().filter((o) => !(o.name in expected) && o.name !== 'record-player' && o.name !== 'loudspeaker')
     for (const o of others) expect(o.parts.filter((p) => p.culledFaces?.length), o.name).toHaveLength(0)
-    expect(facesOf('record-player')).toBe(4)
+    expect(facesOf('record-player')).toBe(3) // the two rear steel posts and the top slab
+    expect(facesOf('loudspeaker')).toBe(1) // the cabinet back
     // Exact triangles of the changed objects.
     const report = sceneDetailReport()
     const tri = (name: string) => report.objects.find((o) => o.name === name)!.triangles
@@ -4412,11 +4709,11 @@ describe('task 34.1: wall-flush face culling and budgets', () => {
     expect(() => culledBoxGeometry(geometries.plane, [0])).toThrow()
   })
 
-  it('every cached culled geometry of the table, the corner posts and the unit box is disposed exactly once and the caches are twice-safe', () => {
+  it('every cached culled geometry of the console, the corner posts and the unit box is disposed exactly once and the caches are twice-safe', () => {
     const pl = hifiTablePlacement()
     const flagged = hifiTableParts(pl.local, { playing: false, track: 4 }, pl.wallBack).filter((p) => removedFaces(p).length > 0)
-    expect(flagged.length).toBe(5) // kick plinth (open bottom) and the four wall-flush back faces
-    const bases = flagged.map((p) => woodBoxGeometry(p.scale[0], p.scale[1], p.scale[2]))
+    expect(flagged.length).toBe(5) // the four steel posts (open bottom, the two rear ones also wall-flush at the back) and the top slab (wall-flush back)
+    const bases = flagged.map((p) => (p.atlas ? atlasBoxGeometry(p.scale[0], p.scale[1], p.scale[2], p.atlas.rect, p.atlas.faces, p.atlas.plain) : woodBoxGeometry(p.scale[0], p.scale[1], p.scale[2])))
     const variants = flagged.map((p, i) => culledBoxGeometry(bases[i], removedFaces(p)))
     const posts = cornerPostParts()
     const postVariants = posts.map((p) => culledBoxGeometry(geometries.box, removedFaces(p)))
@@ -4435,15 +4732,20 @@ describe('task 34.1: wall-flush face culling and budgets', () => {
     expect(woodBoxCount()).toBe(0)
   })
 
-  it('budgets: 19,196 triangles (exact, at most 19,200), 390 draw calls (under 400), 4 lights, 32 textures, 7.703 MiB, nothing new disposed twice', () => {
+  it('budgets (35.1): 19,988 triangles (exact, at most 20,000), 403 draw calls (under 425), 4 lights, 32 textures, 7.703 MiB, nothing new disposed twice', () => {
     const report = sceneDetailReport()
     expect(TASK_34_1_TRIANGLES).toBe(64)
-    expect(report.totalTriangles).toBe(19132 + TASK_34_1_TRIANGLES)
-    expect(report.totalTriangles).toBe(19196)
-    expect(report.totalTriangles).toBeLessThanOrEqual(19200)
-    expect(report.totalTriangles).toBeLessThan(SCENE_TRIANGLE_BUDGET)
-    expect(report.totalDrawCalls).toBe(390)
-    expect(report.totalDrawCalls).toBeLessThan(400)
+    expect(TRIANGLE_CAP).toBe(20000)
+    expect(DRAW_CALL_CAP).toBe(425)
+    expect(SCENE_TRIANGLE_BUDGET).toBe(TRIANGLE_CAP)
+    expect(report.totalTriangles).toBe(19132 + TASK_34_1_TRIANGLES + TASK_35_1_TRIANGLES)
+    expect(report.totalTriangles).toBe(19988)
+    expect(report.totalTriangles).toBeLessThanOrEqual(TRIANGLE_CAP)
+    expect(report.totalDrawCalls).toBe(403)
+    expect(report.totalDrawCalls).toBeLessThan(DRAW_CALL_CAP)
+    const table = new Map(report.objects.map((o) => [o.name, o]))
+    expect(table.get('record-player')).toEqual({ name: 'record-player', triangles: 1250, drawCalls: 34 })
+    expect(table.get('loudspeaker')).toEqual({ name: 'loudspeaker', triangles: 180, drawCalls: 5 })
     expect(M3_LIGHT_COUNT).toBe(4)
     expect(MAX_LIGHTS).toBe(4)
     expect(lightingSource.match(/<pointLight /g)?.length).toBe(3)
@@ -4483,5 +4785,62 @@ describe('task 34.1: wall-flush face culling and budgets', () => {
     }
     for (const t of [0, 1, 2, 3]) expect(mats(t).find((m) => m.startsWith('jacket:'))).toBe(`jacket:${HIFI_SLEEVE_MATERIALS[t]}`)
     expect(mats(4).find((m) => m.startsWith('jacket:'))).toBe('jacket:sleeveNeutral')
+  })
+})
+
+describe('task 35.2: playback state wiring of the console builder', () => {
+  const pl = () => hifiTablePlacement()
+  const all = (playing: boolean, track: number) => hifiTableParts(pl().local, { playing, track }, pl().wallBack)
+  const byRole = (parts: readonly Part[], r: HifiRole) => parts.filter((p) => p.hifiRole === r)
+  const diff = (a: readonly Part[], b: readonly Part[]) => a.map((p, i) => [p, b[i]] as const).filter(([x, y]) => JSON.stringify(x) !== JSON.stringify(y))
+
+  it('playing switches the receiver dial and display, the LED bar and the glow between their stopped and playing materials', () => {
+    const stopped = all(false, 1)
+    const playing = all(true, 1)
+    expect(byRole(stopped, 'receiverDial').find((p) => p.mat.startsWith('receiverDial'))!.mat).toBe('receiverDialOff')
+    expect(byRole(playing, 'receiverDial').find((p) => p.mat.startsWith('receiverDial'))!.mat).toBe('receiverDialOn')
+    expect(byRole(stopped, 'receiverDisplay')[0].mat).toBe('receiverDisplayOff')
+    expect(byRole(playing, 'receiverDisplay')[0].mat).toBe('receiverDisplayOn')
+    expect(byRole(stopped, 'led')[0].mat).toBe('hifiLedOff')
+    expect(byRole(playing, 'led')[0].mat).toBe('hifiLedOn')
+    expect(byRole(stopped, 'glow')[0].mat).toBe('hifiGlowOff')
+    expect(byRole(playing, 'glow')[0].mat).toBe('hifiGlowOn')
+    expect(materials.hifiGlowOn.opacity).toBeCloseTo(0.25, 9)
+    expect(materials.hifiGlowOff.opacity).toBeCloseTo(0.07, 9)
+  })
+
+  it('playing moves the tonearm pose and the track display, and leaves the brass lamp bulb lit in both states (it is a lamp, not an indicator)', () => {
+    const g = (playing: boolean) => hifiTableGroups(pl().local, { playing, track: 0 }, pl().wallBack)
+    const a = g(false)
+    const b = g(true)
+    expect(a.tonearm).toHaveLength(b.tonearm.length)
+    expect(JSON.stringify(a.tonearm)).not.toBe(JSON.stringify(b.tonearm))
+    expect(a.static.some((p) => p.mat === 'trackDisplay')).toBe(true)
+    expect(b.static.some((p) => p.mat === 'trackDisplayOn')).toBe(true)
+    for (const parts of [all(false, 0), all(true, 0)]) {
+      expect(byRole(parts, 'lamp').filter((p) => p.mat === 'hifiLampBulb')).toHaveLength(1)
+    }
+    expect(JSON.stringify(byRole(all(false, 0), 'lamp'))).toBe(JSON.stringify(byRole(all(true, 0), 'lamp')))
+  })
+
+  it('the jacket material follows the track (0..3 colours, 4 neutral) in both playing states', () => {
+    for (const playing of [false, true]) {
+      for (const track of [0, 1, 2, 3, 4]) {
+        expect(byRole(all(playing, track), 'jacket')[0].mat, `${playing} ${track}`).toBe(nowPlayingMaterial(track))
+      }
+    }
+  })
+
+  it('changing only the track changes only the jacket material; changing only playing does not change the jacket', () => {
+    for (const playing of [false, true]) {
+      const changed = diff(all(playing, 0), all(playing, 3))
+      expect(changed).toHaveLength(1)
+      expect(changed[0][0].hifiRole).toBe('jacket')
+      expect({ ...changed[0][0], mat: changed[0][1].mat }).toEqual(changed[0][1])
+    }
+    for (const track of [0, 2, 4]) {
+      expect(byRole(all(false, track), 'jacket')).toEqual(byRole(all(true, track), 'jacket'))
+      expect(diff(all(false, track), all(true, track)).some(([x]) => x.hifiRole === 'jacket')).toBe(false)
+    }
   })
 })

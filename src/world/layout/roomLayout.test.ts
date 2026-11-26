@@ -193,11 +193,11 @@ describe('roomLayout', () => {
     for (const p of ROOM.props) expect(COLLIDERS.includes(p.box)).toBe(p.solid);
   });
 
-  it('counts Colliders: 9 walls, 4 door frames and 16 solid props (three cabinets replace the cabinet and its companion, plus the record player, relocated in 34.1)', () => {
+  it('counts Colliders: 9 walls, 4 door frames and 17 solid props (three cabinets replace the cabinet and its companion, plus the record player of 34.1 and the floor loudspeaker of 35.1)', () => {
     expect(ROOM.walls).toHaveLength(9);
-    expect(ROOM.props.filter((p) => p.solid)).toHaveLength(16); // 33.1: the record player is the 16th solid prop
-    expect(COLLIDERS).toHaveLength(9 + 4 + 16);
-    for (const id of [...CABINET_IDS, 'crt-stack', 'crt-vhs', 'filing-cabinet-a', 'filing-cabinet-b', 'record-player']) {
+    expect(ROOM.props.filter((p) => p.solid)).toHaveLength(17); // 33.1: the record player is the 16th solid prop, 35.1: the loudspeaker the 17th
+    expect(COLLIDERS).toHaveLength(9 + 4 + 17);
+    for (const id of [...CABINET_IDS, 'crt-stack', 'crt-vhs', 'filing-cabinet-a', 'filing-cabinet-b', 'record-player', 'loudspeaker']) {
       expect(COLLIDERS).toContain(prop(id).box);
     }
   });
@@ -583,6 +583,86 @@ describe('record player: Hi-Fi table (tasks 33.1, 34.1)', () => {
     expect(at(-1.3, 2.6)).toBe(true);
     expect(at(-0.5, 3.4)).toBe(true);
     expect(at(0, 3)).toBe(true);
+  });
+});
+describe('floor loudspeaker beside the two-tier console (task 35.1)', () => {
+  const sp = prop('loudspeaker');
+  const rp = prop('record-player');
+  const couch = prop('couch');
+  const overlapXZ = (a: Aabb, b: Aabb) => a.minX < b.maxX && a.maxX > b.minX && a.minZ < b.maxZ && a.maxZ > b.minZ;
+
+  it('keeps the console exactly where it was: 1.25 x 0.45 m at x -2.1..-0.85, z 3.55..4, facing -z, prop height 0.95 m, anchor and spawn distance unchanged', () => {
+    expect(rp.box).toEqual({ minX: -2.1, maxX: -0.85, minZ: 3.55, maxZ: 4 });
+    expect(rp.solid).toBe(true);
+    expect(rp.facing).toBe('-z');
+    expect(rp.height).toBeCloseTo(0.95);
+    expect(COLLIDERS).toContain(rp.box);
+    const def = INTERACTABLE_DEFS.find((d) => d.id === 'record-player')!;
+    expect(def.anchor.x).toBeCloseTo(-1.475, 9);
+    expect(def.anchor.z).toBe(3.55);
+    expect(def.collider).toBe(rp.box);
+    expect(distToBox(ROOM.start, rp.box)).toBeCloseTo(Math.hypot(0.85, 0.55), 9);
+  });
+
+  it('is a solid 0.34 x 0.32 m, 0.96 m tall floor-standing prop with its back on the south wall, facing -z, inside the main room, and not interactable', () => {
+    expect(sp.kind).toBe('furniture');
+    expect(sp.solid).toBe(true);
+    expect(sp.facing).toBe('-z');
+    expect(sp.height).toBeCloseTo(0.96);
+    expect(sp.elevation ?? 0).toBe(0);
+    expect(sp.box).toEqual({ minX: -2.49, maxX: -2.15, minZ: 3.68, maxZ: 4 });
+    expect(sp.box.maxX - sp.box.minX).toBeCloseTo(0.34);
+    expect(sp.box.maxZ - sp.box.minZ).toBeCloseTo(0.32);
+    expect(COLLIDERS).toContain(sp.box);
+    expect(sp.box.maxZ).toBe(4);
+    expect(sp.box.minX).toBeGreaterThanOrEqual(-4.6);
+    expect(sp.box.maxX).toBeLessThanOrEqual(4.85);
+    expect(sp.box.minZ).toBeGreaterThanOrEqual(-4);
+    expect(ROOM.walls.filter((w) => overlapXZ(w, sp.box))).toHaveLength(0);
+    // Not a Station and not an interactable.
+    expect(ROOM.stations.some((s) => (s.id as string) === 'loudspeaker')).toBe(false);
+    expect(INTERACTABLE_DEFS.some((d) => (d.id as string) === 'loudspeaker')).toBe(false);
+  });
+
+  it('stands beside the console on the couch side without overlapping the couch, the console or any other prop, and keeps a 5 cm gap to the console', () => {
+    expect(overlapXZ(sp.box, couch.box)).toBe(false);
+    expect(overlapXZ(sp.box, rp.box)).toBe(false);
+    for (const p of ROOM.props) {
+      if (p === sp || !overlapXZ(p.box, sp.box)) continue;
+      expect(p.elevation ?? 0, p.id).toBeGreaterThanOrEqual(sp.height);
+    }
+    // West of the console, east of the couch's west end: on the couch side of the console, and 0.28 m clear of the couch back (z 3.4).
+    expect(sp.box.maxX).toBeLessThanOrEqual(rp.box.minX);
+    expect(rp.box.minX - sp.box.maxX).toBeCloseTo(0.05, 9);
+    expect(sp.box.minX).toBeGreaterThanOrEqual(couch.box.minX);
+    expect(sp.box.minZ - couch.box.maxZ).toBeCloseTo(0.28, 9);
+    expect(Math.abs((sp.box.minZ + sp.box.maxZ) / 2 - (rp.box.minZ + rp.box.maxZ) / 2)).toBeLessThan(0.3);
+    // It is no closer to the spawn than the console, and clear of the spawn disc, every doorway, the island and the desk walkway.
+    expect(overlapsAny(ROOM.start, 0.99, [sp.box])).toBe(false);
+    expect(distToBox(ROOM.start, sp.box)).toBeGreaterThan(distToBox(ROOM.start, rp.box));
+    for (const d of ROOM.doors) expect(distToBox({ x: (d.opening.minX + d.opening.maxX) / 2, z: (d.opening.minZ + d.opening.maxZ) / 2 }, sp.box)).toBeGreaterThan(5);
+    const island = prop('crt-vhs').box;
+    const gap = Math.hypot(Math.max(island.minX - sp.box.maxX, sp.box.minX - island.maxX, 0), Math.max(island.minZ - sp.box.maxZ, sp.box.minZ - island.maxZ, 0));
+    expect(gap).toBeGreaterThanOrEqual(1.2);
+    expect(sp.box.minZ - prop('reception-desk').box.maxZ).toBeGreaterThanOrEqual(1.2);
+    for (const id of ['shelf-a', 'shelf-b']) expect(prop(id).box.maxX).toBeLessThan(sp.box.minX - 0.5);
+  });
+
+  it('leaves the lounge reachable: the record player front, the couch front, the floor toward the spawn and the old test cells are all still walkable', () => {
+    const cells = reachableCells(ROOM.start);
+    const at = (x: number, z: number) => cells.some((c) => Math.abs(c.x - x) < 1e-6 && Math.abs(c.z - z) < 1e-6);
+    expect(at(-3, 2.2)).toBe(true);
+    expect(at(-1.3, 2.6)).toBe(true);
+    expect(at(-0.5, 3.4)).toBe(true);
+    expect(at(0, 3)).toBe(true);
+    // The floor in front of the console and in front of the speaker (z below 3.25) is reachable; the pocket behind the couch was never a destination.
+    expect(cells.filter((c) => c.z < 3.25 && c.x >= -2.6 && c.x <= -0.9 && c.z > 2.9).length).toBeGreaterThan(5);
+    // No reachable cell overlaps the speaker.
+    expect(cells.every((c) => !overlapsAny(c, PLAYER_RADIUS, [sp.box]))).toBe(true);
+    // The reachable area did not shrink anywhere in front of the console: every cell within 2.2 m of its anchor that is not in the speaker's pocket is still there.
+    const def = INTERACTABLE_DEFS.find((d) => d.id === 'record-player')!;
+    const front = cells.filter((c) => c.z < def.anchor.z && Math.abs(c.x - def.anchor.x) <= 0.6 && Math.hypot(c.x - def.anchor.x, c.z - def.anchor.z) <= 2.2);
+    expect(front.length).toBeGreaterThan(20);
   });
 });
 describe('desk lamps (task 23.1)', () => {

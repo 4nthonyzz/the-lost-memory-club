@@ -58,6 +58,8 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 
 - Approved scope change (Hi-Fi table relocation), 2026-12-11: the `record-player` moves from the north wall (x 2.2..3.1, z -4..-3.55) to a well-lit spot in the lounge beside the sofa. Every existing reachability, 1.2 m walkway, doorway-lane, island-clearance, spawn, bookcase-walkway and line-of-sight test stays green. The stand widens to a ~1.25 m Hi-Fi listening table holding the turntable, a wooden record crate with 4 LP sleeves (#16a34a, #e11d48, #38bdf8, #f59e0b) and an angled NOW PLAYING jacket stand that shows the active track's colour (neutral or lowered on STOP). A warm `MeshBasicMaterial` LED accent bar and an additive tabletop glow disc (`lampGlow` or `coneFalloff`, `depthWrite` false) replace any need for a fifth light. Triangles stay at most 19,200 (19,132 now) by reclaiming hidden geometry (wall-flush back faces on tall bookcases or filing cabinets via `floorCull.ts`, or fewer segments on hidden pipes). The draw-call estimate stays under the existing < 400 test (377 now). Budgets: 4 lights, 32 textures (7.703 MiB), no new timers. `StationId` is unchanged; `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged. The placement wording in task 33.1 and in the turntable and music catalog bullet is superseded by this bullet.
 
+- Approved scope change (two-tier Hi-Fi console, budgets raised), 2026-12-12: the user approved raising the scene triangle cap from 19,200 to the Requirement 14 limit of 20,000 (the hard limit is unchanged) and the draw-call estimate test limit from < 400 to < 425. This supersedes the 19,200 caps in the 26, 27, 28, 29, 30, 31, 33 and 34 bullets for current-state checks (historical task text keeps its wording). The `record-player` becomes a two-tier 1.25 m walnut-and-metal console at about x -2.1..-0.85, z 3.55..4 (it may shift slightly if the floor speaker needs room). Every existing reachability, 1.2 m walkway, doorway-lane, island, spawn-disc, bookcase-walkway and line-of-sight test must stay green without loosening thresholds. Top tier: the turntable under an open clear acrylic dust cover (24-segment platter, label, spindle, tonearm poses), a centre NOW PLAYING stand with the track-coloured jacket (#16a34a, #e11d48, #38bdf8, #f59e0b; #3a3d46 on STOP), scattered cassettes, and a small brass desk lamp on the right with an emissive amber glow (no light). Lower tier: a wire basket rack of tightly packed LP sleeves (left), a silver 1990s stereo receiver with buttons, an LED meter and an amber/green backlit display (centre) above horizontal record or cassette stacks, and a weathered wooden crate of vertical records with spine labels (right). A wood-grained 3-way floor loudspeaker stands beside the console on the couch side (solid collider, because it is floor-standing). Self-illumination only (glow 0.25 playing / 0.07 stopped, LED and display materials). Budgets: 4 lights, 32 textures at 7.703 MiB (0 new bytes), no timers. The referenced image_457.png is not in the workspace, so the text description is the specification. `StationId` is unchanged; `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/` stay unchanged. The audio still needs the Developer 3 review.
+
 ## Tasks
 
 ### Milestone 1: Playable 3D room (primitives only)
@@ -1260,6 +1262,36 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: documentation and the spec folder only.
     - _Requirements: 14.11, 14.12, 15.3, 15.6_
 
+### Two-tier Hi-Fi console
+
+- [x] 35. Two-tier Hi-Fi console
+  - [x] 35.1 Two-tier console model, floor speaker and raised budget tests
+    - Files: `src/world/layout/roomLayout.ts`, `src/world/scene/modelDetail.ts`, `src/world/scene/floorCull.ts`, `src/world/scene/sharedResources.ts`, `src/world/scene/PartMeshes.tsx`, `src/world/scene/Props.tsx`; tests `src/world/layout/roomLayout.test.ts`, `src/world/logic/targeting.test.ts`, `src/world/scene/modelDetail.test.ts`.
+    - Rebuild `record-player` as the two-tier console and add the floor loudspeaker, exactly as described in the 2026-12-12 scope change bullet. Update the triangle cap to 20,000 and the draw-call estimate limit to < 425 in `modelDetail.test.ts`. Use existing textures only and reclaim hidden triangles through `floorCull.ts` if needed.
+    - Acceptance: triangle estimate below 20,000 (hard limit unchanged); draw-call estimate below 425; lights at most 4 (no new light); texture count 32 and memory 7.703 MiB unchanged; `record-player` and the floor speaker are in `COLLIDERS`; the record player stays targetable within range; every existing reachability, 1.2 m walkway, doorway-lane, island, spawn-disc, bookcase-walkway and line-of-sight test passes without loosened thresholds; textures disposed exactly once (twice-safe); Memory_Shift tinting still works; no timers.
+    - Tests: `roomLayout.test.ts` (new colliders, clearances, BFS reachability), `targeting.test.ts` (record player targetable from the lounge, nearest wins), `modelDetail.test.ts` (tiers, parts, jacket colours, budgets, light count, disposal). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 34.3.
+    - Boundary: `src/world/` only; `StationId` unchanged; no new dependency; no GLB; `ASSET_MANIFEST` stays empty.
+    - _Requirements: 1.3, 1.4, 1.8, 6.1, 7.1, 7.2, 7.3, 9.8, 12.5, 13.8, 14.4, 14.5, 19.1_
+
+  - [x] 35.2 Playback state wiring for the new console
+    - Files: `src/world/WorldScene.tsx`, `src/world/scene/Props.tsx`, `src/world/scene/modelDetail.ts` (if needed); tests `src/world/WorldScene.test.ts`, `src/world/scene/modelDetail.test.ts`.
+    - Drive the console from the session-only selected track state: platter spin and tonearm pose, NOW PLAYING jacket colour (#3a3d46 on STOP), glow 0.25 playing and 0.07 stopped, and the receiver LED and display materials. Reduced motion stops the spin. No `onInspect`, no mode change, no storage, no timers.
+    - Acceptance: each track key 1-4 sets the matching jacket colour, key 5 (STOP) sets #3a3d46, glow 0.07 and the tonearm cradle pose; playing sets glow 0.25; no new light or texture; budgets from 35.1 still hold.
+    - Tests: `WorldScene.test.ts` (state follows track keys, STOP, reduced motion, `onInspect` not called), `modelDetail.test.ts` (colour and glow mapping, budgets). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 35.1.
+    - Boundary: `src/world/` only; `WorldSceneProps` and `onInspect` unchanged.
+    - _Requirements: 7.5, 7.6, 7.7, 9.8, 10.4, 10.6, 14.4, 14.5, 16.8, 16.9_
+
+  - [x] 35.3 Docs, metrics and verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, draw calls, lights and texture memory, each labelled "computed, not runtime-measured". Note the raised caps (20,000 triangles, < 425 draw calls) and the outstanding Developer 3 audio review. Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final geometry and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 35.2.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional. The 17 property-based test sub-tasks can be skipped for a faster MVP. Tasks 16.2 and 16.3 are marked `*` because they must not be implemented without approval.
@@ -1356,7 +1388,10 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     { "id": 79, "tasks": ["33.4"] },
     { "id": 80, "tasks": ["34.1"] },
     { "id": 81, "tasks": ["34.2"] },
-    { "id": 82, "tasks": ["34.3"] }
+    { "id": 82, "tasks": ["34.3"] },
+    { "id": 83, "tasks": ["35.1"] },
+    { "id": 84, "tasks": ["35.2"] },
+    { "id": 85, "tasks": ["35.3"] }
   ]
 }
 ```

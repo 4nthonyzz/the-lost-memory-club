@@ -40,6 +40,7 @@ function InstancedGroup({ items }: { items: readonly Part[] }) {
     const mesh = ref.current
     if (!mesh) return
     const o = new Object3D()
+    const c = new Color()
     items.forEach((p, i) => {
       o.position.set(p.pos[0], p.pos[1], p.pos[2])
       if (p.rot) o.rotation.set(p.rot[0], p.rot[1], p.rot[2])
@@ -47,8 +48,11 @@ function InstancedGroup({ items }: { items: readonly Part[] }) {
       o.scale.set(...scaleOf(p))
       o.updateMatrix()
       mesh.setMatrixAt(i, o.matrix)
+      // Task 35.1: per-instance colour (LP sleeves and records) multiplies the white shared material.
+      if (p.colour) mesh.setColorAt(i, c.set(p.colour))
     })
     mesh.instanceMatrix.needsUpdate = true
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
     mesh.computeBoundingSphere()
   }, [items])
   return <instancedMesh ref={ref} args={[geometryOf(first), materials[first.mat], items.length]} />
@@ -123,7 +127,7 @@ export function PartMeshes({ parts }: { parts: readonly Part[] }) {
   return (
     <group>
       {groups.map(([key, items]) =>
-        items.length === 1 ? (
+        items.length === 1 && !items[0].colour ? (
           <mesh
             key={key}
             geometry={geometryOf(items[0])}

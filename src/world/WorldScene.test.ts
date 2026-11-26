@@ -1196,6 +1196,22 @@ describe('WorldScene turntable catalog card (task 33.3)', () => {
     expect(prompt()).toContain('Now playing: 02 // NEON ARCADE LOBBY (1996)');
   });
 
+  it('drives the console state (task 35.2): Digit2 gives track 1 playing, Digit5 gives track 4 stopped, the needle drop sounds for tracks 0..3 only', () => {
+    const { wrapper } = open();
+    key(wrapper, 'Digit2');
+    expect(h.propsArgs).toEqual({ turntablePlaying: true, turntableTrack: 1 });
+    key(wrapper, 'Digit5');
+    expect(h.propsArgs).toEqual({ turntablePlaying: false, turntableTrack: 4 });
+    expect(fake.playVinylNeedleDropSfx).toHaveBeenCalledTimes(1); // only Digit2; STOP is silent
+    key(wrapper, 'Digit1');
+    key(wrapper, 'Digit3');
+    key(wrapper, 'Digit4');
+    expect(h.propsArgs).toEqual({ turntablePlaying: true, turntableTrack: 3 });
+    expect(fake.playVinylNeedleDropSfx).toHaveBeenCalledTimes(4); // tracks 1, 0, 2, 3
+    key(wrapper, 'Digit5');
+    expect(fake.playVinylNeedleDropSfx).toHaveBeenCalledTimes(4);
+  });
+
   it('shows the selected track on the jacket before audio is unlocked while the playing flag stays false', () => {
     unlocked = false;
     track = 2;

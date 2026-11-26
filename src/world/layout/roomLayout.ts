@@ -148,6 +148,14 @@ const CRT_STACK = prop('crt-stack', 'furniture', box(4.3, 4.9, -3.2, -2.6), 1.0,
  */
 const RECORD_PLAYER = prop('record-player', 'furniture', box(-2.1, -0.85, 3.55, 4), 0.95, 3, true, undefined, { facing: '-z' });
 
+/**
+ * Floor loudspeaker (task 35.1): a 0.34 x 0.32 m, 0.96 m tall 3-way tower against the south wall (back on z 4), facing -z like the console. It stands on the couch side of
+ * the console, in the 0.6 m strip between the back of the couch (z 3.4) and the wall: x -2.49..-2.15, 0.05 m west of the console (x -2.1) and 0.28 m clear of the
+ * couch (z 3.4 against 3.68). The console and the couch stay exactly where they were, so the spawn disc, every walkway and lane, the bookcase walkways and the
+ * reachable cells in front of the console are untouched. Solid (floor-standing), not interactable.
+ */
+const LOUDSPEAKER = prop('loudspeaker', 'furniture', box(-2.49, -2.15, 3.68, 4), 0.96, 3, true, undefined, { facing: '-z' });
+
 const CHAIR = prop('abandoned-chair', 'furniture', box(2.9, 3.5, 1.9, 2.5), 0.9, 3);
 const COUCH = prop('couch', 'furniture', box(-3.9, -2.1, 2.6, 3.4), 0.9, 3);
 
@@ -220,6 +228,7 @@ const PROPS: readonly PropDef[] = Object.freeze([
   ARCADE_FREQUENCY,
   CRT_STACK,
   RECORD_PLAYER,
+  LOUDSPEAKER,
   CHAIR,
   COUCH,
   ...DETAILS,
