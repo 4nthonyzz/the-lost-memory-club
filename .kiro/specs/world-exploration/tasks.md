@@ -34,6 +34,22 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 
 - Approved scope change (cohesive prop textures), 2026-11-29: `corkBoard` shrinks to 256x256. New deterministic textures are allowed: `vcrDeck` (256x128), `vhsShell` (128x128) and `metalCabinet` (256x256). `crate` is upgraded to 256x256. Small desk-clutter detail (notebook, mug) and recessed door-panel detail are allowed. The reference monitor uses the `crtCasing` look. The armchair uses `couchFabric` with metric fabric UVs and a slate/teal hue. Every new texture is registered in `sharedResources.ts` and disposed exactly once (`disposeSharedResources()` is twice-safe), with a flat-colour fallback. `memoryShift` tints the new fabric and casing materials over t = 0..1, with t = 0 exact. Budgets stay: fewer than 20,000 triangles (currently 19,128 computed, so geometry changes must be near zero), at most 4 lights, texture memory at most 8 MB (target at most 7.7 MB). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json` and `tools/blender/` stay unchanged. No real trademarks are used.
 
+- Approved scope change (interactive props), 2026-11-30: world-local interactable props (two desk lamps and three arcade manual books on the west bookcase) are added. They do NOT use `StationId` and never call `onInspect`; `StationId` stays `'vhs' | 'arcade'`. Pressing E on a prop is handled inside the world (lamp on/off state is session-only, not persisted, not GameState) and does not suspend world input. Because `WorldSceneProps` has no status callback and `App.tsx` is unchanged, prop messages are shown in a world-owned message line inside the world wrapper (near the interaction prompt, `role="status"`, never covering the App HUD status line); this supersedes the earlier wording "status bar". The reception desk currently has one lamp: a second lamp is added (left green-shaded banker's lamp, right cream-shaded table lamp). Lighting stays `M3_LIGHT_COUNT = 4` (lamp light is emissive meshes, a glow sprite and a desk light-pool decal only). The manual texts describe LAST EXIT and DEAD FREQUENCY gameplay that is not implemented in `src/arcade`: they are in-world lore. Budgets: fewer than 20,000 triangles (currently 19,172 computed; new geometry at most +120), at most 4 lights, texture memory at most 8 MB (`lampGlow` upgraded in place). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json` and `tools/blender/` stay unchanged.
+
+- Approved scope change (lighting and clue inspector), 2026-12-01: no new three.js lights are added (`M3_LIGHT_COUNT` stays 4). Lamp light is produced by emissive shades, additive volumetric cones, additive desk pools and glow sprites. West-light and ambient intensity are modulated by the number of lamps ON, as a multiplier applied on top of the existing Memory_Shift and flicker values (never overwriting them), and the ambient floor is kept. Ceiling fixtures get additive bloom strips. A world-owned Archive Document Card overlay (`WorldInspectorCard`) opens for readable props. It is non-blocking (no `onInspect`, no input suspension) and closes on E, Esc or when the player walks more than 2.6 m away. A session-only "NOTES READ: X / 6" counter is shown (no storage). There are eight world interactables: two lamps, three manuals, the desk notebook, the cork board and the "THE SIGNAL REMEMBERS" poster (targetable only while visible, if it is the Memory_Shift overlay poster). New lore texts are original placeholder writing, for review by the story owner (Developer 3). `StationId` and `onInspect` are unchanged. Budgets: fewer than 20,000 triangles (currently 19,042 computed; task 24 adds at most +100), at most 4 lights, texture memory at most 8 MB (7.521 MB computed; `lampGlow` is upgraded in place). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json` and `tools/blender/` stay unchanged.
+
+- Approved scope change (lamp craft and arcade glow), 2026-12-02: `desk-notebook` moves to about anchor (-0.58, 1.62) so the left lamp is no longer stolen by the notebook when targeting. A new 64x64 `coneFalloff` texture (0.016 MB) gives soft lamp cones. The banker's lamp gets brass end caps (+16 triangles) and a warm inner liner. The ON green shade emissive is `#16a34a` at 0.38, and desk pools use opacity about 0.42. Three additive floor-glow decals in front of the arcade cabinets reuse `lampGlow` (+6 triangles, no new light). The arcade room ARCHIVE poster becomes the 7th readable document (prompt "Press E to read: Club Archive Notice", counter "NOTES READ: X / 7", anchor at the poster's real position). Budgets: fewer than 20,000 triangles (currently 19,100 computed), at most 4 lights, texture memory at most 8 MB (7.521 MB computed). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged. Earlier wording of "X / 6" in task 24.2 is superseded by this bullet.
+
+- Approved scope change (texture craft and mid-tone lighting), 2026-12-03: anisotropy 4 is set on every procedural `CanvasTexture` (no memory cost). Texture detail upgrades are redrawn in place (the texture count stays 31). At most one small-prop texture may grow from 128x128 to 256x256. Normal-state lighting is tuned to a mid-tone balance (ambient about 0.52 to 0.58 with both lamps on, the 0.35 floor is kept, the lamp-coupling ratios are kept). Memory_Shift, flicker and reduced motion are unchanged. Budgets: triangles at most 19,200 (below 20,000; currently 19,124 computed), at most 4 lights, texture memory at most 7.85 MB (currently 7.537 MB computed; hard limit 8 MB). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged.
+
+- Approved scope change (themed inspector and cabinet detail), 2026-12-04: one new 256x128 texture `cabinetAndManualDetail` is added (left half: coin door and control-deck legends for the three arcade cabinets; right half: three illustrated manual spines), mapped onto existing faces with zero new triangles. `rugWoven`, `wood`, `woodDark` and `spineAtlas` are sharpened in place. The Archive Document Card gains per-document themes, status pills, inline SVG header art and two pages switched with keys 1 and 2 (also clickable buttons when the pointer is not locked; while pointer-locked there is no cursor, so keys are the input), without releasing pointer lock or moving the player. E, Esc and walking more than 2.6 m away still close it. In-world status text such as "CABINET 01 // PLAYABLE" is diegetic and is accurate only once the Snake game ships in `src/arcade`. Budgets: triangles at most 19,200 (currently 19,188), at most 4 lights, texture memory at most 7.85 MB (currently 7.537 MB), texture count 32. `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged.
+
+- Approved scope change (scrollable card and protruding manuals), 2026-12-05: the Archive Document Card scrolls with the mouse wheel (window `wheel` listener, `passive: false`, attached only while a card is open, also while pointer-locked) and with ArrowUp / ArrowDown / PageUp / PageDown. While a card is open, ArrowUp / ArrowDown scroll the card and do not move the player (W / S still move). The card becomes `pointer-events: auto` with a styled scrollbar so it can be dragged when the cursor is visible. Clicks and mousedown inside the card never request pointer lock: the world click handler ignores targets inside the card, because React `stopPropagation` alone does not stop the native wrapper listener. `scrollTop` resets on open and on page switch. The three manuals protrude 0.08 m toward +X as 0.31 x 0.085 x 0.29 m volumes with anchors at x -4.52, z 1.4 / 1.8 / 2.2, showing spine art and cover art on the exposed side faces using the right half of `cabinetAndManualDetail` (redrawn in place, 0 bytes). Budgets: triangles at most 19,200 (currently 19,152; 0 extra), at most 4 lights, texture memory at most 7.85 MB (currently 7.703 MiB; 0 extra). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged.
+
+- Approved scope change (open-book manuals and animated attract screens), 2026-12-06: the three manual cards render as an open two-page book (both pages side by side on wide viewports, stacked on narrow ones). Keys 1 and 2 and clicks select and highlight a page, and scroll it into view when stacked. Wheel, arrow keys, page keys and the scrollbar keep working. The four room clues keep their own layouts. The three attract screens are animated in place by redrawing the existing `attractSnake`, `attractMaze` and `attractFrequency` canvases at most 12 times per second from the existing `Effects` `useFrame` (no timers, no new textures). Animation stops while inspecting and is static under reduced motion. `elapsedSec = 0` reproduces the static frame. Any collection flash is a soft pulse that keeps luminance changes at or below 3 per second (Requirement 10). Budgets: triangles at most 19,200 (currently 19,116), at most 4 lights, 32 textures, texture memory at most 7.85 MB (currently 7.703 MiB). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged.
+
+- Approved scope change (lamp fix, smooth motion, 24 Hz attract), 2026-12-07: the `desk-lamp-right` square glow/cone artefact is removed (round, radially faded glow and pool geometry with at least 24 segments, cone top tucked inside the shade's bottom opening, pool flat just above the desk). Camera look (yaw/pitch, lambda about 32) and movement velocity (lambda about 20) use frame-rate-independent exponential smoothing `1 - exp(-lambda * dt)`, bypassed (alpha = 1) under reduced motion; collision, bounds and pointer-lock behaviour are unchanged. The attract-screen redraw throttle rises from 12 Hz to 24 Hz (estimated texture uploads about 18.8 MB/s, not measured) with faster, interpolated motion, and every brightness pulse keeps at most 3 direction changes per rolling second. Budgets: triangles at most 19,200 (currently 19,116), at most 4 lights, 32 textures, texture memory at most 7.85 MB (7.703 MiB). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged. The earlier 12 Hz redraw wording in the open-book/attract scope change and in task 29.2 is superseded by this bullet.
+
 ## Tasks
 
 ### Milestone 1: Playable 3D room (primitives only)
@@ -856,6 +872,257 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: documentation and the spec folder only.
     - _Requirements: 14.11, 14.12, 15.3, 15.6_
 
+### Interactive desk lamps and arcade manuals
+
+- [x] 23. Interactive desk lamps and arcade manuals
+  - [x] 23.1 Lamp glow upgrade and second desk lamp
+    - Files: `src/world/scene/proceduralTextures.ts`, `src/world/scene/modelDetail.ts`, `src/world/scene/Props.tsx`, `src/world/scene/sharedResources.ts`, `src/world/layout/roomLayout.ts`, `src/world/scene/proceduralTextures.test.ts`, `src/world/scene/modelDetail.test.ts`, `src/world/layout/roomLayout.test.ts`.
+    - Upgrade `lampGlow` in place to 128x128 with a multi-stop warm radial falloff, a filament core and no hard edge. Add `desk-lamp-left` (green-shaded banker's lamp) and `desk-lamp-right` (cream-shaded table lamp) to the layout as non-solid visual props on the reception desk, replacing the single existing lamp. Each lamp has a bulb core, inner shade glow, a glow sprite and a desk light-pool decal. An `on` flag per lamp drives lit versus unlit materials. No new light is added.
+    - Acceptance: both lamps render lit and unlit; new geometry at most +120 triangles; triangle estimate below 20,000; lights at most 4 (`M3_LIGHT_COUNT` stays 4); texture memory at most 8 MB; `lampGlow` disposed exactly once; colliders unchanged; Memory_Shift tinting still works.
+    - Tests: `proceduralTextures.test.ts` (determinism with a fake context, 128x128, no randomness); `modelDetail.test.ts` (lit and unlit materials, budgets, disposal once and twice-safe, colliders unchanged); `roomLayout.test.ts` (both lamps present and non-solid, spawn and walkways unchanged). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 22.3.
+    - Boundary: render and layout data only; `src/world/` only; no new dependency; no GLB.
+    - _Requirements: 1.3, 1.4, 1.8, 9.1, 9.2, 9.8, 12.5, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 23.2 Interactable props: lamps and manuals
+    - Files: `src/world/worldTypes.ts`, `src/world/layout/roomLayout.ts`, `src/world/logic/targeting.ts`, `src/world/logic/inputMode.ts`, `src/world/controller/useWorldInput.ts`, `src/world/controller/usePlayerRig.ts`, `src/world/WorldScene.tsx`, `src/world/overlay/InteractionPrompt.tsx`, new `src/world/overlay/WorldMessage.tsx`, `src/world/scene/Props.tsx`, `src/world/scene/shelfModel.ts` or `src/world/scene/modelDetail.ts`; tests `src/world/logic/targeting.test.ts`, the `inputMode` tests, `src/world/scene/modelDetail.test.ts`, `src/world/WorldScene.test.ts`.
+    - Add a world-local `PropDef` type (not `StationId`) for two lamps and three manual books. Targeting uses range 2.2 m and the existing cone and line-of-sight rules, and returns either a Station or a prop; the nearest eligible target wins and Stations keep working. Each prop has prompt text per prop and state (for example lamp on versus off).
+    - E on a lamp toggles its session-only `on` state (React or ref state in the world, never persisted, never GameState). E on a manual shows its message in `WorldMessage.tsx`, a `role="status"` line inside the world wrapper near the prompt that never covers the App HUD status line. Prop activation never calls `onInspect` and never enters `inspecting` or suspends input; the E repeat guard applies.
+    - Place three manual books at x about -4.2, y 1.1..1.4 on the west bookcase, with the exact message texts approved by the user (supplied with the task prompt; not defined in this plan, and no text is invented). The messages are in-world lore and do not claim that LAST EXIT or DEAD FREQUENCY gameplay exists.
+    - Acceptance: E on a prop does not call `onInspect` and does not change the mode; E at a Station still calls `onInspect` with the same `StationId`; `StationId` stays `'vhs' | 'arcade'`; lamp state resets on reload; manuals are reachable and targetable within 2.2 m; triangle estimate below 20,000; lights at most 4; shared contracts and `src/App.tsx` unchanged.
+    - Tests: `targeting.test.ts` (prop in range, at the 2.2 m boundary, nearest of Station and prop, line of sight); `inputMode` tests (prop activation emits no `CALL_ON_INSPECT` and keeps the mode); `modelDetail.test.ts` (manual book positions, budgets); `WorldScene.test.ts` (lamp toggle changes prompt text, manual shows the message, `onInspect` not called for props, Station E unchanged). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 23.1.
+    - Boundary: `src/world/` only; `WorldSceneProps` and `onInspect` unchanged; no storage access; no import from `src/arcade/` or `src/memories/`.
+    - _Requirements: 7.1, 7.2, 7.3, 7.5, 7.6, 7.7, 8.1, 8.6, 11.14, 16.6, 16.7, 16.8, 16.9, 20.1, 20.2, 20.8_
+
+  - [x] 23.3 Docs, metrics and verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, lights and texture memory, each labelled "computed, not runtime-measured". Document the world-owned message line, that lamp state is session-only, and that the manuals are in-world lore for unimplemented gameplay. Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final geometry and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 23.2.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
+### Dramatic lighting and clue inspector
+
+- [x] 24. Dramatic lighting and clue inspector
+  - [x] 24.1 Lamp cones, pools, emissive shades, room light coupling and ceiling bloom
+    - Files: `src/world/scene/proceduralTextures.ts`, `src/world/scene/modelDetail.ts`, `src/world/scene/Props.tsx`, `src/world/scene/Lighting.tsx`, `src/world/scene/Room.tsx`, `src/world/scene/sharedResources.ts`, `src/world/scene/MemoryShiftDriver.tsx` or `src/world/scene/Effects.tsx` (wherever light intensities are written), `src/world/WorldScene.tsx`, and the matching tests (`proceduralTextures.test.ts`, `modelDetail.test.ts`, Memory_Shift tests updated, not weakened).
+    - Add additive volumetric cones and additive desk pools for each lamp, driven by its session-only `on` state, with emissive shades. Upgrade `lampGlow` in place. Add additive bloom strips to the ceiling fixtures. Couple west-light and ambient intensity to the number of lamps ON as a multiplier applied on top of the Memory_Shift and flicker values, never overwriting them, with the ambient floor kept.
+    - Acceptance: no new three.js light (`M3_LIGHT_COUNT` stays 4); lights at most 4; new geometry at most +100 triangles and the estimate stays below 20,000; texture memory at most 8 MB; changed textures disposed exactly once (twice-safe); colliders and Station anchors unchanged; Memory_Shift tinting and reduced motion still work; ambient never drops below the floor.
+    - Tests: `modelDetail.test.ts` (budgets, lamp-count multiplier values including 0, 1 and 2 lamps, floor kept, multiplier composes with Memory_Shift and flicker), `proceduralTextures.test.ts` (determinism with a fake context, power-of-two sizes, no randomness). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 23.3.
+    - Boundary: render-only; `src/world/` only; no new dependency; no GLB; `ASSET_MANIFEST` stays empty.
+    - _Requirements: 1.3, 1.4, 1.8, 9.1, 9.2, 9.8, 10.2, 10.3, 10.7, 12.5, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 24.2 Clue inspector card, new readable props and notes counter
+    - Files: `src/world/logic/propState.ts`, `src/world/layout/roomLayout.ts`, `src/world/logic/targeting.ts`, `src/world/worldTypes.ts`, `src/world/logic/inputMode.ts` (only if needed), `src/world/controller/useWorldInput.ts`, `src/world/controller/usePlayerRig.ts`, `src/world/WorldScene.tsx`, new `src/world/overlay/WorldInspectorCard.tsx`, `src/world/overlay/WorldOverlay.tsx`, `src/world/overlay/world.css`; tests `src/world/logic/targeting.test.ts`, `src/world/logic/propState.test.ts`, `src/world/WorldScene.test.ts`, `src/world/scene/modelDetail.test.ts`.
+    - Add the desk notebook, the cork board and the "THE SIGNAL REMEMBERS" poster as world-local readable props (eight world interactables in total with the two lamps and three manuals). The poster is targetable only while visible when it is the Memory_Shift overlay poster. E on a readable prop opens `WorldInspectorCard` (Archive Document Card) with original placeholder lore text for review by the story owner (Developer 3). The card is non-blocking: no `onInspect`, no input suspension, no pointer-lock change. It closes on E, Esc or when the player walks more than 2.6 m away. Add a session-only "NOTES READ: X / 6" counter (unique readable props read; no storage, not GameState, resets on reload).
+    - Acceptance: `StationId` stays `'vhs' | 'arcade'`; E on a prop never calls `onInspect` and never changes the input mode; E at a Station is unchanged; the card is reachable by keyboard and has `role` and accessible label; the counter increments once per unique prop; no storage access; triangle estimate below 20,000; lights at most 4; `src/App.tsx` and shared contracts unchanged.
+    - Tests: `targeting.test.ts` (new props in range, boundary, nearest wins, hidden poster not targetable), `propState.test.ts` (counter uniqueness, card open and close transitions, 2.6 m auto-close), `WorldScene.test.ts` (card opens and closes on E, Esc and distance; `onInspect` not called; Station E unchanged; counter text), `modelDetail.test.ts` (prop positions, budgets). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 24.1.
+    - Boundary: `src/world/` only; `WorldSceneProps` and `onInspect` unchanged; no import from `src/arcade/` or `src/memories/`; the import-boundary test still passes.
+    - _Requirements: 7.1, 7.2, 7.3, 7.5, 7.6, 7.7, 8.1, 8.6, 9.3, 11.14, 15.1, 15.2, 15.4, 16.6, 16.7, 16.8, 16.9, 20.1, 20.2, 20.8_
+
+  - [x] 24.3 Docs, metrics and verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, lights and texture memory, each labelled "computed, not runtime-measured". Document the Archive Document Card, the session-only notes counter, the lamp-count light coupling, and that the lore texts are placeholders pending Developer 3 review. Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final geometry and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 24.2.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
+### Lamp craft, arcade glow and final polish
+
+- [x] 25. Lamp craft, arcade glow and final polish
+  - [x] 25.1 Notebook targeting fix, banker's lamp craft, soft cones and richer pools
+    - Files: `src/world/layout/roomLayout.ts`, `src/world/scene/modelDetail.ts`, `src/world/scene/Props.tsx`, `src/world/scene/proceduralTextures.ts`, `src/world/scene/sharedResources.ts`; tests `src/world/logic/targeting.test.ts`, `src/world/scene/modelDetail.test.ts`, `src/world/scene/proceduralTextures.test.ts`.
+    - Move `desk-notebook` to about anchor (-0.58, 1.62). Add banker's lamp brass end caps (+16 triangles) and a warm inner liner. Set the ON green shade emissive to `#16a34a` at 0.38 and desk pool opacity to about 0.42. Add a 64x64 `coneFalloff` `CanvasTexture` (0.016 MB) for soft lamp cones, registered in `sharedResources.ts` with a flat-colour fallback and disposed exactly once.
+    - Acceptance: standing in front of the left lamp targets the lamp, not the notebook; the notebook is still targetable from its own position; triangle estimate below 20,000; lights at most 4; texture memory at most 8 MB; colliders and Station anchors unchanged; Memory_Shift tinting still works.
+    - Tests: `targeting.test.ts` (left lamp wins from its front position, notebook reachable), `modelDetail.test.ts` (brass caps triangle delta, emissive value, pool opacity, budgets, disposal once and twice-safe), `proceduralTextures.test.ts` (determinism with a fake context, 64x64, no randomness). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 24.3.
+    - Boundary: `src/world/` only; no new dependency; no GLB; `ASSET_MANIFEST` stays empty; `StationId` and `onInspect` unchanged.
+    - _Requirements: 1.3, 1.4, 1.8, 7.1, 7.2, 7.3, 9.1, 9.2, 9.8, 12.5, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 25.2 Arcade floor glow and Club Archive Notice
+    - Files: `src/world/scene/modelDetail.ts`, `src/world/scene/Props.tsx`, `src/world/layout/roomLayout.ts`, `src/world/overlay/archiveDocuments.ts`, `src/world/overlay/NotesCounter.tsx`, `src/world/logic/propState.ts` (only if the count is defined there); tests `src/world/logic/targeting.test.ts`, `src/world/overlay/archiveDocuments.test.ts`, `src/world/scene/modelDetail.test.ts`, `src/world/WorldScene.test.ts`, `src/world/logic/propState.test.ts`.
+    - Add three additive floor-glow decals in front of the arcade cabinets reusing `lampGlow` (+6 triangles, no new light). Make the arcade room ARCHIVE poster the 7th readable document with prompt "Press E to read: Club Archive Notice" and anchor at the poster's real position. The counter reads "NOTES READ: X / 7".
+    - Acceptance: the poster is targetable within range and cone; E opens the card without calling `onInspect` or changing the input mode; the counter increments once per unique document and shows "/ 7"; triangle estimate below 20,000; lights at most 4; texture memory unchanged; colliders unchanged; `StationId` stays `'vhs' | 'arcade'`.
+    - Tests: `targeting.test.ts` (poster in range, boundary), `archiveDocuments.test.ts` (7 documents, new title and prompt), `propState.test.ts` (counter of 7, uniqueness), `modelDetail.test.ts` (decal triangle delta, no new light, budgets), `WorldScene.test.ts` (card opens, counter text, `onInspect` not called). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 25.1.
+    - Boundary: `src/world/` only; `WorldSceneProps` and `onInspect` unchanged; no storage access; no import from `src/arcade/` or `src/memories/`.
+    - _Requirements: 1.3, 1.4, 7.1, 7.2, 7.3, 7.5, 7.6, 7.7, 8.1, 8.6, 9.8, 14.4, 14.5, 15.1, 15.2, 15.4, 16.6, 16.7, 16.8, 16.9, 20.1, 20.2, 20.8_
+
+  - [x] 25.3 Docs, metrics, verification and PR summary
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, lights and texture memory, each labelled "computed, not runtime-measured", and write a short PR summary. Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final geometry, the "X / 7" counter and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 25.2.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
+### Texture craft and mid-tone lighting
+
+- [x] 26. Texture craft and mid-tone lighting
+  - [x] 26.1 Anisotropic filtering and procedural texture detail
+    - Files: `src/world/scene/sharedResources.ts`, `src/world/scene/proceduralTextures.ts`, `src/world/scene/modelDetail.ts`; tests `src/world/scene/proceduralTextures.test.ts`, `src/world/scene/modelDetail.test.ts`.
+    - Set anisotropy 4 on every procedural `CanvasTexture` (central helper in `sharedResources.ts`). Redraw texture detail in place (texture count stays 31). At most one small-prop texture may grow from 128x128 to 256x256, with the texture memory estimate updated.
+    - Acceptance: every texture has anisotropy 4; texture count is 31; triangle estimate at most 19,200; lights at most 4; texture memory at most 7.85 MB (computed); textures stay deterministic and power-of-two; each texture disposed exactly once (twice-safe); colliders and Station anchors unchanged; Memory_Shift tinting still works.
+    - Tests: `proceduralTextures.test.ts` (determinism with a fake context, power-of-two sizes, no randomness, at most one 128 to 256 change); `modelDetail.test.ts` (anisotropy on all textures, count 31, memory and triangle budgets, light count, disposal once and twice-safe). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 25.3.
+    - Boundary: render-only; `src/world/` only; no new dependency; no GLB; `ASSET_MANIFEST` stays empty.
+    - _Requirements: 1.3, 1.4, 1.8, 9.8, 12.5, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 26.2 Mid-tone lighting balance
+    - Files: `src/world/logic/palette.ts`, `src/world/scene/Lighting.tsx`, `src/world/scene/WorldCanvas.tsx` or `src/world/WorldScene.tsx` (exposure, only if configured), `src/world/scene/memoryShift.ts`, `src/world/logic/lampCoupling.ts` (if needed); tests `palette.test.ts`, `palette.full.test.ts`, `memoryShift.test.ts`, `lampCoupling.test.ts`, `src/world/scene/modelDetail.test.ts`.
+    - Tune normal-state lighting to a mid-tone balance: ambient about 0.52 to 0.58 with both lamps on. Keep the 0.35 ambient floor and the lamp-coupling ratios. Memory_Shift, flicker and reduced motion are unchanged; `M3_LIGHT_COUNT` stays 4.
+    - Acceptance: ambient with both lamps on is within 0.52 to 0.58; ambient never drops below 0.35 in any state; coupling ratios are unchanged; the multiplier still composes on top of Memory_Shift and flicker; lights at most 4; colliders unchanged.
+    - Tests: `palette.test.ts` and `palette.full.test.ts` (normal and shifted values, floor kept), `memoryShift.test.ts` (tint at t = 0, 0.5 and 1 still exact), `lampCoupling.test.ts` (ratios for 0, 1 and 2 lamps), `modelDetail.test.ts` (light count and budgets). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 26.1.
+    - Boundary: render-only; `src/world/` only; no new dependency; no new three.js light.
+    - _Requirements: 9.1, 9.2, 9.8, 10.2, 10.3, 10.7, 14.5, 19.1_
+
+  - [x] 26.3 Docs, metrics and verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, lights and texture memory, each labelled "computed, not runtime-measured". Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final geometry, lighting values and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 26.2.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
+### Cabinet detail and themed document card
+
+- [x] 27. Cabinet detail and themed document card
+  - [x] 27.1 cabinetAndManualDetail texture and in-place sharpening
+    - Files: `src/world/scene/proceduralTextures.ts`, `src/world/scene/sharedResources.ts`, `src/world/scene/modelDetail.ts`, `src/world/scene/shelfModel.ts`, `src/world/scene/PartMeshes.tsx` (only if UV mapping needs it); tests `src/world/scene/proceduralTextures.test.ts`, `src/world/scene/modelDetail.test.ts`.
+    - Add the 256x128 `cabinetAndManualDetail` texture (left half: coin door and control-deck legends for the three cabinets; right half: three illustrated manual spines), registered in `sharedResources.ts` with a flat-colour fallback and anisotropy 4. Map it onto existing faces with zero new triangles. Sharpen `rugWoven`, `wood`, `woodDark` and `spineAtlas` in place.
+    - Acceptance: texture count is 32; texture memory at most 7.85 MB (computed); triangle estimate at most 19,200; lights at most 4; textures deterministic and power-of-two; each texture disposed exactly once (twice-safe); colliders and Station anchors unchanged; Memory_Shift tinting still works.
+    - Tests: `proceduralTextures.test.ts` (determinism with a fake context, 256x128, no randomness, sharpened textures keep their sizes); `modelDetail.test.ts` (texture count 32, memory and triangle budgets, light count, disposal once and twice-safe, colliders unchanged). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 26.3.
+    - Boundary: render-only; `src/world/` only; no new dependency; no GLB; `ASSET_MANIFEST` stays empty.
+    - _Requirements: 1.3, 1.4, 1.8, 9.8, 12.5, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 27.2 Themed two-page Archive Document Card
+    - Files: `src/world/overlay/archiveDocuments.ts`, `src/world/overlay/WorldInspectorCard.tsx`, `src/world/WorldScene.tsx`, `src/world/controller/useWorldInput.ts`, `src/world/logic/inputState.ts`, `src/world/logic/inputMode.ts`, `src/world/logic/propState.ts`, `src/world/overlay/world.css`; tests `src/world/overlay/archiveDocuments.test.ts`, `src/world/logic/propState.test.ts`, `src/world/logic/inputMode.prop.test.ts`, `src/world/logic/inputState.test.ts`, `src/world/WorldScene.test.ts`.
+    - Give each document a theme, a status pill, inline SVG header art and two pages. Keys 1 and 2 switch pages while the card is open; the page buttons are also clickable when the pointer is not locked. While pointer-locked there is no cursor, so keys are the input. Page switching never releases pointer lock, never moves the player and never calls `onInspect`. E, Esc and walking more than 2.6 m away still close the card. Texts remain original placeholders for Developer 3 review; status text such as "CABINET 01 // PLAYABLE" is diegetic and accurate only once the Snake game ships in `src/arcade`.
+    - Acceptance: every document has two pages, a theme and a status pill; keys 1 and 2 are accepted only while the card is open and are ignored when focus is in an input outside the wrapper; page state resets when the card closes; the notes counter is unchanged; `StationId` stays `'vhs' | 'arcade'`; the card keeps its `role` and accessible label; no storage access; `src/App.tsx` unchanged.
+    - Tests: `archiveDocuments.test.ts` (themes, pills, two pages per document), `propState.test.ts` (page transitions, reset on close), `inputMode.prop.test.ts` and `inputState.test.ts` (keys 1 and 2 role and filtering, no mode change, no `CALL_ON_INSPECT`, no pointer-lock effect), `WorldScene.test.ts` (key and button page switching, closing on E, Esc and distance, `onInspect` not called). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 27.1.
+    - Boundary: `src/world/` only; `WorldSceneProps` and `onInspect` unchanged; no import from `src/arcade/` or `src/memories/`; the import-boundary test still passes.
+    - _Requirements: 7.5, 7.6, 7.7, 8.1, 8.6, 11.12, 11.13, 11.14, 15.1, 15.2, 15.4, 16.6, 16.7, 16.8, 16.9, 20.1, 20.2, 20.8_
+
+  - [x] 27.3 Docs, metrics and verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, lights and texture memory, each labelled "computed, not runtime-measured". Document the two-page card controls and the diegetic status text caveat. Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final geometry, texture count of 32 and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 27.2.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
+### Scrollable card and protruding manuals
+
+- [x] 28. Scrollable card and protruding themed manuals
+  - [x] 28.1 Wheel, key and scrollbar scrolling for the document card
+    - Files: `src/world/overlay/WorldInspectorCard.tsx`, `src/world/WorldScene.tsx`, `src/world/controller/useWorldInput.ts`, `src/world/logic/inputState.ts`, `src/world/logic/inputMode.ts` or `src/world/logic/propState.ts` (only if needed), `src/world/overlay/world.css`; tests `src/world/WorldScene.test.ts`, `src/world/logic/inputState.test.ts`, `src/world/logic/inputMode.prop.test.ts`.
+    - Add a window `wheel` listener (`passive: false`) attached only while a card is open, working also while pointer-locked, plus ArrowUp / ArrowDown / PageUp / PageDown scrolling. While a card is open ArrowUp / ArrowDown scroll the card and do not move the player; W / S still move. The card gets `pointer-events: auto` and a styled scrollbar. The world click handler ignores clicks and mousedown whose target is inside the card, so they never request pointer lock. `scrollTop` resets on open and on page switch.
+    - Acceptance: wheel scrolls the card (also when pointer-locked) and the page is not scrolled; the wheel listener is removed when the card closes or the world unmounts; click inside the card does not call `requestPointerLock`; no `onInspect` call, no mode change; ArrowUp / ArrowDown do not move the player while a card is open and do move it otherwise; scroll position resets on open and page switch.
+    - Tests: `WorldScene.test.ts` (wheel scroll, listener add and removal, click inside card does not request lock, scroll reset), `inputState.test.ts` (key roles for scroll keys while the card is open), `inputMode.prop.test.ts` (no mode change, no `CALL_ON_INSPECT`, no lock effect). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 27.3.
+    - Boundary: `src/world/` only; `WorldSceneProps` and `onInspect` unchanged; no storage access; no import from `src/arcade/` or `src/memories/`.
+    - _Requirements: 4.10, 7.5, 7.6, 7.7, 8.1, 11.12, 11.13, 11.14, 11.23, 15.1, 15.2, 15.4, 20.2, 20.8_
+
+  - [x] 28.2 Protruding manual volumes with spine and cover art
+    - Files: `src/world/scene/shelfModel.ts`, `src/world/scene/modelDetail.ts`, `src/world/scene/proceduralTextures.ts`, `src/world/scene/sharedResources.ts` (only if needed), `src/world/layout/roomLayout.ts`; tests `src/world/scene/modelDetail.test.ts`, `src/world/scene/proceduralTextures.test.ts`, `src/world/logic/targeting.test.ts`, `src/world/layout/roomLayout.test.ts`.
+    - Make the three manuals protrude 0.08 m toward +X as 0.31 x 0.085 x 0.29 m volumes with anchors at x -4.52, z 1.4 / 1.8 / 2.2. Show spine art and cover art on the exposed side faces using the right half of `cabinetAndManualDetail`, redrawn in place (size unchanged, 0 extra bytes).
+    - Acceptance: triangle estimate at most 19,200 (0 extra from 19,152); lights at most 4; texture memory at most 7.85 MB (0 extra); texture count unchanged; the manuals stay targetable within 2.2 m and do not block walkways or change colliders in a way that breaks reachability; `cabinetAndManualDetail` disposed exactly once (twice-safe); Memory_Shift tinting still works.
+    - Tests: `modelDetail.test.ts` (manual dimensions and anchors, budgets, disposal once and twice-safe), `proceduralTextures.test.ts` (determinism with a fake context, same size, no randomness), `targeting.test.ts` (each manual targetable from the aisle, nearest wins), `roomLayout.test.ts` (anchors, reachability and clearances unchanged). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 28.1.
+    - Boundary: render and layout data only; `src/world/` only; no new dependency; no GLB; `ASSET_MANIFEST` stays empty; `StationId` and `onInspect` unchanged.
+    - _Requirements: 1.3, 1.4, 1.8, 6.1, 7.1, 7.2, 7.3, 9.8, 12.5, 13.8, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 28.3 Docs, metrics and verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, lights and texture memory, each labelled "computed, not runtime-measured". Document the card scroll controls and the protruding manuals. Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final geometry and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 28.2.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
+### Open-book manuals and animated attract screens
+
+- [x] 29. Open-book manuals and animated attract screens
+  - [x] 29.1 Open two-page book layout for the manual cards
+    - Files: `src/world/overlay/WorldInspectorCard.tsx`, `src/world/overlay/world.css`, `src/world/overlay/archiveDocuments.ts` (if needed), `src/world/WorldScene.tsx` (if needed), `src/world/overlay/cardThemes.ts` (if needed); tests `src/world/WorldScene.test.ts`, `src/world/overlay/archiveDocuments.test.ts`.
+    - The three manual cards render as an open book with both pages side by side on wide viewports and stacked on narrow ones. Keys 1 and 2 and clicks select and highlight a page, and scroll it into view when stacked. Wheel, ArrowUp / ArrowDown, PageUp / PageDown and the scrollbar keep working. The four room clues keep their own layouts. Texts stay as they are.
+    - Acceptance: both pages of a manual are visible at once on wide viewports; stacked on narrow ones; the selected page is highlighted; the selected page scrolls into view when stacked; scrolling inputs still work; room clues are unchanged; no `onInspect` call, no mode change, no pointer-lock change; clicks inside the card never request pointer lock.
+    - Tests: `WorldScene.test.ts` (manual shows two pages, key 1 and 2 and click select and highlight, room clue layout unchanged, no `onInspect`), `archiveDocuments.test.ts` (each manual has two pages). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 28.3.
+    - Boundary: `src/world/` only; `WorldSceneProps` and `onInspect` unchanged; no storage access; no import from `src/arcade/` or `src/memories/`.
+    - _Requirements: 7.5, 7.6, 7.7, 8.1, 11.12, 11.13, 11.14, 15.1, 15.2, 15.4, 20.2, 20.8_
+
+  - [x] 29.2 Animated attract screens
+    - Files: `src/world/scene/proceduralTextures.ts`, `src/world/scene/sharedResources.ts`, `src/world/scene/Effects.tsx`, `src/world/scene/effectsTiming.ts`; tests `src/world/scene/proceduralTextures.test.ts`, `src/world/scene/effectsTiming.test.ts`, `src/world/scene/modelDetail.test.ts`.
+    - Redraw the existing `attractSnake`, `attractMaze` and `attractFrequency` canvases in place, at most 12 times per second, from the existing `Effects` `useFrame`. No timers and no new textures. Animation stops while inspecting and is static under reduced motion. `elapsedSec = 0` reproduces the static frame. Any collection flash is a soft pulse that keeps luminance changes at or below 3 per second.
+    - Acceptance: redraw rate at most 12 per second; no timer; texture count stays 32; texture memory at most 7.85 MB (computed); triangle estimate at most 19,200; lights at most 4; animation off while inspecting and under reduced motion; `elapsedSec = 0` matches the static frame; textures deterministic for a given `elapsedSec`; each texture disposed exactly once (twice-safe); Memory_Shift tinting still works.
+    - Tests: `proceduralTextures.test.ts` (determinism with a fake context for fixed `elapsedSec`, `elapsedSec = 0` equals static frame, sizes unchanged), `effectsTiming.test.ts` (12 per second cap, stop while inspecting, static under reduced motion, flash luminance changes at most 3 per second), `modelDetail.test.ts` (texture count 32, memory, triangle and light budgets, disposal). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 29.1.
+    - Boundary: render-only; `src/world/` only; no new dependency; no GLB; `ASSET_MANIFEST` stays empty.
+    - _Requirements: 9.8, 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 14.2, 14.4, 14.5, 14.6, 14.7_
+
+  - [x] 29.3 Docs, metrics and verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, lights and texture memory, each labelled "computed, not runtime-measured". Document the open-book manual cards and the animated attract screens. Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final geometry and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 29.2.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
+### Lamp fix, smooth motion and 24 Hz attract screens
+
+- [x] 30. Lamp fix, smooth motion and 24 Hz attract screens
+  - [x] 30.1 Remove the right desk lamp square artefact
+    - Files: `src/world/scene/modelDetail.ts`, `src/world/scene/sharedResources.ts`, `src/world/scene/Props.tsx`, `src/world/scene/proceduralTextures.ts` (if needed); tests `src/world/scene/modelDetail.test.ts`, `src/world/scene/proceduralTextures.test.ts`.
+    - Make the `desk-lamp-right` glow sprite and pool round and radially faded, using geometry with at least 24 segments. Tuck the cone top inside the shade's bottom opening. Lay the pool flat just above the desk surface.
+    - Acceptance: no square edge is visible in glow, cone or pool; glow and pool geometry have at least 24 segments; cone top lies inside the shade opening; pool sits just above the desk without z-fighting; triangle estimate at most 19,200; lights at most 4; texture count 32; texture memory at most 7.85 MB (computed); each texture disposed exactly once (twice-safe); colliders and Station anchors unchanged; Memory_Shift tinting still works.
+    - Tests: `modelDetail.test.ts` (segment counts at least 24, cone top inside shade, pool height above desk, budgets, disposal once and twice-safe); `proceduralTextures.test.ts` (glow texture deterministic with a fake context, alpha is zero at the edge, unchanged size). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 29.3.
+    - Boundary: render-only; `src/world/` only; no new dependency; no GLB; `ASSET_MANIFEST` stays empty.
+    - _Requirements: 1.3, 1.4, 1.8, 9.1, 9.2, 9.8, 14.2, 14.4, 14.5, 14.6, 14.7, 19.1_
+
+  - [x] 30.2 Smooth camera look and movement
+    - Files: `src/world/logic/playerStep.ts`, `src/world/logic/movement.ts` and `src/world/logic/look.ts` (if needed), `src/world/controller/usePlayerRig.ts`, `src/world/WorldScene.tsx` (if needed); tests `src/world/logic/playerStep.test.ts`, `src/world/logic/look.test.ts`, `src/world/logic/movement.test.ts`, `src/world/WorldScene.test.ts`.
+    - Apply frame-rate-independent exponential smoothing with alpha = `1 - exp(-lambda * dt)` (using clamped dt) to camera look (yaw and pitch, lambda about 32) and movement velocity (lambda about 20). Under reduced motion alpha is 1 (no smoothing). Collision, bounds, pitch limits, yaw wrapping and pointer-lock behaviour are unchanged. Smoothing is a pure function.
+    - Acceptance: the smoothed value converges to the target; results are consistent across frame rates within tolerance; alpha is 1 under reduced motion; zero input stops the player without drift; position stays valid (no overlap, inside bounds); pitch stays within 80 degrees; yaw stays finite and wrapped; no pointer-lock change.
+    - Tests: `playerStep.test.ts` (alpha formula, convergence, frame-rate consistency, reduced-motion bypass, stop on zero input, collision still applied); `look.test.ts` and `movement.test.ts` (limits and wrapping preserved, NaN and large dt safe); `WorldScene.test.ts` (no `onInspect` or lock regression). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 30.1.
+    - Boundary: `src/world/` only; pure logic stays free of React, three.js and DOM; `WorldSceneProps` and `onInspect` unchanged.
+    - _Requirements: 3.1, 3.2, 3.3, 3.6, 3.10, 3.11, 4.2, 4.3, 4.4, 4.5, 6.2, 6.4, 6.5, 10.4, 10.6, 13.1, 13.2_
+
+  - [x] 30.3 24 Hz fluid attract animations
+    - Files: `src/world/scene/proceduralTextures.ts`, `src/world/scene/effectsTiming.ts`, `src/world/scene/Effects.tsx`; tests `src/world/scene/proceduralTextures.test.ts`, `src/world/scene/effectsTiming.test.ts`.
+    - Raise the attract-screen redraw throttle from 12 Hz to 24 Hz (estimated texture uploads about 18.8 MB/s, not measured). Make motion faster and interpolated between frames. Every brightness pulse keeps at most 3 direction changes per rolling second. Animation stays off while inspecting and static under reduced motion; `elapsedSec = 0` still reproduces the static frame; no timers, no new textures.
+    - Acceptance: redraw rate at most 24 per second; pulses have at most 3 direction changes in any rolling second; animation stops while inspecting and is static under reduced motion; textures are deterministic for a given `elapsedSec`; texture count 32; texture memory at most 7.85 MB (computed); triangle estimate at most 19,200; lights at most 4; each texture disposed exactly once.
+    - Tests: `proceduralTextures.test.ts` (determinism for fixed `elapsedSec`, `elapsedSec = 0` equals the static frame, sizes unchanged); `effectsTiming.test.ts` (24 Hz cap, rolling-second direction-change limit, stop while inspecting, static under reduced motion). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 30.2.
+    - Boundary: render-only; `src/world/` only; no new dependency; no GLB; `ASSET_MANIFEST` stays empty.
+    - _Requirements: 9.8, 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 14.2, 14.4, 14.5, 14.6, 14.7_
+
+  - [x] 30.4 Docs, metrics and verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, lights and texture memory, each labelled "computed, not runtime-measured". Document the lamp fix, the smoothing constants and the 24 Hz attract throttle (upload estimate labelled not measured). Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final geometry and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 30.3.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional. The 17 property-based test sub-tasks can be skipped for a faster MVP. Tasks 16.2 and 16.3 are marked `*` because they must not be implemented without approval.
@@ -914,7 +1181,32 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     { "id": 41, "tasks": ["21.3"] },
     { "id": 42, "tasks": ["22.1"] },
     { "id": 43, "tasks": ["22.2"] },
-    { "id": 44, "tasks": ["22.3"] }
+    { "id": 44, "tasks": ["22.3"] },
+    { "id": 45, "tasks": ["23.1"] },
+    { "id": 46, "tasks": ["23.2"] },
+    { "id": 47, "tasks": ["23.3"] },
+    { "id": 48, "tasks": ["24.1"] },
+    { "id": 49, "tasks": ["24.2"] },
+    { "id": 50, "tasks": ["24.3"] },
+    { "id": 51, "tasks": ["25.1"] },
+    { "id": 52, "tasks": ["25.2"] },
+    { "id": 53, "tasks": ["25.3"] },
+    { "id": 54, "tasks": ["26.1"] },
+    { "id": 55, "tasks": ["26.2"] },
+    { "id": 56, "tasks": ["26.3"] },
+    { "id": 57, "tasks": ["27.1"] },
+    { "id": 58, "tasks": ["27.2"] },
+    { "id": 59, "tasks": ["27.3"] },
+    { "id": 60, "tasks": ["28.1"] },
+    { "id": 61, "tasks": ["28.2"] },
+    { "id": 62, "tasks": ["28.3"] },
+    { "id": 63, "tasks": ["29.1"] },
+    { "id": 64, "tasks": ["29.2"] },
+    { "id": 65, "tasks": ["29.3"] },
+    { "id": 66, "tasks": ["30.1"] },
+    { "id": 67, "tasks": ["30.2"] },
+    { "id": 68, "tasks": ["30.3"] },
+    { "id": 69, "tasks": ["30.4"] }
   ]
 }
 ```

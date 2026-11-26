@@ -10,7 +10,7 @@
  */
 import { PLAYER_RADIUS } from '../logic/constants';
 import { overlapsAny } from '../logic/collision';
-import type { Aabb, ArcadeGameKind, Facing, StationDef, Vec2 } from '../worldTypes';
+import type { Aabb, ArcadeGameKind, Facing, InteractableDef, ManualId, StationDef, Vec2 } from '../worldTypes';
 
 export interface PropDef {
   id: string;
@@ -140,14 +140,21 @@ const CRT_STACK = prop('crt-stack', 'furniture', box(4.3, 4.9, -3.2, -2.6), 1.0,
 const CHAIR = prop('abandoned-chair', 'furniture', box(2.9, 3.5, 1.9, 2.5), 0.9, 3);
 const COUCH = prop('couch', 'furniture', box(-3.9, -2.1, 2.6, 3.4), 0.9, 3);
 
+/** Framed ARCHIVE / MEMBERS ONLY poster on the Arcade_Area north wall (visual; also the 'poster-archive' readable, task 25.2). */
+const ARCADE_POSTER = prop('poster-arcade-area', 'detail', box(7, 8, -2, -1.95), 1.0, 3, false);
+
 const DETAILS: readonly PropDef[] = Object.freeze([
   // Crates moved to the main room's south-east corner (task 20.1) so the Arcade_Area keeps 1.2 m lanes from both
   // doorways to all three cabinet anchors.
   prop('crate-a', 'detail', box(4.3, 4.9, 3.1, 3.7), 0.6, 3),
   prop('crate-b', 'detail', box(4.3, 4.9, 2.4, 3.0), 0.5, 3),
   prop('tape-stack', 'detail', box(-0.6, -0.2, 1.4, 1.8), 0.15, 3, false),
+  // Two desk lamps on the reception desk top (task 23.1), visual only: a green-shaded banker's lamp on the
+  // left (shade offset west of its base) and a cream-shaded table lamp on the right. `elevation` is the desk top.
+  prop('desk-lamp-left', 'detail', box(-1.44, -1.1, 1.38, 1.52), 0.34, 3, false, undefined, { elevation: 1.0 }),
+  prop('desk-lamp-right', 'detail', box(1.14, 1.4, 1.32, 1.58), 0.4, 3, false, undefined, { elevation: 1.0 }),
   prop('poster-north', 'detail', box(0.5, 1.5, -4, -3.95), 1.0, 3, false),
-  prop('poster-arcade-area', 'detail', box(7, 8, -2, -1.95), 1.0, 3, false),
+  ARCADE_POSTER,
   prop('cable-run', 'detail', box(-1, 1, -2.5, -2.45), 0.02, 3, false),
   // Archival tape boxes in three corners (visual only).
   prop('archive-boxes-nw', 'detail', box(-4.9, -4.3, -3.9, -3.4), 0.4, 3, false),
@@ -224,6 +231,122 @@ export const COLLIDERS: readonly Aabb[] = Object.freeze([
 ]);
 
 export const STATION_DEFS: readonly StationDef[] = STATIONS;
+
+/** Interaction range of a world-local prop (lamps and manuals), in metres. */
+export const PROP_INTERACTION_RANGE = 2.2;
+
+/**
+ * The three arcade manuals stand in one row on level 2 of the west bookcase `shelf-b` (board top at about
+ * y 1.12, books up to y 1.4), spines facing +x at the bookcase front. They replace ordinary books in that
+ * row and are not solid: they live inside the bookcase volume. `z` is the book centre along the wall.
+ */
+export const MANUAL_PLACEMENT = Object.freeze({
+  shelfId: 'shelf-b',
+  level: 2,
+  /**
+   * Task 28.2: each manual is a 0.085 (along z) x 0.31 x 0.29 m (along x) volume whose spine face is at x -4.555, so the book is pulled
+   * 0.08 m toward +x compared with the flush row (spines at -4.635) and sticks out 0.045 m past the bookcase front (x -4.6). The
+   * volumes are non-solid. Back face at x -4.845.
+   */
+  spineX: -4.555,
+  backX: -4.845,
+  thickness: 0.085,
+  books: Object.freeze([
+    Object.freeze({ id: 'manual-snake' as const, z: 1.4 }),
+    Object.freeze({ id: 'manual-maze' as const, z: 1.8 }),
+    Object.freeze({ id: 'manual-frequency' as const, z: 2.2 }),
+  ]),
+});
+
+function lampDef(id: 'desk-lamp-left' | 'desk-lamp-right'): InteractableDef {
+  const b = DETAILS.find((p) => p.id === id)!.box;
+  return Object.freeze({
+    id,
+    kind: 'lamp' as const,
+    anchor: Object.freeze({ x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 }),
+    // The lamps stand on the solid desk, so its footprint must not occlude them.
+    collider: DESK.box,
+    range: PROP_INTERACTION_RANGE,
+    height: 1.2,
+  });
+}
+
+function manualDef(id: ManualId, z: number): InteractableDef {
+  return Object.freeze({
+    id,
+    kind: 'manual' as const,
+    // Task 28.2: 0.035 m in front of the protruding spine face (x -4.555), centred on the book.
+    anchor: Object.freeze({ x: -4.52, z }),
+    // The book's own footprint is excluded from its line-of-sight test (it is not in COLLIDERS; this box only identifies it).
+    collider: box(MANUAL_PLACEMENT.backX, MANUAL_PLACEMENT.spineX, z - MANUAL_PLACEMENT.thickness / 2, z + MANUAL_PLACEMENT.thickness / 2),
+    range: PROP_INTERACTION_RANGE,
+    height: 1.25,
+  });
+}
+
+/**
+ * Readable notes (task 24.2). All three are non-solid and visual only; their anchors sit on the object itself.
+ *  - desk-notebook: the notepad on the reception desk (deskParts: x = desk centre - 0.58, z = desk centre + 0.02; moved in 25.1 so the left lamp is no longer stolen by the notebook,
+ *    on the desk top). The solid desk footprint is excluded from its line-of-sight test, like the lamps.
+ *  - cork-board: the north-wall bulletin board between the two filing cabinets, anchored at the board centre on the wall face.
+ *  - poster-shift: the Memory_Shift overlay poster (north wall, x -0.3, z -3.94; see ShiftDressing in Props.tsx). It is
+ *    invisible at t = 0, so requiresShift makes targeting exclude it until memoryShifted is true.
+ */
+function noteDefs(): InteractableDef[] {
+  const dx = (DESK.box.minX + DESK.box.maxX) / 2;
+  const dz = (DESK.box.minZ + DESK.box.maxZ) / 2;
+  return [
+    Object.freeze({
+      id: 'desk-notebook' as const,
+      kind: 'note' as const,
+      anchor: Object.freeze({ x: dx - 0.58, z: dz + 0.02 }),
+      collider: DESK.box,
+      range: PROP_INTERACTION_RANGE,
+      height: 1.0,
+    }),
+    Object.freeze({
+      id: 'cork-board' as const,
+      kind: 'note' as const,
+      anchor: Object.freeze({ x: (BULLETIN.box.minX + BULLETIN.box.maxX) / 2, z: BULLETIN.box.maxZ }),
+      collider: BULLETIN.box,
+      range: PROP_INTERACTION_RANGE,
+      height: 1.6,
+    }),
+    Object.freeze({
+      id: 'poster-shift' as const,
+      kind: 'note' as const,
+      anchor: Object.freeze({ x: -0.3, z: -3.94 }),
+      range: PROP_INTERACTION_RANGE,
+      height: 1.7,
+      requiresShift: true,
+    }),
+    // Task 25.2: the framed ARCHIVE / MEMBERS ONLY poster on the Arcade_Area north wall (prop 'poster-arcade-area', centre
+    // x 7.5, face at z -1.945). The anchor is its real position, 0.02 m into the room from the wall face (z -1.95). Always
+    // targetable (it is not a Memory_Shift overlay). Its own small box is excluded from its line-of-sight test.
+    Object.freeze({
+      id: 'poster-archive' as const,
+      kind: 'note' as const,
+      anchor: Object.freeze({
+        x: (ARCADE_POSTER.box.minX + ARCADE_POSTER.box.maxX) / 2,
+        z: ARCADE_POSTER.box.maxZ + 0.02,
+      }),
+      collider: ARCADE_POSTER.box,
+      range: PROP_INTERACTION_RANGE,
+      height: 1.7,
+    }),
+  ];
+}
+
+/**
+ * World-local interactable props (nine): the two desk lamps, the three manuals, then the desk notebook, the cork
+ * board, the Memory_Shift poster and the Arcade_Area Club Archive Notice. Not Stations, not Colliders.
+ */
+export const INTERACTABLE_DEFS: readonly InteractableDef[] = Object.freeze([
+  lampDef('desk-lamp-left'),
+  lampDef('desk-lamp-right'),
+  ...MANUAL_PLACEMENT.books.map((m) => manualDef(m.id, m.z)),
+  ...noteDefs(),
+]);
 /** Rough triangle estimate: 12 per box (walls, props, floor, ceiling). */
 export function estimateTriangles(): number {
   const frames = DOORS.reduce((n, d) => n + d.frames.length, 0);

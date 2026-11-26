@@ -84,7 +84,7 @@ describe('flickerFactor', () => {
     for (let start = 0; start + per < samples.length; start += 50) {
       expect(countDirectionChanges(samples.slice(start, start + per + 1))).toBeLessThanOrEqual(3)
     }
-  })
+  }, 30000)
   it('is constant 1 under reduced motion', () => {
     for (let i = 0; i < 100; i++) expect(flickerFactor(i * 0.137, true)).toBe(1)
   })

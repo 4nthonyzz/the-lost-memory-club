@@ -110,7 +110,12 @@ export function DoorDetail() {
 
 /** Fluorescent ceiling fixture: metal housing plus an emissive tube box. Not a light source. */
 export function CeilingFixture({ x, z }: { x: number; z: number }) {
-  const parts = useMemo(() => ceilingFixtureParts(x, z), [x, z])
+  const parts = useMemo(() => {
+    ensureSharedTextures()
+    // Without the glow texture the additive strip would be a flat rectangle, so it is skipped.
+    const textured = hasSharedTexture('lampGlow')
+    return ceilingFixtureParts(x, z).filter((p) => textured || p.mat !== 'ceilingBloom')
+  }, [x, z])
   return <PartMeshes parts={parts} />
 }
 

@@ -7,6 +7,7 @@ import {
   AdditiveBlending,
   BoxGeometry,
   CanvasTexture,
+  CircleGeometry,
   DoubleSide,
   ClampToEdgeWrapping,
   CylinderGeometry,
@@ -24,19 +25,30 @@ import {
 import { ROOM } from '../layout/roomLayout'
 import { ARCADE_SCREEN_BASE_COLORS, BASE_CRT_SCREEN_COLOR, BASE_WALL_COLOR, COUCH_FABRIC_COLORS, CRT_CASING_COLORS, arcadeScreenBaseColor, crtScreenBaseColor } from './memoryShift'
 import {
+  ATTRACT_FRAME_DRAWERS,
+  ATTRACT_TEXTURE_IDS,
+  BOX_FACE_FRONT,
   FLOOR_METRES_PER_REPEAT,
   SPINE_CASE_SIDE_CELL,
   SPINE_COVER_CELL,
   SPINE_VARIANT_COUNT,
   TEXTURE_IDS,
   TEXTURE_SPECS,
+  CABINET_DETAIL_REGIONS,
+  MANUAL_STRIP_KEYS,
+  VCR_CHASSIS_COLOR,
   WALL_METRES_U,
   WALL_METRES_V,
   type Ctx2D,
   type TextureFilter,
+  type UvRect,
+  detailUvRect,
   spineCellUv,
   type TextureId,
 } from './proceduralTextures'
+
+/** Radial segments of every round lamp glow surface and light cone (task 30.1). */
+const LAMP_RADIAL_SEGMENTS = 24
 
 export const geometries = {
   /** Unit box; size it with mesh `scale`. */
@@ -49,6 +61,20 @@ export const geometries = {
   cylinderLow: new CylinderGeometry(0.5, 0.5, 1, 8),
   /** Low-segment sphere (8 x 6) of diameter 1: joystick ball, bulb, bell. */
   sphere: new SphereGeometry(0.5, 8, 6),
+  /** Open-ended truncated cone (task 23.1): bottom diameter 1, top diameter 0.6, 12 sides, no caps. Table-lamp shade. */
+  cone: new CylinderGeometry(0.3, 0.5, 1, 12, 1, true),
+  /** Open square tube (task 25.1): 4 radial segments turned 45 degrees at radius sqrt(1/2), so the section is exactly 1 x 1 (scale = real size). 8 triangles. */
+  collar: new CylinderGeometry(Math.SQRT1_2, Math.SQRT1_2, 1, 4, 1, true, Math.PI / 4),
+  /**
+   * Unit disc (task 30.1): diameter 1, 24 radial segments (24 triangles), facing +z with UVs inscribed in the unit square like the plane.
+   * Every glow-like lamp surface (halo sprite, desk pool, inner shade glow) uses it, so no glow ever has square corners.
+   */
+  disc: new CircleGeometry(0.5, LAMP_RADIAL_SEGMENTS),
+  /**
+   * Open light cone of a desk lamp (task 30.1): bottom diameter 1, top diameter 0.5, 24 radial segments, no caps (48 triangles).
+   * Scale uniformly by 4 x the wanted top radius.
+   */
+  lampCone: new CylinderGeometry(0.25, 0.5, 1, LAMP_RADIAL_SEGMENTS, 1, true),
 }
 
 /**
@@ -72,11 +98,67 @@ function makeSpineGeometry(variant: number): BoxGeometry {
 
 export const spineGeometries: readonly BoxGeometry[] = Array.from({ length: SPINE_VARIANT_COUNT }, (_, v) => makeSpineGeometry(v))
 
+/**
+ * Remaps the native UVs of a box (task 27.1): the faces in `faces` show the whole of `rect`, every other face shows
+ * the flat `plain` rect. The native orientation is kept (on +z, u follows +x and v follows +y), so text reads upright
+ * from the front. `g` must be a fresh BoxGeometry.
+ */
+function remapBoxUv(g: BoxGeometry, rect: UvRect, faces: readonly number[], plain: UvRect): BoxGeometry {
+  const uv = g.getAttribute('uv')
+  for (let i = 0; i < uv.count; i++) {
+    const r = faces.includes(Math.floor(i / 4)) ? rect : plain
+    uv.setXY(i, r.u0 + uv.getX(i) * (r.u1 - r.u0), r.v0 + uv.getY(i) * (r.v1 - r.v0))
+  }
+  uv.needsUpdate = true
+  return g
+}
+
+/**
+ * Unit box per arcade manual (tasks 27.1 and 28.2), in MANUAL_STRIP_KEYS order: the +z face (the spine, which faces +X toward the room
+ * on the west bookcase) shows the manual's own spine strip of cabinetAndManualDetail, the two side faces (+x and -x of the box, which
+ * are the exposed covers once the book protrudes) show its cover panel, and the top, bottom and back (-z) show its plain cloth stripe.
+ * One box (12 triangles) per manual, sized by instance scale like the spine variants.
+ */
+function manualBoxGeometry(strip: UvRect, cover: UvRect, plain: UvRect): BoxGeometry {
+  const g = new BoxGeometry(1, 1, 1)
+  const uv = g.getAttribute('uv')
+  for (let i = 0; i < uv.count; i++) {
+    const face = Math.floor(i / 4)
+    const r = face === BOX_FACE_FRONT ? strip : face === 0 || face === 1 ? cover : plain
+    uv.setXY(i, r.u0 + uv.getX(i) * (r.u1 - r.u0), r.v0 + uv.getY(i) * (r.v1 - r.v0))
+  }
+  uv.needsUpdate = true
+  return g
+}
+
+export const manualGeometries: Readonly<Record<(typeof MANUAL_STRIP_KEYS)[number], BoxGeometry>> = Object.freeze(
+  Object.fromEntries(
+    MANUAL_STRIP_KEYS.map((id, i) => [
+      id,
+      manualBoxGeometry(detailUvRect(CABINET_DETAIL_REGIONS.strips[i]), detailUvRect(CABINET_DETAIL_REGIONS.covers[i]), detailUvRect(CABINET_DETAIL_REGIONS.plains[i])),
+    ]),
+  ),
+) as Record<(typeof MANUAL_STRIP_KEYS)[number], BoxGeometry>
+
 const lambert = (color: string) => new MeshLambertMaterial({ color })
 
 /** Hidden by default (opacity 0, invisible); the Memory_Shift driver fades them in. Visual only. */
 const overlay = (color: string) =>
   new MeshBasicMaterial({ color, transparent: true, opacity: 0, visible: false, depthWrite: false })
+
+/** Task 25.2: additive floor glow, opacity 0.26, no depth write, pulled toward the camera by a polygon offset. */
+export const ARCADE_GLOW_OPACITY = 0.26
+const arcadeGlowMaterial = (color: string) =>
+  new MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity: ARCADE_GLOW_OPACITY,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  })
 
 export const materials = {
   floor: lambert('#3a3340'),
@@ -100,7 +182,6 @@ export const materials = {
   tapeBlue: lambert('#2a4aa0'),
   tapeLabel: lambert('#d8d2b8'),
   cabinet: lambert('#5a1f7a'),
-  lampShade: lambert('#e8c27a'),
   /** 13.6 detail materials. All fixed colours, none reads game state. */
   casingDark: lambert('#5f5b52'),
   bezel: lambert('#0c0c10'),
@@ -120,8 +201,8 @@ export const materials = {
   /** 22.1 armchair upholstery. Flat colours are the previous green armchair; with couchFabric the slate/teal multiplier applies. Tinted by Memory_Shift. */
   armchairBody: lambert(COUCH_FABRIC_COLORS.armchairBody.flat),
   armchairCushion: lambert(COUCH_FABRIC_COLORS.armchairCushion.flat),
-  /** 22.1 VCR housing: brushed dark metal texture; flat dark grey fallback. */
-  vcrDeck: lambert('#2e2f36'),
+  /** 22.1 VCR housing: brushed dark metal texture; flat charcoal-slate fallback (26.1: #2b303a, also the texture base colour). */
+  vcrDeck: lambert(VCR_CHASSIS_COLOR),
   rugLight: lambert('#8c3446'),
   /** 21.1 couch upholstery. Flat colours are the no-canvas fallback; with the couchFabric texture the multiplier is the textured hue. Tinted by Memory_Shift. */
   couchBody: lambert(COUCH_FABRIC_COLORS.couchBody.flat),
@@ -148,8 +229,11 @@ export const materials = {
   paper: lambert('#e6dfc6'),
   /** Notepad cover (22.2 part B): the grain cell of deskDetail times this colour; flat colour is the fallback. */
   notebookCover: lambert('#4a5866'),
-  /** Lighter ceramic rim ring of the desk mug (22.2 part B). */
-  mugRim: lambert('#d98a76'),
+  /** Lighter ceramic rim ring of the desk mug (22.2 part B); 26.1: a brighter glaze highlight. */
+  mugRim: lambert('#f2b8a4'),
+  /** 26.1 coffee surface inside the mug rim, and a translucent coffee ring stain on the desk top beside the mug. */
+  coffee: lambert('#2a170d'),
+  coffeeStain: new MeshLambertMaterial({ color: '#3a2112', transparent: true, opacity: 0.6, depthWrite: false }),
   /** Powered-down screen and marquee of the companion cabinet and the CRT stack. */
   screenOff: lambert('#050508'),
   marqueeOff: lambert('#2a2018'),
@@ -172,8 +256,83 @@ export const materials = {
   /** Archival cardboard boxes and their packing tape. */
   cardboard: lambert('#a98457'),
   cardboardDark: lambert('#7e603a'),
-  /** Warm desk-lamp shade: emissive basic material (not a light). The halo is an additive glow plane. */
-  lampEmissive: new MeshBasicMaterial({ color: '#ffb255' }),
+  /**
+   * Desk lamps (task 23.1). Nothing here is a light. Lit and unlit states are separate materials that are
+   * swapped per mesh, so one lamp's state never touches the other (`bulb` above is the lit bulb core).
+   */
+  brass: lambert('#a8802f'),
+  /** 24.1 banker shade: OFF is dark green glass with no emission; ON adds emissive #16a34a at 0.38 (25.1). Separate per lamp, swapped per mesh. */
+  lampGreenShade: new MeshLambertMaterial({ color: '#16503a', emissive: '#16a34a', emissiveIntensity: 0 }),
+  lampGreenShadeOn: new MeshLambertMaterial({ color: '#1f7a4e', emissive: '#16a34a', emissiveIntensity: 0.38 }),
+  /** 27.1, 28.2: arcade manuals. White base and white instance colour: the cabinetAndManualDetail spine, cover and cloth pixels carry the exact manual colours (#16a34a, #e11d48, #f59e0b). */
+  manualBook: lambert('#ffffff'),
+  /** 27.1: coin door and kick plate of the arcade cabinets (steel, lit like the old `metal` #777c86). The texture is the colour, so the multiplier is white; the flat grey is the no-canvas fallback. */
+  cabinetPanel: lambert('#777c86'),
+  /** 24.1 table-lamp shade: OFF is a dull grey-cream with no emission; ON adds emissive #ffd27d at 0.85. */
+  lampCreamShade: new MeshLambertMaterial({ color: '#a89f8a', emissive: '#ffd27d', emissiveIntensity: 0, side: DoubleSide }),
+  lampCreamShadeOn: new MeshLambertMaterial({ color: '#efe3c4', emissive: '#ffd27d', emissiveIntensity: 0.85, side: DoubleSide }),
+  lampBulbOff: lambert('#46443f'),
+  lampInnerOn: new MeshBasicMaterial({ color: '#ffc272', side: DoubleSide }),
+  lampInnerOff: new MeshLambertMaterial({ color: '#2a2824', side: DoubleSide }),
+  /** Light pool decal on the desk top (table lamp, warm tungsten amber): additive lampGlow, pulled toward the camera by a polygon offset. */
+  lampPool: new MeshBasicMaterial({
+    color: '#ffa63c',
+    transparent: true,
+    opacity: 0.42,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  }),
+  /** Same decal for the banker's lamp, emerald-gold. A separate material so the two lamps never share state. */
+  lampPoolBanker: new MeshBasicMaterial({
+    color: '#a6d65a',
+    transparent: true,
+    opacity: 0.42,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  }),
+  /** Translucent volumetric light cones from each shade rim to the desk top (24.1): additive, no depth write, both faces. */
+  lampConeBanker: new MeshBasicMaterial({
+    color: '#8fd65a',
+    transparent: true,
+    opacity: 0.2,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    side: DoubleSide,
+  }),
+  lampConeTable: new MeshBasicMaterial({
+    color: '#ffa63c',
+    transparent: true,
+    opacity: 0.2,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    side: DoubleSide,
+  }),
+  /** Faint cool-white additive bloom strip under each ceiling fluorescent tube (24.1), lampGlow map when a canvas exists. */
+  ceilingBloom: new MeshBasicMaterial({
+    color: '#cfe4ff',
+    transparent: true,
+    opacity: 0.16,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    side: DoubleSide,
+    fog: false,
+  }),
+  /** 25.2 arcade floor glow decals (one per cabinet): subtle additive lampGlow tinted with the cabinet colour. Static, no collider. */
+  arcadeGlowSnake: arcadeGlowMaterial('#22c55e'),
+  arcadeGlowMaze: arcadeGlowMaterial('#e11d48'),
+  arcadeGlowFrequency: arcadeGlowMaterial('#f59e0b'),
+  /** Swapped in for the glow sprite and the pool when a lamp is off: never drawn. */
+  /** 25.1 banker hood liner: warm-white inner bulb glow on the underside of the green hood (separate lit/unlit pair). */
+  lampLinerOn: new MeshBasicMaterial({ color: '#fff1cc', side: DoubleSide }),
+  lampLinerOff: new MeshLambertMaterial({ color: '#1c1b18', side: DoubleSide }),
+  lampGlowOff: new MeshBasicMaterial({ transparent: true, opacity: 0, visible: false, depthWrite: false }),
+  /** Camera-facing glow sprite of a lit lamp: additive lampGlow. */
   lampHalo: new MeshBasicMaterial({
     color: '#ffb060',
     transparent: true,
@@ -317,6 +476,27 @@ export function metricBoxGeometry(
 
 export const woodBoxGeometry = (w: number, h: number, d: number): BoxGeometry => metricBoxGeometry(w, h, d, WOOD_METRES_PER_REPEAT, true)
 
+/**
+ * Real-size box whose `faces` show a UV window of an atlas texture and whose other faces show a flat `plain` stripe (task 27.1).
+ * Used by the arcade cabinet coin door, kick plate and control deck, so the legends live only on the player-facing +z face.
+ * Cached by dimensions (0.1 mm) + window + faces, in the same cache as the metric boxes, so disposeSharedResources() disposes it once.
+ */
+export function atlasBoxGeometry(w: number, h: number, d: number, rect: UvRect, faces: readonly number[], plain: UvRect): BoxGeometry {
+  const sx = round4(w)
+  const sy = round4(h)
+  const sz = round4(d)
+  const r = (u: UvRect) => `${u.u0.toFixed(5)},${u.u1.toFixed(5)},${u.v0.toFixed(5)},${u.v1.toFixed(5)}`
+  const key = `atlas|${sx},${sy},${sz}|f${faces.join('.')}|${r(rect)}|${r(plain)}`
+  const cached = woodBoxCache.get(key)
+  if (cached) return cached
+  const g = remapBoxUv(new BoxGeometry(sx, sy, sz), rect, faces, plain)
+  woodBoxCache.set(key, g)
+  return g
+}
+
+/** Number of live cached atlas-window box geometries (tests and reports). */
+export const atlasBoxCount = (): number => [...woodBoxCache.keys()].filter((k) => k.startsWith('atlas|')).length
+
 /** Number of live cached wood geometries (tests and reports). */
 export const woodBoxCount = (): number => [...woodBoxCache.keys()].filter((k) => k.startsWith('grain|')).length
 
@@ -324,7 +504,7 @@ export const woodBoxCount = (): number => [...woodBoxCache.keys()].filter((k) =>
 export const fabricBoxCount = (): number => [...woodBoxCache.keys()].filter((k) => k.startsWith('plain|')).length
 
 // ---------------------------------------------------------------------------------------------
-// Procedural canvas textures (task 15.7, 18.3, 19.2). Deterministic, drawn once, never redrawn per frame.
+// Procedural canvas textures (task 15.7, 18.3, 19.2). Deterministic and drawn once, except the three attract screens, which are redrawn in place at most 12 times per second (task 29.2, updateAnimatedAttractTextures).
 // Budget: 30 textures (see proceduralTextures.ts for the estimate), limit 8 MB.
 // ---------------------------------------------------------------------------------------------
 
@@ -348,6 +528,9 @@ let canvasFactory: CanvasFactory = defaultCanvasFactory
 /** Every texture created and not yet disposed, in creation order. */
 const registry: CanvasTexture[] = []
 const cache = new Map<TextureId, CanvasTexture | null>()
+
+/** Anisotropic filtering level of every procedural CanvasTexture (task 26.1). */
+export const TEXTURE_ANISOTROPY = 4
 
 export interface CanvasTextureOptions {
   filter?: TextureFilter
@@ -374,7 +557,12 @@ export function createCanvasTexture(
   draw(ctx, width, height)
   const tex = new CanvasTexture(canvas as unknown as HTMLCanvasElement)
   tex.colorSpace = SRGBColorSpace
-  if ((options.filter ?? 'mipmap') === 'nearest') {
+  if (options.filter === 'linear') {
+    // Smooth, no mipmaps (task 25.1): soft gradients such as the lamp cone falloff.
+    tex.generateMipmaps = false
+    tex.minFilter = LinearFilter
+    tex.magFilter = LinearFilter
+  } else if ((options.filter ?? 'mipmap') === 'nearest') {
     tex.generateMipmaps = false
     tex.minFilter = NearestFilter
     tex.magFilter = NearestFilter
@@ -382,15 +570,38 @@ export function createCanvasTexture(
     tex.generateMipmaps = true
     tex.minFilter = LinearMipmapLinearFilter
     tex.magFilter = LinearFilter
-    tex.anisotropy = 4
   }
+  // Task 26.1: anisotropy 4 on every procedural texture, set in this one place. It sharpens mipmapped surfaces seen at grazing
+  // angles (floor, wall, wood). For nearest-filtered or non-mipmapped pixel-art textures (attract screens, marquees, crtGlass,
+  // smpte, timecode, coneFalloff) it has little or no effect, but it is harmless, so the value is uniform and easy to test.
+  tex.anisotropy = TEXTURE_ANISOTROPY
   const wrap = options.wrap === 'repeat' ? RepeatWrapping : ClampToEdgeWrapping
   tex.wrapS = wrap
   tex.wrapT = wrap
   if (options.repeat) tex.repeat.set(options.repeat[0], options.repeat[1])
   tex.needsUpdate = true
+  surfaces.set(tex, { ctx, width, height })
   registry.push(tex)
   return tex
+}
+
+/** The canvas context and size each texture was drawn with, kept so an attract screen can be redrawn in place (task 29.2). */
+const surfaces = new WeakMap<CanvasTexture, { ctx: Ctx2D; width: number; height: number }>()
+
+/**
+ * Redraws the three attract screen canvases in place at `elapsedSec` and flags their textures for upload (task 29.2).
+ * Reuses the canvas and context each texture was created with: no canvas, texture or material is created here.
+ * A no-op for a texture that does not exist (no canvas support, or after disposeSharedResources()).
+ */
+export function updateAnimatedAttractTextures(elapsedSec: number): void {
+  for (const id of ATTRACT_TEXTURE_IDS) {
+    const tex = cache.get(id)
+    const surface = tex ? surfaces.get(tex) : undefined
+    if (!tex || !surface) continue
+    surface.ctx.clearRect(0, 0, surface.width, surface.height)
+    ATTRACT_FRAME_DRAWERS[id](surface.ctx, surface.width, surface.height, elapsedSec)
+    tex.needsUpdate = true
+  }
 }
 
 function repeatFor(id: TextureId): readonly [number, number] | undefined {
@@ -454,7 +665,7 @@ const TEXTURE_BINDINGS: readonly TextureBinding[] = [
   { material: 'armchairBody', texture: 'couchFabric', color: COUCH_FABRIC_COLORS.armchairBody.textured, fallbackColor: COUCH_FABRIC_COLORS.armchairBody.flat },
   { material: 'armchairCushion', texture: 'couchFabric', color: COUCH_FABRIC_COLORS.armchairCushion.textured, fallbackColor: COUCH_FABRIC_COLORS.armchairCushion.flat },
   { material: 'crtCasing', texture: 'crtCasing', color: CRT_CASING_COLORS.textured, fallbackColor: CRT_CASING_COLORS.flat },
-  { material: 'vcrDeck', texture: 'vcrDeck', color: '#ffffff', fallbackColor: '#2e2f36' },
+  { material: 'vcrDeck', texture: 'vcrDeck', color: '#ffffff', fallbackColor: VCR_CHASSIS_COLOR },
   /** The cabinet texture is light neutral grey; each multiplier is the old flat grey lifted about 15 %, so the lit result stays close to it. */
   { material: 'filingGrey', texture: 'metalCabinet', color: '#808996', fallbackColor: '#6f7782' },
   { material: 'filingDark', texture: 'metalCabinet', color: '#666e7b', fallbackColor: '#59606b' },
@@ -470,10 +681,22 @@ const TEXTURE_BINDINGS: readonly TextureBinding[] = [
   { material: 'cork', texture: 'corkBoard', color: '#ffffff' },
   { material: 'paper', texture: 'deskDetail', color: '#ffffff', fallbackColor: '#e6dfc6' },
   { material: 'notebookCover', texture: 'deskDetail', color: '#6a7888', fallbackColor: '#4a5866' },
+  { material: 'lampConeBanker', texture: 'coneFalloff', color: '#8fd65a', fallbackColor: '#8fd65a' },
+  { material: 'lampConeTable', texture: 'coneFalloff', color: '#ffa63c', fallbackColor: '#ffa63c' },
   { material: 'lampHalo', texture: 'lampGlow', color: '#ffffff' },
+  { material: 'lampPool', texture: 'lampGlow', color: '#ffa63c' },
+  { material: 'lampPoolBanker', texture: 'lampGlow', color: '#a6d65a' },
+  { material: 'ceilingBloom', texture: 'lampGlow', color: '#cfe4ff' },
+  { material: 'arcadeGlowSnake', texture: 'lampGlow', color: '#22c55e' },
+  { material: 'arcadeGlowMaze', texture: 'lampGlow', color: '#e11d48' },
+  { material: 'arcadeGlowFrequency', texture: 'lampGlow', color: '#f59e0b' },
   /** Slightly dimmed multiplier: the reference card stays below the main CRT's brightness. */
   { material: 'smpteScreen', texture: 'smpteBars', color: '#b8b8b8' },
   { material: 'timecode', texture: 'timecode', color: '#ffffff' },
+  /** 27.1: the cabinetAndManualDetail texture is the colour of the coin door, kick plate, control-deck lip and the three manual spines (white multiplier; books multiply it by the instance colour). */
+  { material: 'cabinetPanel', texture: 'cabinetAndManualDetail', color: '#ffffff', fallbackColor: '#777c86' },
+  { material: 'deckPlate', texture: 'cabinetAndManualDetail', color: '#ffffff', fallbackColor: '#1a1b22' },
+  { material: 'manualBook', texture: 'cabinetAndManualDetail', color: '#ffffff', fallbackColor: '#ffffff' },
 ]
 
 /**
@@ -522,6 +745,7 @@ export const SHARED_TEXTURE_IDS: readonly TextureId[] = TEXTURE_IDS
 export function disposeSharedResources(): void {
   for (const g of Object.values(geometries)) g.dispose()
   for (const g of spineGeometries) g.dispose()
+  for (const g of Object.values(manualGeometries)) g.dispose()
   for (const g of wallGeometryCache.values()) g.dispose()
   wallGeometryCache.clear()
   for (const g of woodBoxCache.values()) g.dispose()

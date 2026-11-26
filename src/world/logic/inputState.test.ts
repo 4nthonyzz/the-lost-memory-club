@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   EMPTY_HELD_KEYS,
+  cardScrollFor,
+  isActionRole,
   isKeyEventAccepted,
   keyRole,
   reduceHeldKeys,
@@ -27,6 +29,18 @@ describe('keyRole', () => {
     expect(keyRole('KeyI')).toBe('pitchUp');
     expect(keyRole('KeyK')).toBe('pitchDown');
     expect(keyRole('KeyE')).toBe('interact');
+  });
+
+  it('maps the digit and numpad keys 1 and 2 to the page roles (task 27.2)', () => {
+    expect(keyRole('Digit1')).toBe('page1');
+    expect(keyRole('Numpad1')).toBe('page1');
+    expect(keyRole('Digit2')).toBe('page2');
+    expect(keyRole('Numpad2')).toBe('page2');
+    expect(keyRole('Digit3')).toBeNull();
+    expect(isActionRole('page1')).toBe(true);
+    expect(isActionRole('page2')).toBe(true);
+    expect(isActionRole('interact')).toBe(true);
+    expect(isActionRole('forward')).toBe(false);
   });
 
   it('returns null for unused codes', () => {
@@ -92,5 +106,23 @@ describe('toMovementInput and toLookKeys', () => {
     }
     expect(toMovementInput(s)).toEqual({ forward: true, backward: false, left: false, right: true });
     expect(toLookKeys(s)).toEqual({ yawLeft: false, yawRight: true, pitchUp: false, pitchDown: true });
+  });
+});
+
+describe('card scroll keys (task 28.1)', () => {
+  it('maps PageUp / PageDown to one-shot roles that are never held', () => {
+    expect(keyRole('PageUp')).toBe('scrollPageUp');
+    expect(keyRole('PageDown')).toBe('scrollPageDown');
+    expect(isActionRole('scrollPageUp')).toBe(true);
+    expect(isActionRole('scrollPageDown')).toBe(true);
+  });
+
+  it('cardScrollFor maps the four scroll keys and nothing else', () => {
+    expect(cardScrollFor('ArrowUp')).toEqual({ kind: 'line', dir: -1 });
+    expect(cardScrollFor('ArrowDown')).toEqual({ kind: 'line', dir: 1 });
+    expect(cardScrollFor('PageUp')).toEqual({ kind: 'page', dir: -1 });
+    expect(cardScrollFor('PageDown')).toEqual({ kind: 'page', dir: 1 });
+    expect(cardScrollFor('KeyW')).toBeNull();
+    expect(cardScrollFor('ArrowLeft')).toBeNull();
   });
 });

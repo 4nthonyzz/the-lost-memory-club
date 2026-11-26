@@ -6,8 +6,22 @@ import { usePlayerRig } from './controller/usePlayerRig';
 import { useWorldInput, type WorldInput } from './controller/useWorldInput';
 import { WebglFallback } from './overlay/WebglFallback';
 import { WorldOverlay } from './overlay/WorldOverlay';
+import {
+  initialPropState,
+  reduceCardPage,
+  reduceCloseCard,
+  reducePropInteract,
+  reduceTargetChange,
+  type PropState,
+} from './logic/propState';
+import type { CardPage } from './logic/archiveDocuments';
+import type { CardScroll } from './logic/inputState';
+import { INTERACTABLE_DEFS } from './layout/roomLayout';
+import type { InteractionTarget, PropInteractableId, Vec2 } from './worldTypes';
 import { Effects } from './scene/Effects';
+import { countLampsOn } from './scene/lampCoupling';
 import { Lighting } from './scene/Lighting';
+import { DESK_LAMPS } from './scene/modelDetail';
 import { Props } from './scene/Props';
 import { Room } from './scene/Room';
 import { Stations } from './scene/Stations';
@@ -22,6 +36,11 @@ export interface WorldSceneProps {
 
 /** Delay before a lost WebGL context without restore switches to the fallback. */
 const CONTEXT_RESTORE_TIMEOUT_MS = 3000;
+
+/** Pixels per ArrowUp / ArrowDown press while a card is open. */
+const CARD_LINE_SCROLL_PX = 48;
+/** Overlap kept between pages when PageUp / PageDown scroll the card. */
+const CARD_PAGE_OVERLAP_PX = 32;
 
 const WORLD_LABEL =
   'First-person 3D archive room. Click the scene to capture the mouse. ' +
@@ -43,20 +62,30 @@ function PlayerRigHost({
   input,
   getTargetRef,
   onTargetChange,
+  memoryShifted,
+  getCardAnchor,
+  onCardAutoClose,
   onContextLost,
   onContextRestored,
 }: {
   input: WorldInput;
-  getTargetRef: { current: () => StationId | null };
-  onTargetChange: (target: StationId | null) => void;
+  getTargetRef: { current: () => InteractionTarget | null };
+  onTargetChange: (target: InteractionTarget | null) => void;
+  memoryShifted: boolean;
+  getCardAnchor: () => Vec2 | null;
+  onCardAutoClose: () => void;
   onContextLost: () => void;
   onContextRestored: () => void;
 }) {
   const rig = usePlayerRig({
     heldKeysRef: input.heldKeysRef,
     consumeMouseDelta: input.consumeMouseDelta,
+    clearEpochRef: input.clearEpochRef,
     getMode: input.getMode,
     onTargetChange,
+    memoryShifted,
+    getCardAnchor,
+    onCardAutoClose,
   });
   getTargetRef.current = rig.getTarget;
 
@@ -84,12 +113,67 @@ function WorldInteractive({
   onFail,
 }: WorldSceneProps & { onFail: () => void }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const getTargetRef = useRef<() => StationId | null>(() => null);
-  const [target, setTarget] = useState<StationId | null>(null);
+  const getTargetRef = useRef<() => InteractionTarget | null>(() => null);
+  const [target, setTarget] = useState<InteractionTarget | null>(null);
+  // World-local prop state: lamp on/off and the latest prop message. Session-only, never persisted.
+  const [propState, setPropState] = useState<PropState>(initialPropState);
+  const onPropInteract = useCallback((id: PropInteractableId) => setPropState((s) => reducePropInteract(s, id)), []);
+  // Archive Document Card. The anchor and open flag live in refs so the per-frame distance check and the key handler
+  // read them without React state churn. Closing is idempotent.
+  const cardAnchorRef = useRef<Vec2 | null>(null);
+  const cardOpenRef = useRef(false);
+  const closeCard = useCallback(() => {
+    cardAnchorRef.current = null;
+    cardOpenRef.current = false;
+    setPropState((s) => reduceCloseCard(s));
+  }, []);
+  const onCardPage = useCallback((page: CardPage) => setPropState((s) => reduceCardPage(s, page)), []);
+  const getCardAnchor = useCallback(() => cardAnchorRef.current, []);
+  const isCardOpen = useCallback(() => cardOpenRef.current, []);
+  const onCardScroll = useCallback((s: CardScroll) => {
+    const el = wrapperRef.current?.querySelector<HTMLElement>('[data-world-card]');
+    if (!el) return;
+    const px = s.kind === 'line' ? CARD_LINE_SCROLL_PX : Math.max(CARD_LINE_SCROLL_PX, el.clientHeight - CARD_PAGE_OVERLAP_PX);
+    el.scrollTop += s.dir * px;
+  }, []);
+  const inspectStation = useCallback(
+    (id: StationId) => {
+      closeCard(); // opening a station closes any open card
+      onInspect(id);
+    },
+    [closeCard, onInspect],
+  );
+  const onTargetChange = useCallback((t: InteractionTarget | null) => {
+    setTarget(t);
+    setPropState((s) => reduceTargetChange(s, t));
+  }, []);
   const restoreTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const getTarget = useCallback(() => getTargetRef.current(), []);
-  const input = useWorldInput({ wrapperRef, onInspect, getTarget, inputEnabled });
+  const input = useWorldInput({
+    wrapperRef,
+    onInspect: inspectStation,
+    getTarget,
+    onPropInteract,
+    onCloseCard: closeCard,
+    isCardOpen,
+    onCardPage,
+    onCardScroll,
+    inputEnabled,
+  });
+  // Keep the refs in step with the committed state (the open card id is the single source).
+  const openCard = propState.openCard;
+  const { releaseCardArrows } = input;
+  useEffect(() => {
+    cardOpenRef.current = openCard !== null;
+    cardAnchorRef.current = openCard === null ? null : (INTERACTABLE_DEFS.find((d) => d.id === openCard)?.anchor ?? null);
+    // ArrowUp / ArrowDown scroll the card now, so movement they were driving stops.
+    if (openCard !== null) releaseCardArrows();
+  }, [openCard, releaseCardArrows]);
+  // The station panel opening (inspecting) closes the card.
+  useEffect(() => {
+    if (input.mode === 'inspecting') closeCard();
+  }, [input.mode, closeCard]);
 
   const clearTimer = useCallback(() => {
     if (restoreTimer.current !== null) {
@@ -107,21 +191,24 @@ function WorldInteractive({
   return (
     <div className="world-wrapper" ref={wrapperRef} tabIndex={0} role="group" aria-label={WORLD_LABEL}>
       <WorldCanvas frameloop={input.mode === 'inspecting' ? 'demand' : 'always'}>
-        <Lighting memoryShifted={memoryShifted} />
+        <Lighting memoryShifted={memoryShifted} lampsOn={countLampsOn(propState.lampOn, DESK_LAMPS.map((l) => l.id))} />
         <Room />
-        <Props />
+        <Props lampOn={propState.lampOn} />
         <Stations />
         <Effects active={input.mode !== 'inspecting'} />
         <FrameSamplerHost />
         <PlayerRigHost
           input={input}
           getTargetRef={getTargetRef}
-          onTargetChange={setTarget}
+          onTargetChange={onTargetChange}
+          memoryShifted={memoryShifted}
+          getCardAnchor={getCardAnchor}
+          onCardAutoClose={closeCard}
           onContextLost={handleContextLost}
           onContextRestored={clearTimer}
         />
       </WorldCanvas>
-      <WorldOverlay mode={input.mode} target={target} canResume={inputEnabled === undefined} keyboardLookHint={input.keyboardLookHint} />
+      <WorldOverlay mode={input.mode} target={target} lampOn={propState.lampOn} message={propState.message} card={propState.openCard} cardPage={propState.cardPage} onCardPage={onCardPage} notesRead={propState.read.size} canResume={inputEnabled === undefined} keyboardLookHint={input.keyboardLookHint} />
     </div>
   );
 }

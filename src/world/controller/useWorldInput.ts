@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import type { StationId } from '../../core/contracts';
+import type { InteractionTarget, PropInteractableId } from '../worldTypes';
 import {
   initialModeState,
   reduceMode,
@@ -12,10 +13,14 @@ import {
 } from '../logic/inputMode';
 import {
   EMPTY_HELD_KEYS,
+  cardScrollFor,
+  isActionRole,
   isKeyEventAccepted,
   keyRole,
   reduceHeldKeys,
+  type CardScroll,
   type HeldKeys,
+  type KeyRole,
 } from '../logic/inputState';
 import {
   attachPointerLockListeners,
@@ -34,7 +39,23 @@ export interface UseWorldInputOptions {
   /** Latest onInspect callback. Read through a ref, never re-registers listeners. */
   onInspect: (id: StationId) => void;
   /** Returns the current interaction target, or null. Read at key time. */
-  getTarget: () => StationId | null;
+  getTarget: () => InteractionTarget | null;
+  /** Called when E is pressed on a world-local prop (lamp or manual). Read through a ref. Never calls onInspect. */
+  onPropInteract?: (id: PropInteractableId) => void;
+  /**
+   * Closes the open Archive Document Card (E on nothing, Escape, pointer lock lost). Read through a ref. Must be
+   * idempotent: it can be called when no card is open.
+   */
+  onCloseCard?: () => void;
+  /** Returns true while a card is open. Read at key time. */
+  isCardOpen?: () => boolean;
+  /** Called when key 1 or 2 is pressed while a card is open. Read through a ref. Never releases pointer lock. */
+  onCardPage?: (page: 1 | 2) => void;
+  /**
+   * Scrolls the open card (ArrowUp / ArrowDown by a line, PageUp / PageDown by a page). Read through a ref. While a
+   * card is open ArrowUp / ArrowDown call this instead of moving the player.
+   */
+  onCardScroll?: (scroll: CardScroll) => void;
   /** Optional external switch. Absent means unchanged default behavior. */
   inputEnabled?: boolean;
 }
@@ -49,6 +70,10 @@ export interface WorldInput {
   heldKeysRef: { current: HeldKeys };
   mouseDeltaRef: { current: MouseDelta };
   consumeMouseDelta: () => MouseDelta;
+  /** Incremented every time input is cleared (CLEAR_INPUT, blur). The rig snaps its smoothing state when it changes. */
+  clearEpochRef: { current: number };
+  /** Stops forward / backward movement that comes only from ArrowUp / ArrowDown. Call when a card opens. */
+  releaseCardArrows: () => void;
 }
 
 export function useWorldInput(options: UseWorldInputOptions): WorldInput {
@@ -60,14 +85,28 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
   const dispatchRef = useRef<((event: ModeEvent, gesture: boolean) => void) | null>(null);
   const prevInputEnabledRef = useRef<boolean | undefined>(options.inputEnabled);
   const heldKeysRef = useRef<HeldKeys>(EMPTY_HELD_KEYS);
+  const clearEpochRef = useRef(0);
   const [mode, setMode] = useState<InputMode>(stateRef.current.mode);
   const [keyboardLookHint, setKeyboardLookHint] = useState<boolean>(false);
 
   // Latest callbacks, read at event time.
   const onInspectRef = useRef(options.onInspect);
   const getTargetRef = useRef(options.getTarget);
+  const onPropInteractRef = useRef(options.onPropInteract);
+  const onCloseCardRef = useRef(options.onCloseCard);
+  const isCardOpenRef = useRef(options.isCardOpen);
+  const onCardPageRef = useRef(options.onCardPage);
+  const onCardScrollRef = useRef(options.onCardScroll);
+  // Physical codes of the held movement keys, so two keys sharing a role (W and ArrowUp) release independently.
+  const physicalRef = useRef<Set<string>>(new Set());
+  const releaseArrowsRef = useRef<() => void>(() => undefined);
   onInspectRef.current = options.onInspect;
   getTargetRef.current = options.getTarget;
+  onPropInteractRef.current = options.onPropInteract;
+  onCloseCardRef.current = options.onCloseCard;
+  isCardOpenRef.current = options.isCardOpen;
+  onCardPageRef.current = options.onCardPage;
+  onCardScrollRef.current = options.onCardScroll;
 
   const getMode = useCallback((): InputMode => stateRef.current.mode, []);
 
@@ -79,7 +118,19 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
 
     const getLockElement = (): HTMLElement => lockElementRef?.current ?? wrapper;
 
+    const releaseRoleIfFree = (role: KeyRole) => {
+      for (const code of physicalRef.current) if (keyRole(code) === role) return;
+      heldKeysRef.current = reduceHeldKeys(heldKeysRef.current, { type: 'up', role });
+    };
+    releaseArrowsRef.current = () => {
+      for (const code of ['ArrowUp', 'ArrowDown']) physicalRef.current.delete(code);
+      releaseRoleIfFree('forward');
+      releaseRoleIfFree('backward');
+    };
+
     const clearInput = () => {
+      physicalRef.current.clear();
+      clearEpochRef.current += 1;
       heldKeysRef.current = reduceHeldKeys(heldKeysRef.current, { type: 'clear' });
       clearMouseDelta();
     };
@@ -97,9 +148,18 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
         switch (effect.type) {
           case 'CALL_ON_INSPECT': {
             const target = getTargetRef.current();
-            if (target !== null) onInspectRef.current(target);
+            if (target !== null && target.type === 'station') onInspectRef.current(target.station.id);
             break;
           }
+          case 'PROP_INTERACT':
+            onPropInteractRef.current?.(effect.id);
+            break;
+          case 'CLOSE_CARD':
+            onCloseCardRef.current?.();
+            break;
+          case 'CARD_PAGE':
+            onCardPageRef.current?.(effect.page);
+            break;
           case 'RELEASE_POINTER_LOCK':
             exitLock(doc);
             break;
@@ -136,19 +196,44 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
         insideWorldWrapper: target instanceof Node && wrapper.contains(target),
       });
       const modeBefore = stateRef.current.mode;
+      // Escape closes an open card. It is never prevented: the browser also uses it to release pointer lock.
+      if (accepted && e.code === 'Escape') onCloseCardRef.current?.();
 
-      if (accepted && role !== null && role !== 'interact' && modeBefore !== 'inspecting') {
+      const cardOpen = isCardOpenRef.current?.() === true;
+      const isPageKey = role === 'page1' || role === 'page2';
+      const scroll = cardOpen ? cardScrollFor(e.code) : null;
+      // Keys claimed only while a card is open (1, 2, PageUp, PageDown).
+      const cardOnlyKey = isPageKey || role === 'scrollPageUp' || role === 'scrollPageDown';
+      // Movement and look keys are held. E, the page keys and PageUp / PageDown are one-shot and are never held.
+      // While a card is open, ArrowUp / ArrowDown scroll the card and are not held.
+      if (accepted && role !== null && !isActionRole(role) && modeBefore !== 'inspecting' && !(scroll !== null && e.code.startsWith('Arrow'))) {
         heldKeysRef.current = reduceHeldKeys(heldKeysRef.current, { type: 'down', role });
+        physicalRef.current.add(e.code);
       }
+      if (accepted && scroll !== null && modeBefore !== 'inspecting') onCardScrollRef.current?.(scroll);
       // preventDefault only for used keys while not inspecting. Esc is never touched.
-      if (accepted && role !== null && modeBefore !== 'inspecting' && e.code !== 'Escape') {
+      // Keys 1 and 2 are claimed only while a card is open.
+      if (accepted && role !== null && modeBefore !== 'inspecting' && e.code !== 'Escape' && (!cardOnlyKey || cardOpen)) {
         e.preventDefault();
       }
 
-      const hasTarget = role === 'interact' && getTargetRef.current() !== null;
+      const current = role === 'interact' ? getTargetRef.current() : null;
+      const hasTarget = current !== null;
+      const targetKind = current === null ? null : current.type;
+      const targetPropId = current !== null && current.type === 'prop' ? current.prop.id : null;
       // keydown is a valid activation gesture (Enter or E on the capture overlay).
       dispatch(
-        { type: 'KEY_DOWN', role, code: e.code, repeat: e.repeat, accepted, hasTarget },
+        {
+          type: 'KEY_DOWN',
+          role,
+          code: e.code,
+          repeat: e.repeat,
+          accepted,
+          hasTarget,
+          targetKind,
+          targetPropId,
+          cardOpen: role === 'interact' || isPageKey ? cardOpen : false,
+        },
         true,
       );
     };
@@ -156,14 +241,17 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
     const onKeyUp = (e: KeyboardEvent) => {
       const role = keyRole(e.code);
       // Always release, even for keys that were not accepted, so none can stick.
-      if (role !== null && role !== 'interact') {
-        heldKeysRef.current = reduceHeldKeys(heldKeysRef.current, { type: 'up', role });
+      if (role !== null && !isActionRole(role)) {
+        physicalRef.current.delete(e.code);
+        releaseRoleIfFree(role);
       }
       dispatch({ type: 'KEY_UP', role }, false);
     };
 
     const onClick = (e: MouseEvent) => {
       const target = e.target as Element | null;
+      // Clicks inside the document card (body or scrollbar) never capture the pointer.
+      if (target?.closest?.('[data-world-card]')) return;
       // Clicks on overlay buttons or form fields are not canvas activations.
       const tag = target?.tagName?.toUpperCase();
       if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
@@ -185,6 +273,8 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
         } else {
           dispatch({ type: locked ? 'LOCK_ACQUIRED' : 'LOCK_LOST' }, false);
         }
+        // Losing the lock (Esc in the browser) closes an open card.
+        if (!locked) onCloseCardRef.current?.();
         clearInput();
       },
       onError: () => dispatch({ type: 'LOCK_DENIED' }, false),
@@ -224,5 +314,7 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
     dispatchRef.current?.({ type: 'EXTERNAL_ENABLED', value: inputEnabled }, false);
   }, [inputEnabled]);
 
-  return { mode, keyboardLookHint, getMode, heldKeysRef, mouseDeltaRef, consumeMouseDelta };
+  const releaseCardArrows = useCallback(() => releaseArrowsRef.current(), []);
+
+  return { mode, keyboardLookHint, getMode, heldKeysRef, mouseDeltaRef, consumeMouseDelta, clearEpochRef, releaseCardArrows };
 }

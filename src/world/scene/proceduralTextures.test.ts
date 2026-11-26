@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  LAMP_GLOW_RADIUS_FRACTION,
   SPINE_ATLAS_HEIGHT,
   SPINE_ATLAS_WIDTH,
   SPINE_CELL_WIDTH,
@@ -25,18 +26,58 @@ import {
   CRT_BADGE_TEXT,
   CRT_LED_COLOR,
   VCR_BUTTON_LABELS,
+  VCR_CHASSIS_COLOR,
   VCR_MARK_TEXT,
   VHS_LABEL_TEXTS,
   CABINET_CARD_TEXTS,
   CABINET_PLAIN_V,
   CRATE_LABEL_HEADER,
   CRATE_STENCIL_TEXT,
+  CABINET_COIN_LEGEND,
+  CABINET_DECK_LEGENDS,
+  CABINET_DETAIL_HEIGHT,
+  CABINET_DETAIL_REGIONS,
+  CABINET_DETAIL_WIDTH,
+  CABINET_INSERT_LEGEND,
+  CABINET_SERIAL_TEXT,
+  MANUAL_SPINE_TITLES,
+  MANUAL_STRIP_KEYS,
+  MANUAL_COVER_COLOURS,
+  detailUvRect,
   cabinetCardV,
   marqueeFontSize,
   marqueeTextWidth,
   type TextureId,
 } from './proceduralTextures'
 import { RecordingContext } from './recordingContext'
+import {
+  ATTRACT_FRAME_DRAWERS,
+  ATTRACT_PULSE_SEC,
+  ATTRACT_SEEDS,
+  FREQUENCY_OLD_SCROLL_RATE,
+  FREQUENCY_SCROLL_RATE,
+  MAZE_ANOMALY_SPEED,
+  MAZE_SURVIVOR_SPEED,
+  SNAKE_CELLS_PER_SEC,
+  SNAKE_FIRST_FRAGMENT_STEP,
+  SNAKE_FRAGMENT_SPACING,
+  frequencyLockLevel,
+  MAZE_ANOMALY_LOOP,
+  MAZE_SURVIVOR_LOOP,
+  SNAKE_BODY_LENGTH,
+  SNAKE_PATH,
+  SNAKE_STEP_SEC,
+  attractPulseLevel,
+  drawAttractFrequencyFrame,
+  drawAttractMazeFrame,
+  drawAttractSnakeFrame,
+  frequencyMarkerMhz,
+  mazeActorsAt,
+  snakeStateAt,
+} from './proceduralTextures'
+
+/** Task 27.1: cabinetAndManualDetail, 256 x 128 mipmapped (estimate 174,326 bytes), on top of the older memory caps below. */
+const TASK_27_1_TEXTURE_BYTES = Math.round(256 * 128 * 4 * 1.33)
 
 const ATTRACT_IDS = ['attractSnake', 'attractMaze', 'attractFrequency'] as const
 const MARQUEE_IDS = ['marqueeSnake', 'marqueeMaze', 'marqueeFrequency'] as const
@@ -71,7 +112,10 @@ describe('determinism', () => {
     const b = run(id)
     expect(b.log).toEqual(a.log)
     expect(b.hash()).toBe(a.hash())
-    expect(run(id, TEXTURE_SPECS[id].seed + 1).hash()).not.toBe(a.hash())
+    // lampGlow (task 23.1) is a pure radial gradient with no random input, so its seed changes nothing.
+    // coneFalloff (task 25.1) is a pure row-by-row gradient with no random input, so its seed changes nothing either.
+    if (id === 'lampGlow' || id === 'coneFalloff') expect(run(id, TEXTURE_SPECS[id].seed + 1).hash()).toBe(a.hash())
+    else expect(run(id, TEXTURE_SPECS[id].seed + 1).hash()).not.toBe(a.hash())
   })
 
   it('never uses Math.random', () => {
@@ -240,7 +284,7 @@ describe('wall, rug, cork board and lamp glow (task 18.3)', () => {
     expect(rug.filter((c) => c.op === 'fill').length).toBeGreaterThan(40)
     const glow = run('lampGlow')
     expect(glow.calls[0].op).toBe('clearRect')
-    expect(glow.calls.filter((c) => c.op === 'arc').length).toBeGreaterThan(10)
+    expect(glow.calls.some((c) => c.op === 'createRadialGradient')).toBe(true)
   })
 })
 
@@ -636,7 +680,7 @@ describe('task 22.1: corkBoard 256, vcrDeck and vhsShell textures', () => {
   })
 
   it('texture memory after task 22.2 is at most 7.7 MB', () => {
-    expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(7.55 * 1048576)
+    expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(7.55 * 1048576 + TASK_27_1_TEXTURE_BYTES)
   })
 })
 
@@ -731,7 +775,7 @@ describe('task 22.2: metalCabinet, and cardboard crate textures', () => {
     const mb = (id: TextureId) => textureMemoryBytes(TEXTURE_SPECS[id]) / 1048576
     expect(mb('metalCabinet')).toBeCloseTo(0.33, 2)
     expect(mb('crate')).toBeCloseTo(0.33, 2)
-    expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(7.7 * 1048576)
+    expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(7.7 * 1048576 + TASK_27_1_TEXTURE_BYTES)
     expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
   })
 })
@@ -759,5 +803,692 @@ describe('task 22.2 part B: deskDetail texture', () => {
     expect(lines).toHaveLength(13)
     expect(r.some((q) => q[0] === 73 && q[2] === 1 && q[3] === 60)).toBe(true)
     for (let y = 60; y < 64; y++) expect(r.some((q) => q[0] === 64 && q[1] === y && q[2] === 64 && q[3] === 1)).toBe(true)
+  })
+})
+
+describe('task 23.1: lampGlow radial falloff', () => {
+  const recorded = () => run('lampGlow').calls
+  const stops = () => recorded().filter((c) => c.op === 'addColorStop').map((c) => ({ o: c.args[0] as number, color: String(c.args[1]) }))
+  const alphaOf = (color: string) => Number(/rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)/.exec(color)![1])
+
+  it('is 128 x 128, mipmapped, clamped, and keeps its id and seed', () => {
+    expect(TEXTURE_SPECS.lampGlow).toMatchObject({ id: 'lampGlow', width: 128, height: 128, filter: 'mipmap', wrap: 'clamp', seed: 118 })
+  })
+
+  it('is deterministic: two runs record the same calls', () => {
+    expect(run('lampGlow').hash()).toBe(run('lampGlow').hash())
+    expect(run('lampGlow').log).toEqual(run('lampGlow').log)
+  })
+
+  it('uses a radial gradient with at least 5 ordered colour stops that fade to alpha 0 before the border', () => {
+    const { width: W } = TEXTURE_SPECS.lampGlow
+    const grads = recorded().filter((c) => c.op === 'createRadialGradient')
+    expect(grads).toHaveLength(1)
+    const [cx, cy, r0, , , r1] = grads[0].args as number[]
+    expect([cx, cy, r0]).toEqual([W / 2, W / 2, 0])
+    // The gradient ends well inside the canvas, so the outermost ring and the corners are fully transparent.
+    expect(r1).toBeLessThan(W / 2)
+    const s = stops()
+    expect(s.length).toBeGreaterThanOrEqual(5)
+    expect(s.map((x) => x.o)).toEqual([...s.map((x) => x.o)].sort((a, b) => a - b))
+    expect(s[0].o).toBe(0)
+    expect(s[s.length - 1].o).toBe(1)
+    expect(alphaOf(s[s.length - 1].color)).toBe(0)
+    // Alpha never rises after the core.
+    const alphas = s.map((x) => alphaOf(x.color))
+    for (let i = 1; i < alphas.length; i++) expect(alphas[i]).toBeLessThanOrEqual(alphas[i - 1])
+    // Warm falloff: the first stop is a near-white core.
+    expect(alphas[0]).toBe(1)
+  })
+
+  it('task 24.1: has a warm-white core, a golden-amber mid falloff and a feather that reaches alpha 0 on the last stop', () => {
+    const rgb = (color: string) => /rgba\((\d+),(\d+),(\d+),/.exec(color)!.slice(1, 4).map(Number)
+    const s = stops()
+    const [r0, g0, b0] = rgb(s[0].color)
+    expect(Math.min(r0, g0, b0)).toBeGreaterThanOrEqual(235)
+    const mid = s.find((x) => x.o >= 0.3 && x.o <= 0.5)!
+    const [r, g, b] = rgb(mid.color)
+    expect(r).toBeGreaterThan(g)
+    expect(g).toBeGreaterThan(b)
+    expect(r).toBeGreaterThanOrEqual(240)
+    expect(b).toBeLessThan(100)
+    // The gradient radius leaves a clear outer ring, so the edge pixels stay fully transparent.
+    expect(alphaOf(s[s.length - 2].color)).toBeLessThanOrEqual(0.03)
+    expect(alphaOf(s[s.length - 1].color)).toBe(0)
+  })
+
+  it('task 30.1: alpha is 0 at and beyond 90 % of the half-width and at the corners (last stop alpha 0, radius <= 0.9 x half-width)', () => {
+    const { width: W } = TEXTURE_SPECS.lampGlow
+    const [, , , , , r1] = recorded().find((c) => c.op === 'createRadialGradient')!.args as number[]
+    expect(r1).toBeLessThanOrEqual(0.9 * (W / 2) + 1e-9)
+    expect(LAMP_GLOW_RADIUS_FRACTION).toBeLessThanOrEqual(0.9)
+    const s = stops()
+    expect(s[s.length - 1].o).toBe(1)
+    expect(alphaOf(s[s.length - 1].color)).toBe(0)
+    // fillRect repeats the last stop outside the gradient radius, so everything past r1 (the whole border and every corner) is alpha 0.
+    const corner = Math.hypot(W / 2, W / 2)
+    expect(corner).toBeGreaterThan(r1)
+  })
+
+  it('draws a small bright filament core at the centre', () => {
+    const { width: W } = TEXTURE_SPECS.lampGlow
+    const calls = recorded()
+    const arc = calls.find((c) => c.op === 'arc')!
+    expect(arc.args.slice(0, 2)).toEqual([W / 2, W / 2])
+    expect(arc.args[2] as number).toBeLessThan(W * 0.05)
+    const i = calls.indexOf(arc)
+    expect(calls.slice(0, i).some((c) => c.op === 'set fillStyle' && c.args[0] === '#ffffff')).toBe(true)
+  })
+
+  it('costs about 0.06 MB more than the 64 x 64 version', () => {
+    const delta = textureMemoryBytes(TEXTURE_SPECS.lampGlow) - textureMemoryBytes({ width: 64, height: 64, filter: 'mipmap' })
+    expect(delta).toBeGreaterThan(0.06e6)
+    expect(delta).toBeLessThan(0.07e6)
+  })
+})
+
+describe('task 25.1: coneFalloff texture', () => {
+  const calls = () => run('coneFalloff').calls
+  const alphaOf = (color: string) => Number(/rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*([\d.]+)\)/.exec(color)![1])
+  /** Per row: the recorded gradient stops (position, alpha) followed by the fillRect that paints it. */
+  const rows = () => {
+    const out: Array<{ y: number; stops: Array<{ o: number; a: number }> }> = []
+    let stops: Array<{ o: number; a: number }> = []
+    for (const c of calls()) {
+      if (c.op === 'createLinearGradient') stops = []
+      else if (c.op === 'addColorStop') stops.push({ o: c.args[0] as number, a: alphaOf(String(c.args[1])) })
+      else if (c.op === 'fillRect') out.push({ y: (c.args as number[])[1], stops })
+    }
+    return out
+  }
+  const centre = (r: { stops: Array<{ o: number; a: number }> }) => r.stops.find((s) => s.o === 0.5)!.a
+
+  it('is 64 x 64, linear without mipmaps, clamped, with a unique seed and about 0.016 MB', () => {
+    expect(TEXTURE_SPECS.coneFalloff).toMatchObject({ id: 'coneFalloff', width: 64, height: 64, filter: 'linear', wrap: 'clamp', seed: 133 })
+    expect(TEXTURE_IDS.filter((o) => o !== 'coneFalloff').every((o) => TEXTURE_SPECS[o].seed !== 133)).toBe(true)
+    expect(textureMemoryBytes(TEXTURE_SPECS.coneFalloff)).toBe(64 * 64 * 4)
+    expect(textureMemoryBytes(TEXTURE_SPECS.coneFalloff) / 1048576).toBeCloseTo(0.016, 3)
+  })
+
+  it('is deterministic and ignores the seed (no random input)', () => {
+    expect(run('coneFalloff').hash()).toBe(run('coneFalloff').hash())
+    expect(run('coneFalloff', 7).hash()).toBe(run('coneFalloff', 8).hash())
+  })
+
+  it('paints one full-width row at a time, in bounds', () => {
+    const r = rows()
+    expect(r).toHaveLength(64)
+    r.forEach((row, i) => expect(row.y).toBe(i))
+    for (const c of calls().filter((q) => q.op === 'fillRect')) expect(c.args).toEqual([0, (c.args as number[])[1], 64, 1])
+  })
+
+  it('has a warm translucent core at the top row (alpha > 0 in the centre)', () => {
+    const top = rows()[0]
+    expect(centre(top)).toBeGreaterThan(0.5)
+    expect(centre(top)).toBeLessThanOrEqual(1)
+    const colour = String(calls().find((c) => c.op === 'addColorStop')!.args[1])
+    const [r, g, b] = /rgba\((\d+),(\d+),(\d+)/.exec(colour)!.slice(1).map(Number)
+    expect(r).toBeGreaterThan(b) // warm
+    expect(g).toBeGreaterThan(b)
+  })
+
+  it('fades smoothly and monotonically down the rows to exactly 0 well before the bottom (by 85 % of the height)', () => {
+    const r = rows()
+    const alphas = r.map(centre)
+    for (let i = 1; i < alphas.length; i++) expect(alphas[i]).toBeLessThanOrEqual(alphas[i - 1] + 1e-9)
+    // Smooth: no step bigger than 12 % of the top alpha between neighbouring rows.
+    for (let i = 1; i < alphas.length; i++) expect(alphas[i - 1] - alphas[i]).toBeLessThan(alphas[0] * 0.12)
+    for (let i = Math.ceil(64 * 0.85); i < 64; i++) expect(alphas[i], 'row ' + i).toBe(0)
+    expect(alphas[Math.floor(64 * 0.85) - 1]).toBe(0)
+  })
+
+  it('tapers to alpha 0 at the left and right edges on every row, symmetrically', () => {
+    for (const row of rows()) {
+      const first = row.stops[0]
+      const last = row.stops[row.stops.length - 1]
+      expect([first.o, first.a, last.o, last.a]).toEqual([0, 0, 1, 0])
+      const mid = row.stops.length - 1
+      for (let i = 0; i <= mid; i++) expect(row.stops[i].a).toBeCloseTo(row.stops[mid - i].a, 4)
+      expect(row.stops[1].a).toBeLessThan(centre(row) * 0.5 + 1e-9)
+    }
+  })
+
+  it('contains no text and no brand names', () => {
+    expect(run('coneFalloff').texts()).toEqual([])
+  })
+})
+describe('task 26.1: texture craft (redrawn in place)', () => {
+  const REDRAWN = [
+    'wood', 'woodDark', 'deskDetail', 'crate', 'wallPanel', 'floor', 'spineAtlas', 'vhsShell', 'vcrDeck', 'corkBoard',
+    'attractSnake', 'attractMaze', 'attractFrequency', 'marqueeSnake', 'marqueeMaze', 'marqueeFrequency', 'crtGlass',
+  ] as const satisfies readonly TextureId[]
+  const brands = /sony|panasonic|jvc|toshiba|samsung|sharp|zenith|rca|nintendo|sega|atari|blockbuster|kind rewind|maxell|fuji|memorex/i
+
+  it('keeps 32 textures, within 7.85 MB (computed), and every size is a power of two with no 128 -> 256 growth', () => {
+    expect(TEXTURE_IDS).toHaveLength(32)
+    expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(7.85 * 1048576)
+    expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(TEXTURE_MEMORY_BUDGET_BYTES)
+    expect(totalTextureMemoryBytes() / 1048576).toBeCloseTo(7.537 + TASK_27_1_TEXTURE_BYTES / 1048576, 2)
+    for (const id of TEXTURE_IDS) expect(isPowerOfTwo(TEXTURE_SPECS[id].width) && isPowerOfTwo(TEXTURE_SPECS[id].height)).toBe(true)
+  })
+
+  it.each(REDRAWN)('%s is deterministic, uses no Math.random, differs with another seed and stays finite', (id) => {
+    const real = Math.random
+    Math.random = () => {
+      throw new Error('Math.random is not allowed in texture drawing')
+    }
+    try {
+      expect(run(id).hash()).toBe(run(id).hash())
+    } finally {
+      Math.random = real
+    }
+    expect(run(id, TEXTURE_SPECS[id].seed + 1).hash()).not.toBe(run(id).hash())
+    for (const call of run(id).calls) {
+      for (const a of call.args) if (typeof a === 'number') expect(Number.isFinite(a), `${id} ${call.op}`).toBe(true)
+    }
+  })
+
+  it.each(REDRAWN)('%s draws no filled rectangle completely outside the canvas and no brand names', (id) => {
+    const { width: W, height: H } = TEXTURE_SPECS[id]
+    for (const call of run(id).calls) {
+      if (call.op !== 'fillRect') continue
+      const [x, y, rw, rh] = call.args as number[]
+      expect(x < W && y < H && x + rw > 0 && y + rh > 0, `${id} fillRect ${call.args.join()}`).toBe(true)
+    }
+    for (const s of run(id).texts()) expect(s).not.toMatch(brands)
+  })
+
+  it('vcrDeck uses the charcoal-slate chassis colour as its base and draws two reels, two status LEDs and amber buttons', () => {
+    expect(VCR_CHASSIS_COLOR).toBe('#2b303a')
+    const ctx = run('vcrDeck')
+    expect(ctx.calls.find((c) => c.op === 'set fillStyle')!.args[0]).toBe(VCR_CHASSIS_COLOR)
+    const fills = ctx.calls.filter((c) => c.op === 'set fillStyle').map((c) => String(c.args[0]))
+    for (const led of ['#3dff7a', '#ff3b30', '#ffb020']) expect(fills).toContain(led)
+    // Two bay reels: a disc and a ring each, radius 6.
+    expect(ctx.calls.filter((c) => c.op === 'arc' && (c.args as number[])[2] === 6)).toHaveLength(4)
+  })
+
+  it('wallPanel keeps its baseboard grime band inside the tile', () => {
+    const { width: W, height: H } = TEXTURE_SPECS.wallPanel
+    for (const call of run('wallPanel').calls) {
+      if (call.op !== 'fillRect') continue
+      const [x, y, rw, rh] = call.args as number[]
+      if (rh <= 3 && y > H * 0.8) expect(x >= 0 && x + rw <= W + 1 && y + rh <= H + 1, call.args.join()).toBe(true)
+    }
+  })
+})
+
+describe('task 27.1: cabinetAndManualDetail (arcade cabinet front and manual spines)', () => {
+  const ID = 'cabinetAndManualDetail' as const
+  const W = CABINET_DETAIL_WIDTH
+  const H = CABINET_DETAIL_HEIGHT
+  const brands = /sony|panasonic|jvc|toshiba|samsung|sharp|zenith|rca|nintendo|sega|atari|blockbuster|kind rewind|maxell|fuji|memorex|namco|capcom|konami/i
+
+  /** A recording context that also supports setTransform, like a real canvas. */
+  class TransformContext extends RecordingContext {
+    setTransform(a: number, b: number, c: number, d: number, e: number, f: number): void {
+      this.calls.push({ op: 'setTransform', args: [a, b, c, d, e, f] })
+    }
+  }
+  const runWithTransform = (): TransformContext => {
+    const ctx = new TransformContext()
+    drawTexture(ID, ctx)
+    return ctx
+  }
+  const textCalls = (ctx: RecordingContext) =>
+    ctx.calls.filter((c) => c.op === 'fillText').map((c) => ({ s: String(c.args[0]), x: c.args[1] as number, y: c.args[2] as number }))
+
+  it('is a 256 x 128 mipmapped, clamped, power-of-two texture with its own seed', () => {
+    expect(TEXTURE_SPECS[ID]).toMatchObject({ id: ID, width: 256, height: 128, filter: 'mipmap', wrap: 'clamp', seed: 134 })
+    expect(isPowerOfTwo(W) && isPowerOfTwo(H)).toBe(true)
+    expect(TEXTURE_IDS.filter((o) => o !== ID).every((o) => TEXTURE_SPECS[o].seed !== 134)).toBe(true)
+  })
+
+  it('costs 0.166 MB, so there are 32 textures within 7.85 MB (computed)', () => {
+    expect(textureMemoryBytes(TEXTURE_SPECS[ID])).toBe(174326)
+    expect(textureMemoryBytes(TEXTURE_SPECS[ID]) / 1048576).toBeCloseTo(0.166, 3)
+    expect(TEXTURE_IDS).toHaveLength(32)
+    expect(totalTextureMemoryBytes()).toBeLessThanOrEqual(7.85 * 1048576)
+    expect(totalTextureMemoryBytes() / 1048576).toBeCloseTo(7.703, 3)
+  })
+
+  it('is deterministic for one seed, differs for another and never calls Math.random', () => {
+    const real = Math.random
+    Math.random = () => {
+      throw new Error('Math.random is not allowed in texture drawing')
+    }
+    try {
+      expect(run(ID).hash()).toBe(run(ID).hash())
+      expect(runWithTransform().hash()).toBe(runWithTransform().hash())
+    } finally {
+      Math.random = real
+    }
+    expect(run(ID, 135).hash()).not.toBe(run(ID).hash())
+    expect(() => drawTexture(ID, new RecordingContext())).not.toThrow()
+  })
+
+  it('keeps every rectangle, arc, path point and text anchor inside the canvas and every number finite', () => {
+    for (const ctx of [run(ID), runWithTransform()]) {
+      for (const call of ctx.calls) {
+        const a = call.args as number[]
+        for (const v of a) if (typeof v === 'number') expect(Number.isFinite(v), call.op).toBe(true)
+        if (call.op === 'fillRect' || call.op === 'strokeRect') {
+          expect(a[0] >= 0 && a[1] >= 0 && a[0] + a[2] <= W && a[1] + a[3] <= H, `${call.op} ${a.join()}`).toBe(true)
+        } else if (call.op === 'arc') {
+          expect(a[0] - a[2] >= 0 && a[0] + a[2] <= W && a[1] - a[2] >= 0 && a[1] + a[2] <= H, `arc ${a.join()}`).toBe(true)
+        } else if (call.op === 'moveTo' || call.op === 'lineTo' || call.op === 'fillText') {
+          const [x, y] = call.op === 'fillText' ? [a[1], a[2]] : [a[0], a[1]]
+          expect(x >= 0 && x <= W && y >= 0 && y <= H, `${call.op} ${a.join()}`).toBe(true)
+        }
+      }
+    }
+  })
+
+  it('prints the cabinet legends: 25 cent, INSERT COIN, MOVE, ACTION, 1P START and a serial plate', () => {
+    expect(CABINET_COIN_LEGEND).toBe('25\u00a2')
+    expect(CABINET_INSERT_LEGEND).toBe('INSERT COIN')
+    expect([...CABINET_DECK_LEGENDS]).toEqual(['MOVE', 'ACTION', '1P START'])
+    const texts = textCalls(run(ID))
+    const left = texts.filter((t) => t.x < 128).map((t) => t.s)
+    for (const s of ['25\u00a2', 'INSERT COIN', 'MOVE', 'ACTION', '1P START', 'SER. 0996-LMC']) expect(left, s).toContain(s)
+    expect(CABINET_SERIAL_TEXT).toBe('SER. 0996-LMC')
+    // Two reject buttons, so two 25 cent legends.
+    expect(left.filter((s) => s === '25\u00a2')).toHaveLength(2)
+  })
+
+  it('draws the control-deck legends inside the deck lip band, in order left to right', () => {
+    const [, y0, , y1] = CABINET_DETAIL_REGIONS.lip
+    const legends = textCalls(run(ID)).filter((t) => (CABINET_DECK_LEGENDS as readonly string[]).includes(t.s))
+    expect(legends.map((t) => t.s)).toEqual(['MOVE', 'ACTION', '1P START'])
+    for (const t of legends) expect(t.y > y0 && t.y < y1, t.s).toBe(true)
+    expect(legends[0].x).toBeLessThan(legends[1].x)
+    expect(legends[1].x).toBeLessThan(legends[2].x)
+  })
+
+  it('prints the three manual titles along the spines: whole strings with a transform, stacked letters without', () => {
+    expect([...MANUAL_SPINE_TITLES]).toEqual(['01 SNAKE.EXE', '02 LAST EXIT', '03 DEAD FREQUENCY'])
+    const withT = runWithTransform()
+    const wholes = textCalls(withT).map((t) => t.s)
+    for (const title of MANUAL_SPINE_TITLES) expect(wholes).toContain(title)
+    // Each whole title is drawn inside a save/setTransform/restore pair whose translation lies in its own strip.
+    const transforms = withT.calls.filter((c) => c.op === 'setTransform').map((c) => c.args as number[])
+    expect(transforms).toHaveLength(3)
+    transforms.forEach((t, i) => {
+      const [x0, , x1] = CABINET_DETAIL_REGIONS.strips[i]
+      expect(t[4] > x0 && t[4] < x1).toBe(true)
+      expect(t[5] > 40 && t[5] < 122).toBe(true)
+    })
+    expect(withT.calls.filter((c) => c.op === 'save')).toHaveLength(withT.calls.filter((c) => c.op === 'restore').length)
+
+    // Without setTransform the letters are stacked top to bottom on the strip axis.
+    const plain = textCalls(run(ID))
+    CABINET_DETAIL_REGIONS.strips.forEach((strip, i) => {
+      const cx = (strip[0] + strip[2]) / 2
+      const letters = plain.filter((t) => t.x === cx && t.s.length === 1)
+      expect(letters.map((t) => t.s).join('')).toBe(MANUAL_SPINE_TITLES[i].replace(/ /g, ''))
+      for (let k = 1; k < letters.length; k++) expect(letters[k].y).toBeGreaterThan(letters[k - 1].y)
+    })
+  })
+
+  it('draws the amber 89.4 MHz oscilloscope on the third cover and keeps right-half text inside the strips and covers', () => {
+    const texts = textCalls(run(ID))
+    const mhz = texts.find((t) => t.s === FREQUENCY_TEXT)!
+    expect(FREQUENCY_TEXT).toBe('89.4 MHz')
+    const third = CABINET_DETAIL_REGIONS.covers[2]
+    expect(mhz.x > third[0] && mhz.x < third[2] && mhz.y > third[1] && mhz.y < third[3]).toBe(true)
+    // The three cover titles are the same whole strings as the spines, one per cover, inside their own panel.
+    CABINET_DETAIL_REGIONS.covers.forEach((cv, i) => {
+      const t = texts.find((q) => q.s === MANUAL_SPINE_TITLES[i] && q.x > cv[0] && q.x < cv[2])!
+      expect(t, MANUAL_SPINE_TITLES[i]).toBeDefined()
+      expect(t.y > cv[1] && t.y < cv[3]).toBe(true)
+    })
+    for (const t of texts.filter((q) => q.x >= 128)) {
+      const inside = [...CABINET_DETAIL_REGIONS.strips, ...CABINET_DETAIL_REGIONS.covers].some((s) => t.x > s[0] && t.x < s[2] && t.y > s[1] && t.y < s[3])
+      expect(inside, t.s).toBe(true)
+    }
+  })
+  it('has no brand names in any string', () => {
+    for (const s of [...run(ID).texts(), ...runWithTransform().texts()]) expect(s).not.toMatch(brands)
+  })
+
+  it('lays the regions out inside their half, without overlap, at the real aspect of the faces they map onto', () => {
+    const R = CABINET_DETAIL_REGIONS
+    const left = [R.door, R.lip, R.kick, R.plainSteel, R.plainDark]
+    for (const r of left) expect(r[0] >= 0 && r[2] <= 128 && r[1] >= 0 && r[3] <= H).toBe(true)
+    for (const r of [...R.strips, ...R.covers, ...R.plains]) expect(r[0] >= 128 && r[2] <= W && r[1] >= 0 && r[3] <= H).toBe(true)
+    const all = [...left, ...R.strips, ...R.covers, ...R.plains]
+    for (let i = 0; i < all.length; i++) {
+      for (let j = i + 1; j < all.length; j++) {
+        const a = all[i]
+        const b = all[j]
+        expect(a[2] <= b[0] || b[2] <= a[0] || a[3] <= b[1] || b[3] <= a[1], `${i} vs ${j}`).toBe(true)
+      }
+    }
+    const aspect = (r: readonly number[]) => (r[2] - r[0]) / (r[3] - r[1])
+    expect(aspect(R.door)).toBeCloseTo(0.26 / 0.34, 1) // coin door 0.26 x 0.34 m
+    expect(aspect(R.lip) / (1 / 0.07)).toBeCloseTo(1, 1) // deck lip 1.0 x 0.07 m
+    expect(aspect(R.kick) / (0.98 / 0.13)).toBeCloseTo(1, 1) // kick plate 0.98 x 0.13 m
+    expect(MANUAL_STRIP_KEYS).toHaveLength(3)
+    for (const s of R.strips) expect(s[2] - s[0]).toBeGreaterThanOrEqual(20)
+    // Task 28.2: the spine face is 0.085 x 0.31 m (20 x 128 px) and the cover face 0.29 x 0.31 m (64 x 42 px), so the covers are drawn about 1.6x wider than tall.
+    for (const s of R.strips) expect((s[2] - s[0]) * 0.00425).toBeCloseTo(0.085, 2)
+    for (const s of R.covers) expect((s[2] - s[0]) * 0.0045).toBeCloseTo(0.29, 2)
+  })
+
+  it('maps UV windows to the same regions: inside their half, top of the canvas is v = 1', () => {
+    for (const r of [CABINET_DETAIL_REGIONS.door, CABINET_DETAIL_REGIONS.lip, CABINET_DETAIL_REGIONS.kick, CABINET_DETAIL_REGIONS.plainSteel, CABINET_DETAIL_REGIONS.plainDark]) {
+      const u = detailUvRect(r)
+      expect(u.u0).toBeGreaterThanOrEqual(0)
+      expect(u.u1).toBeLessThanOrEqual(0.5)
+      expect(u.u0).toBeLessThan(u.u1)
+      expect(u.v0).toBeLessThan(u.v1)
+    }
+    for (const r of [...CABINET_DETAIL_REGIONS.strips, ...CABINET_DETAIL_REGIONS.covers, ...CABINET_DETAIL_REGIONS.plains]) {
+      const u = detailUvRect(r)
+      expect(u.u0).toBeGreaterThanOrEqual(0.5)
+      expect(u.u1).toBeLessThanOrEqual(1)
+    }
+    // The door is the top-left region of the canvas: its window reaches v close to 1.
+    expect(detailUvRect(CABINET_DETAIL_REGIONS.door).v1).toBeCloseTo(1 - 0.5 / 128, 6)
+  })
+
+  it('paints the exact manual colours (#16a34a, #e11d48, #f59e0b) as spine, cover and plain-cloth ground, and keeps the left half strings unchanged', () => {
+    expect([...MANUAL_COVER_COLOURS]).toEqual(['#16a34a', '#e11d48', '#f59e0b'])
+    const ctx = run(ID)
+    const fills = ctx.calls.filter((c) => c.op === 'set fillStyle').map((c) => String(c.args[0]))
+    for (const hue of MANUAL_COVER_COLOURS) expect(fills, hue).toContain(hue)
+    // Each manual's ground is drawn as a full strip, a full cover panel and a plain stripe.
+    const rects = ctx.calls.filter((c) => c.op === 'fillRect').map((c) => c.args as number[])
+    MANUAL_COVER_COLOURS.forEach((hue, i) => {
+      const grounds = [CABINET_DETAIL_REGIONS.strips[i], CABINET_DETAIL_REGIONS.covers[i], CABINET_DETAIL_REGIONS.plains[i]]
+      for (const [x0, y0, x1, y1] of grounds) expect(rects.some((q) => q[0] === x0 && q[1] === y0 && q[2] === x1 - x0 && q[3] === y1 - y0), `${hue} ${x0},${y0}`).toBe(true)
+    })
+    const left = textCalls(run(ID))
+      .filter((t) => t.x < 128)
+      .map((t) => t.s)
+      .sort()
+    expect(left).toEqual(['25\u00a2', '25\u00a2', '1P START', 'ACTION', 'INSERT COIN', 'MOVE', 'REJECT', 'SER. 0996-LMC'].sort())
+  })
+})
+describe('task 27.1: sharpened in place (rugWoven, wood, woodDark, spineAtlas)', () => {
+  const SHARPENED = [
+    ['rugWoven', 256, 256],
+    ['wood', 128, 128],
+    ['woodDark', 128, 128],
+    ['spineAtlas', 512, 256],
+  ] as const
+
+  it.each(SHARPENED)('%s keeps its size (%i x %i), id, mipmap filter and memory', (id, w, h) => {
+    expect(TEXTURE_SPECS[id]).toMatchObject({ id, width: w, height: h, filter: 'mipmap' })
+    expect(textureMemoryBytes(TEXTURE_SPECS[id])).toBe(Math.round(w * h * 4 * 1.33))
+  })
+
+  it.each(SHARPENED)('%s is deterministic, uses no Math.random and differs with another seed', (id) => {
+    const real = Math.random
+    Math.random = () => {
+      throw new Error('Math.random is not allowed in texture drawing')
+    }
+    try {
+      expect(run(id).hash()).toBe(run(id).hash())
+    } finally {
+      Math.random = real
+    }
+    expect(run(id, TEXTURE_SPECS[id].seed + 1).hash()).not.toBe(run(id).hash())
+  })
+
+  it('rugWoven draws crisp border threads: many 1 px dark and light ticks in the crimson border ring', () => {
+    const rects = run('rugWoven').calls.filter((c) => c.op === 'fillRect')
+    const threads = rects.filter((c) => {
+      const [, , rw, rh] = c.args as number[]
+      return rw === 1 || rh === 1
+    })
+    expect(threads.length).toBeGreaterThan(400)
+  })
+
+  it('wood and woodDark add pale grain highlights that stay inside the tile', () => {
+    for (const id of ['wood', 'woodDark'] as const) {
+      const { width: tw, height: th } = TEXTURE_SPECS[id]
+      const fills = run(id).calls
+      const lights = fills.filter((c, i) => c.op === 'fillRect' && fills[i - 1]?.args[0] === '#ffe2b0')
+      expect(lights.length, id).toBeGreaterThanOrEqual(20)
+      for (const c of lights) {
+        const [x, y, rw, rh] = c.args as number[]
+        expect(x >= 0 && y >= 0 && x + rw <= tw && y + rh <= th, `${id} ${c.args.join()}`).toBe(true)
+      }
+    }
+  })
+
+  it('spineAtlas prints each stacked title twice at full strength (crisper ink) and keeps ink light enough to tint', () => {
+    const texts = run('spineAtlas').calls.filter((c) => c.op === 'fillText').map((c) => String(c.args[0]))
+    // "ARCHIVE" stacked on cell 1 and cell 5: every letter appears at least four times (embossed copy + two ink passes, two cells).
+    expect(texts.filter((s) => s === 'A').length).toBeGreaterThanOrEqual(6)
+    for (const s of run('spineAtlas').texts()) expect(s).not.toMatch(/sony|jvc|rca|fuji/i)
+  })
+})
+
+describe('task 29.2: animated attract screens (pure frame renderers)', () => {
+  const FRAMES = {
+    attractSnake: drawAttractSnakeFrame,
+    attractMaze: drawAttractMazeFrame,
+    attractFrequency: drawAttractFrequencyFrame,
+  } as const
+  const TITLES: Record<(typeof ATTRACT_IDS)[number], string[]> = {
+    attractSnake: ['SNAKE.EXE', 'PRESS E', 'INSERT 25¢'],
+    attractMaze: ['LAST EXIT'],
+    attractFrequency: ['DEAD FREQUENCY', '89.4 MHz'],
+  }
+  const frameLog = (id: (typeof ATTRACT_IDS)[number], t: number): RecordingContext => {
+    const ctx = new RecordingContext()
+    FRAMES[id](ctx, 256, 256, t)
+    return ctx
+  }
+  const SAMPLE_TIMES = Array.from({ length: 80 }, (_, i) => i * 0.37)
+
+  it('elapsedSec 0 gives exactly the static draw sequence, and the seeds match the specs', () => {
+    expect(ATTRACT_SEEDS).toEqual({ snake: 101, maze: 102, frequency: 122 })
+    expect(TEXTURE_SPECS.attractSnake.seed).toBe(ATTRACT_SEEDS.snake)
+    expect(TEXTURE_SPECS.attractMaze.seed).toBe(ATTRACT_SEEDS.maze)
+    expect(TEXTURE_SPECS.attractFrequency.seed).toBe(ATTRACT_SEEDS.frequency)
+    for (const id of ATTRACT_IDS) expect(frameLog(id, 0).log).toEqual(run(id).log)
+  })
+
+  it('frames at different times differ, the same time is deterministic, and the drawers map matches', () => {
+    for (const id of ATTRACT_IDS) {
+      expect(frameLog(id, 1.3).hash(), id).toBe(frameLog(id, 1.3).hash())
+      expect(frameLog(id, 1.3).hash(), id).not.toBe(frameLog(id, 0).hash())
+      expect(frameLog(id, 1.3).hash(), id).not.toBe(frameLog(id, 2.6).hash())
+      const ctx = new RecordingContext()
+      ATTRACT_FRAME_DRAWERS[id](ctx, 256, 256, 1.3)
+      expect(ctx.hash()).toBe(frameLog(id, 1.3).hash())
+    }
+  })
+
+  it('keeps every draw coordinate inside the canvas and keeps the titles on every sampled frame', () => {
+    for (const id of ATTRACT_IDS) {
+      for (const t of SAMPLE_TIMES) {
+        const ctx = frameLog(id, t)
+        for (const call of ctx.calls) {
+          if (!['fillRect', 'strokeRect', 'moveTo', 'lineTo', 'arc', 'fillText'].includes(call.op)) continue
+          const nums = (call.op === 'fillText' ? call.args.slice(1) : call.args.slice(0, 2)) as number[]
+          expect(nums[0] >= 0 && nums[0] <= 256 && nums[1] >= 0 && nums[1] <= 256, `${id} t=${t} ${call.op} ${nums}`).toBe(true)
+        }
+        expect(ctx.texts(), `${id} t=${t}`).toEqual(expect.arrayContaining(TITLES[id]))
+      }
+    }
+  })
+
+  it('the frame functions use no Math.random, Date or performance clock', () => {
+    const sources = import.meta.glob('./proceduralTextures.ts', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
+    const src = sources['./proceduralTextures.ts']
+    const start = src.indexOf('// Task 29.2: animated attract screens')
+    const end = src.indexOf('export interface MarqueePalette')
+    expect(start).toBeGreaterThan(0)
+    expect(end).toBeGreaterThan(start)
+    const code = src
+      .slice(start, end)
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '')
+    expect(code.match(/Math\.random|\bDate\b|performance\.now/)).toBeNull()
+  })
+
+  it('snake: the head advances one path cell per step, turns corners, reaches each fragment, and the fragment then respawns', () => {
+    expect(SNAKE_PATH.length).toBe(34)
+    const heads = new Set<string>()
+    let turns = 0
+    for (let i = 0; i < 80; i++) {
+      const s = snakeStateAt(i * SNAKE_STEP_SEC)
+      heads.add(String(s.head))
+      const d = [s.next[0] - s.head[0], s.next[1] - s.head[1]]
+      expect(Math.abs(d[0]) + Math.abs(d[1])).toBe(1)
+      const prev = snakeStateAt((i - 1) * SNAKE_STEP_SEC)
+      if (i > 0 && (s.next[0] - s.head[0] !== s.head[0] - prev.head[0] || s.next[1] - s.head[1] !== s.head[1] - prev.head[1])) turns++
+    }
+    expect(heads.size).toBe(SNAKE_PATH.length)
+    expect(turns).toBeGreaterThanOrEqual(6)
+    // Just before collection the head chases the fragment. At the collection step it stands on it, then the fragment moves on.
+    let previousFragment = snakeStateAt(0).fragment
+    for (let k = 0; k < 5; k++) {
+      const collectStep = SNAKE_FIRST_FRAGMENT_STEP + SNAKE_FRAGMENT_SPACING * k
+      const before = snakeStateAt((collectStep - 0.5) * SNAKE_STEP_SEC)
+      const at = snakeStateAt(collectStep * SNAKE_STEP_SEC)
+      expect(before.fragment).toEqual(previousFragment)
+      expect(at.head).toEqual(before.fragment)
+      expect(at.collected).toBe(k + 1)
+      expect(at.collectedCell).toEqual(before.fragment)
+      expect(at.fragment).not.toEqual(before.fragment)
+      previousFragment = at.fragment
+    }
+    expect(SNAKE_BODY_LENGTH + 1).toBeLessThan(SNAKE_PATH.length)
+  })
+
+  it('snake: the collection pulse is soft (a single bump of at most 1 s, 0 elsewhere) and draws a small ring only while it lasts', () => {
+    expect(attractPulseLevel(0)).toBe(0)
+    const first = SNAKE_FIRST_FRAGMENT_STEP * SNAKE_STEP_SEC // 1.6 s
+    expect(attractPulseLevel(first - 0.1)).toBe(0)
+    expect(attractPulseLevel(first + ATTRACT_PULSE_SEC / 2)).toBeCloseTo(1, 5)
+    expect(attractPulseLevel(first + ATTRACT_PULSE_SEC + 0.01)).toBe(0)
+    const rings = (t: number) => frameLog('attractSnake', t).calls.filter((c) => c.op === 'arc' && (c.args[2] as number) > 6).length
+    expect(rings(first + 0.3)).toBeGreaterThan(rings(first + 1.2))
+  })
+
+  it('task 30.3 snake: about 7.5 cells per second and the head position changes continuously between cell steps', () => {
+    expect(SNAKE_CELLS_PER_SEC).toBe(7.5)
+    expect(snakeStateAt(1).pathIndex - snakeStateAt(0).pathIndex).toBeCloseTo(7.5, 9)
+    expect(SNAKE_FRAGMENT_SPACING * SNAKE_STEP_SEC).toBeGreaterThanOrEqual(1.5)
+    for (let step = 0; step < SNAKE_PATH.length + 3; step++) {
+      for (const f of [0.25, 0.5, 0.75]) {
+        const s = snakeStateAt((step + f) * SNAKE_STEP_SEC)
+        const a = SNAKE_PATH[step % SNAKE_PATH.length]
+        const b = SNAKE_PATH[(step + 1) % SNAKE_PATH.length]
+        const between = (v: number, p: number, q: number) => (p === q ? v === p : v > Math.min(p, q) && v < Math.max(p, q))
+        expect(between(s.headPos[0], a[0], b[0]) && between(s.headPos[1], a[1], b[1]), `step ${step} f ${f}`).toBe(true)
+        // Moves along a grid line: one coordinate stays on the integer cell.
+        expect(Number.isInteger(s.headPos[0]) || Number.isInteger(s.headPos[1])).toBe(true)
+      }
+    }
+    // The drawn head follows: the head rectangle (colour #c8ffe0) is at a non-cell-aligned pixel position between steps.
+    const headRect = (t: number) => {
+      const calls = frameLog('attractSnake', t).calls
+      const i = calls.findIndex((c, k) => c.op === 'set fillStyle' && c.args[0] === '#c8ffe0' && calls[k + 1]?.op === 'fillRect')
+      return calls[i + 1].args as number[]
+    }
+    const mid = headRect(10.5 * SNAKE_STEP_SEC)
+    expect(mid[0] % 16 !== 0 || (mid[1] - 1) % 16 !== 0).toBe(true)
+  })
+
+  it('task 30.3 maze: the survivor moves about 75 px/s and the anomaly about 55 px/s along their loops', () => {
+    expect(MAZE_SURVIVOR_SPEED).toBe(75)
+    expect(MAZE_ANOMALY_SPEED).toBe(55)
+    const loopLength = (loop: readonly (readonly [number, number])[]) => loop.reduce((s, a, i) => s + Math.hypot(loop[(i + 1) % loop.length][0] - a[0], loop[(i + 1) % loop.length][1] - a[1]), 0)
+    for (const t of [0, 0.37, 2.2]) {
+      const a = mazeActorsAt(t)
+      const b = mazeActorsAt(t + 0.05)
+      // Short straight stretch: the speed is the distance over the interval unless a corner is inside it.
+      const ds = Math.hypot(b.survivor[0] - a.survivor[0], b.survivor[1] - a.survivor[1]) / 0.05
+      expect(ds).toBeGreaterThan(0)
+      expect(ds).toBeLessThanOrEqual(75 + 1e-6)
+    }
+    // Travelled path length over one whole loop period equals loop length: sample finely and sum segments.
+    const travelled = (fn: (t: number) => readonly [number, number], seconds: number) => {
+      let d = 0
+      let prev = fn(0)
+      for (let i = 1; i <= seconds * 1000; i++) {
+        const p = fn(i / 1000)
+        d += Math.hypot(p[0] - prev[0], p[1] - prev[1])
+        prev = p
+      }
+      return d
+    }
+    expect(travelled((t) => mazeActorsAt(t).survivor, 1)).toBeGreaterThan(70)
+    expect(travelled((t) => mazeActorsAt(t).survivor, 1)).toBeLessThan(75.5)
+    expect(travelled((t) => mazeActorsAt(t).anomaly, 1)).toBeGreaterThan(50)
+    expect(travelled((t) => mazeActorsAt(t).anomaly, 1)).toBeLessThan(55.5)
+    // After exactly one loop period the actor is back at its start.
+    const periodS = loopLength(MAZE_SURVIVOR_LOOP) / 75
+    const back = mazeActorsAt(periodS).survivor
+    expect(Math.hypot(back[0] - MAZE_SURVIVOR_LOOP[0][0], back[1] - MAZE_SURVIVOR_LOOP[0][1])).toBeLessThan(1e-6)
+    // The radar ping is a soft ring around the survivor that is drawn with a changing radius.
+    const pingRadius = (t: number) => frameLog('attractMaze', t).calls.filter((c) => c.op === 'arc' && (c.args[2] as number) >= 5).map((c) => c.args[2])
+    expect(pingRadius(0.2)).not.toEqual(pingRadius(0.6))
+  })
+
+  it('task 30.3 frequency: the scroll is 2.2 times faster, modulation stays inside the scope, and the lock pulse peaks at 89.4 MHz', () => {
+    expect(FREQUENCY_SCROLL_RATE / FREQUENCY_OLD_SCROLL_RATE).toBeCloseTo(2.2, 9)
+    expect(FREQUENCY_OLD_SCROLL_RATE).toBe(7)
+    // Find the time the marker is at 89.4 MHz on the way up.
+    let tBest = 0
+    for (let i = 0; i < 5000; i++) {
+      const t = i / 1000
+      if (Math.abs(frequencyMarkerMhz(t) - 89.4) < Math.abs(frequencyMarkerMhz(tBest) - 89.4)) tBest = t
+    }
+    expect(Math.abs(frequencyMarkerMhz(tBest) - 89.4)).toBeLessThan(0.01)
+    expect(frequencyLockLevel(tBest)).toBeGreaterThan(0.99)
+    for (const t of [0, 0.01, 2, 4, 5, 7, 9.5]) expect(frequencyLockLevel(t), `t=${t}`).toBeLessThan(frequencyLockLevel(tBest))
+    // One bump per 10 s sweep: no lock on the way down.
+    let bumps = 0
+    let was = false
+    for (let i = 0; i < 20000; i++) {
+      const on = frequencyLockLevel(i / 1000) > 0
+      if (on && !was) bumps++
+      was = on
+    }
+    expect(bumps).toBe(2) // two sweeps in 20 s
+    // Waveform y stays inside the scope panel (y 44..164) on all sampled frames.
+    for (const t of SAMPLE_TIMES) {
+      const calls = frameLog('attractFrequency', t).calls
+      const start = calls.findIndex((c) => c.op === 'set strokeStyle' && c.args[0] === '#ff9a1a')
+      expect(start, `t=${t}`).toBeGreaterThan(0)
+      const wave: number[] = []
+      for (let k = start; calls[k].op !== 'stroke'; k++) if (calls[k].op === 'lineTo') wave.push(calls[k].args[1] as number)
+      expect(wave.length).toBeGreaterThan(40)
+      for (const y of wave) expect(y >= 48 && y <= 160, `t=${t} y=${y}`).toBe(true)
+    }
+  })
+
+  it('maze: survivor and anomaly move along their loops and stay inside the screen; the survivor passes the three photos', () => {
+    const a0 = mazeActorsAt(0)
+    const a1 = mazeActorsAt(2)
+    expect(a1.survivor).not.toEqual(a0.survivor)
+    expect(a1.anomaly).not.toEqual(a0.anomaly)
+    const onLoop = (p: readonly [number, number], loop: readonly (readonly [number, number])[]) =>
+      loop.some((a, i) => {
+        const b = loop[(i + 1) % loop.length]
+        return p[0] >= Math.min(a[0], b[0]) - 1e-6 && p[0] <= Math.max(a[0], b[0]) + 1e-6 && p[1] >= Math.min(a[1], b[1]) - 1e-6 && p[1] <= Math.max(a[1], b[1]) + 1e-6
+      })
+    for (const t of SAMPLE_TIMES) {
+      const a = mazeActorsAt(t)
+      expect(onLoop(a.survivor, MAZE_SURVIVOR_LOOP), `survivor ${t}`).toBe(true)
+      expect(onLoop(a.anomaly, MAZE_ANOMALY_LOOP), `anomaly ${t}`).toBe(true)
+    }
+    for (const photo of [[31, 82], [210, 137], [75, 187]] as const) expect(MAZE_SURVIVOR_LOOP.some((p) => p[0] === photo[0] && p[1] === photo[1])).toBe(true)
+  })
+
+  it('frequency: the tuning marker sweeps over the dial and the waveform scrolls', () => {
+    expect(frequencyMarkerMhz(0)).toBe(88)
+    expect(frequencyMarkerMhz(5)).toBe(108)
+    expect(frequencyMarkerMhz(10)).toBe(88)
+    expect(frequencyMarkerMhz(2.5)).toBeGreaterThan(88)
+    const strokes = (t: number) => frameLog('attractFrequency', t).calls.filter((c) => c.op === 'lineTo').map((c) => c.args.join(','))
+    expect(strokes(0.5)).not.toEqual(strokes(0))
   })
 })

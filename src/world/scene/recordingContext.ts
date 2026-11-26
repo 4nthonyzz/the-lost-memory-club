@@ -112,6 +112,10 @@ export class RecordingContext implements Ctx2D {
     this.rec('createLinearGradient', x0, y0, x1, y1)
     return { addColorStop: (o: number, c: string) => this.rec('addColorStop', o, c) }
   }
+  createRadialGradient(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number): GradientLike {
+    this.rec('createRadialGradient', x0, y0, r0, x1, y1, r1)
+    return { addColorStop: (o: number, c: string) => this.rec('addColorStop', o, c) }
+  }
   save(): void {
     this.rec('save')
   }

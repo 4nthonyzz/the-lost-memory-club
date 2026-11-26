@@ -7,7 +7,7 @@
  *   signFace     512x128 mip       0.33 MB     posterSunset 256x512 mip  0.70 MB
  *   posterReel, shiftPoster 256x512 mip 0.70 MB each     shiftPlaque 256x128 mip 0.17 MB
  *   floor, wood, woodDark, crate, grille: 128x128 mip, 0.09 MB each     spineAtlas 512x256 mip 0.67 MB (task 18.2).
- *   Task 18.3: corkBoard (512x512 mip 1.33 MB, shrunk to 256x256 mip 0.33 MB in task 22.1), rugWoven 256x256 mip 0.33 MB, lampGlow 64x64 mip 0.02 MB.
+ *   Task 18.3: corkBoard (512x512 mip 1.33 MB, shrunk to 256x256 mip 0.33 MB in task 22.1), rugWoven 256x256 mip 0.33 MB, lampGlow 64x64 mip 0.02 MB (task 23.1: 128x128 mip 0.08 MB, radial gradient).
  *   Task 19.2: wallPanel 256x256 mip 0.33 MB, smpteBars 256x128 nearest 0.13 MB, timecode 128x32 nearest 0.02 MB.
  *   Task 20.2: three attract screens 256x256 nearest 0.25 MB each and three marquees 256x64 nearest 0.06 MB each
  *   replace the old arcadeScreen, marquee, outOfOrder and deck textures.
@@ -16,6 +16,7 @@
  *   Task 22.1: vcrDeck 256x128 mip 0.17 MB, vhsShell 128x128 mip 0.08 MB.
  *   Task 22.2: metalCabinet 256x256 mip 0.33 MB (new), crate 128x128 -> 256x256 mip 0.33 MB (+0.25 MB).
  *   Task 22.2 part B: deskDetail 128x64 mip 0.04 MB (notebook cover grain and ruled paper).
+ *   Task 27.1: cabinetAndManualDetail 256x128 mip 0.17 MB (arcade coin door, kick plate and control-deck legends; three manual spines).
  *   The total is checked against TEXTURE_MEMORY_BUDGET_BYTES in tests.
  */
 import { makeRng } from './effectsTiming'
@@ -49,6 +50,7 @@ export interface Ctx2D {
   fillText(text: string, x: number, y: number): void
   arc(x: number, y: number, r: number, start: number, end: number): void
   createLinearGradient(x0: number, y0: number, x1: number, y1: number): GradientLike
+  createRadialGradient(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number): GradientLike
   save(): void
   restore(): void
   setTransform?(a: number, b: number, c: number, d: number, e: number, f: number): void
@@ -85,14 +87,16 @@ export type TextureId =
   | 'vhsShell'
   | 'metalCabinet'
   | 'deskDetail'
+  | 'coneFalloff'
+  | 'cabinetAndManualDetail'
 
-export type TextureFilter = 'nearest' | 'mipmap'
+export type TextureFilter = 'nearest' | 'mipmap' | 'linear'
 
 export interface TextureSpec {
   id: TextureId
   width: number
   height: number
-  /** `nearest` = pixel art, no mipmaps. `mipmap` = linear with mipmaps. */
+  /** `nearest` = pixel art, no mipmaps. `mipmap` = linear with mipmaps. `linear` = smooth, no mipmaps (task 25.1 coneFalloff). */
   filter: TextureFilter
   wrap: 'clamp' | 'repeat'
   seed: number
@@ -245,47 +249,249 @@ function speckle(
 // Task 20.2: per-game attract screens (256x256) and marquees (256x64). Original art, no real brands.
 // ---------------------------------------------------------------------------------------------
 
-/** Phosphor-green CRT Snake: a serpent built from VHS-tape segments on a dark grid, with a faint shadow serpent. */
-export function drawAttractSnake(c: Ctx2D, w: number, h: number, seed: number): void {
+/** Task 26.1: crisp 1 px corner brackets in an accent colour, drawn on the attract screens under the scanlines (side-art accents that live in the texture). */
+function cornerBrackets(c: Ctx2D, w: number, h: number, inset: number, len: number, color: string): void {
+  for (const [x, y, sx, sy] of [[inset, inset, 1, 1], [w - inset - 1, inset, -1, 1], [inset, h - inset - 1, 1, -1], [w - inset - 1, h - inset - 1, -1, -1]] as const) {
+    rect(c, sx > 0 ? x : x - len + 1, y, len, 1, color, 0.85)
+    rect(c, x, sy > 0 ? y : y - len + 1, 1, len, color, 0.85)
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Task 29.2: animated attract screens. Every screen is a pure function of `elapsedSec` (no Math.random, no Date):
+// the static parts use a fixed seed and all motion comes from the elapsed time. `elapsedSec = 0` is the static frame
+// that the TEXTURE_SPECS draw functions (drawAttractSnake, drawAttractMaze, drawAttractFrequency) render.
+// ---------------------------------------------------------------------------------------------
+
+export type AttractTextureId = 'attractSnake' | 'attractMaze' | 'attractFrequency'
+
+/** Fixed seeds of the static parts (grid speckle). They equal the TEXTURE_SPECS seeds. */
+export const ATTRACT_SEEDS = Object.freeze({ snake: 101, maze: 102, frequency: 122 })
+
+type Pt = readonly [number, number]
+
+const finiteTime = (t: number): number => (Number.isFinite(t) && t > 0 ? t : 0)
+const fract = (v: number): number => v - Math.floor(v)
+
+/** Position at `distance` along a closed polyline loop (wraps around). */
+export function loopPoint(points: readonly Pt[], distance: number): Pt {
+  let total = 0
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i]
+    const b = points[(i + 1) % points.length]
+    total += Math.hypot(b[0] - a[0], b[1] - a[1])
+  }
+  let d = ((distance % total) + total) % total
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i]
+    const b = points[(i + 1) % points.length]
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1])
+    if (d <= len) {
+      const f = len > 0 ? d / len : 0
+      return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]
+    }
+    d -= len
+  }
+  return points[0]
+}
+
+/** Deterministic integer hash to [0, 1). */
+function hash01(n: number): number {
+  let x = Math.imul((n | 0) ^ 0x9e3779b9, 0x85ebca6b)
+  x ^= x >>> 13
+  x = Math.imul(x, 0xc2b2ae35)
+  x ^= x >>> 16
+  return (x >>> 0) / 4294967296
+}
+
+/** Scanlines under one globalAlpha and one fillStyle (the redraw runs 24 times per second, so per-line style writes are avoided). */
+function batchedScanlines(c: Ctx2D, w: number, h: number, step: number, alpha: number): void {
+  c.globalAlpha = alpha
+  c.fillStyle = '#000000'
+  for (let y = 0; y < h; y += step) c.fillRect(0, y, w, 1)
+  c.globalAlpha = 1
+}
+
+// ---- SNAKE.EXE ----
+
+const SNAKE_CELL = 16
+/** Corner cells (column, row) of the closed loop the tape serpent follows. It turns at every corner. */
+const SNAKE_WAYPOINTS: readonly Pt[] = [[2, 6], [13, 6], [13, 9], [6, 9], [6, 12], [2, 12]]
+
+function expandLoop(corners: readonly Pt[]): Pt[] {
+  const cells: Pt[] = []
+  for (let i = 0; i < corners.length; i++) {
+    const a = corners[i]
+    const b = corners[(i + 1) % corners.length]
+    const n = Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1])
+    const dx = Math.sign(b[0] - a[0])
+    const dy = Math.sign(b[1] - a[1])
+    for (let k = 0; k < n; k++) cells.push([a[0] + dx * k, a[1] + dy * k])
+  }
+  return cells
+}
+
+/** Every cell of the loop, in travel order (34 cells). */
+export const SNAKE_PATH: readonly Pt[] = Object.freeze(expandLoop(SNAKE_WAYPOINTS))
+/** Cells per second of the serpent (task 30.3; it was 4). */
+export const SNAKE_CELLS_PER_SEC = 7.5
+/** One path cell per step. The drawn positions are interpolated inside each step. */
+export const SNAKE_STEP_SEC = 1 / SNAKE_CELLS_PER_SEC
+/** Body segments behind the head. */
+export const SNAKE_BODY_LENGTH = 11
+/** Step at which the head first reaches a fragment, and the number of path cells between successive fragments. */
+export const SNAKE_FIRST_FRAGMENT_STEP = 12
+export const SNAKE_FRAGMENT_SPACING = 12
+/** Length of the soft collection pulse. Collections are 12 steps (1.6 s) apart, so pulses never overlap and stay at least 1.5 s apart. */
+export const ATTRACT_PULSE_SEC = 1
+
+const pathCell = (index: number): Pt => SNAKE_PATH[((index % SNAKE_PATH.length) + SNAKE_PATH.length) % SNAKE_PATH.length]
+
+/**
+ * Position (in cell units, fractional) at a fractional path index. It interpolates linearly between two consecutive path cells,
+ * which are always grid neighbours (also across the loop wrap), so motion follows a grid line and corners turn through the corner cell.
+ */
+export function snakePathPosition(pathIndex: number): Pt {
+  const i = Math.floor(pathIndex)
+  const f = pathIndex - i
+  const a = pathCell(i)
+  const b = pathCell(i + 1)
+  return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]
+}
+
+export interface SnakeState {
+  /** Steps taken so far. */
+  step: number
+  /** Fractional path index of the head (step + progress inside the step). */
+  pathIndex: number
+  /** Interpolated head position in cell units. */
+  headPos: Pt
+  head: Pt
+  /** Cell of the head's next move, for the facing direction. */
+  next: Pt
+  /** Cell of the fragment the head is chasing. */
+  fragment: Pt
+  /** Number of fragments collected so far. */
+  collected: number
+  /** Cell where the last fragment was collected (null before the first). */
+  collectedCell: Pt | null
+  /** Seconds since the last collection (Infinity before the first). */
+  pulseAge: number
+}
+
+/** Deterministic snake state at `elapsedSec`. When the head reaches the fragment, the fragment respawns 11 cells further along the path. */
+export function snakeStateAt(elapsedSec: number): SnakeState {
+  const e = finiteTime(elapsedSec)
+  // The tiny epsilon keeps exact step boundaries (i * SNAKE_STEP_SEC) on the step they belong to despite float rounding.
+  const step = Math.floor(e / SNAKE_STEP_SEC + 1e-9)
+  const collected = step >= SNAKE_FIRST_FRAGMENT_STEP ? Math.floor((step - SNAKE_FIRST_FRAGMENT_STEP) / SNAKE_FRAGMENT_SPACING) + 1 : 0
+  const fragmentStep = SNAKE_FIRST_FRAGMENT_STEP + SNAKE_FRAGMENT_SPACING * collected
+  const lastStep = SNAKE_FIRST_FRAGMENT_STEP + SNAKE_FRAGMENT_SPACING * (collected - 1)
+  const pathIndex = e / SNAKE_STEP_SEC
+  return {
+    step,
+    pathIndex,
+    headPos: snakePathPosition(pathIndex),
+    head: pathCell(step),
+    next: pathCell(step + 1),
+    fragment: pathCell(fragmentStep),
+    collected,
+    collectedCell: collected > 0 ? pathCell(lastStep) : null,
+    pulseAge: collected > 0 ? Math.max(0, e - lastStep * SNAKE_STEP_SEC) : Infinity,
+  }
+}
+
+/**
+ * Soft collection pulse in 0..1: one sin^2 bump lasting ATTRACT_PULSE_SEC after each fragment collection, 0 otherwise.
+ * Pulses are 2.75 s apart, so the luminance changes direction at most twice per 2.75 s (limit: 3 per second, Requirement 10).
+ */
+export function attractPulseLevel(elapsedSec: number): number {
+  const age = snakeStateAt(elapsedSec).pulseAge
+  if (!(age >= 0 && age < ATTRACT_PULSE_SEC)) return 0
+  return Math.sin((Math.PI * age) / ATTRACT_PULSE_SEC) ** 2
+}
+
+/** Phosphor-green CRT Snake: a VHS-tape serpent walks a looping path, turning corners, toward a glowing tape fragment. */
+export function drawAttractSnakeFrame(c: Ctx2D, w: number, h: number, elapsedSec: number, seed: number = ATTRACT_SEEDS.snake): void {
   const rnd = makeRng(seed)
+  const e = finiteTime(elapsedSec)
+  const s = snakeStateAt(e)
+  const pulse = attractPulseLevel(e)
   vertical(c, w, h, [[0, '#020a05'], [1, '#04140a']])
-  // Dark play grid.
+  // Dark play grid (one style assignment for all lines).
+  c.globalAlpha = 0.35
+  c.fillStyle = '#0e4a2a'
   for (let k = 16; k < w; k += 16) {
-    rect(c, k, 0, 1, h, '#0e4a2a', 0.35)
-    rect(c, 0, k, w, 1, '#0e4a2a', 0.35)
+    c.fillRect(k, 0, 1, h)
+    c.fillRect(0, k, w, 1)
   }
-  const route = (i: number) => ({ x: 22 + i * 17, y: 150 + Math.sin(i * 0.8) * 24 })
-  // Shadow serpent: larger, offset, very faint, behind the real one.
-  for (let i = 0; i < 12; i++) {
-    const p = route(i)
-    rect(c, p.x - 6, p.y - 26 + (i % 2) * 3, 22, 16, '#0f6a3a', 0.18)
+  c.globalAlpha = 1
+  const cellX = (cx: number) => cx * SNAKE_CELL
+  const cellY = (cy: number) => cy * SNAKE_CELL
+  // Shadow serpent: very faint, trailing far behind the real one (sub-cell positions, like the real serpent).
+  for (let i = 0; i < 6; i++) {
+    const p = snakePathPosition(s.pathIndex - SNAKE_BODY_LENGTH - 6 - i)
+    rect(c, cellX(p[0]) - 2, cellY(p[1]) - 3 + (i % 2) * 2, 20, 18, '#0f6a3a', 0.18)
   }
-  // The serpent: tape segments (cassette body, label strip, two reel dots) and a head.
-  for (let i = 0; i < 11; i++) {
-    const p = route(i)
-    const y = p.y + Math.floor(rnd() * 2)
-    rect(c, p.x, y, 16, 11, '#1f9c52')
-    frame(c, p.x, y, 16, 11, '#7dffb0', 1)
-    rect(c, p.x + 3, y + 1, 10, 3, '#b8ffd2', 0.8)
-    disc(c, p.x + 4.5, y + 7, 2, '#02140a')
-    disc(c, p.x + 11.5, y + 7, 2, '#02140a')
+  // Tape fragment: a glowing cassette label. Its glow lifts softly during the collection pulse.
+  const fx = cellX(s.fragment[0])
+  const fy = cellY(s.fragment[1])
+  disc(c, fx + 8, fy + 8, 9, '#ff5a6a', 0.22 + 0.3 * pulse)
+  rect(c, fx + 4, fy + 4, 8, 8, '#ff5a6a')
+  rect(c, fx + 6, fy + 6, 4, 2, '#ffd0d6')
+  // Collection: a brightness lift and one small expanding ring on the cell where the last fragment was taken.
+  if (s.collectedCell && s.pulseAge < ATTRACT_PULSE_SEC) {
+    const cx = cellX(s.collectedCell[0]) + 8
+    const cy = cellY(s.collectedCell[1]) + 8
+    disc(c, cx, cy, 9, '#b8ffd2', 0.3 * pulse)
+    ring(c, cx, cy, 6 + 10 * (s.pulseAge / ATTRACT_PULSE_SEC), '#b8ffd2', 1, 0.6 * (1 - s.pulseAge / ATTRACT_PULSE_SEC))
   }
-  const head = route(11)
-  rect(c, head.x, head.y - 2, 18, 15, '#c8ffe0')
-  rect(c, head.x + 11, head.y + 1, 3, 3, '#ff3a4a')
-  rect(c, head.x + 11, head.y + 7, 3, 3, '#ff3a4a')
-  // Prey: a lone tape label.
-  rect(c, 58, 205, 9, 9, '#ff5a6a')
+  // The serpent: tape segments (cassette body, label strip, two reel dots), tail first, then the head.
+  for (let i = SNAKE_BODY_LENGTH; i >= 1; i--) {
+    const p = snakePathPosition(s.pathIndex - i)
+    const x = cellX(p[0])
+    const y = cellY(p[1])
+    rect(c, x + 1, y + 2, 14, 12, '#1f9c52')
+    frame(c, x + 1, y + 2, 14, 12, '#7dffb0', 1)
+    rect(c, x + 3, y + 3, 10, 3, '#b8ffd2', 0.8)
+    disc(c, x + 5, y + 10, 2, '#02140a')
+    disc(c, x + 11, y + 10, 2, '#02140a')
+  }
+  const hx = cellX(s.headPos[0])
+  const hy = cellY(s.headPos[1])
+  rect(c, hx, hy + 1, 16, 14, '#c8ffe0')
+  const dx = s.next[0] - s.head[0]
+  const dy = s.next[1] - s.head[1]
+  if (dy === 0) {
+    const ex = dx >= 0 ? hx + 10 : hx + 3
+    rect(c, ex, hy + 3, 3, 3, '#ff3a4a')
+    rect(c, ex, hy + 9, 3, 3, '#ff3a4a')
+  } else {
+    const ey = dy >= 0 ? hy + 10 : hy + 3
+    rect(c, hx + 3, ey, 3, 3, '#ff3a4a')
+    rect(c, hx + 10, ey, 3, 3, '#ff3a4a')
+  }
   text(c, 'SNAKE.EXE', w / 2 + 2, 37, 'bold 28px monospace', '#0a5a30')
   text(c, 'SNAKE.EXE', w / 2, 35, 'bold 28px monospace', '#7dffc0')
   text(c, 'PRESS E', w / 2, 72, 'bold 16px monospace', '#c8ffe4')
   text(c, 'INSERT 25¢', w / 2, 236, 'bold 12px monospace', '#3fbf8a', 0.9)
-  // Phosphor dot grid.
-  for (let y = 3; y < h; y += 8) for (let x = 3; x < w; x += 8) rect(c, x, y, 1, 1, '#2fa874', 0.2)
+  // Phosphor dot grid (one style assignment for the whole grid).
+  c.globalAlpha = 0.2
+  c.fillStyle = '#2fa874'
+  for (let y = 3; y < h; y += 8) for (let x = 3; x < w; x += 8) c.fillRect(x, y, 1, 1)
+  c.globalAlpha = 1
   speckle(c, rnd, 0, 0, w, h, 50, ['#2fa874', '#7dffc0', '#0a3a28'], 2, 0.25)
-  scanlines(c, w, h, 2, 0.24)
-  vignette(c, w, h, 40, 0.6)
+  cornerBrackets(c, w, h, 6, 14, '#7dffc0')
+  batchedScanlines(c, w, h, 2, 0.3)
+  vignette(c, w, h, 40, 0.68)
 }
+
+/** Static frame (elapsedSec = 0), used by the texture spec. */
+export function drawAttractSnake(c: Ctx2D, w: number, h: number, seed: number): void {
+  drawAttractSnakeFrame(c, w, h, 0, seed)
+}
+
+// ---- LAST EXIT ----
 
 /** Vanishing point of the maze corridor and the corridor depth steps (0 = near edge, 1 = vanishing rectangle). */
 const MAZE_OUTER = { l: 6, r: 250, t: 6, b: 250 } as const
@@ -293,9 +499,52 @@ const MAZE_INNER = { l: 104, r: 152, t: 88, b: 150 } as const
 const MAZE_DEPTHS = [0, 0.3, 0.5, 0.65, 0.76, 0.84, 0.9] as const
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 
-/** Dark labyrinth in one-point perspective, three glowing photo fragments and a lurking silhouette at the far end. */
-export function drawAttractMaze(c: Ctx2D, w: number, h: number, seed: number): void {
+/** Corridor loop of the survivor (screen px). It passes through the three photo fragments: their centres (31,82), (210,137) and (75,187) are waypoints. */
+export const MAZE_SURVIVOR_LOOP: readonly Pt[] = Object.freeze([[31, 82], [31, 187], [75, 187], [75, 222], [210, 222], [210, 137], [150, 137], [150, 82]] as Pt[])
+/** A separate, smaller loop patrolled by the red shadow anomaly. */
+export const MAZE_ANOMALY_LOOP: readonly Pt[] = Object.freeze([[110, 160], [190, 160], [190, 200], [110, 200]] as Pt[])
+/** Task 30.3: pixels per second along the loops (were 40 and 28). Motion is continuous, with no stepping. */
+export const MAZE_SURVIVOR_SPEED = 75
+export const MAZE_ANOMALY_SPEED = 55
+/** Radar ping around the survivor: one soft expanding ring every 1.25 s (alpha is a sin^2 bump, so it fades in and out smoothly). */
+export const MAZE_PING_PERIOD_SEC = 1.25
+export const MAZE_PING_MAX_RADIUS = 26
+
+/** Ping brightness in 0..1: sin^2 of the ping phase. At most 2 direction changes per 1.25 s. */
+export function mazePingLevel(elapsedSec: number): number {
+  return Math.sin(Math.PI * fract(finiteTime(elapsedSec) / MAZE_PING_PERIOD_SEC)) ** 2
+}
+/** Glow pulse of the photo fragments: a 0.5 Hz sinusoid is one bright-dark cycle per 2 s (2 direction changes per 2 s). */
+export const MAZE_PHOTO_PULSE_HZ = 0.5
+
+export interface MazeActors {
+  survivor: Pt
+  anomaly: Pt
+}
+
+/** Deterministic survivor and anomaly positions at `elapsedSec`. */
+export function mazeActorsAt(elapsedSec: number): MazeActors {
+  const e = finiteTime(elapsedSec)
+  return { survivor: loopPoint(MAZE_SURVIVOR_LOOP, e * MAZE_SURVIVOR_SPEED), anomaly: loopPoint(MAZE_ANOMALY_LOOP, e * MAZE_ANOMALY_SPEED) }
+}
+
+/** Gold glow level (0..1) of photo fragment `index`: a smooth sinusoid, phase shifted per photo. */
+export function mazePhotoPulse(elapsedSec: number, index: number): number {
+  return 0.5 + 0.5 * Math.sin(2 * Math.PI * MAZE_PHOTO_PULSE_HZ * finiteTime(elapsedSec) + index * 2.1)
+}
+
+function corridorStrips(c: Ctx2D, loop: readonly Pt[], color: string, alpha: number): void {
+  for (let i = 0; i < loop.length; i++) {
+    const a = loop[i]
+    const b = loop[(i + 1) % loop.length]
+    rect(c, Math.min(a[0], b[0]) - 4, Math.min(a[1], b[1]) - 4, Math.abs(b[0] - a[0]) + 8, Math.abs(b[1] - a[1]) + 8, color, alpha)
+  }
+}
+
+/** Dark labyrinth: a survivor dot walks the corridors toward three pulsing gold photographs while a red shadow patrols its own loop. */
+export function drawAttractMazeFrame(c: Ctx2D, w: number, h: number, elapsedSec: number, seed: number = ATTRACT_SEEDS.maze): void {
   const rnd = makeRng(seed)
+  const e = finiteTime(elapsedSec)
   rect(c, 0, 0, w, h, '#06020c')
   const level = (k: number) => {
     const f = MAZE_DEPTHS[k]
@@ -333,29 +582,85 @@ export function drawAttractMaze(c: Ctx2D, w: number, h: number, seed: number): v
   ring(c, 128, 107, 6, '#8a3ad0', 1, 0.55)
   line(c, 120, 114, 115, 156, '#c8203c', 1, 0.45)
   line(c, 136, 114, 141, 156, '#c8203c', 1, 0.45)
-  // Three glowing photo fragments: light frame, dark inner photo area.
-  for (const [x, y, fw, fh] of [[16, 70, 30, 24], [196, 120, 28, 34], [62, 176, 26, 22]] as const) {
-    rect(c, x - 3, y - 3, fw + 6, fh + 6, '#ff9ac0', 0.16)
+  // Faint corridor strips under the actors: the survivor's loop (violet) and the anomaly's loop (red).
+  corridorStrips(c, MAZE_SURVIVOR_LOOP, '#8a3ad0', 0.14)
+  corridorStrips(c, MAZE_ANOMALY_LOOP, '#c8203c', 0.16)
+  // Three photo fragments: pulsing gold glow, light frame, dark inner photo area.
+  for (const [i, [x, y, fw, fh]] of ([[16, 70, 30, 24], [196, 120, 28, 34], [62, 176, 26, 22]] as const).entries()) {
+    rect(c, x - 3, y - 3, fw + 6, fh + 6, '#ffd24a', 0.1 + 0.22 * mazePhotoPulse(e, i))
     rect(c, x, y, fw, fh, '#f0d8e8')
     rect(c, x + 3, y + 3, fw - 6, fh - 6, '#1c0616')
     rect(c, x + fw / 2 - 2, y + 6, 4, 5, '#7a2a5a', 0.8)
   }
+  // Actors: the survivor (warm dot with a halo) and the red shadow anomaly.
+  const actors = mazeActorsAt(e)
+  ring(c, actors.survivor[0], actors.survivor[1], 5 + (MAZE_PING_MAX_RADIUS - 5) * fract(e / MAZE_PING_PERIOD_SEC), '#ffd24a', 1.5, 0.45 * mazePingLevel(e))
+  disc(c, actors.survivor[0], actors.survivor[1], 6, '#ffd24a', 0.3)
+  disc(c, actors.survivor[0], actors.survivor[1], 3.5, '#fff2c0')
+  disc(c, actors.anomaly[0], actors.anomaly[1], 8, '#000000', 0.85)
+  ring(c, actors.anomaly[0], actors.anomaly[1], 8, '#ff2a3a', 1.5, 0.8)
+  rect(c, actors.anomaly[0] - 4, actors.anomaly[1] - 2, 2, 2, '#ff2a3a')
+  rect(c, actors.anomaly[0] + 2, actors.anomaly[1] - 2, 2, 2, '#ff2a3a')
   text(c, 'LAST EXIT', w / 2 + 2, 26, 'bold 26px monospace', '#5a0f8a')
   text(c, 'LAST EXIT', w / 2, 24, 'bold 26px monospace', '#ff4a6a')
   speckle(c, rnd, 0, 0, w, h, 50, ['#c8203c', '#8a3ad0', '#000000'], 2, 0.22)
-  scanlines(c, w, h, 2, 0.26)
-  vignette(c, w, h, 44, 0.6)
+  cornerBrackets(c, w, h, 6, 14, '#ff4a6a')
+  batchedScanlines(c, w, h, 2, 0.32)
+  vignette(c, w, h, 44, 0.68)
 }
+
+/** Static frame (elapsedSec = 0), used by the texture spec. */
+export function drawAttractMaze(c: Ctx2D, w: number, h: number, seed: number): void {
+  drawAttractMazeFrame(c, w, h, 0, seed)
+}
+
+// ---- DEAD FREQUENCY ----
 
 /** Dial scale of the frequency screen, in MHz, and the station it is tuned to. */
 export const FREQUENCY_TEXT = '89.4 MHz'
 const DIAL_MIN_MHZ = 88
 const DIAL_MAX_MHZ = 108
 const DIAL_STATION_MHZ = 89.4
+/** The scanning tuning marker sweeps the whole dial and back in this many seconds. */
+export const FREQUENCY_SWEEP_SEC = 10
 
-/** Retro radio oscilloscope: grid, a bright waveform that breaks into noise, a tuning dial with a needle. */
-export function drawAttractFrequency(c: Ctx2D, w: number, h: number, seed: number): void {
+/** Waveform scroll rate in radians per second: 2.2 times the rate before task 30.3 (7). */
+export const FREQUENCY_OLD_SCROLL_RATE = 7
+export const FREQUENCY_SCROLL_RATE = FREQUENCY_OLD_SCROLL_RATE * 2.2
+
+/** Scanning marker position on the dial in MHz: a cosine-eased sweep between 88 and 108 (no sharp turn at the ends). */
+export function frequencyMarkerMhz(elapsedSec: number): number {
+  const phase = fract(finiteTime(elapsedSec) / FREQUENCY_SWEEP_SEC)
+  return DIAL_MIN_MHZ + (DIAL_MAX_MHZ - DIAL_MIN_MHZ) * (0.5 - 0.5 * Math.cos(TAU * phase))
+}
+
+/** Half width in MHz of the signal-lock glow bump. */
+const LOCK_WIDTH_MHZ = 1.2
+
+/**
+ * Signal-lock glow in 0..1: a cos^2 bump while the marker passes 89.4 MHz on its way up (one bump per sweep, none on the way back down).
+ * The bump lasts well under a second, so it adds 2 luminance direction changes per 10 s sweep.
+ */
+export function frequencyLockLevel(elapsedSec: number): number {
+  const phase = fract(finiteTime(elapsedSec) / FREQUENCY_SWEEP_SEC)
+  if (phase >= 0.5) return 0
+  const d = Math.abs(frequencyMarkerMhz(elapsedSec) - DIAL_STATION_MHZ)
+  return d < LOCK_WIDTH_MHZ ? Math.cos((Math.PI * d) / (2 * LOCK_WIDTH_MHZ)) ** 2 : 0
+}
+
+/** Time-smooth value noise in -0.5..0.5: hashed values at 8 per second, blended with a smoothstep (no stepping). */
+function smoothNoise(index: number, elapsedSec: number): number {
+  const t = elapsedSec * 8
+  const k = Math.floor(t)
+  const f = t - k
+  const s = f * f * (3 - 2 * f)
+  return lerp(hash01(index * 31 + k * 977), hash01(index * 31 + (k + 1) * 977), s) - 0.5
+}
+
+/** Retro radio oscilloscope: a live amber waveform scrolls over the grid with modulated spikes, and a marker scans the dial. */
+export function drawAttractFrequencyFrame(c: Ctx2D, w: number, h: number, elapsedSec: number, seed: number = ATTRACT_SEEDS.frequency): void {
   const rnd = makeRng(seed)
+  const e = finiteTime(elapsedSec)
   vertical(c, w, h, [[0, '#031210'], [1, '#02100e']])
   // Oscilloscope panel with a 8 x 6 graticule.
   const sx = 16
@@ -367,15 +672,27 @@ export function drawAttractFrequency(c: Ctx2D, w: number, h: number, seed: numbe
   for (let j = 1; j < 6; j++) line(c, sx, sy + (j * sh) / 6, sx + sw, sy + (j * sh) / 6, '#1fa8a0', 1, 0.28)
   line(c, sx, sy + sh / 2, sx + sw, sy + sh / 2, '#2ad8d0', 1, 0.5)
   frame(c, sx, sy, sw, sh, '#2ad8d0', 2)
-  // Waveform: a clean sine on the left that tears into noise on the right. Drawn twice for a soft glow.
+  // Waveform: a sine that scrolls left with a slowly modulated amplitude and tears into noise on the right.
+  // Three narrow signal spikes drift across it. Drawn twice for a soft glow.
   const mid = sy + sh / 2
+  const amp = 34 * (1 + 0.2 * Math.sin(e * 1.3))
+  // Harmonics with slowly varying amplitudes; the sum is normalised so the envelope stays inside the scope.
+  const a2 = 0.45 * (0.5 + 0.5 * Math.sin(e * 0.7))
+  const a3 = 0.25 * (0.5 + 0.5 * Math.sin(e * 0.45 + 1))
+  const scroll = e * FREQUENCY_SCROLL_RATE
   const pts: Array<[number, number]> = []
-  for (let x = sx + 4; x <= sx + sw - 4; x += 4) {
+  for (let x = sx + 4, i = 0; x <= sx + sw - 4; x += 4, i++) {
     const u = (x - sx) / sw
-    const clean = Math.sin(u * 22) * 34
-    const noise = (rnd() - 0.5) * 2 * 40
+    const clean = ((Math.sin(u * 22 - scroll) + a2 * Math.sin(u * 37 - scroll * 1.37) + a3 * Math.sin(u * 53 - scroll * 0.71)) / 1.7) * amp
+    const noise = smoothNoise(i, e) * 2 * 40
     const mix = u < 0.5 ? 0 : Math.min(1, (u - 0.5) / 0.25)
-    pts.push([x, mid - (clean * (1 - mix) + noise * mix)])
+    let spike = 0
+    for (let j = 0; j < 3; j++) {
+      const bump = Math.max(0, 1 - Math.abs(u - fract(0.15 + j * 0.33 + e * 0.06 * 2.2)) / 0.035)
+      spike += bump * (j % 2 === 0 ? 1 : -1) * (30 + 16 * Math.sin(e * 2 + j))
+    }
+    const y = mid - (clean * (1 - mix) + noise * mix + spike)
+    pts.push([x, Math.min(sy + sh - 4, Math.max(sy + 4, y))])
   }
   for (const [lw, alpha, col] of [[5, 0.25, '#ff9a1a'], [2, 1, '#ffc23a']] as const) {
     c.globalAlpha = alpha
@@ -398,15 +715,33 @@ export function drawAttractFrequency(c: Ctx2D, w: number, h: number, seed: numbe
     line(c, x, 196, x, (m - DIAL_MIN_MHZ) % 5 === 0 ? 182 : 189, '#ffc23a', 1, 0.85)
   }
   const nx = dialX(DIAL_STATION_MHZ)
+  disc(c, nx, 194, 14, '#ffc23a', 0.3 * frequencyLockLevel(e)) // soft signal-lock glow
   line(c, nx, 178, nx, 210, '#ff3a3a', 2)
   disc(c, nx, 210, 2, '#ff3a3a')
+  const mx = dialX(frequencyMarkerMhz(e))
+  line(c, mx, 184, mx, 206, '#fff2c0', 1, 0.8)
+  triangle(c, [[mx - 3, 215], [mx + 3, 215], [mx, 208]], '#fff2c0', 0.9)
   text(c, FREQUENCY_TEXT, w / 2, 228, 'bold 18px monospace', '#ffc23a')
   text(c, 'DEAD FREQUENCY', w / 2 + 2, 22, 'bold 20px monospace', '#0a5a58')
   text(c, 'DEAD FREQUENCY', w / 2, 20, 'bold 20px monospace', '#2ad8d0')
   speckle(c, rnd, 0, 0, w, h, 50, ['#2ad8d0', '#ffc23a', '#000000'], 2, 0.2)
-  scanlines(c, w, h, 2, 0.26)
-  vignette(c, w, h, 40, 0.6)
+  cornerBrackets(c, w, h, 6, 14, '#ffc23a')
+  batchedScanlines(c, w, h, 2, 0.32)
+  vignette(c, w, h, 40, 0.68)
 }
+
+/** Static frame (elapsedSec = 0), used by the texture spec. */
+export function drawAttractFrequency(c: Ctx2D, w: number, h: number, seed: number): void {
+  drawAttractFrequencyFrame(c, w, h, 0, seed)
+}
+
+/** Time-stepped renderers of the three attract textures (task 29.2), redrawn in place by sharedResources. */
+export const ATTRACT_TEXTURE_IDS: readonly AttractTextureId[] = Object.freeze(['attractSnake', 'attractMaze', 'attractFrequency'] as AttractTextureId[])
+export const ATTRACT_FRAME_DRAWERS: Readonly<Record<AttractTextureId, (c: Ctx2D, w: number, h: number, elapsedSec: number) => void>> = Object.freeze({
+  attractSnake: (c, w, h, t) => drawAttractSnakeFrame(c, w, h, t),
+  attractMaze: (c, w, h, t) => drawAttractMazeFrame(c, w, h, t),
+  attractFrequency: (c, w, h, t) => drawAttractFrequencyFrame(c, w, h, t),
+})
 
 export interface MarqueePalette {
   /** Outer trim gradient: edge colour and centre colour. */
@@ -448,6 +783,10 @@ function drawMarqueeWith(c: Ctx2D, w: number, h: number, seed: number, label: st
   gradientRect(c, 0, 0, w, h, 0, 0, w, 0, [[0, p.trimEdge], [0.5, p.trimCentre], [1, p.trimEdge]])
   gradientRect(c, 6, 8, w - 12, h - 16, 0, 8, 0, h - 8, [[0, p.panelTop], [1, p.panelBottom]])
   frame(c, 6, 8, w - 12, h - 16, p.text, 1)
+  // Task 26.1: a crisp light top lip and a dark lower edge on the backlit panel, plus two end caps.
+  rect(c, 7, 9, w - 14, 1, '#ffffff', 0.3)
+  rect(c, 7, h - 10, w - 14, 1, '#000000', 0.4)
+  for (const x of [9, w - 10]) rect(c, x, 12, 1, h - 24, p.glow, 0.55)
   // Border bulbs with a soft halo, top and bottom rows.
   for (let x = 12; x <= w - 12; x += 16) {
     for (const y of [4, h - 4]) {
@@ -596,8 +935,17 @@ export function drawFloor(c: Ctx2D, w: number, h: number, seed: number): void {
     for (let i = 0; i < n; i++) rect(c, i * tw, j * th, tw, th, (i + j) % 2 === 0 ? '#352f3c' : '#403850')
   }
   for (let k = 0; k < n; k++) {
-    rect(c, k * tw, 0, 1, h, '#17131c', 0.9)
-    rect(c, 0, k * th, w, 1, '#17131c', 0.9)
+    rect(c, k * tw, 0, 1, h, '#0e0b13', 1)
+    rect(c, 0, k * th, w, 1, '#0e0b13', 1)
+    // Task 26.1: crisper grout. A light lip right after each dark line (tiles stay seamless: the lip of the last line wraps to x = 0 via the next tile).
+    rect(c, k * tw + 1, 0, 1, h, '#8a809a', 0.22)
+    rect(c, 0, k * th + 1, w, 1, '#8a809a', 0.22)
+  }
+  // Satin sheen: every tile brightens toward one corner and darkens toward the other, so the repeat stays seamless.
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      gradientRect(c, i * tw + 2, j * th + 2, tw - 2, th - 2, i * tw, j * th, (i + 1) * tw, (j + 1) * th, [[0, 'rgba(255,255,255,0.10)'], [0.5, 'rgba(255,255,255,0)'], [1, 'rgba(0,0,0,0.12)']])
+    }
   }
   speckle(c, rnd, 0, 0, w, h, 140, ['#5a5068', '#1c1824', '#6a5a78'], 1, 0.22)
   // Wear: short lighter scuffs, kept inside the tile.
@@ -633,13 +981,47 @@ export function drawWood(c: Ctx2D, w: number, h: number, seed: number, palette: 
     c.stroke()
     c.globalAlpha = 1
   }
+  // Task 26.1: deeper grain contrast. Extra dark pores and a few strong grain lines (start and end on the same y, so the tile repeats).
+  for (let i = 0; i < 16; i++) {
+    const y = 1 + Math.floor(rnd() * (h - 2))
+    const len = 12 + Math.floor(rnd() * 40)
+    rect(c, Math.floor(rnd() * (w - len)), y, len, 1, palette.knot, 0.28 + rnd() * 0.2)
+  }
+  for (let y = 5; y < h; y += 16) {
+    c.globalAlpha = 0.5
+    c.strokeStyle = palette.knot
+    c.lineWidth = 1
+    c.beginPath()
+    c.moveTo(0, y)
+    c.lineTo(w / 2, y + (rnd() - 0.5) * 2)
+    c.lineTo(w, y)
+    c.stroke()
+    c.globalAlpha = 1
+  }
+  // Warm satin varnish: soft full-width highlight streaks (a light, balanced counterweight to the darker grain).
+  for (const y of [h * 0.18, h * 0.57, h * 0.83]) {
+    rect(c, 0, y, w, 3, '#ffd9a0', 0.1)
+    rect(c, 0, y + 1, w, 1, '#fff0d0', 0.12)
+  }
   for (const y of [0, h / 2]) rect(c, 0, y, w, 2, palette.knot, 0.7)
+  // Edge wear: pale nicks along both plank seams.
+  for (const y of [2, h / 2 + 2]) {
+    for (let i = 0; i < 5; i++) rect(c, 4 + Math.floor(rnd() * (w - 16)), y, 3 + Math.floor(rnd() * 8), 1, '#e8c898', 0.3)
+  }
   for (let k = 0; k < 2; k++) {
     const x = 24 + rnd() * (w - 48)
     const y = 20 + rnd() * (h - 40)
     disc(c, x, y, 6, palette.knot, 0.55)
     ring(c, x, y, 9, palette.grain, 1, 0.6)
     ring(c, x, y, 12, palette.grain, 1, 0.35)
+  }
+  // Task 27.1: deeper grain. Pale grain highlights (short 1 px strokes inside the tile) beside darker grain cuts, balanced so the mean tone holds.
+  for (let i = 0; i < 22; i++) {
+    const y = 1 + Math.floor(rnd() * (h - 2))
+    const len = 10 + Math.floor(rnd() * 36)
+    const x = Math.floor(rnd() * (w - len))
+    rect(c, x, y, len, 1, '#ffe2b0', 0.16 + rnd() * 0.1)
+    rect(c, x + 2, y + 1 < h ? y + 1 : y, Math.max(1, len - 4), 1, palette.knot, 0.22)
   }
 }
 
@@ -689,16 +1071,40 @@ export function spineCellUv(cell: number): { u0: number; u1: number; v0: number;
 
 /** One letter per line, reading downward, like a title printed along a spine. */
 function stackedWord(c: Ctx2D, word: string, cx: number, y0: number, step: number, font: string, color: string): void {
+  // Task 26.1: a light embossed copy one pixel down-right under the ink, so the printed spine title reads crisply.
   ;[...word].forEach((ch, i) => {
-    if (ch !== ' ') text(c, ch, cx, y0 + i * step, font, color)
+    if (ch !== ' ') text(c, ch, cx + 1, y0 + i * step + 1, font, '#ffffff', 0.8)
   })
+  // Task 27.1: crisper print. The ink is drawn at full strength twice, half a pixel apart, which thickens each stroke to a solid 1 px edge.
+  ;[0, 0.5].forEach((dx) => {
+    ;[...word].forEach((ch, i) => {
+      if (ch !== ' ') text(c, ch, cx + dx, y0 + i * step, font, color)
+    })
+  })
+}
+
+/** Task 26.1: foil stripes at head and tail and a few wear marks on spine cells 0..5 (light tones only, inside the cell). */
+function spineFoilAndWear(c: Ctx2D, rnd: () => number, i: number): void {
+  const x0 = i * SPINE_CELL_WIDTH
+  const W = SPINE_CELL_WIDTH
+  rect(c, x0 + 2, 6, W - 4, 2, '#fff2c4', 0.75)
+  rect(c, x0 + 2, 9, W - 4, 1, '#ffffff', 0.45)
+  rect(c, x0 + 2, SPINE_ATLAS_HEIGHT - 9, W - 4, 2, '#fff2c4', 0.75)
+  for (let k = 0; k < 5; k++) {
+    const x = x0 + 4 + rnd() * (W - 16)
+    const y = 12 + rnd() * (SPINE_ATLAS_HEIGHT - 28)
+    line(c, x, y, x + 3 + rnd() * 7, y + 1 + rnd() * 5, '#d8d8d8', 1, 0.5)
+  }
+  // Worn spine edges: a pale fold line near each side.
+  rect(c, x0 + 3, 12, 1, SPINE_ATLAS_HEIGHT - 24, '#ffffff', 0.22)
+  rect(c, x0 + W - 4, 12, 1, SPINE_ATLAS_HEIGHT - 24, '#ffffff', 0.18)
 }
 
 /** Tiny unreadable "title" strokes: short horizontal marks of varying length, stacked down the spine. */
 function glyphMarks(c: Ctx2D, rnd: () => number, cx: number, y0: number, step: number, count: number, color: string): void {
   for (let i = 0; i < count; i++) {
     const w = 14 + Math.floor(rnd() * 24)
-    rect(c, cx - w / 2, y0 + i * step, w, 3, color, 0.8)
+    rect(c, cx - w / 2, y0 + i * step, w, 3, color, 0.95)
   }
 }
 
@@ -734,7 +1140,7 @@ function drawSpineCell(c: Ctx2D, rnd: () => number, i: number): void {
       }
       rect(c, x0 + 8, 56, 48, 110, '#f8f8f8')
       frame(c, x0 + 8, 56, 48, 110, '#6a6a6a', 1.5)
-      stackedWord(c, 'ARCHIVE', cx, 72, 14, 'bold 12px monospace', '#3a3a3a')
+      stackedWord(c, 'ARCHIVE', cx, 72, 14, 'bold 12px monospace', '#2e2e2e')
       rect(c, x0 + 14, 182, 36, 3, '#6a6a6a')
       rect(c, x0 + 14, 192, 36, 3, '#6a6a6a')
       break
@@ -744,7 +1150,7 @@ function drawSpineCell(c: Ctx2D, rnd: () => number, i: number): void {
       rect(c, x0, 0, W, 150, '#eeeeee')
       rect(c, x0, 150, W, H - 150, '#a0a0a0')
       rect(c, x0, 148, W, 4, '#5e5e5e')
-      stackedWord(c, 'VOL. 3', cx, 30, 22, 'bold 16px monospace', '#444444')
+      stackedWord(c, 'VOL. 3', cx, 30, 22, 'bold 16px monospace', '#2e2e2e')
       glyphMarks(c, rnd, cx, 172, 14, 4, '#3c3c3c')
       rect(c, x0 + 22, 236, 20, 8, '#f2f2f2')
       break
@@ -755,7 +1161,7 @@ function drawSpineCell(c: Ctx2D, rnd: () => number, i: number): void {
       rect(c, x0, 0, W, 14, '#6e6e6e')
       rect(c, x0 + 6, 22, 52, 200, '#fafafa')
       frame(c, x0 + 6, 22, 52, 200, '#8a8a8a', 1)
-      stackedWord(c, 'REWIND', cx, 60, 20, 'bold 15px monospace', '#3a3a3a')
+      stackedWord(c, 'REWIND', cx, 60, 20, 'bold 15px monospace', '#2e2e2e')
       glyphMarks(c, rnd, cx, 176, 10, 4, '#555555')
       rect(c, x0, 232, W, 24, '#6e6e6e')
       break
@@ -778,7 +1184,7 @@ function drawSpineCell(c: Ctx2D, rnd: () => number, i: number): void {
       rect(c, x0, 20, W, 26, '#f4f4f4')
       rect(c, x0, 52, W, 8, '#707070')
       rect(c, x0, 212, W, 26, '#f4f4f4')
-      stackedWord(c, 'ARCHIVE', cx, 74, 18, 'bold 14px monospace', '#2e2e2e')
+      stackedWord(c, 'ARCHIVE', cx, 74, 18, 'bold 14px monospace', '#2c2c2c')
       glyphMarks(c, rnd, cx, 196, 6, 2, '#555555')
       break
     }
@@ -806,6 +1212,7 @@ export function drawSpineAtlas(c: Ctx2D, w: number, h: number, seed: number): vo
   // Cells are laid out for the nominal 512 x 256 canvas; spec width and height are fixed.
   if (w !== SPINE_ATLAS_WIDTH || h !== SPINE_ATLAS_HEIGHT) throw new Error('spine atlas size is fixed')
   for (let i = 0; i < SPINE_ATLAS_WIDTH / SPINE_CELL_WIDTH; i++) drawSpineCell(c, rnd, i)
+  for (let i = 0; i < SPINE_VARIANT_COUNT; i++) spineFoilAndWear(c, rnd, i)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -888,6 +1295,15 @@ export function drawWallPanel(c: Ctx2D, w: number, h: number, seed: number): voi
     const y = py(0.7) + rnd() * (baseY - py(0.7) - 10 * k)
     line(c, x, y, x + (10 + rnd() * 24) * k, y + (1 + rnd() * 3) * k, '#7f7899', lw(1), 0.22)
   }
+  // Task 26.1: plaster shading (a light wash high up, a dark wash just above the picture rail's shadow side) and a wainscot wash
+  // that is brighter under the chair rail and darker toward the floor. Light and dark parts are balanced so the mean albedo
+  // stays close to WALL_TEXTURE_ALBEDO.
+  gradientRect(c, 0, 0, w, railY - inset, 0, 0, 0, railY - inset, [[0, 'rgba(255,255,255,0.05)'], [0.5, 'rgba(255,255,255,0)'], [1, 'rgba(0,0,0,0.05)']])
+  gradientRect(c, 0, railY, w, baseY - railY, 0, railY, 0, baseY, [[0, 'rgba(255,255,255,0.05)'], [1, 'rgba(0,0,0,0.05)']])
+  // Baseboard grime band: a darker streaky strip with a light top edge and a few scuff ticks (inside the tile, so it repeats cleanly).
+  rect(c, 0, baseY + lw(3), w, Math.max(2, h - baseY - lw(3)), '#14101e', 0.22)
+  for (let i = 0; i < 10; i++) rect(c, rnd() * (w - 12 * k), baseY + lw(3) + rnd() * (h - baseY - lw(6)), (4 + rnd() * 10) * k, lw(1), '#0e0b16', 0.3)
+  rect(c, 0, baseY + lw(2), w, lw(1), '#8c85ab', 0.2)
 }
 
 /** Rug size in metres, the layout footprint of the 'rug' decal (3.0 x 2.2). The texture is stretched over it. */
@@ -911,6 +1327,28 @@ export function drawRugWoven(c: Ctx2D, w: number, h: number, seed: number): void
     [0.5, '#8c3446'],
   ]
   for (const [m, col] of bands) rect(c, X(m), Y(m), w - 2 * X(m), h - 2 * Y(m), col)
+  // Task 27.1: crisp woven border threads in the crimson ring (0.13 m to 0.4 m): warp ticks along the long borders and weft ticks
+  // along the short ones, on a 2 px pitch, one dark and one light thread per pair.
+  const rx0 = X(0.13)
+  const rx1 = w - X(0.13)
+  const ry0 = Y(0.13)
+  const ry1 = h - Y(0.13)
+  const ix0 = X(0.4)
+  const ix1 = w - X(0.4)
+  const iy0 = Y(0.4)
+  const iy1 = h - Y(0.4)
+  for (let x = Math.ceil(rx0); x + 2 <= rx1; x += 2) {
+    for (const [ya, yb] of [[ry0, iy0], [iy1, ry1]] as const) {
+      rect(c, x, ya, 1, yb - ya, '#12101c', 0.24)
+      rect(c, x + 1, ya, 1, yb - ya, '#f0d8b0', 0.1)
+    }
+  }
+  for (let y = Math.ceil(iy0); y + 2 <= iy1; y += 2) {
+    for (const [xa, xb] of [[rx0, ix0], [ix1, rx1]] as const) {
+      rect(c, xa, y, xb - xa, 1, '#12101c', 0.24)
+      rect(c, xa, y + 1, xb - xa, 1, '#f0d8b0', 0.1)
+    }
+  }
   const diamond = (cx: number, cy: number, hw: number, hh: number, color: string, alpha = 1) =>
     triangle(c, [[cx - hw, cy], [cx, cy - hh], [cx + hw, cy], [cx, cy + hh]], color, alpha)
   // Border diamonds along the long and short edges.
@@ -946,10 +1384,18 @@ export function drawRugWoven(c: Ctx2D, w: number, h: number, seed: number): void
     [0.32, '#d2bc82'],
     [0.2, '#24203a'],
   ]
-  for (const [s, col] of steps) diamond(cx, cy, X(0.95 * s), Y(0.58 * s), col)
+  for (const [s, col] of steps) {
+    diamond(cx, cy, X(0.95 * s), Y(0.58 * s), col)
+    // Task 27.1: a thin dark outline on every medallion step raises the pattern contrast.
+    const hw = X(0.95 * s)
+    const hh = Y(0.58 * s)
+    for (const [ax, ay, bx2, by2] of [[cx - hw, cy, cx, cy - hh], [cx, cy - hh, cx + hw, cy], [cx + hw, cy, cx, cy + hh], [cx, cy + hh, cx - hw, cy]] as const) {
+      line(c, ax, ay, bx2, by2, '#12101c', 1, 0.5)
+    }
+  }
   for (const dx of [-0.45, 0.45]) diamond(cx + X(dx), cy, X(0.09), Y(0.09), '#d2bc82')
   // Weft lines, thread noise, a worn patch and the end fringes.
-  for (let y = 0; y < h; y += 2) rect(c, 0, y, w, 1, y % 4 === 0 ? '#ffffff' : '#000000', y % 4 === 0 ? 0.04 : 0.09)
+  for (let y = 0; y < h; y += 2) rect(c, 0, y, w, 1, y % 4 === 0 ? '#ffffff' : '#000000', y % 4 === 0 ? 0.06 : 0.12)
   speckle(c, rnd, 0, 0, w, h, 380, ['#ffffff', '#000000', '#d2bc82'], 1, 0.13)
   disc(c, cx + X(0.3), cy + Y(0.2), X(0.18), '#000000', 0.06)
   for (let y = 2; y < h - 2; y += 3) {
@@ -1012,7 +1458,13 @@ function indexCard(c: Ctx2D, rnd: () => number, x: number, y: number, w: number,
 /** Polaroid: light frame, dark photo area with a simple window and silhouette, handwritten caption. `k` scales fixed offsets. */
 function polaroid(c: Ctx2D, rnd: () => number, cx: number, cy: number, w: number, h: number, angle: number, k = 1): void {
   tilted(c, cx + 3 * k, cy + 4 * k, w, h, angle, '#000000', 0.25)
-  tilted(c, cx, cy, w, h, angle, '#ece8dc')
+  const pts = tilted(c, cx, cy, w, h, angle, '#ece8dc')
+  // Task 26.1: crisp frame edge, light on the top and left, grey on the bottom and right.
+  for (let e = 0; e < 4; e++) {
+    const a = pts[e]
+    const b = pts[(e + 1) % 4]
+    line(c, a[0], a[1], b[0], b[1], e < 2 ? '#fffdf4' : '#9a968a', Math.max(1, k), 0.8)
+  }
   const side = w - 16 * k
   const py0 = cy - h / 2 + 8 * k + side / 2
   tilted(c, cx, py0, side, side, angle, '#1d1a24')
@@ -1028,6 +1480,8 @@ function stickyNote(c: Ctx2D, rnd: () => number, cx: number, cy: number, s: numb
   tilted(c, cx + 2 * k, cy + 3 * k, s, s, angle, '#000000', 0.25)
   tilted(c, cx, cy, s, s, angle, color)
   tilted(c, cx, cy + s / 2 - 3 * k, s, 6 * k, angle, edge, 0.6)
+  // Task 26.1: the glued top strip catches the light.
+  tilted(c, cx, cy - s / 2 + 2 * k, s, 4 * k, angle, '#ffffff', 0.3)
   scribble(c, rnd, cx - s / 2 + 8 * k, cy - 6 * k, s - 16 * k, '#3a2a2a', 0.8, k)
   scribble(c, rnd, cx - s / 2 + 8 * k, cy + 8 * k, s - 24 * k, '#3a2a2a', 0.8, k)
 }
@@ -1083,16 +1537,53 @@ export function drawCorkBoard(c: Ctx2D, w: number, h: number, seed: number): voi
     line(c, S(p[0] + 1), S(p[1] + 2), S(q[0] + 1), S(q[1] + 2), '#000000', lw(1.5), 0.25)
     line(c, S(p[0]), S(p[1]), S(q[0]), S(q[1]), '#c42222', lw(1.5), 0.92)
   }
+  // Task 26.1: a thin lighter strand on every string link (a different stroke colour, so the red string count is unchanged).
+  for (const [from, to] of links) {
+    const p = pins[from]
+    const q = pins[to]
+    line(c, S(p[0]), S(p[1] - 1), S(q[0]), S(q[1] - 1), '#ff7a6a', lw(0.6), 0.45)
+  }
+  // Task 26.1: a dark 1 px outline and a strip of translucent tape on each index card.
+  for (const [x, y, cw, ch] of [[24, 28, 132, 100], [292, 30, 150, 100], [226, 184, 164, 110], [24, 318, 150, 110]] as const) {
+    frame(c, S(x), S(y), S(cw), S(ch), '#5a4a30', lw(1), 0.7)
+    rect(c, S(x + cw / 2 - 16), S(y - 5), S(32), S(10), '#f0e6a8', 0.55)
+  }
   const pinColors = ['#d62a2a', '#2a5ad6', '#e8c42a', '#2aa84a'] as const
   Object.values(pins).forEach((p, i) => pushPin(c, S(p[0]), S(p[1]), pinColors[i % pinColors.length], k))
   vignette(c, w, h, S(24), 0.35)
 }
 
-/** Soft warm halo for the additive lamp glow planes: concentric translucent discs on a transparent canvas. */
-export function drawLampGlow(c: Ctx2D, w: number, h: number, seed: number): void {
-  const rnd = makeRng(seed)
+/**
+ * Colour stops of the lamp glow radial gradient (task 23.1, richer in 24.1): a bright warm-white core, golden amber,
+ * then a long soft falloff that reaches alpha 0 at LAMP_GLOW_RADIUS_FRACTION of the half width, so the disc has no hard edge.
+ */
+export const LAMP_GLOW_STOPS: Stops = [
+  // Task 24.1: bright warm-white core, rich golden amber mid falloff, then a smooth feather to alpha 0 at the end.
+  [0, 'rgba(255,252,240,1)'],
+  [0.05, 'rgba(255,246,214,0.95)'],
+  [0.14, 'rgba(255,224,150,0.7)'],
+  [0.3, 'rgba(255,190,80,0.42)'],
+  [0.5, 'rgba(244,156,40,0.2)'],
+  [0.7, 'rgba(214,120,22,0.075)'],
+  [0.86, 'rgba(190,100,18,0.02)'],
+  [1, 'rgba(180,90,16,0)'],
+]
+/** Radius where the glow reaches alpha 0, as a fraction of half the canvas width (the outer ring stays clear). */
+export const LAMP_GLOW_RADIUS_FRACTION = 0.9
+
+/**
+ * Soft warm radial glow for the additive lamp sprite and desk pool: a multi-stop radial gradient from a bright
+ * filament core to transparent amber, plus a tiny solid filament dot. Fully deterministic (no random input).
+ */
+export function drawLampGlow(c: Ctx2D, w: number, h: number, _seed: number): void {
   c.clearRect(0, 0, w, h)
-  for (let r = w / 2 - 2; r > 3; r -= 2.5) disc(c, w / 2, h / 2, r, '#ffb060', 0.06 + rnd() * 0.01)
+  const g = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, (w / 2) * LAMP_GLOW_RADIUS_FRACTION)
+  for (const [o, col] of LAMP_GLOW_STOPS) g.addColorStop(o, col)
+  c.globalAlpha = 1
+  c.fillStyle = g
+  c.fillRect(0, 0, w, h)
+  // Bright filament core.
+  disc(c, w / 2, h / 2, Math.max(1.5, w * 0.018), '#ffffff', 0.95)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1294,12 +1785,12 @@ export function drawCrtGlass(c: Ctx2D, w: number, h: number, seed: number): void
   const triad = ['#ff3030', '#30ff30', '#3030ff']
   for (let x = 0, i = 0; x < w; x += 2, i++) rect(c, x, 0, 1, h, triad[i % 3], 0.05)
   speckle(c, rnd, 0, 0, w, h, 500, ['#ffffff', '#4a6ab0', '#000000'], 1, 0.12)
-  scanlines(c, w, h, 2, 0.28)
+  scanlines(c, w, h, 2, 0.34)
   // Reflection: a soft diagonal sheen at the top left and a thin highlight edge.
   gradientRect(c, 0, 0, 150, 110, 0, 0, 120, 100, [[0, 'rgba(255,255,255,0.12)'], [1, 'rgba(255,255,255,0)']])
   line(c, 20, 12, 96, 12, '#ffffff', 2, 0.1)
   // Curved-glass vignette and darker corners.
-  vignette(c, w, h, 56, 0.75)
+  vignette(c, w, h, 56, 0.82)
   for (const [x, y] of [[0, 0], [w - 18, 0], [0, h - 18], [w - 18, h - 18]] as const) rect(c, x, y, 18, 18, '#000000', 0.35)
 }
 
@@ -1311,6 +1802,8 @@ export function drawCrtGlass(c: Ctx2D, w: number, h: number, seed: number): void
 export const VCR_BUTTON_LABELS = ['PLAY', 'STOP', 'REW', 'EJECT'] as const
 /** Generic marking on the VCR front. Not a real trademark. */
 export const VCR_MARK_TEXT = 'HI-FI STEREO'
+/** Task 26.1: charcoal-slate VCR chassis colour. It is the vcrDeck texture base colour and the flat fallback of the vcrDeck material. */
+export const VCR_CHASSIS_COLOR = '#2b303a'
 /** The VCR texture tile is 0.62 m wide (the VCR width) and 0.31 m tall: 2.4 mm per px in both axes. */
 export const VCR_TILE_METRES = 0.62
 export const VCR_TILE_ASPECT = 0.5
@@ -1326,35 +1819,67 @@ export const VCR_TILE_ASPECT = 0.5
  */
 export function drawVcrDeck(c: Ctx2D, w: number, h: number, seed: number): void {
   const rnd = makeRng(seed)
-  rect(c, 0, 0, w, h, '#2c2e35')
-  // Brushed grain: one faint light or dark streak per row, plus short brighter strokes.
-  for (let y = 0; y < h; y++) rect(c, 0, y, w, 1, rnd() < 0.5 ? '#14151a' : '#7a7e88', 0.05 + rnd() * 0.09)
-  for (let i = 0; i < 70; i++) {
+  rect(c, 0, 0, w, h, VCR_CHASSIS_COLOR)
+  // Brushed grain: one streak per row, plus short brighter strokes (task 26.1: stronger contrast).
+  for (let y = 0; y < h; y++) rect(c, 0, y, w, 1, rnd() < 0.5 ? '#0e1016' : '#8a909c', 0.07 + rnd() * 0.11)
+  for (let i = 0; i < 90; i++) {
     const len = 18 + Math.floor(rnd() * 44)
-    rect(c, Math.floor(rnd() * (w - len)), Math.floor(rnd() * h), len, 1, '#9096a2', 0.12)
+    rect(c, Math.floor(rnd() * (w - len)), Math.floor(rnd() * h), len, 1, '#a4abb8', 0.16)
   }
   // Ventilation slots: two banks of six slots with a lower highlight lip.
   for (const x0 of [24, 152]) {
     for (let r = 0; r < 6; r++) {
       const y = 24 + r * 10
-      rect(c, x0, y, 80, 4, '#07070a', 0.92)
-      rect(c, x0, y + 4, 80, 1, '#9096a2', 0.3)
+      rect(c, x0, y, 80, 4, '#05060a', 0.95)
+      rect(c, x0, y + 4, 80, 1, '#a4abb8', 0.36)
     }
   }
-  // Front: chrome trim at the top edge, then buttons with labels.
-  rect(c, 0, 88, w, 1, '#e4e8f0', 0.85)
+  // Front: a brushed metallic trim band along the top edge, with a bright chrome line and a dark seam under it.
+  gradientRect(c, 0, 89, w, 5, 0, 89, 0, 94, [[0, 'rgba(210,216,228,0.55)'], [0.5, 'rgba(120,128,142,0.4)'], [1, 'rgba(20,22,30,0.5)']])
+  rect(c, 0, 88, w, 1, '#e4e8f0', 0.9)
   rect(c, 0, 89, w, 1, '#08080b', 0.6)
+  rect(c, 0, 94, w, 1, '#05060a', 0.7)
+  // Recessed cassette bay window (behind the 3D bezel and tape): dark glass, inner shadow, two tape reels.
+  rect(c, 22, 96, 112, 17, '#07080c')
+  frame(c, 22, 96, 112, 17, '#0a0b10', 2, 0.9)
+  rect(c, 22, 112, 112, 1, '#9aa1ae', 0.5)
+  for (const rx of [56, 100]) {
+    disc(c, rx, 104.5, 6, '#2a2e38')
+    ring(c, rx, 104.5, 6, '#b4bac8', 1, 0.8)
+    for (let a = 0; a < 3; a++) {
+      const ang = (a * TAU) / 3
+      line(c, rx, 104.5, rx + Math.cos(ang) * 4.5, 104.5 + Math.sin(ang) * 4.5, '#05060a', 1, 0.9)
+    }
+    disc(c, rx, 104.5, 1.6, '#05060a')
+  }
+  line(c, 62, 109, 94, 109, '#05060a', 1, 0.8)
+  rect(c, 24, 97, 108, 1, '#ffffff', 0.12)
+  // Tactile buttons: silver caps with a bright top lip and a dark base; PLAY and EJECT carry an amber lamp strip.
   VCR_BUTTON_LABELS.forEach((label, i) => {
     const bx = 161 + i * 18.6
-    rect(c, bx - 7.25, 109.4, 14.5, 8.3, '#101116', 0.9)
+    rect(c, bx - 7.25, 109.4, 14.5, 8.3, '#0a0b10', 0.95)
+    gradientRect(c, bx - 6.25, 110.2, 12.5, 6.6, 0, 110.2, 0, 116.8, [[0, '#e6eaf2'], [0.55, '#a4abb8'], [1, '#5c6270']])
+    rect(c, bx - 6.25, 110.2, 12.5, 1, '#ffffff', 0.7)
+    rect(c, bx - 6.25, 116, 12.5, 1, '#1c1e26', 0.6)
     frame(c, bx - 7.25, 109.4, 14.5, 8.3, '#9096a2', 1, 0.6)
-    text(c, label, bx, 123, 'bold 6px monospace', '#e8ecf4', 0.95)
+    if (i === 0 || i === 3) rect(c, bx - 3.5, 112.6, 7, 1.6, '#ffb020', 0.95)
+    text(c, label, bx, 123, 'bold 6px monospace', '#f0f3fa', 0.98)
   })
-  text(c, VCR_MARK_TEXT, 70, 123, 'bold 6px monospace', '#d6dae4', 0.9)
-  rect(c, 14, 126, 112, 1, '#e4e8f0', 0.35)
+  text(c, VCR_MARK_TEXT, 70, 123, 'bold 6px monospace', '#e2e6f0', 0.95)
+  rect(c, 14, 126, 112, 1, '#e4e8f0', 0.4)
+  // Status LEDs at the right end of the front: glowing green (power) and red (record), each with a halo.
+  for (const [lx, ly, core, halo] of [[246, 98, '#3dff7a', '#2be06a'], [246, 106, '#ff3b30', '#ff5a4a']] as const) {
+    disc(c, lx, ly, 4, halo, 0.22)
+    disc(c, lx, ly, 2.2, core)
+    disc(c, lx - 0.6, ly - 0.6, 0.7, '#ffffff', 0.9)
+  }
+  // Fine panel screws in the corners of the front.
+  for (const [sx, sy] of [[4, 92], [252, 92], [4, 124], [252, 124]] as const) {
+    disc(c, sx, sy, 1.4, '#7c8390')
+    line(c, sx - 1, sy, sx + 1, sy, '#14161c', 1, 0.8)
+  }
   speckle(c, rnd, 0, 0, w, h, 120, ['#000000', '#c8ccd6'], 1, 0.1)
 }
-
 /** Tape labels written on the cassette shell. */
 export const VHS_LABEL_TEXTS = ['TAPE 001', 'ARCHIVE'] as const
 
@@ -1400,6 +1925,9 @@ export function drawVhsShell(c: Ctx2D, w: number, h: number, seed: number): void
   rect(c, 12, 72, 104, 1, '#b84a4a', 0.7)
   handText(c, VHS_LABEL_TEXTS[0], 42, 80, 'bold 8px monospace', '#1a1a2a', 0.95)
   scribble(c, rnd, 70, 80, 40, '#2a2a3a', 0.8)
+  // Task 26.1: crisp label edges and two corner screws on the top face.
+  frame(c, 12.5, 72.5, 103, 13, '#4a4a54', 1, 0.7)
+  for (const sx of [6, 122]) disc(c, sx, 78, 1.5, '#5c5c66')
   // Window with two reels (arcs), the tape path between them and a lower edge highlight.
   rect(c, 14, 88, 100, 20, '#202026')
   frame(c, 14, 88, 100, 20, '#e0e0e8', 1, 0.5)
@@ -1418,6 +1946,7 @@ export function drawVhsShell(c: Ctx2D, w: number, h: number, seed: number): void
   rect(c, 14, 111, 100, 1, '#b84a4a', 0.7)
   handText(c, VHS_LABEL_TEXTS[1], 40, 118, 'bold 8px monospace', '#1a1a2a', 0.95)
   scribble(c, rnd, 66, 118, 44, '#2a2a3a', 0.8)
+  frame(c, 14.5, 111.5, 99, 12, '#4a4a54', 1, 0.7)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1456,6 +1985,8 @@ export function drawCrate(c: Ctx2D, w: number, h: number, seed: number): void {
   rect(c, 112, 0, 1, h, '#3a2810', 0.4)
   rect(c, 143, 0, 1, h, '#3a2810', 0.4)
   rect(c, 116, 0, 2, h, '#f0d8a0', 0.18)
+  rect(c, 112, 0, 32, 1, '#3a2810', 0.25) // tape end
+  rect(c, 0, 105, w, 1, '#f0d8a0', 0.25)
   rect(c, 0, 104, w, 14, '#7a5524', 0.4)
   rect(c, 0, 104, w, 1, '#3a2810', 0.35)
   rect(c, 0, 117, w, 1, '#3a2810', 0.35)
@@ -1470,7 +2001,10 @@ export function drawCrate(c: Ctx2D, w: number, h: number, seed: number): void {
     if (i % 2 === 0) rect(c, bx, 175, bw, 22, '#14141a', 0.92)
     bx += bw + 1
   }
-  // "This way up" arrows.
+  // Task 26.1: a crisp red stamp (framed box with hatching, no lettering) beside the label and a barcode quiet-zone line.
+  rect(c, 12, 206, 96, 1, '#8a8a90', 0.5)
+  frame(c, 156.5, 200.5, 80, 22, '#a02a24', 2, 0.85)
+  for (let x = 160; x < 234; x += 6) line(c, x, 222, x + 6, 202, '#a02a24', 1, 0.45)
   for (const x of [168, 210]) {
     triangle(c, [[x, 142], [x - 11, 160], [x + 11, 160]], '#3a2a14', 0.7)
     rect(c, x - 4, 160, 8, 26, '#3a2a14', 0.7)
@@ -1582,9 +2116,403 @@ export function drawDeskDetail(c: Ctx2D, w: number, h: number, seed: number): vo
   speckle(c, rnd, 0, 0, cell, h, 70, ['#000000', '#ffffff'], 1, 0.1)
   rect(c, cell, 0, cell, h, '#e6dfc6')
   speckle(c, rnd, cell, 0, cell, h, 40, ['#b8ad8c', '#fffaf0'], 1, 0.12)
-  for (let k = 0; k < 13; k++) rect(c, cell, 6 + k * 4, cell, 1, '#7f93b0', 0.75)
+  for (let k = 0; k < 13; k++) rect(c, cell, 6 + k * 4, cell, 1, '#5f78a0', 0.92)
   rect(c, cell + 9, 0, 1, DESK_DETAIL_EDGE_ROW, '#c0605a', 0.7)
+  // Task 26.1: a crisp double margin, spiral binding holes along the top, and a few ink strokes on the ruled lines (all above the page-edge rows).
+  rect(c, cell + 11, 0, 1, DESK_DETAIL_EDGE_ROW, '#c0605a', 0.4)
+  for (let x = cell + 4; x < w - 2; x += 8) disc(c, x, 3, 1.2, '#7a7058', 0.8)
+  for (let k = 0; k < 4; k++) line(c, cell + 14 + rnd() * 20, 11 + k * 8, cell + 36 + rnd() * 20, 11 + k * 8 + (rnd() - 0.5) * 2, '#23304f', 1, 0.8)
+  // Cover: a firmer grain, a light edge lip and a darker lower edge so the cover has depth.
+  rect(c, 0, 0, cell, 1, '#ffffff', 0.3)
+  rect(c, 0, h - 1, cell, 1, '#2a2d34', 0.4)
   for (let y = DESK_DETAIL_EDGE_ROW; y < h; y++) rect(c, cell, y, cell, 1, y % 2 ? '#bfb698' : '#f4eedb')
+}
+
+// ---------------------------------------------------------------------------------------------
+// Task 25.1: soft lamp cone falloff
+// ---------------------------------------------------------------------------------------------
+
+/** Alpha at the centre of the top row (the shade rim end of the cone). */
+export const CONE_FALLOFF_TOP_ALPHA = 0.9
+/** Rows (as a fraction of the height) over which the alpha fades from the top value to exactly 0. */
+export const CONE_FALLOFF_FADE_END = 0.75
+/** Horizontal taper: gradient stops (position across the width, share of the row alpha). Symmetric, 0 at both edges. */
+export const CONE_FALLOFF_SIDE_STOPS: ReadonlyArray<readonly [number, number]> = [
+  [0, 0],
+  [0.12, 0.18],
+  [0.28, 0.62],
+  [0.5, 1],
+  [0.72, 0.62],
+  [0.88, 0.18],
+  [1, 0],
+]
+
+/** Vertical alpha profile: smoothstep from CONE_FALLOFF_TOP_ALPHA at row 0 down to 0 at CONE_FALLOFF_FADE_END of the height. */
+export function coneFalloffRowAlpha(y: number, h: number): number {
+  const t = Math.min(1, Math.max(0, y / (h * CONE_FALLOFF_FADE_END)))
+  return CONE_FALLOFF_TOP_ALPHA * (1 - t * t * (3 - 2 * t))
+}
+
+/**
+ * Soft light-cone falloff, 64 x 64 RGBA, fully deterministic (no random input). Canvas row 0 is the top of the
+ * cone (the shade rim end; the cone geometry maps v = 1 to its top and the texture is flipped, see modelDetail.ts):
+ * a warm translucent core that fades smoothly to alpha 0 at 75 % of the height, and tapers to 0 at the left and
+ * right edges, so the cone has no hard side edge. One horizontal gradient per row.
+ */
+export function drawConeFalloff(c: Ctx2D, w: number, h: number, _seed: number): void {
+  c.clearRect(0, 0, w, h)
+  c.globalAlpha = 1
+  for (let y = 0; y < h; y++) {
+    const a = coneFalloffRowAlpha(y, h)
+    const g = c.createLinearGradient(0, 0, w, 0)
+    for (const [o, k] of CONE_FALLOFF_SIDE_STOPS) g.addColorStop(o, `rgba(255,236,196,${(a * k).toFixed(4)})`)
+    c.fillStyle = g
+    c.fillRect(0, y, w, 1)
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Task 27.1: arcade cabinet front detail and arcade manual spines (one 256 x 128 texture)
+// ---------------------------------------------------------------------------------------------
+
+export const CABINET_DETAIL_WIDTH = 256
+export const CABINET_DETAIL_HEIGHT = 128
+
+/** three.js BoxGeometry face order is +x, -x, +y, -y, +z, -z (four vertices each). The +z face is the front of a cabinet part and the spine of a book. */
+export const BOX_FACE_FRONT = 4
+
+/** A pixel rectangle of the canvas: x0, y0 (inclusive) to x1, y1 (exclusive). */
+export type PxRect = readonly [number, number, number, number]
+/** A UV rectangle (canvas top is v = 1). */
+export interface UvRect {
+  u0: number
+  u1: number
+  v0: number
+  v1: number
+}
+
+/**
+ * Regions of the cabinetAndManualDetail canvas. Left half (x 0..127): the arcade cabinet front, drawn at the real size of
+ * the faces it is mapped onto (about 3.9 mm per px for the coin door, 7.8 mm per px for the rest):
+ *  - door: the 0.26 x 0.34 m coin door (front face of the door box);
+ *  - lip: the 1.0 x 0.07 m front face of the control deck (the player-facing lip, tilted with the deck);
+ *  - kick: the 0.98 x 0.13 m kick plate;
+ *  - plainSteel / plainDark: flat stripes that every other face of those boxes samples, so no legend shows on the sides.
+ * Right half (x 128..255), redrawn in place in task 28.2 for the protruding manuals (0.085 x 0.31 x 0.29 m boxes):
+ *  - strips: three spine strips, 20 x 128 px each (x 128..187), mapped onto the +x face of a manual (0.085 x 0.31 m, about 4.25 mm per px
+ *    across and 2.4 mm per px along the spine);
+ *  - covers: three cover panels, 64 x 42 px each, stacked in one column (x 188..251, y 0..41, 43..84, 86..127), mapped onto both side faces
+ *    (0.29 x 0.31 m, about 4.5 mm per px across and 7.4 mm per px up, so shapes are drawn about 1.6x wider than tall to look square);
+ *  - plains: three 4 x 38 px stripes of plain cloth (x 252..255), one per manual, in that manual's own colour, for the top, bottom and back.
+ * The manual colours are painted into the texture (the manual instances multiply it by white).
+ */
+export const CABINET_DETAIL_REGIONS = Object.freeze({
+  door: [0, 0, 66, 86] as PxRect,
+  lip: [0, 88, 128, 97] as PxRect,
+  kick: [0, 99, 128, 116] as PxRect,
+  plainSteel: [0, 117, 128, 122] as PxRect,
+  plainDark: [0, 123, 128, 128] as PxRect,
+  strips: Object.freeze([
+    [128, 0, 148, 128] as PxRect,
+    [148, 0, 168, 128] as PxRect,
+    [168, 0, 188, 128] as PxRect,
+  ]),
+  covers: Object.freeze([
+    [188, 0, 252, 42] as PxRect,
+    [188, 43, 252, 85] as PxRect,
+    [188, 86, 252, 128] as PxRect,
+  ]),
+  plains: Object.freeze([
+    [252, 2, 256, 40] as PxRect,
+    [252, 44, 256, 82] as PxRect,
+    [252, 86, 256, 124] as PxRect,
+  ]),
+})
+
+/** Exact cloth colours of the three manuals (emerald, crimson, amber), painted into the texture as spine, cover and plain-cloth ground. */
+export const MANUAL_COVER_COLOURS = Object.freeze(['#16a34a', '#e11d48', '#f59e0b'] as const)
+
+/** Manual spine strips, left to right, and the title printed along each one. */
+export const MANUAL_STRIP_KEYS = ['manual-snake', 'manual-maze', 'manual-frequency'] as const
+export const MANUAL_SPINE_TITLES = Object.freeze(['01 SNAKE.EXE', '02 LAST EXIT', '03 DEAD FREQUENCY'] as const)
+/** Legends on the control-deck lip, left to right, and on the coin door. */
+export const CABINET_DECK_LEGENDS = Object.freeze(['MOVE', 'ACTION', '1P START'] as const)
+export const CABINET_COIN_LEGEND = '25\u00a2'
+export const CABINET_INSERT_LEGEND = 'INSERT COIN'
+export const CABINET_SERIAL_TEXT = 'SER. 0996-LMC'
+
+/** UV inset in pixels: sampling stays half a texel inside a region. */
+const CABINET_UV_INSET_PX = 0.5
+
+/** UV rectangle of a pixel region of the cabinetAndManualDetail canvas (canvas top is v = 1). */
+export function detailUvRect(px: PxRect): UvRect {
+  const i = CABINET_UV_INSET_PX
+  return {
+    u0: (px[0] + i) / CABINET_DETAIL_WIDTH,
+    u1: (px[2] - i) / CABINET_DETAIL_WIDTH,
+    v0: 1 - (px[3] - i) / CABINET_DETAIL_HEIGHT,
+    v1: 1 - (px[1] + i) / CABINET_DETAIL_HEIGHT,
+  }
+}
+
+/** Pixel x of the left half of the texture ends here: the cabinet art lives left of it, the manual spines right of it. */
+export const CABINET_DETAIL_HALF_X = 128
+
+/**
+ * Scale of vertical spine text along its reading direction. The spine face (0.085 x 0.31 m on 20 x 128 px) is about 1.8x wider per px
+ * across than along, so glyphs come out tall and narrow; a factor of 1 keeps the long titles inside 84 px at a legible size.
+ */
+const SPINE_TEXT_SQUASH = 1
+
+/** Horizontal brushing: one faint light or dark streak per row inside the rectangle. */
+function brushed(c: Ctx2D, rnd: () => number, x: number, y: number, w: number, h: number, base: string): void {
+  rect(c, x, y, w, h, base)
+  for (let r = 0; r < h; r++) rect(c, x, y + r, w, 1, rnd() < 0.5 ? '#ffffff' : '#14161c', 0.05 + rnd() * 0.08)
+}
+
+/**
+ * Title printed along a spine, reading downward. With a transform-capable context the whole string is drawn rotated 90 degrees\n * clockwise; otherwise the letters are stacked, one per line.
+ * The text stays inside x (cx +- 8) and y0..y1.
+ */
+function spineTitle(c: Ctx2D, s: string, cx: number, y0: number, y1: number, ink: string): void {
+  const len = y1 - y0
+  const chars = [...s].length
+  if (c.setTransform) {
+    const fs = Math.max(6, Math.min(9, Math.floor(len / (SPINE_TEXT_SQUASH * MARQUEE_CHAR_WIDTH_EM * chars))))
+    c.save()
+    // x' = -y + cx, y' = squash * x + centre: text x runs down the canvas, text y runs to the left.
+    c.setTransform(0, SPINE_TEXT_SQUASH, -1, 0, cx, (y0 + y1) / 2)
+    text(c, s, 0, 0, `bold ${fs}px monospace`, ink)
+    c.restore()
+    return
+  }
+  const step = len / chars
+  const font = `bold ${Math.max(5, Math.min(9, Math.floor(step * 1.2)))}px monospace`
+  ;[...s].forEach((ch, i) => {
+    if (ch !== ' ') text(c, ch, cx, y0 + step * (i + 0.5), font, ink)
+  })
+}
+
+/** Per-manual palette: dark CRT-style window ground, light glow tint, spine and title ink (dark on emerald and amber, pale on crimson, each at least 4.5:1). */
+const MANUAL_ART = Object.freeze([
+  { ground: '#07140c', glow: '#86efac', bright: '#dcfce7', ink: '#04210f' },
+  { ground: '#1a0610', glow: '#fb7185', bright: '#ffe4e6', ink: '#ffe4e6' },
+  { ground: '#1c1203', glow: '#fde68a', bright: '#fffbeb', ink: '#2b1700' },
+] as const)
+
+/** Small spine badge (14 x 26 px dark window) with a tiny icon of the game, in the top part of the spine. */
+function spineIcon(c: Ctx2D, i: number, x0: number): void {
+  const art = MANUAL_ART[i]
+  rect(c, x0 + 3, 8, 14, 26, art.ground)
+  frame(c, x0 + 3.5, 8.5, 13, 25, art.glow, 1, 0.6)
+  if (i === 0) {
+    // Serpent: an S of 3 x 2 px cells with a lit head.
+    const cells: ReadonlyArray<readonly [number, number]> = [[0, 0], [1, 0], [2, 0], [2, 1], [2, 2], [1, 2], [0, 2], [0, 3], [0, 4], [1, 4], [2, 4]]
+    for (const [col, row] of cells) rect(c, x0 + 5 + col * 3, 12 + row * 4, 3, 2, art.glow)
+    rect(c, x0 + 11, 28, 3, 2, art.bright)
+  } else if (i === 1) {
+    // Corridor walls with one gold photo fragment.
+    for (const [ax, ay, bx2, by2] of [[5, 12, 5, 26], [5, 26, 12, 26], [9, 16, 9, 30], [9, 16, 15, 16], [13, 20, 13, 30]] as const) line(c, x0 + ax, ay, x0 + bx2, by2, art.glow, 1)
+    rect(c, x0 + 11, 10, 4, 3, '#facc15')
+  } else {
+    // Oscilloscope wave over a baseline.
+    line(c, x0 + 5, 21, x0 + 15, 21, art.glow, 1, 0.4)
+    c.globalAlpha = 1
+    c.strokeStyle = art.bright
+    c.lineWidth = 1
+    c.beginPath()
+    for (let k = 0; k <= 10; k++) {
+      const y = 12 + k * 1.8
+      const x = x0 + 10 + Math.sin(k * 1.2) * 4
+      if (k === 0) c.moveTo(x, y)
+      else c.lineTo(x, y)
+    }
+    c.stroke()
+  }
+}
+
+/** One spine strip: manual-coloured cloth, foil bands, a game badge and the title running down the spine. */
+function drawManualSpine(c: Ctx2D, i: number): void {
+  const [x0, , x1] = CABINET_DETAIL_REGIONS.strips[i]
+  const cx = (x0 + x1) / 2
+  const art = MANUAL_ART[i]
+  rect(c, x0, 0, x1 - x0, 128, MANUAL_COVER_COLOURS[i])
+  // Rounded-hinge shading: a dark groove and a light edge on each side.
+  rect(c, x0, 0, 1, 128, '#000000', 0.3)
+  rect(c, x1 - 1, 0, 1, 128, '#000000', 0.3)
+  rect(c, x0 + 1, 8, 1, 112, '#ffffff', 0.25)
+  // Foil bands at the head and tail.
+  rect(c, x0 + 1, 3, x1 - x0 - 2, 2, art.bright, 0.85)
+  rect(c, x0 + 1, 123, x1 - x0 - 2, 2, art.bright, 0.85)
+  spineIcon(c, i, x0)
+  rect(c, x0 + 2, 37, x1 - x0 - 4, 1, art.ink, 0.7)
+  spineTitle(c, MANUAL_SPINE_TITLES[i], cx, 40, 122, art.ink)
+}
+
+/** Cover 1: a pixel serpent made of a VHS tape winds across a CRT grid. 4 x 3 px cells look square on the 0.29 x 0.31 m face. */
+function drawSnakeCover(c: Ctx2D, wx: number, wy: number): void {
+  const art = MANUAL_ART[0]
+  // CRT grid.
+  for (let gx = 0; gx <= 54; gx += 6) rect(c, wx + gx, wy, 1, 22, MANUAL_COVER_COLOURS[0], 0.3)
+  for (let gy = 0; gy <= 22; gy += 4) rect(c, wx, wy + gy, 54, 1, MANUAL_COVER_COLOURS[0], 0.3)
+  // Body path: (col, row) on a 4 x 3 px lattice, offset (3, 1) inside the window.
+  const path: ReadonlyArray<readonly [number, number]> = [
+    [0, 5], [1, 5], [2, 5], [3, 5], [4, 5], [5, 5], [6, 5], [7, 5], [8, 5], [8, 4], [8, 3], [7, 3], [6, 3], [5, 3], [4, 3], [3, 3], [2, 3], [2, 2], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1],
+  ]
+  // Soft glow first, then the tape-brown-free emerald body.
+  for (const [col, row] of path) rect(c, wx + 2 + col * 4, wy + row * 3, 5, 4, MANUAL_COVER_COLOURS[0], 0.4)
+  path.forEach(([col, row], k) => rect(c, wx + 3 + col * 4, wy + 1 + row * 3, 3, 2, k % 2 ? art.glow : '#4ade80'))
+  // Head: a tiny VHS cassette with two reels.
+  rect(c, wx + 3 + 8 * 4, wy + 1 * 3, 8, 6, art.bright)
+  frame(c, wx + 3 + 8 * 4 + 0.5, wy + 1 * 3 + 0.5, 7, 5, '#04210f', 1)
+  rect(c, wx + 3 + 8 * 4 + 1.5, wy + 1 * 3 + 2, 2, 2, '#04210f')
+  rect(c, wx + 3 + 8 * 4 + 4.5, wy + 1 * 3 + 2, 2, 2, '#04210f')
+  // Prey pixel.
+  rect(c, wx + 46, wy + 16, 3, 3, art.bright, 0.9)
+}
+
+/** Cover 2: labyrinth corridor walls with three golden photograph fragments. */
+function drawMazeCover(c: Ctx2D, wx: number, wy: number): void {
+  const art = MANUAL_ART[1]
+  const walls: ReadonlyArray<readonly [number, number, number, number]> = [
+    [6, 0, 6, 14], [6, 14, 18, 14], [12, 6, 12, 22], [12, 6, 26, 6], [20, 6, 20, 16], [20, 16, 34, 16], [26, 0, 26, 6], [32, 6, 32, 22], [32, 6, 46, 6], [40, 6, 40, 16], [40, 16, 53, 16], [46, 0, 46, 6],
+  ]
+  for (const [ax, ay, bx2, by2] of walls) line(c, wx + ax + 0.5, wy + ay + 0.5, wx + bx2 + 0.5, wy + by2 + 0.5, MANUAL_COVER_COLOURS[1], 3, 0.45)
+  for (const [ax, ay, bx2, by2] of walls) line(c, wx + ax + 0.5, wy + ay + 0.5, wx + bx2 + 0.5, wy + by2 + 0.5, art.glow, 1, 0.95)
+  // Three torn photograph fragments (gold prints with a dark picture area), each a different shape.
+  const gold = '#facc15'
+  rect(c, wx + 2, wy + 16, 6, 4, gold)
+  rect(c, wx + 3, wy + 17, 3, 2, '#5a3a05')
+  rect(c, wx + 23, wy + 9, 5, 4, gold)
+  rect(c, wx + 24, wy + 10, 2, 2, '#5a3a05')
+  triangle(c, [[wx + 43, wy + 8], [wx + 49, wy + 8], [wx + 43, wy + 13]], gold)
+  rect(c, wx + 44, wy + 9, 2, 1, '#5a3a05')
+}
+
+/** Cover 3: a glowing oscilloscope trace tuned to 89.4 MHz. */
+function drawFrequencyCover(c: Ctx2D, wx: number, wy: number): void {
+  const art = MANUAL_ART[2]
+  for (let gx = 0; gx <= 54; gx += 9) rect(c, wx + gx, wy, 1, 22, MANUAL_COVER_COLOURS[2], 0.3)
+  for (let gy = 2; gy <= 22; gy += 5) rect(c, wx, wy + gy, 54, 1, MANUAL_COVER_COLOURS[2], 0.3)
+  text(c, FREQUENCY_TEXT, wx + 40, wy + 4, 'bold 5px monospace', art.glow)
+  const trace = (lw: number, color: string, alpha: number) => {
+    c.globalAlpha = alpha
+    c.strokeStyle = color
+    c.lineWidth = lw
+    c.beginPath()
+    for (let k = 0; k <= 52; k++) {
+      const x = wx + 1 + k
+      const y = wy + 14 + Math.sin(k * 0.45) * 5 * (1 - Math.abs(k - 26) / 40)
+      if (k === 0) c.moveTo(x, y)
+      else c.lineTo(x, y)
+    }
+    c.stroke()
+    c.globalAlpha = 1
+  }
+  trace(3, MANUAL_COVER_COLOURS[2], 0.4)
+  trace(1, art.bright, 1)
+}
+
+/**
+ * One cover panel (64 x 42 px): manual-coloured cloth with a dark 54 x 22 px window for the art and the title on a plate below.
+ * Titles are horizontal and read upright on both side faces.
+ */
+function drawManualCover(c: Ctx2D, i: number): void {
+  const [x0, y0, x1, y1] = CABINET_DETAIL_REGIONS.covers[i]
+  const art = MANUAL_ART[i]
+  rect(c, x0, y0, x1 - x0, y1 - y0, MANUAL_COVER_COLOURS[i])
+  rect(c, x0, y0, x1 - x0, 1, '#ffffff', 0.25)
+  rect(c, x0, y1 - 1, x1 - x0, 1, '#000000', 0.3)
+  const wx = x0 + 5
+  const wy = y0 + 4
+  rect(c, wx, wy, 54, 22, art.ground)
+  frame(c, wx - 0.5, wy - 0.5, 55, 23, art.ink, 1, 0.8)
+  if (i === 0) drawSnakeCover(c, wx, wy)
+  else if (i === 1) drawMazeCover(c, wx, wy)
+  else drawFrequencyCover(c, wx, wy)
+  rect(c, x0 + 5, y0 + 29, 54, 1, art.ink, 0.6)
+  text(c, MANUAL_SPINE_TITLES[i], (x0 + x1) / 2, y0 + 35, `bold ${i === 2 ? 5 : 6}px monospace`, art.ink)
+}
+
+function drawCabinetDoor(c: Ctx2D, rnd: () => number): void {
+  brushed(c, rnd, 0, 0, 66, 86, '#8a909a')
+  // Steel frame: light top and left, dark bottom and right, then a recessed inner panel.
+  rect(c, 0, 0, 66, 2, '#d4d9e2')
+  rect(c, 0, 0, 2, 86, '#c0c6d0')
+  rect(c, 64, 0, 2, 86, '#4a4f58')
+  rect(c, 0, 84, 66, 2, '#3a3e46')
+  rect(c, 4, 4, 58, 78, '#6c727d', 0.55)
+  frame(c, 4.5, 4.5, 57, 77, '#2a2d34', 1)
+  // INSERT COIN legend plate on the strip above the 3D coin slots.
+  rect(c, 8, 6, 50, 11, '#15161b')
+  frame(c, 8.5, 6.5, 49, 10, '#b0b6c0', 1)
+  text(c, CABINET_INSERT_LEGEND, 33, 11.5, 'bold 7px monospace', '#ffc23a')
+  // Louvred speaker grille between the two slot bezels.
+  rect(c, 25, 21, 16, 24, '#0e0f13')
+  for (let y = 23; y < 44; y += 3) {
+    rect(c, 25, y, 16, 1, '#555a64')
+    rect(c, 25, y + 1, 16, 1, '#000000', 0.6)
+  }
+  frame(c, 25.5, 21.5, 15, 23, '#9aa0aa', 1, 0.7)
+  // Two glowing amber reject buttons with a coin legend under each.
+  for (const cx of [15, 51]) {
+    disc(c, cx, 64, 11, '#ffb030', 0.2)
+    disc(c, cx, 64, 8, '#2a1a00')
+    disc(c, cx, 64, 6.5, '#ff9a1a')
+    disc(c, cx, 64, 4.5, '#ffc24a')
+    disc(c, cx - 2, 62, 1.5, '#ffffff', 0.7)
+    rect(c, cx - 9, 74, 18, 8, '#15161b')
+    text(c, CABINET_COIN_LEGEND, cx, 78.5, 'bold 6px monospace', '#ffc23a')
+  }
+  text(c, 'REJECT', 33, 64, 'bold 5px monospace', '#15161b')
+}
+
+function drawDeckLip(c: Ctx2D): void {
+  rect(c, 0, 88, 128, 9, '#1a1b22')
+  rect(c, 0, 88, 128, 1, '#4a4e58')
+  rect(c, 0, 96, 128, 1, '#0a0a0e')
+  const plates: ReadonlyArray<readonly [number, number]> = [[22, 26], [64, 32], [106, 36]]
+  CABINET_DECK_LEGENDS.forEach((label, i) => {
+    const [cx, pw] = plates[i]
+    rect(c, cx - pw / 2, 89, pw, 7, '#0d0e12')
+    frame(c, cx - pw / 2 + 0.5, 89.5, pw - 1, 6, '#5a5e68', 1)
+    text(c, label, cx, 92.5, 'bold 6px monospace', '#ffc23a')
+  })
+}
+
+function drawKickPlate(c: Ctx2D, rnd: () => number): void {
+  brushed(c, rnd, 0, 99, 128, 17, '#7d838d')
+  rect(c, 0, 99, 128, 1, '#c8cdd6')
+  rect(c, 0, 115, 128, 1, '#30343c')
+  // Louvred vent block on the left, small serial plate on the right.
+  rect(c, 6, 102, 58, 11, '#0e0f13')
+  for (let y = 103; y < 112; y += 2) rect(c, 6, y, 58, 1, '#555a64')
+  rect(c, 70, 102, 52, 11, '#e4e7ec')
+  frame(c, 70.5, 102.5, 51, 10, '#6a707a', 1)
+  text(c, CABINET_SERIAL_TEXT, 96, 107.5, 'bold 5px monospace', '#22252b')
+  for (const x of [73, 119]) disc(c, x, 107.5, 1, '#7a808a')
+}
+
+/**
+ * Arcade cabinet front and manual spines and covers, 256 x 128 (task 27.1, right half redrawn in task 28.2). See CABINET_DETAIL_REGIONS for the layout. Original text only
+ * ("SER. 0996-LMC" is the club's own serial plate). Deterministic: seeded streaks, no Math.random.
+ */
+export function drawCabinetAndManualDetail(c: Ctx2D, w: number, h: number, seed: number): void {
+  if (w !== CABINET_DETAIL_WIDTH || h !== CABINET_DETAIL_HEIGHT) throw new Error('cabinet detail size is fixed')
+  const rnd = makeRng(seed)
+  rect(c, 0, 0, CABINET_DETAIL_HALF_X, h, '#1a1b22')
+  drawCabinetDoor(c, rnd)
+  drawDeckLip(c)
+  drawKickPlate(c, rnd)
+  brushed(c, rnd, 0, 117, 128, 5, '#7f858f')
+  // Right half (task 28.2): three spine strips, three cover panels and one plain-cloth stripe per manual, all in the manual's own colour.
+  rect(c, CABINET_DETAIL_HALF_X, 0, w - CABINET_DETAIL_HALF_X, h, '#14141a')
+  for (let i = 0; i < 3; i++) {
+    drawManualSpine(c, i)
+    drawManualCover(c, i)
+    const [px0, py0, px1, py1] = CABINET_DETAIL_REGIONS.plains[i]
+    rect(c, px0, py0, px1 - px0, py1 - py0, MANUAL_COVER_COLOURS[i])
+  }
 }
 
 // Table, memory estimate
@@ -1611,7 +2539,7 @@ export const TEXTURE_SPECS: Readonly<Record<TextureId, TextureSpec>> = Object.fr
   wallPanel: { id: 'wallPanel', width: 256, height: 256, filter: 'mipmap', wrap: 'repeat', seed: 115, draw: drawWallPanel },
   rugWoven: { id: 'rugWoven', width: 256, height: 256, filter: 'mipmap', wrap: 'clamp', seed: 116, draw: drawRugWoven },
   corkBoard: { id: 'corkBoard', width: 256, height: 256, filter: 'mipmap', wrap: 'clamp', seed: 117, draw: drawCorkBoard },
-  lampGlow: { id: 'lampGlow', width: 64, height: 64, filter: 'mipmap', wrap: 'clamp', seed: 118, draw: drawLampGlow },
+  lampGlow: { id: 'lampGlow', width: 128, height: 128, filter: 'mipmap', wrap: 'clamp', seed: 118, draw: drawLampGlow },
   smpteBars: { id: 'smpteBars', width: 256, height: 128, filter: 'nearest', wrap: 'clamp', seed: 119, draw: drawSmpteBars },
   timecode: { id: 'timecode', width: 128, height: 32, filter: 'nearest', wrap: 'clamp', seed: 121, draw: drawTimecode },
   couchFabric: { id: 'couchFabric', width: 256, height: 256, filter: 'mipmap', wrap: 'repeat', seed: 126, draw: drawCouchFabric },
@@ -1621,6 +2549,8 @@ export const TEXTURE_SPECS: Readonly<Record<TextureId, TextureSpec>> = Object.fr
   vhsShell: { id: 'vhsShell', width: 128, height: 128, filter: 'mipmap', wrap: 'clamp', seed: 130, draw: drawVhsShell },
   metalCabinet: { id: 'metalCabinet', width: 256, height: 256, filter: 'mipmap', wrap: 'repeat', seed: 131, draw: drawMetalCabinet },
   deskDetail: { id: 'deskDetail', width: 128, height: 64, filter: 'mipmap', wrap: 'repeat', seed: 132, draw: drawDeskDetail },
+  coneFalloff: { id: 'coneFalloff', width: 64, height: 64, filter: 'linear', wrap: 'clamp', seed: 133, draw: drawConeFalloff },
+  cabinetAndManualDetail: { id: 'cabinetAndManualDetail', width: CABINET_DETAIL_WIDTH, height: CABINET_DETAIL_HEIGHT, filter: 'mipmap', wrap: 'clamp', seed: 134, draw: drawCabinetAndManualDetail },
 })
 
 export const TEXTURE_IDS = Object.keys(TEXTURE_SPECS) as TextureId[]

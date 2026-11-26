@@ -9,7 +9,11 @@ import {
   PALETTE_SHIFTED,
   blendPalette,
 } from '../logic/palette'
+import { LAMP_LIGHT_FACTOR_TABLE, type LampLightFactors } from './lampCoupling'
 import { WALL_TEXTURE_ALBEDO } from './proceduralTextures'
+
+/** Factors for both lamps ON: exactly 1, so the default look is unchanged. */
+const NEUTRAL_LAMP_FACTORS: LampLightFactors = LAMP_LIGHT_FACTOR_TABLE[2]
 
 /**
  * Authored colors of the materials that the shift tints.
@@ -121,6 +125,8 @@ export interface ShiftTargets {
     light: { color: ColorLike; intensity: number }
     baseColor: string
     baseIntensity: number
+    /** True for the west-light: its intensity is multiplied by the lamp factor (task 24.1). */
+    lampCoupled?: boolean
   }>
   wall: { color: ColorLike }
   screens: Array<{ material: { color: ColorLike }; baseColor: string }>
@@ -162,8 +168,12 @@ export function overlayVisible(t: number): boolean {
   return clamp01(t) > 0
 }
 
-/** Writes the look for progress `t` into the targets. Ambient intensity never drops below the floor. */
-export function applyShift(t: number, targets: ShiftTargets): void {
+/**
+ * Writes the look for progress `t` into the targets. Ambient intensity never drops below the floor.
+ * `lamp` (task 24.1) multiplies the ambient and the lamp-coupled point light AFTER the blend. Every write is
+ * computed from the authored bases and `t`, so repeated calls with the same arguments give the same result.
+ */
+export function applyShift(t: number, targets: ShiftTargets, lamp: LampLightFactors = NEUTRAL_LAMP_FACTORS): void {
   const k = clamp01(t)
   const p = blendPalette(PALETTE_NORMAL, PALETTE_SHIFTED, k)
 
@@ -175,11 +185,11 @@ export function applyShift(t: number, targets: ShiftTargets): void {
   }
   if (targets.ambient) {
     targets.ambient.color.set(p.ambient)
-    targets.ambient.intensity = Math.max(AMBIENT_INTENSITY_FLOOR, p.ambientIntensity)
+    targets.ambient.intensity = Math.max(AMBIENT_INTENSITY_FLOOR, p.ambientIntensity * lamp.ambient)
   }
   for (const pt of targets.points) {
     pt.light.color.set(mixHex(pt.baseColor, PALETTE_SHIFTED.lightColor, k * POINT_LIGHT_TINT))
-    pt.light.intensity = pt.baseIntensity * (1 + (POINT_LIGHT_SHIFTED_SCALE - 1) * k)
+    pt.light.intensity = pt.baseIntensity * (1 + (POINT_LIGHT_SHIFTED_SCALE - 1) * k) * (pt.lampCoupled ? lamp.west : 1)
   }
   targets.wall.color.set(mixHex(BASE_WALL_COLOR, wallShiftColor(), k))
   for (const s of targets.screens) {
