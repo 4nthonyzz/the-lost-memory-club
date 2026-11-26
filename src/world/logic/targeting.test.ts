@@ -387,7 +387,7 @@ describe('Club Archive Notice in the Arcade_Area (task 25.2)', () => {
   });
 });
 
-describe('record player on the north wall (task 33.1)', () => {
+describe('record player on the south-wall Hi-Fi table (tasks 33.1, 34.1)', () => {
   const cells = reachableCells(ROOM.start);
   const reachable = (x: number, z: number) => cells.some((c) => Math.abs(c.x - x) < 1e-6 && Math.abs(c.z - z) < 1e-6);
   const pick = (pos: { x: number; z: number }, yaw: number, defs: readonly InteractableDef[] = INTERACTABLE_DEFS) =>
@@ -395,32 +395,54 @@ describe('record player on the north wall (task 33.1)', () => {
   const label = (t: ReturnType<typeof pick>) => (t === null ? null : t.type === 'prop' ? t.prop.id : `station:${t.station.id}`);
   const def = INTERACTABLE_DEFS.find((d) => d.id === 'record-player')!;
   const body = ROOM.props.find((p) => p.id === 'record-player')!;
+  /** Yaw that looks from `from` toward `to` (yaw 0 looks toward -z). */
+  const yawToward = (from: { x: number; z: number }, to: { x: number; z: number }) => Math.atan2(-(to.x - from.x), -(to.z - from.z));
 
-  it('is a turntable interactable on the middle of the solid console front face, range 2.2, excluding only its own footprint', () => {
+  it('is a turntable interactable on the middle of the solid table front face (z = box.minZ, facing -z), range 2.2, excluding only its own footprint', () => {
     expect(def.kind).toBe('turntable');
     expect(def.range).toBe(2.2);
     expect(def.requiresShift).toBeUndefined();
-    expect(def.anchor).toEqual({ x: (body.box.minX + body.box.maxX) / 2, z: body.box.maxZ });
+    expect(body.facing).toBe('-z');
+    expect(def.anchor).toEqual({ x: (body.box.minX + body.box.maxX) / 2, z: body.box.minZ });
+    expect(def.anchor).toEqual({ x: -1.475, z: 3.55 });
     expect(def.collider).toBe(body.box);
     expect(COLLIDERS).toContain(body.box);
     expect(STATION_DEFS.some((s) => (s.id as string) === def.id)).toBe(false);
   });
 
   it.each([
-    [{ x: 2.6, z: -2.8 }, 0.75],
-    [{ x: 2.6, z: -2.0 }, 1.55],
-    [{ x: 2.6, z: -1.6 }, 1.95],
+    [{ x: -1.5, z: 2.6 }, 0.95],
+    [{ x: -2, z: 2.1 }, 1.54],
+    [{ x: -2.1, z: 1.6 }, 2.05],
   ] as const)('is selected from the reachable cell %j in front of it (%s m)', (pos, _distance) => {
     expect(reachable(pos.x, pos.z)).toBe(true);
     expect(Math.hypot(def.anchor.x - pos.x, def.anchor.z - pos.z)).toBeLessThanOrEqual(2.2);
-    expect(label(pick(pos, 0))).toBe('record-player');
+    expect(label(pick(pos, yawToward(pos, def.anchor)))).toBe('record-player');
   });
 
-  it('is not selected beyond 2.2 m or when looking away', () => {
-    expect(reachable(2.6, -1.2)).toBe(true);
-    expect(Math.hypot(def.anchor.x - 2.6, def.anchor.z + 1.2)).toBeGreaterThan(2.2);
-    expect(label(pick({ x: 2.6, z: -1.2 }, 0))).not.toBe('record-player');
-    expect(label(pick({ x: 2.6, z: -2.8 }, Math.PI))).not.toBe('record-player');
+  it('is also selected when aiming at the crate end of the table: the line-of-sight box is the whole 1.25 m table, crate end included', () => {
+    // The crate stands on the west (couch side) end of the table: world x about -2.09..-1.75. Both end points lie inside the Collider box.
+    const crateEnd = { x: -2.0, z: 3.8 };
+    expect(crateEnd.x).toBeGreaterThan(body.box.minX);
+    expect(crateEnd.x).toBeLessThan(body.box.maxX);
+    expect(crateEnd.z).toBeGreaterThan(body.box.minZ);
+    expect(crateEnd.z).toBeLessThan(body.box.maxZ);
+    const pos = { x: -1.7, z: 2.4 };
+    expect(reachable(pos.x, pos.z)).toBe(true);
+    expect(label(pick(pos, yawToward(pos, crateEnd)))).toBe('record-player');
+    // The far (east) end of the table as well.
+    const eastEnd = { x: -0.95, z: 3.8 };
+    expect(label(pick({ x: -1.2, z: 2.4 }, yawToward({ x: -1.2, z: 2.4 }, eastEnd)))).toBe('record-player');
+  });
+
+  it('is not selected beyond 2.2 m, when looking away, or from its old north-wall spot', () => {
+    expect(reachable(-3, 1)).toBe(true);
+    expect(Math.hypot(def.anchor.x + 3, def.anchor.z - 1)).toBeGreaterThan(2.2);
+    expect(label(pick({ x: -3, z: 1 }, yawToward({ x: -3, z: 1 }, def.anchor)))).not.toBe('record-player');
+    expect(label(pick({ x: -1.7, z: 2.4 }, 0))).not.toBe('record-player');
+    // The old spot (x 2.2..3.1, z -4..-3.55) no longer offers the record player.
+    expect(reachable(2.6, -2.8)).toBe(true);
+    expect(label(pick({ x: 2.6, z: -2.8 }, 0))).not.toBe('record-player');
   });
 
   it('leaves every Station and every other prop target at its existing test cells unchanged', () => {

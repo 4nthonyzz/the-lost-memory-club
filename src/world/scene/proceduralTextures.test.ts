@@ -1304,18 +1304,27 @@ describe('task 29.2: animated attract screens (pure frame renderers)', () => {
   })
 
   it('keeps every draw coordinate inside the canvas and keeps the titles on every sampled frame', () => {
+    // Same coverage as before: 3 screens x 80 time points = 240 frames. Violations are collected in one
+    // pass and asserted once, instead of one expect (with a formatted message) per draw call.
+    const BOUNDED = new Set(['fillRect', 'strokeRect', 'moveTo', 'lineTo', 'arc', 'fillText'])
+    const violations: string[] = []
+    let frames = 0
     for (const id of ATTRACT_IDS) {
       for (const t of SAMPLE_TIMES) {
+        frames++
         const ctx = frameLog(id, t)
         for (const call of ctx.calls) {
-          if (!['fillRect', 'strokeRect', 'moveTo', 'lineTo', 'arc', 'fillText'].includes(call.op)) continue
+          if (!BOUNDED.has(call.op)) continue
           const nums = (call.op === 'fillText' ? call.args.slice(1) : call.args.slice(0, 2)) as number[]
-          expect(nums[0] >= 0 && nums[0] <= 256 && nums[1] >= 0 && nums[1] <= 256, `${id} t=${t} ${call.op} ${nums}`).toBe(true)
+          if (!(nums[0] >= 0 && nums[0] <= 256 && nums[1] >= 0 && nums[1] <= 256)) violations.push(`${id} t=${t} ${call.op} ${nums}`)
         }
-        expect(ctx.texts(), `${id} t=${t}`).toEqual(expect.arrayContaining(TITLES[id]))
+        const texts = new Set(ctx.texts())
+        for (const title of TITLES[id]) if (!texts.has(title)) violations.push(`${id} t=${t} missing title ${title}`)
       }
     }
-  })
+    expect(frames).toBe(ATTRACT_IDS.length * SAMPLE_TIMES.length)
+    expect(violations).toEqual([])
+  }, 30000)
 
   it('the frame functions use no Math.random, Date or performance clock', () => {
     const sources = import.meta.glob('./proceduralTextures.ts', { query: '?raw', import: 'default', eager: true }) as Record<string, string>

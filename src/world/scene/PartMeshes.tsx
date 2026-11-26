@@ -7,10 +7,17 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 import { Color, Object3D, type BufferGeometry, type InstancedMesh } from 'three'
 import { instanceColour, isRealSizePart, partGroupKey, type BookInstance, type Part } from './modelDetail'
 import { FABRIC_METRES_PER_REPEAT } from './proceduralTextures'
-import { atlasBoxGeometry, cassetteBoxGeometry, ensureSharedTextures, geometries, manualGeometries, materials, metricBoxGeometry, openBottomBoxGeometry, spineGeometries, woodBoxGeometry } from './sharedResources'
+import { removedFaces } from './floorCull'
+import { atlasBoxGeometry, cassetteBoxGeometry, culledBoxGeometry, ensureSharedTextures, geometries, manualGeometries, materials, metricBoxGeometry, spineGeometries, woodBoxGeometry } from './sharedResources'
 
-/** Metric wood boards use a cached real-size geometry and unit mesh scale; every other part scales the unit geometry. */
-const geometryOf = (p: Part): BufferGeometry => (p.openBottom ? openBottomBoxGeometry(fullGeometryOf(p)) : fullGeometryOf(p))
+/**
+ * Metric wood boards use a cached real-size geometry and unit mesh scale; every other part scales the unit geometry. Parts with hidden faces
+ * (the floor-flush bottom of 33.1, the wall-flush faces of 34.1) use the cached variant of that geometry without those faces.
+ */
+const geometryOf = (p: Part): BufferGeometry => {
+  const faces = removedFaces(p)
+  return faces.length ? culledBoxGeometry(fullGeometryOf(p), faces) : fullGeometryOf(p)
+}
 
 const fullGeometryOf = (p: Part): BufferGeometry =>
   p.cassette

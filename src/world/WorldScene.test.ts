@@ -10,6 +10,8 @@ const h = vi.hoisted(() => ({
   target: null as TargetId | null,
   setTarget: null as ((id: TargetId | null) => void) | null,
   heldKeysRef: null as { current: { roles: ReadonlySet<string> } } | null,
+  // Last props the (mocked) Props component rendered with (task 34.2).
+  propsArgs: null as { turntablePlaying?: boolean; turntableTrack?: number } | null,
 }));
 
 vi.mock('./scene/WorldCanvas', () => ({
@@ -19,7 +21,12 @@ vi.mock('./scene/WorldCanvas', () => ({
 vi.mock('./controller/useFrameSampler', () => ({ FrameSamplerHost: () => null }));
 vi.mock('./scene/Lighting', () => ({ Lighting: () => null }));
 vi.mock('./scene/Effects', () => ({ Effects: () => null }));
-vi.mock('./scene/Props', () => ({ Props: () => null }));
+vi.mock('./scene/Props', () => ({
+  Props: (p: { turntablePlaying?: boolean; turntableTrack?: number }) => {
+    h.propsArgs = { turntablePlaying: p.turntablePlaying, turntableTrack: p.turntableTrack };
+    return null;
+  },
+}));
 vi.mock('./scene/Room', () => ({ Room: () => null }));
 vi.mock('./scene/Stations', () => ({ Stations: () => null }));
 vi.mock('@react-three/fiber', () => {
@@ -1167,6 +1174,33 @@ describe('WorldScene turntable catalog card (task 33.3)', () => {
     track = 4; // stopped
     renderWorld();
     expect(prompt()).toBe('Press E to use 1990s Turntable');
+  });
+
+  it('passes the selected track to Props as turntableTrack (task 34.2): keys, row click, persistence, and the pre-unlock selection', () => {
+    const { wrapper } = open();
+    expect(h.propsArgs).toEqual({ turntablePlaying: true, turntableTrack: 0 });
+    key(wrapper, 'Digit3');
+    expect(h.propsArgs).toEqual({ turntablePlaying: true, turntableTrack: 2 });
+    key(wrapper, 'Digit5');
+    expect(h.propsArgs).toEqual({ turntablePlaying: false, turntableTrack: 4 }); // STOP: neutral jacket, not playing
+    fireEvent.mouseDown(rows()[1]);
+    fireEvent.click(rows()[1]);
+    expect(h.propsArgs).toEqual({ turntablePlaying: true, turntableTrack: 1 });
+    // Close and reopen: the selection persists and the card shows the same active row.
+    pressE(wrapper);
+    expect(card()).toBeNull();
+    expect(h.propsArgs?.turntableTrack).toBe(1);
+    pressE(wrapper);
+    expect(activeRow()).toBe(1);
+    expect(h.propsArgs?.turntableTrack).toBe(1);
+    expect(prompt()).toContain('Now playing: 02 // NEON ARCADE LOBBY (1996)');
+  });
+
+  it('shows the selected track on the jacket before audio is unlocked while the playing flag stays false', () => {
+    unlocked = false;
+    track = 2;
+    renderWorld();
+    expect(h.propsArgs).toEqual({ turntablePlaying: false, turntableTrack: 2 });
   });
 
   it('keeps every other prompt unchanged', () => {

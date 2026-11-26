@@ -16,6 +16,7 @@ import {
   consoleTapeParts,
   crtTelevisionParts,
   filingCabinetParts,
+  propBackAgainstWall,
   mediaConsoleParts,
   referenceMonitorParts,
   vcrDeckParts,
@@ -75,8 +76,8 @@ export function MediaConsole({ box }: { box: Aabb }) {
 }
 
 /** Metal filing cabinet with recessed drawers, pulls and label slots (task 18.3). `variant` picks the grey. */
-export function FilingCabinet({ box, height, variant = 0 }: BoxHeightProps & { variant?: number }) {
-  const parts = useMemo(() => filingCabinetParts(box, height, variant), [box, height, variant])
+export function FilingCabinet({ box, height, variant = 0, wallBack = false }: BoxHeightProps & { variant?: number; wallBack?: boolean }) {
+  const parts = useMemo(() => filingCabinetParts(box, height, variant, wallBack), [box, height, variant, wallBack])
   return <PartMeshes parts={parts} />
 }
 
@@ -149,7 +150,7 @@ export function Stations() {
       {/* North wall focal zone placeholders (18.3 adds detail and the cork texture). */}
       {[cabinetA, cabinetB].map((c, i) => (
         <Faced key={c.id} box={c.box} facing={c.facing}>
-          {(local) => <FilingCabinet box={local} height={c.height} variant={i} />}
+          {(local) => <FilingCabinet box={local} height={c.height} variant={i} wallBack={propBackAgainstWall(c.id)} />}
         </Faced>
       ))}
       <BulletinBoard />

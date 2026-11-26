@@ -138,12 +138,15 @@ const ARCADE_FREQUENCY = prop('arcade-frequency', 'station', box(8.4, 9.2, 0.7, 
 const CRT_STACK = prop('crt-stack', 'furniture', box(4.3, 4.9, -3.2, -2.6), 1.0, 3, true, undefined, { facing: '-x' });
 
 /**
- * Walnut audio console with a Hi-Fi turntable on top (task 33.1), 0.9 m x 0.45 m x 0.75 m, back against the north wall at
- * x 2.2..3.1, front toward +z. The spot is the free stretch of north wall between the poster-north / island zone (x <= 1.5, the island
- * is 1.45 m south of this box) and the archive boxes in the north-east corner (x >= 4.1). It is 3.1 m from the east wall, so it
- * touches no doorway lane, and far from the west bookcases, the spawn disc (3.0 m from the spawn) and the island walkways.
+ * Hi-Fi listening table with the turntable, a record crate and a NOW PLAYING jacket stand (task 34.1; the walnut console of 33.1 moved here
+ * from the north wall at x 2.2..3.1). It is 1.25 m x 0.45 m, back against the south wall (z 4) at x -2.1..-0.85, front toward -z (into the room),
+ * directly east of the couch (couch x -3.9..-2.1, z 2.6..3.4; the table starts at the couch's east edge, 0.15 m further back). The prop height 0.95 m is
+ * the top of the LP sleeves; the table top is 0.62 m and the turntable 0.75 m. The table-top centre is about 4.1 m (3D) from the west light at
+ * (x -2.6, y 2.3, z 0.2), well inside its 8.5 m range, and 4.7 m from the CRT light. The 1.0125 m distance from the spawn clears the 0.99 m spawn
+ * disc, and the table touches no doorway lane, island walkway or bookcase walkway. Candidates beside the couch facing +x, in front of the couch and
+ * in the south-west corner were rejected (see task 34.1 notes): they block couch access, a tested reachable cell, or lose the wall-flush back faces.
  */
-const RECORD_PLAYER = prop('record-player', 'furniture', box(2.2, 3.1, -4, -3.55), 0.75, 3, true, undefined, { facing: '+z' });
+const RECORD_PLAYER = prop('record-player', 'furniture', box(-2.1, -0.85, 3.55, 4), 0.95, 3, true, undefined, { facing: '-z' });
 
 const CHAIR = prop('abandoned-chair', 'furniture', box(2.9, 3.5, 1.9, 2.5), 0.9, 3);
 const COUCH = prop('couch', 'furniture', box(-3.9, -2.1, 2.6, 3.4), 0.9, 3);
@@ -347,16 +350,17 @@ function noteDefs(): InteractableDef[] {
 }
 
 /**
- * Task 33.1: the record player. The anchor sits on the middle of its front (+z) face, so the player stands in the open floor in front
- * of the console. The console is solid; its own footprint is excluded from its line-of-sight test, like every other prop that sits on
- * a Collider. Not a Station: it never reaches onInspect.
+ * Tasks 33.1 and 34.1: the record player. The anchor sits on the middle of its front face (the south-wall table faces -z, so the front face is
+ * z = box.minZ), so the player stands in the open floor in front of the table. The table is solid and its whole footprint (the crate end
+ * included) is the line-of-sight box; its own footprint is excluded from its line-of-sight test, like every other prop that sits on a
+ * Collider. Not a Station: it never reaches onInspect.
  */
 function recordPlayerDef(): InteractableDef {
   const b = RECORD_PLAYER.box;
   return Object.freeze({
     id: 'record-player' as const,
     kind: 'turntable' as const,
-    anchor: Object.freeze({ x: (b.minX + b.maxX) / 2, z: b.maxZ }),
+    anchor: Object.freeze({ x: (b.minX + b.maxX) / 2, z: RECORD_PLAYER.facing === '+z' ? b.maxZ : b.minZ }),
     collider: b,
     range: PROP_INTERACTION_RANGE,
     height: 0.85,

@@ -169,6 +169,20 @@ const arcadeGlowMaterial = (color: string) =>
     polygonOffsetUnits: -2,
   })
 
+/** Task 34.1: warm additive tabletop glow (lampGlow map when a canvas exists), no depth write, pulled toward the camera by a polygon offset. */
+export const HIFI_GLOW_OPACITY = Object.freeze({ on: 0.25, off: 0.07 })
+const hifiGlowMaterial = (opacity: number) =>
+  new MeshBasicMaterial({
+    color: '#ffa63c',
+    transparent: true,
+    opacity,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  })
+
 export const materials = {
   floor: lambert('#3a3340'),
   wall: lambert(BASE_WALL_COLOR),
@@ -361,6 +375,21 @@ export const materials = {
   recordLabel: lambert('#d2542f'),
   trackDisplay: new MeshBasicMaterial({ color: '#ffb347' }),
   trackDisplayOn: new MeshBasicMaterial({ color: '#3ddc97' }),
+  /**
+   * 34.1 Hi-Fi table. Flat colours only, no new texture. The four LP sleeves and the NOW PLAYING jacket share these materials (the jacket of track n uses
+   * the sleeve material of the same colour, so the two merge into one draw call); sleeveNeutral is the dark grey of the STOP state. The front LED
+   * accent bar is a warm amber MeshBasicMaterial pair (bright while playing, dim while stopped), and the tabletop glow is an additive lampGlow pair
+   * (dimmer while stopped). All are swapped per mesh, never mutated.
+   */
+  sleeveGreen: lambert('#16a34a'),
+  sleeveRose: lambert('#e11d48'),
+  sleeveSky: lambert('#38bdf8'),
+  sleeveAmber: lambert('#f59e0b'),
+  sleeveNeutral: lambert('#3a3d46'),
+  hifiLedOn: new MeshBasicMaterial({ color: '#ffc15a' }),
+  hifiLedOff: new MeshBasicMaterial({ color: '#5c3912' }),
+  hifiGlowOn: hifiGlowMaterial(0.25),
+  hifiGlowOff: hifiGlowMaterial(0.07),
   /** Screens: tinted only by the Memory_Shift blend. They never read lock state. */
   crtScreen: new MeshBasicMaterial({ color: BASE_CRT_SCREEN_COLOR }),
   /** Per-cabinet screens: flat game colours are the no-canvas fallback; with a canvas the attract texture is attached and the base becomes white. Tinted by Memory_Shift. */
@@ -563,30 +592,45 @@ export function cassetteBoxGeometry(w: number, h: number, d: number): BoxGeometr
   return g
 }
 
-/** BoxGeometry face order is +x, -x, +y, -y, +z, -z, six indices per face: the -Y face owns indices 18..23. */
-const BOX_BOTTOM_INDEX_START = 18
+/** BoxGeometry face order is +x, -x, +y, -y, +z, -z, six indices per face (the -Y face owns indices 18..23). */
 const BOX_FACE_INDEX_COUNT = 6
-const openBottomCache = new Map<BufferGeometry, BufferGeometry>()
+/** Culled variants per source geometry, keyed by the removed face indices ('3' = the open bottom of 33.1). */
+const culledCache = new Map<BufferGeometry, Map<string, BufferGeometry>>()
 
 /**
  * Copy of a box geometry without its -Y face (task 33.1): used by floor-flush boxes whose bottom is never visible. The copy keeps every
  * UV of the source, so metric, atlas and cassette mappings are unchanged on the other five faces (10 triangles). Cached per source
  * geometry and disposed once by disposeSharedResources(). `source` must be a BoxGeometry (indexed, 12 triangles).
  */
-export function openBottomBoxGeometry(source: BufferGeometry): BufferGeometry {
-  const cached = openBottomCache.get(source)
+export const openBottomBoxGeometry = (source: BufferGeometry): BufferGeometry => culledBoxGeometry(source, [3])
+
+/**
+ * Copy of a box geometry without the given faces (task 34.1; generalises the open bottom of 33.1). `faces` are BoxGeometry face indices (+x 0, -x 1, +y 2,
+ * -y 3, +z 4, -z 5), each removing two triangles. The copy keeps every UV and vertex of the source, so metric, atlas and cassette mappings are unchanged
+ * on the remaining faces. Cached per (source geometry, removed faces) and disposed once by disposeSharedResources(). `source` must be a BoxGeometry.
+ */
+export function culledBoxGeometry(source: BufferGeometry, faces: readonly number[]): BufferGeometry {
+  const unique = [...new Set(faces)].sort((a, b) => a - b)
+  if (unique.some((f) => !Number.isInteger(f) || f < 0 || f > 5)) throw new Error('culledBoxGeometry: face index out of range')
+  const key = unique.join('.')
+  let perSource = culledCache.get(source)
+  const cached = perSource?.get(key)
   if (cached) return cached
   const index = source.getIndex()
-  if (!index || index.count !== 36) throw new Error('openBottomBoxGeometry needs an indexed 12-triangle box')
-  const kept = Array.from(index.array).filter((_, i) => i < BOX_BOTTOM_INDEX_START || i >= BOX_BOTTOM_INDEX_START + BOX_FACE_INDEX_COUNT)
+  if (!index || index.count !== 36) throw new Error('culledBoxGeometry needs an indexed 12-triangle box')
+  const kept = Array.from(index.array).filter((_, i) => !unique.includes(Math.floor(i / BOX_FACE_INDEX_COUNT)))
   const g = source.clone()
   g.setIndex(kept)
-  openBottomCache.set(source, g)
+  if (!perSource) {
+    perSource = new Map()
+    culledCache.set(source, perSource)
+  }
+  perSource.set(key, g)
   return g
 }
 
-/** Number of live cached open-bottom box geometries (tests and reports). */
-export const openBottomBoxCount = (): number => openBottomCache.size
+/** Number of live cached culled box geometries, open-bottom ones included (tests and reports). */
+export const openBottomBoxCount = (): number => [...culledCache.values()].reduce((n, m) => n + m.size, 0)
 
 /** Number of live cached cassette geometries (tests and reports). */
 export const cassetteBoxCount = (): number => [...woodBoxCache.keys()].filter((k) => k.startsWith('cassette|')).length
@@ -795,6 +839,8 @@ const TEXTURE_BINDINGS: readonly TextureBinding[] = [
   { material: 'arcadeGlowSnake', texture: 'lampGlow', color: '#22c55e' },
   { material: 'arcadeGlowMaze', texture: 'lampGlow', color: '#e11d48' },
   { material: 'arcadeGlowFrequency', texture: 'lampGlow', color: '#f59e0b' },
+  { material: 'hifiGlowOn', texture: 'lampGlow', color: '#ffa63c' },
+  { material: 'hifiGlowOff', texture: 'lampGlow', color: '#ffa63c' },
   /** Slightly dimmed multiplier: the reference card stays below the main CRT's brightness. */
   { material: 'smpteScreen', texture: 'smpteBars', color: '#b8b8b8' },
   { material: 'timecode', texture: 'timecode', color: '#ffffff' },
@@ -855,8 +901,8 @@ export function disposeSharedResources(): void {
   wallGeometryCache.clear()
   for (const g of woodBoxCache.values()) g.dispose()
   woodBoxCache.clear()
-  for (const g of openBottomCache.values()) g.dispose()
-  openBottomCache.clear()
+  for (const m of culledCache.values()) for (const g of m.values()) g.dispose()
+  culledCache.clear()
   for (const m of Object.values(materials)) m.dispose()
   disposeTextures()
 }

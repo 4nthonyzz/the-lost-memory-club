@@ -323,7 +323,7 @@ function WorldInteractive({
       <WorldCanvas frameloop={input.mode === 'inspecting' ? 'demand' : 'always'}>
         <Lighting memoryShifted={memoryShifted} lampsOn={countLampsOn(propState.lampOn, DESK_LAMPS.map((l) => l.id))} />
         <Room />
-        <Props lampOn={propState.lampOn} turntablePlaying={audioTrack.playing} />
+        <Props lampOn={propState.lampOn} turntablePlaying={audioTrack.playing} turntableTrack={audioTrack.track} />
         <Stations />
         <Effects active={input.mode !== 'inspecting'} onAudioTick={onAudioTick} />
         <FrameSamplerHost />

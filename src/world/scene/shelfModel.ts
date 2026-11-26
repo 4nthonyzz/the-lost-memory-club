@@ -5,7 +5,7 @@
  */
 import { MANUAL_PLACEMENT, ROOM } from '../layout/roomLayout'
 import type { Aabb, ManualId } from '../worldTypes'
-import { cullFloorBottoms } from './floorCull'
+import { cullFloorBottoms, cullWallFlush } from './floorCull'
 import type { MaterialKey, Part, Vec3 } from './modelDetail'
 import { MANUAL_COVER_COLOURS, SPINE_BOOK_VARIANTS, SPINE_CASE_VARIANTS } from './proceduralTextures'
 
@@ -221,7 +221,8 @@ export function shelfFrameParts(box: Aabb, height: number): Part[] {
     p('woodDark', 0, bodyTop + 0.055, 0, len, 0.04, depth),
     p('wood', 0, bodyTop + 0.0925, 0, len - 0.04, 0.035, depth - 0.04),
   )
-  return cullFloorBottoms(parts)
+  // Task 34.1: the base moulding, both side panels, the fillet and the crown start exactly on the wall plane; those back faces point into the wall.
+  return cullWallFlush(cullFloorBottoms(parts), ROOM.walls, ROOM.height)
 }
 
 // ---------------------------------------------------------------------------------------------

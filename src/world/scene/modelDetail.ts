@@ -23,7 +23,7 @@ import {
   totalTextureMemoryBytes,
   type UvRect,
 } from './proceduralTextures'
-import { OPEN_BOTTOM_SAVED_TRIANGLES, cullFloorBottoms } from './floorCull'
+import { CULLED_FACE_SAVED_TRIANGLES, OPEN_BOTTOM_SAVED_TRIANGLES, backAgainstWall, cullFloorBottoms, cullLocalBack, cullWallFlush, removedFacesKey } from './floorCull'
 import { SHELF_IDS, shelfContents, shelfFrameParts } from './shelfModel'
 import type { geometries, materials } from './sharedResources'
 
@@ -94,6 +94,13 @@ export interface Part {
    * as one arm pose, `static` parts never move. Lets Props.tsx and task 33.3 address each group separately.
    */
   turntableGroup?: 'static' | 'platter' | 'tonearm'
+  /**
+   * Wall-flush box (task 34.1): BoxGeometry face indices (+x 0, -x 1, +y 2, -y 3, +z 4, -z 5) that lie exactly on a wall plane (within 1 mm) and
+   * point into the wall, so they are never visible. The renderer uses a cached geometry without them (2 triangles less per face).
+   */
+  culledFaces?: readonly number[]
+  /** Hi-Fi table role (task 34.1): lets Props.tsx skip the additive glow disc when the glow texture is missing and tests find each piece. */
+  hifiRole?: 'crate' | 'sleeve' | 'stand' | 'jacket' | 'led' | 'glow'
 }
 
 /** True when the part is rendered from a cached real-size geometry (mesh scale 1). */
@@ -101,7 +108,7 @@ export const isRealSizePart = (p: Part): boolean => Boolean(p.metric || p.metric
 
 /** Draw-call group of a part: geometry + material, plus the board size and the UV mapping for metric parts. */
 export function partGroupKey(p: Part): string {
-  const ob = p.openBottom ? '|open' : ''
+  const ob = (p.openBottom ? '|open' : '') + (p.culledFaces && p.culledFaces.length ? `|cf${removedFacesKey(p)}` : '')
   if (!isRealSizePart(p)) return `${p.geo}|${p.mat}${ob}`
   const size = p.scale.map((v) => Math.round(v * 1e4)).join(',')
   const aspect = p.metricAspect && p.metricAspect !== 1 ? `|a${p.metricAspect}` : ''
@@ -406,7 +413,7 @@ export const FILING_DRAWERS = 4
  * outline, a round-bar pull on two posts, a bright label slot and a paper label with an ink line.
  * `variant` 1 uses a warmer grey, so two cabinets side by side do not look identical.
  */
-export function filingCabinetParts(box: Aabb, height: number, variant = 0): Part[] {
+export function filingCabinetParts(box: Aabb, height: number, variant = 0, wallBack = false): Part[] {
   const { cx, cz, w, d } = centre(box)
   const f = box.maxZ
   const body: MaterialKey = variant === 0 ? 'filingGrey' : 'filingGreyB'
@@ -465,7 +472,8 @@ export function filingCabinetParts(box: Aabb, height: number, variant = 0): Part
       bx('metal', [cx + 0.07, y - fh * 0.14, f + 0.018], [0.012, 0.012, 0.028]),
     )
   }
-  return cullFloorBottoms(parts)
+  // Task 34.1: with the back on a wall plane (z -4 for both north cabinets) the local back face of the body is never visible.
+  return cullFloorBottoms(wallBack ? cullLocalBack(parts, box.minZ) : parts)
 }
 
 /**
@@ -581,7 +589,8 @@ export function conduitParts(): Part[] {
   for (const x of [-4, -2, 0, 2, 4]) parts.push(bx('metal', [x, CONDUIT_Y, r.minZ + 0.045], [0.04, 0.09, 0.07]))
   for (const z of [-3, -1, 1, 3]) parts.push(bx('metal', [r.minX + 0.045, CONDUIT_Y, z], [0.07, 0.09, 0.04]))
   for (const y of [2.5, 2.15]) parts.push(bx('metal', [CONDUIT_DROP_X, y, r.minZ + 0.045], [0.09, 0.04, 0.07]))
-  return parts
+  // Task 34.1: the junction box stands exactly on the north wall plane; its back face points into the wall.
+  return cullWallFlush(parts, ROOM.walls, ROOM.height)
 }
 
 /** Ceiling ventilation grille (louvred box using the grille texture) and a smaller high wall grille on the south wall. */
@@ -603,7 +612,8 @@ export function ventilationParts(): Part[] {
     bx('metal', [wx, wy, r.maxZ - 0.02], [0.7, 0.4, 0.04]),
     bx('grille', [wx, wy, r.maxZ - 0.05], [0.6, 0.3, 0.02]),
   )
-  return parts
+  // Task 34.1: the metal frame of the high wall grille starts exactly on the south wall plane; its back face points into the wall.
+  return cullWallFlush(parts, ROOM.walls, ROOM.height)
 }
 
 const CABLE_THICK = 0.025
@@ -650,12 +660,17 @@ export function cornerPostParts(): Part[] {
   const y0 = SKIRT_H
   const y1 = ROOM.height - CROWN_H
   const post = 0.1
-  return [
-    [r.minX + post / 2, r.minZ + post / 2],
-    [r.maxX - post / 2, r.minZ + post / 2],
-    [r.minX + post / 2, r.maxZ - post / 2],
-    [r.maxX - post / 2, r.maxZ - post / 2],
-  ].map(([x, z]) => bx('trim', [x, (y0 + y1) / 2, z], [post, y1 - y0, post]))
+  // Task 34.1: each post stands in a corner with two faces exactly on the wall planes; those faces point into the walls and are culled.
+  return cullWallFlush(
+    [
+      [r.minX + post / 2, r.minZ + post / 2],
+      [r.maxX - post / 2, r.minZ + post / 2],
+      [r.minX + post / 2, r.maxZ - post / 2],
+      [r.maxX - post / 2, r.maxZ - post / 2],
+    ].map(([x, z]) => bx('trim', [x, (y0 + y1) / 2, z], [post, y1 - y0, post])),
+    ROOM.walls,
+    ROOM.height,
+  )
 }
 
 /** Round wall clock high on the south wall above shelf-c, facing -Z. 0.05 m deep. */
@@ -1435,14 +1450,10 @@ export function turntableStylusXZ(box: Aabb, state: TurntableState): readonly [n
  * `static` and `tonearm` parts are in world coordinates. `turntableParts` merges them into world coordinates for counting and tests.
  */
 export function turntableGroups(box: Aabb, state: TurntableState = { playing: false }) {
-  const L = turntableLayout(box)
-  const { cx, cz, pz, w, d } = L
+  const asm = turntableAssembly(box, state)
   const tag = (g: NonNullable<Part['turntableGroup']>, parts: Part[]): Part[] => parts.map((p) => ({ ...p, turntableGroup: g }))
+  const { cx, cz, w, d } = asm.L
   const top = TURNTABLE_CABINET_TOP
-  const plinthW = w - 0.06
-  const plinthD = d - 0.05
-  const plinthY0 = top + TT_FOOT_H
-  const deckY = TURNTABLE_DECK_Y
 
   // Walnut console: kick plinth, two side panels, back, top slab, a middle shelf and four LP sleeves in the lower bay.
   const cabinet: Part[] = [
@@ -1457,6 +1468,29 @@ export function turntableGroups(box: Aabb, state: TurntableState = { playing: fa
   sleeveMats.forEach((m, i) =>
     cabinet.push(bx(m, [box.minX + 0.06 + i * 0.022, 0.215, box.minZ + 0.185], [0.018, 0.31, 0.31], i === 3 ? [0, 0, 0.14] : undefined)),
   )
+
+  return {
+    static: tag('static', cullFloorBottoms([...cabinet, ...asm.feet, ...asm.controls, asm.cradle])),
+    platter: tag('platter', asm.platter),
+    tonearm: tag('tonearm', asm.tonearm),
+    spindle: asm.L.spindle,
+    pivot: asm.L.pivot,
+  }
+}
+
+/**
+ * The turntable assembly on top of a console or table top at `TURNTABLE_CABINET_TOP` (task 34.1 split it out of `turntableGroups` unchanged): isolation feet,
+ * plinth, brushed steel deck, display, pitch slider and power button, cradle, tonearm in its pose and the 24-segment platter group (local to the spindle).
+ * `box` is the footprint the assembly is sized to (the whole console in 33.1, the left 0.9 m of the Hi-Fi table in 34.1). Parts are untagged.
+ */
+function turntableAssembly(box: Aabb, state: TurntableState) {
+  const L = turntableLayout(box)
+  const { cx, pz, w, d } = L
+  const top = TURNTABLE_CABINET_TOP
+  const plinthW = w - 0.06
+  const plinthD = d - 0.05
+  const plinthY0 = top + TT_FOOT_H
+  const deckY = TURNTABLE_DECK_Y
 
   // Isolation feet, plinth, deck plate and controls.
   const feet = ([-1, 1] as const).flatMap((sx) =>
@@ -1500,19 +1534,168 @@ export function turntableGroups(box: Aabb, state: TurntableState = { playing: fa
     part('cylinderLow', 'metal', [0, TT_RECORD_T + 0.01, 0], [0.006, 0.016, 0.006]),
   ]
 
-  return {
-    static: tag('static', cullFloorBottoms([...cabinet, ...feet, ...controls, cradle])),
-    platter: tag('platter', platter),
-    tonearm: tag('tonearm', tonearm),
-    spindle: L.spindle,
-    pivot: L.pivot,
-  }
+  return { L, feet, controls, cradle, platter, tonearm }
 }
 
 /** Whole record player in world coordinates (platter at rest, angle 0). `box` is the console footprint, front at +z. */
 export function turntableParts(box: Aabb, state: TurntableState = { playing: false }): Part[] {
   const g = turntableGroups(box, state)
   return [...g.static, ...offset(g.platter, g.spindle), ...g.tonearm]
+}
+
+// ---------------------------------------------------------------------------------------------
+// Hi-Fi listening table (task 34.1): the turntable assembly on the left, a wooden record crate with four LP sleeves on the right, an angled
+// NOW PLAYING jacket stand in front of the crate, a warm LED accent bar on the front edge and an additive glow disc on the table top.
+// Parts are built in the prop-local frame (footprint centred on the origin, front toward +z) and placed with Faced, like the arcade cabinets.
+// ---------------------------------------------------------------------------------------------
+
+export interface HifiState extends TurntableState {
+  /** Selected catalog track: 0..3 are the four records, anything else (4 = STOP, or none yet) shows the neutral jacket. */
+  track: number
+}
+
+/** The four record colours (#16a34a, #e11d48, #38bdf8, #f59e0b) in catalog order, and the neutral jacket for STOP. */
+export const NOW_PLAYING_COLOURS = Object.freeze(['#16a34a', '#e11d48', '#38bdf8', '#f59e0b'] as const)
+export const NOW_PLAYING_NEUTRAL = '#3a3d46'
+export const HIFI_SLEEVE_MATERIALS = Object.freeze(['sleeveGreen', 'sleeveRose', 'sleeveSky', 'sleeveAmber'] as const)
+
+const isRecordTrack = (track: number): boolean => Number.isInteger(track) && track >= 0 && track < NOW_PLAYING_COLOURS.length
+
+/** Colour of the NOW PLAYING jacket: the track colour for tracks 0..3, a neutral dark grey for STOP (4) and for anything else. */
+export function nowPlayingColour(track: number): string {
+  return isRecordTrack(track) ? NOW_PLAYING_COLOURS[track] : NOW_PLAYING_NEUTRAL
+}
+
+/** Shared flat-colour material of the jacket for a track (the same material as the crate sleeve of that colour, so they share a draw call). */
+export function nowPlayingMaterial(track: number): MaterialKey {
+  return isRecordTrack(track) ? HIFI_SLEEVE_MATERIALS[track] : 'sleeveNeutral'
+}
+
+export const HIFI_TABLE_W = 1.25
+export const HIFI_TABLE_D = 0.45
+/** Width of the left section the turntable assembly is sized to (the 33.1 console width). */
+export const HIFI_TURNTABLE_SECTION_W = 0.9
+/** The top slab stops this far short of the front of the side panels, so the LED bar sits inside the footprint. */
+const HIFI_SLAB_FRONT_INSET = 0.012
+export const HIFI_CRATE = Object.freeze({ w: 0.34, d: 0.13, wallH: 0.1, backH: 0.14, edgeGap: 0.015, backGap: 0.03 })
+/** 12-inch LP sleeve: 0.31 m square, 4 mm thin. Lean angles (about x, negative = top toward the back wall) fan the four sleeves. */
+export const HIFI_SLEEVE = Object.freeze({ size: 0.31, thickness: 0.004, lean: [-0.18, -0.12, -0.06, 0] as readonly number[], firstZ: 0.03, stepZ: 0.022 })
+/** NOW PLAYING jacket: a 0.20 m square sleeve leaning back 0.30 rad on a small easel in front of the crate. */
+export const HIFI_JACKET = Object.freeze({ size: 0.2, thickness: 0.004, lean: -0.3, baseW: 0.24, baseD: 0.09, baseT: 0.012, legW: 0.04, legH: 0.17, legT: 0.008, frontOfCrate: 0.06 })
+/** The LED bar and the glow disc: 2 mm lift of the disc above the table top. */
+export const HIFI_GLOW_LIFT = 0.002
+export const HIFI_LED = Object.freeze({ h: 0.014, d: 0.01, inset: 0.1 })
+
+/** A thin flat sleeve of `size` standing on `baseY`, bottom edge at local z `contactZ`, leaning about x by `lean`. It rests exactly on `baseY`. */
+function leaningSleeve(mat: MaterialKey, role: NonNullable<Part['hifiRole']>, x: number, contactZ: number, baseY: number, size: number, thickness: number, lean: number): Part {
+  const c = Math.cos(lean)
+  const s = Math.sin(lean)
+  const y = baseY + (size / 2) * c + (thickness / 2) * Math.abs(s)
+  const z = contactZ + (size / 2) * s
+  const p = bx(mat, [x, y, z], [size, size, thickness], lean === 0 ? undefined : [lean, 0, 0])
+  return { ...p, hifiRole: role }
+}
+
+/**
+ * The Hi-Fi table in three groups like `turntableGroups` (`static`, `platter` local to the spindle, `tonearm`), in the prop-local frame. `box` is the local
+ * footprint (1.25 x 0.45 m, front at +z). `wallBack` drops the back (-z) faces of the cabinet boards when the prop's back lies on a wall plane.
+ */
+export function hifiTableGroups(box: Aabb, state: HifiState = { playing: false, track: 4 }, wallBack = false) {
+  const { cx, cz, w, d } = centre(box)
+  const top = TURNTABLE_CABINET_TOP
+  const tag = (g: NonNullable<Part['turntableGroup']>, parts: Part[]): Part[] => parts.map((p) => ({ ...p, turntableGroup: g }))
+  const role = (r: NonNullable<Part['hifiRole']>, parts: Part[]): Part[] => parts.map((p) => ({ ...p, hifiRole: r }))
+
+  // The turntable assembly is exactly the 33.1 one, sized to the left 0.9 m of the table.
+  const ttBox: Aabb = { minX: box.minX, maxX: box.minX + HIFI_TURNTABLE_SECTION_W, minZ: box.minZ, maxZ: box.maxZ }
+  const asm = turntableAssembly(ttBox, state)
+
+  // Walnut table: kick plinth, two side panels, back, a top slab that stops 12 mm short of the front, and a middle shelf.
+  const slabD = d - HIFI_SLAB_FRONT_INSET
+  let cabinet: Part[] = [
+    wd('woodDark', [cx, 0.03, cz + 0.01], [w - 0.04, 0.06, d - 0.06]),
+    wd('woodDark', [box.minX + 0.02, 0.32, cz], [0.04, 0.52, d]),
+    wd('woodDark', [box.maxX - 0.02, 0.32, cz], [0.04, 0.52, d]),
+    wd('woodDark', [cx, 0.32, box.minZ + 0.01], [w - 0.08, 0.52, 0.02]),
+    wd('woodDark', [cx, top - 0.02, cz - HIFI_SLAB_FRONT_INSET / 2], [w, 0.04, slabD]),
+    wd('woodDark', [cx, 0.4, box.minZ + 0.02 + (d - 0.06) / 2], [w - 0.08, 0.02, d - 0.06]),
+  ]
+  if (wallBack) cabinet = cullLocalBack(cabinet, box.minZ)
+
+  // Front LED accent bar: on the front face of the top slab, 2 mm embedded and 8 mm proud, inside the footprint. Two materials, swapped per state.
+  const led: Part = {
+    ...bx(state.playing ? 'hifiLedOn' : 'hifiLedOff', [cx, top - 0.02, box.maxZ - HIFI_SLAB_FRONT_INSET - 0.002 + HIFI_LED.d / 2], [w - 2 * HIFI_LED.inset, HIFI_LED.h, HIFI_LED.d]),
+    hifiRole: 'led',
+  }
+
+  // Record crate (right end): back plank, front plank and two end boards standing on the table top (no floor board: the top is the floor).
+  const C = HIFI_CRATE
+  const crateX1 = box.maxX - C.edgeGap
+  const crateX0 = crateX1 - C.w
+  const crateCx = (crateX0 + crateX1) / 2
+  const crateZ0 = box.minZ + C.backGap
+  const crateZ1 = crateZ0 + C.d
+  const crateCz = (crateZ0 + crateZ1) / 2
+  const crate: Part[] = role('crate', [
+    bx('crateSlat', [crateCx, top + C.backH / 2, crateZ0 + 0.006], [C.w, C.backH, 0.012]),
+    bx('crateSlat', [crateCx, top + C.wallH / 2, crateZ1 - 0.006], [C.w, C.wallH, 0.012]),
+    bx('crateWood', [crateX0 + 0.006, top + C.wallH / 2, crateCz], [0.012, C.wallH, C.d - 0.024]),
+    bx('crateWood', [crateX1 - 0.006, top + C.wallH / 2, crateCz], [0.012, C.wallH, C.d - 0.024]),
+  ])
+
+  // Four 12-inch LP sleeves standing on the table top inside the crate, fanned (each leans back a little more than the one in front).
+  const S = HIFI_SLEEVE
+  const sleeves: Part[] = HIFI_SLEEVE_MATERIALS.map((m, i) =>
+    leaningSleeve(m, 'sleeve', crateCx, crateZ0 + 0.012 + S.firstZ + i * S.stepZ, top, S.size, S.thickness, S.lean[i]),
+  )
+
+  // NOW PLAYING jacket stand in front of the crate: base plate, a back leg and the leaning jacket in the active track colour.
+  const J = HIFI_JACKET
+  const baseZ0 = crateZ1 + J.frontOfCrate
+  const baseCz = baseZ0 + J.baseD / 2
+  const jacketTop = top + J.baseT
+  const contactZ = baseZ0 + J.baseD - 0.02
+  const legBottomZ = contactZ - 0.065
+  const legTopZ = contactZ + (J.size - 0.03) * Math.sin(J.lean) - 0.004
+  const legLean = Math.atan2(legTopZ - legBottomZ, J.legH)
+  const stand: Part[] = role('stand', [
+    bx('woodDark', [crateCx, top + J.baseT / 2, baseCz], [J.baseW, J.baseT, J.baseD]),
+    bx('woodDark', [crateCx, jacketTop + (J.legH / 2) * Math.cos(legLean) + (J.legT / 2) * Math.abs(Math.sin(legLean)), legBottomZ + (J.legH / 2) * Math.sin(legLean)], [J.legW, J.legH, J.legT], [legLean, 0, 0]),
+  ])
+  const jacket = leaningSleeve(nowPlayingMaterial(state.track), 'jacket', crateCx, contactZ, jacketTop, J.size, J.thickness, J.lean)
+
+  // Additive glow on the table top: a 24-segment disc scaled to an ellipse, 2 mm above the slab, entirely inside the slab rectangle.
+  const glow: Part = {
+    ...part('disc', state.playing ? 'hifiGlowOn' : 'hifiGlowOff', [cx, top + HIFI_GLOW_LIFT, cz - HIFI_SLAB_FRONT_INSET / 2], [w - 0.05, slabD - 0.03, 1], [-HALF_PI, 0, 0]),
+    hifiRole: 'glow',
+  }
+
+  return {
+    static: tag('static', cullFloorBottoms([...cabinet, ...asm.feet, ...asm.controls, asm.cradle, led, ...crate, ...sleeves, ...stand, jacket, glow])),
+    platter: tag('platter', asm.platter),
+    tonearm: tag('tonearm', asm.tonearm),
+    spindle: asm.L.spindle,
+    pivot: asm.L.pivot,
+  }
+}
+
+/** Whole Hi-Fi table in prop-local coordinates (platter at rest, angle 0). */
+export function hifiTableParts(box: Aabb, state: HifiState = { playing: false, track: 4 }, wallBack = false): Part[] {
+  const g = hifiTableGroups(box, state, wallBack)
+  return [...g.static, ...offset(g.platter, g.spindle), ...g.tonearm]
+}
+
+/** Layout placement of the Hi-Fi table: the world prop, its frame (local footprint, yaw) and whether its back lies on a wall plane. */
+export function hifiTablePlacement() {
+  const p = layoutProp('record-player')
+  const frame = facingFrame(p.box, p.facing)
+  return { prop: p, frame, local: frame.local, wallBack: backAgainstWall(p.box, p.facing, ROOM.walls) }
+}
+
+/** True when the back of the named layout prop lies on a wall plane (so its builder may drop the local back faces). */
+export function propBackAgainstWall(id: string): boolean {
+  const p = layoutProp(id)
+  return backAgainstWall(p.box, p.facing, ROOM.walls)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1622,7 +1805,8 @@ export function doorDetailParts(): Part[] {
   for (const f of [outerNorth, outerSouth]) {
     parts.push(bx('metal', [f.minX - t / 2, kickY, (f.minZ + f.maxZ) / 2], [t, 0.18, f.maxZ - f.minZ - 0.02]))
   }
-  return parts
+  // Task 34.1: each plate lies on a pillar face or a jamb face and its back face is exactly on that solid's plane (walls and door frames are opaque).
+  return cullWallFlush(parts, [...ROOM.walls, ...ROOM.doors.flatMap((d) => d.frames)], ROOM.height)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1630,7 +1814,8 @@ export function doorDetailParts(): Part[] {
 // ---------------------------------------------------------------------------------------------
 
 /** Triangles of one part: its shared geometry, minus the two faces of the culled -Y face of a floor-flush box (33.1). */
-export const partTriangles = (p: Part): number => GEOMETRY_TRIANGLES[p.geo] - (p.openBottom ? OPEN_BOTTOM_SAVED_TRIANGLES : 0)
+export const partTriangles = (p: Part): number =>
+  GEOMETRY_TRIANGLES[p.geo] - (p.openBottom ? OPEN_BOTTOM_SAVED_TRIANGLES : 0) - (p.culledFaces?.length ?? 0) * CULLED_FACE_SAVED_TRIANGLES
 
 export function countTriangles(parts: readonly Part[]): number {
   return parts.reduce((n, p) => n + partTriangles(p), 0)
@@ -1675,8 +1860,8 @@ export function declaredObjects(): Array<{ name: string; parts: Part[]; extraTri
     { name: 'console-tapes', parts: consoleTapeParts(crt.box) },
     { name: 'reference-monitor', parts: referenceMonitorParts(crt.box) },
     { name: 'console-cables', parts: consoleCableParts(crt.box) },
-    { name: 'filing-cabinet-a', parts: filingCabinetParts(prop('filing-cabinet-a').box, prop('filing-cabinet-a').height, 0) },
-    { name: 'filing-cabinet-b', parts: filingCabinetParts(prop('filing-cabinet-b').box, prop('filing-cabinet-b').height, 1) },
+    { name: 'filing-cabinet-a', parts: filingCabinetParts(prop('filing-cabinet-a').box, prop('filing-cabinet-a').height, 0, propBackAgainstWall('filing-cabinet-a')) },
+    { name: 'filing-cabinet-b', parts: filingCabinetParts(prop('filing-cabinet-b').box, prop('filing-cabinet-b').height, 1, propBackAgainstWall('filing-cabinet-b')) },
     { name: 'conduit', parts: conduitParts() },
     { name: 'ventilation', parts: ventilationParts() },
     { name: 'cable-loops', parts: cableLoopsParts() },
@@ -1697,7 +1882,7 @@ export function declaredObjects(): Array<{ name: string; parts: Part[]; extraTri
     { name: 'desk', parts: deskParts(prop('reception-desk').box, prop('reception-desk').height) },
     { name: 'armchair', parts: armchairParts(prop('abandoned-chair').box) },
     { name: 'couch', parts: couchParts(prop('couch').box) },
-    { name: 'record-player', parts: turntableParts(prop('record-player').box, { playing: false }) },
+    { name: 'record-player', parts: hifiTableParts(hifiTablePlacement().local, { playing: false, track: 4 }, hifiTablePlacement().wallBack) },
     { name: 'crate-a', parts: crateParts(prop('crate-a').box, prop('crate-a').height) },
     { name: 'crate-b', parts: crateParts(prop('crate-b').box, prop('crate-b').height) },
     { name: 'trim', parts: trimParts() },
