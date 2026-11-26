@@ -22,6 +22,7 @@ import {
 } from './memories/session';
 import type { ClueDetection, TapeDefinition } from './memories/restoration/types';
 import { VhsPlayerBoundary } from './memories/VhsPlayerBoundary';
+import { TapePickupOverlay } from './memories/TapePickupOverlay';
 import { AccessibilitySettings } from './ui/AccessibilitySettings';
 import { CrtCorruptionOverlay } from './ui/CrtCorruptionOverlay';
 import { EndingScreen } from './ui/EndingScreen';
@@ -80,6 +81,8 @@ export function App() {
   const [notice, setNotice] = useState<ShellNotice>('intro');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [devOpen, setDevOpen] = useState(false);
+  const [pickupTape, setPickupTape] = useState<TapeDefinition | null>(null);
+  const [evidence, setEvidence] = useState<Readonly<Record<string, string>>>({});
   const shellRef = useRef<HTMLElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const wasOpen = useRef(false);
@@ -141,7 +144,16 @@ export function App() {
 
   function collectTape() {
     dispatch({ type: 'TAPE_COLLECTED', tapeId: SUMMER_TAPE.id });
+    setPickupTape(SUMMER_TAPE);
     setNotice('tapeCollected');
+  }
+
+  function finishPickup() {
+    setPickupTape(null);
+  }
+
+  function captureEvidence(detection: ClueDetection, image: string) {
+    setEvidence((current) => ({ ...current, [`${detection.tapeId}:${detection.clueId}`]: image }));
   }
 
   function inspectLabelClue() {
@@ -228,10 +240,11 @@ export function App() {
           <AccessibilitySettings preferences={preferences} onChange={updatePreferences} />
           <button type="button" className="secondary" onClick={openEnding}>{shell.progress.openEnding}</button>
           <button type="button" className="secondary" onClick={reset}>{shell.progress.reset}</button>
-          <MemoryJournal language={language} entries={journal.entries} totalEntries={journal.totalEntries} atmosphere={journal.atmosphere} />
+          <MemoryJournal language={language} entries={journal.entries} totalEntries={journal.totalEntries} atmosphere={journal.atmosphere} evidence={evidence} />
         </div>
       </div>
 
+      {pickupTape && <TapePickupOverlay tapeLabel={tapeTitle(pickupTape.id, language)} language={language} onComplete={finishPickup} />}
       {stationOpen && (
         <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closePanel(); }}>
           <div className="modal-dialog" role="dialog" aria-modal="true" aria-label={dialogTitle} ref={dialogRef} tabIndex={-1}>
@@ -275,6 +288,7 @@ export function App() {
                     muted={muted}
                     onMutedChange={(value) => updatePreferences({ muted: value })}
                     onClueDetected={handleDetection}
+                    onEvidenceCaptured={captureEvidence}
                     onClose={closePanel}
                   />
                 ) : (

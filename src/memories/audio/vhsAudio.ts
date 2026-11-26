@@ -17,6 +17,7 @@ export interface VhsAudio {
   resume(): Promise<void>;
   update(input: AudioInput): void;
   click(): void;
+  insert(): void;
   dispose(): void;
 }
 
@@ -233,8 +234,28 @@ export function createVhsAudio(): VhsAudio {
       knock.start(start);
       knock.stop(start + 0.08);
     },
+    insert() {
+      try {
+        if (!graph || !latest || latest.muted) return;
+        const { context, master } = graph;
+        const start = context.currentTime;
+        const oscillator = context.createOscillator();
+        const envelope = context.createGain();
+        oscillator.type = 'square';
+        oscillator.frequency.setValueAtTime(95, start);
+        oscillator.frequency.exponentialRampToValueAtTime(42, start + 0.3);
+        envelope.gain.setValueAtTime(0.0001, start);
+        envelope.gain.exponentialRampToValueAtTime(latest.reducedDistortion ? 0.08 : 0.16, start + 0.04);
+        envelope.gain.exponentialRampToValueAtTime(0.0001, start + 0.5);
+        oscillator.connect(envelope);
+        envelope.connect(master);
+        oscillator.start(start);
+        oscillator.stop(start + 0.55);
+      } catch {
+        // Mechanical feedback is optional and must never interrupt playback.
+      }
+    },
     dispose() {
-      stopHeartbeat();
       const current = graph;
       graph = null;
       latest = null;

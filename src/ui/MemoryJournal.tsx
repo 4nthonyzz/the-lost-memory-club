@@ -9,10 +9,11 @@ export interface MemoryJournalProps {
   entries: readonly JournalEntryView[];
   totalEntries: number;
   atmosphere: AtmosphereView;
+  evidence?: Readonly<Record<string, string>>;
   onClose?: () => void;
 }
 
-export function MemoryJournal({ language, entries, totalEntries, atmosphere, onClose }: MemoryJournalProps) {
+export function MemoryJournal({ language, entries, totalEntries, atmosphere, evidence = {}, onClose }: MemoryJournalProps) {
   const strings = getUiStrings(language).journal;
   const titleId = useId();
   const undeveloped = Math.max(0, totalEntries - entries.length);
@@ -61,6 +62,7 @@ export function MemoryJournal({ language, entries, totalEntries, atmosphere, onC
           <li key={entry.id} className={`journal-card journal-card--${entry.kind}`}>
             <span className="journal-card__kind">{strings.kinds[entry.kind]}</span>
             <div className="journal-card__photo" aria-hidden="true" />
+            {evidence[entry.id] && <img className="journal-card__evidence" src={evidence[entry.id]} alt={`${entry.title} evidence frame`} />}
             <h3>{entry.title}</h3>
             <p className="journal-card__caption">{entry.caption}</p>
             <p className="journal-card__text">{entry.text}</p>

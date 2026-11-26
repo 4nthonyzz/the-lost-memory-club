@@ -23,6 +23,7 @@ export interface PlayerStrings {
   close: string;
   clueRecorded: string;
   perfectTracking: string;
+  inserting: string;
   hint: string;
   keyboardHelp: string;
   timeline: string;
@@ -52,6 +53,7 @@ const EN: PlayerStrings = {
   close: 'Eject and close',
   clueRecorded: 'CLUE RECORDED',
   perfectTracking: '100% TRACKING \u00b7 PERFECT SIGNAL',
+  inserting: 'INSERTING TAPE \u00b7 PLEASE WAIT',
   hint: 'Pause on the strange frame and adjust the tracking.',
   keyboardHelp: 'Space play/pause \u00b7 \u2190/\u2192 rewind/forward \u00b7 , . step frame \u00b7 [ ] or \u2193/\u2191 tracking (Shift for \u00b15) \u00b7 Esc close',
   timeline: 'Tape position',
@@ -81,6 +83,7 @@ const ES: PlayerStrings = {
   close: 'Expulsar y cerrar',
   clueRecorded: 'PISTA REGISTRADA',
   perfectTracking: '100% TRACKING \u00b7 SE\u00d1AL PERFECTA',
+  inserting: 'INSERTANDO CINTA \u00b7 ESPERA',
   hint: 'Pausa en el fotograma extra\u00f1o y ajusta el tracking.',
   keyboardHelp: 'Espacio reproducir/pausa \u00b7 \u2190/\u2192 rebobinar/avanzar \u00b7 , . fotograma \u00b7 [ ] o \u2193/\u2191 tracking (May\u00fas para \u00b15) \u00b7 Esc para cerrar',
   timeline: 'Posici\u00f3n en la cinta',

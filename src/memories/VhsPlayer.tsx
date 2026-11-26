@@ -8,7 +8,7 @@ import { createTransportState, newDetections, transportReducer } from './restora
 import type { ClueDetection, TapeDefinition, TransportAction, TransportState } from './restoration/types';
 import { subtitleAt } from './subtitles';
 import { createVhsRenderer, SCREEN_HEIGHT, SCREEN_WIDTH } from './vhsRenderer';
-import { computeVisualParams, formatClock, formatTimecode, isInAnomalyWindow, SIGNAL_THRESHOLD } from './vhsVisuals';
+import { computeVisualParams, formatClock, formatTimecode } from './vhsVisuals';
 import { TRANSPORT_FPS } from './restoration/types';
 import './VhsPlayer.css';
 
@@ -21,6 +21,7 @@ export interface VhsPlayerProps {
   muted: boolean;
   onMutedChange?: (muted: boolean) => void;
   onClueDetected: (detection: ClueDetection) => void;
+  onEvidenceCaptured?: (detection: ClueDetection, image: string) => void;
   onClose: () => void;
 }
 
@@ -32,10 +33,12 @@ function createLoadedState(tape: TapeDefinition): TransportState {
   return transportReducer(createTransportState(), { type: 'LOAD_TAPE', tape });
 }
 
-export function VhsPlayerContent({ tape, inventory = [tape], onSelectTape, language, reducedDistortion, muted, onMutedChange, onClueDetected, onClose }: VhsPlayerProps) {
+export function VhsPlayerContent({ tape, inventory = [tape], onSelectTape, language, reducedDistortion, muted, onClueDetected, onEvidenceCaptured, onClose }: VhsPlayerProps) {
   const strings = getPlayerStrings(language);
   const [state, dispatch] = useReducer(transportReducer, tape, createLoadedState);
   const [notice, setNotice] = useState<NoticeKind | null>(null);
+  const [inserted, setInserted] = useState(false);
+  const [ejecting, setEjecting] = useState(false);
 
   const rootRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -48,8 +51,6 @@ export function VhsPlayerContent({ tape, inventory = [tape], onSelectTape, langu
   const params = computeVisualParams(state, reducedDistortion);
   const subtitle = subtitleAt(tape.id, state.position, language);
   const moving = state.mode === 'playing' || state.mode === 'rewind' || state.mode === 'ffwd';
-  const stepPaused = state.mode === 'paused' && isInAnomalyWindow(tape, state.position);
-  const stepTuned = state.signalQuality >= SIGNAL_THRESHOLD;
   const anomalyZones = tape.clueWindows.map((window) => ({
     key: window.clueId,
     left: (window.startFrame / TRANSPORT_FPS / tape.duration) * 100,
@@ -64,6 +65,13 @@ export function VhsPlayerContent({ tape, inventory = [tape], onSelectTape, langu
   useEffect(() => {
     dispatch({ type: 'LOAD_TAPE', tape });
   }, [tape]);
+
+  useEffect(() => {
+    setInserted(false);
+    audioRef.current?.insert();
+    const timer = window.setTimeout(() => setInserted(true), 1300);
+    return () => window.clearTimeout(timer);
+  }, [tape.id]);
 
   useEffect(() => {
     rootRef.current?.focus();
@@ -109,6 +117,12 @@ export function VhsPlayerContent({ tape, inventory = [tape], onSelectTape, langu
     previousStateRef.current = state;
     for (const detection of found) {
       onClueDetected(detection);
+      try {
+        const image = canvasRef.current?.toDataURL('image/png');
+        if (image) onEvidenceCaptured?.(detection, image);
+      } catch {
+        // Evidence capture is optional and cannot interrupt the story.
+      }
       setNotice(detection.tapeId === MEMORY_ID && detection.clueId === PERFECT_TRACKING_CLUE_ID ? 'perfect' : 'clue');
     }
   }, [state, onClueDetected]);
@@ -174,10 +188,15 @@ export function VhsPlayerContent({ tape, inventory = [tape], onSelectTape, langu
     for (const action of actions) dispatch(action);
   }
 
-  function stepFrame(direction: 1 | -1): void {
-    if (state.mode === 'stopped') return;
-    if (state.mode !== 'paused') dispatch({ type: 'PAUSE' });
-    dispatch({ type: 'STEP_FRAME', direction });
+  function togglePlayback(): void {
+    if (!inserted) return;
+    dispatch({ type: moving ? 'PAUSE' : 'PLAY' });
+  }
+
+  function eject(): void {
+    if (ejecting) return;
+    setEjecting(true);
+    window.setTimeout(onClose, 500);
   }
 
   function handleKeyDown(event: ReactKeyboardEvent<HTMLElement>): void {
@@ -188,6 +207,7 @@ export function VhsPlayerContent({ tape, inventory = [tape], onSelectTape, langu
     const command = commandForKey(event, state.mode);
     if (!command) return;
     event.preventDefault();
+    if (!inserted && command.actions.some((action) => action.type === 'PLAY')) return;
     run(command.actions);
     if (command.close) onClose();
   }
@@ -196,7 +216,7 @@ export function VhsPlayerContent({ tape, inventory = [tape], onSelectTape, langu
   const rootClass = ['vhs-player', atmosphereClass, reducedDistortion ? 'vhs-player--reduced' : ''].filter(Boolean).join(' ');
 
   return (
-    <section ref={rootRef} className={rootClass} aria-label={strings.region} tabIndex={-1} onKeyDown={handleKeyDown} onPointerDown={wakeAudio}>
+    <section ref={rootRef} className={rootClass} aria-label={strings.region} translate="no" tabIndex={-1} onKeyDown={handleKeyDown} onPointerDown={wakeAudio}>
       <nav className="vhs-inventory" aria-label="VHS inventory">
         {inventory.map((item) => (
           <button
@@ -225,10 +245,19 @@ export function VhsPlayerContent({ tape, inventory = [tape], onSelectTape, langu
             </div>
           )}
         </div>
-        <p className="vhs-subtitle" lang={language}>
-          {subtitle ?? '\u00a0'}
-        </p>
       </div>
+      <div className={`vhs-deck${ejecting ? ' vhs-deck--ejecting' : ''}`} aria-label="VCR deck">
+        <div className="vhs-deck__slot" aria-hidden="true">
+          <div className="vhs-deck__cassette">
+            <span className="vhs-deck__reel" />
+            <strong>{tape.id === MEMORY_ID ? 'ARCHIVE 09' : "MIDNIGHT RENTALS '97"}</strong>
+            <span className="vhs-deck__reel" />
+          </div>
+        </div>
+        <span className={`vhs-deck__led${moving ? ' vhs-deck__led--play' : ''}`} aria-hidden="true">{moving ? 'PLAY' : 'READY'}</span>
+        {!inserted && <div className="vhs-insert-overlay"><div className="vhs-insert-cassette" aria-hidden="true"><span /><span /></div><strong>{strings.inserting}</strong></div>}
+      </div>
+      <p className="vhs-subtitle" lang={language}>{subtitle ?? '\u00a0'}</p>
 
       <div className="vhs-timeline">
         <div className="vhs-timeline__track">
@@ -258,17 +287,6 @@ export function VhsPlayerContent({ tape, inventory = [tape], onSelectTape, langu
         </div>
       </div>
 
-      <ol className="vhs-steps">
-        <li className={stepPaused ? 'vhs-step vhs-step--done' : 'vhs-step'}>
-          {stepPaused ? '\u2713 ' : ''}
-          {strings.stepPause}
-        </li>
-        <li className={stepTuned ? 'vhs-step vhs-step--done' : 'vhs-step'}>
-          {stepTuned ? '\u2713 ' : ''}
-          {strings.stepTune}
-        </li>
-      </ol>
-
       <div className="vhs-meters">
         <label className="vhs-meter">
           <span>
@@ -294,50 +312,13 @@ export function VhsPlayerContent({ tape, inventory = [tape], onSelectTape, langu
         </div>
       </div>
 
-      <div className="vhs-controls">
-        <button type="button" aria-label={strings.rewind} title={strings.rewind} onClick={() => dispatch({ type: 'REWIND' })}>
-          {'\u25c0\u25c0'}
-        </button>
-        <button type="button" aria-label={strings.stepBack} title={strings.stepBack} onClick={() => stepFrame(-1)}>
-          {'|\u25c0'}
-        </button>
-        <button
-          type="button"
-          className="vhs-controls__main"
-          onClick={() => dispatch({ type: moving ? 'PAUSE' : 'PLAY' })}
-        >
+      <div className="vhs-controls vhs-controls--minimal">
+        <button type="button" className="vhs-controls__main" disabled={!inserted} onClick={togglePlayback}>
           {moving ? `\u275a\u275a ${strings.pause}` : `\u25b6 ${strings.play}`}
         </button>
-        <button type="button" aria-label={strings.stepForward} title={strings.stepForward} onClick={() => stepFrame(1)}>
-          {'\u25b6|'}
+        <button type="button" className="vhs-secondary" onClick={eject}>
+          {strings.close}
         </button>
-        <button type="button" aria-label={strings.fastForward} title={strings.fastForward} onClick={() => dispatch({ type: 'FAST_FORWARD' })}>
-          {'\u25b6\u25b6'}
-        </button>
-        <button type="button" aria-label={strings.stop} title={strings.stop} onClick={() => dispatch({ type: 'STOP' })}>
-          {'\u25a0'}
-        </button>
-        <button type="button" aria-label={strings.trackingDown} title={strings.trackingDown} onClick={() => dispatch({ type: 'ADJUST_TRACKING', delta: -1 })}>
-          {'TRK \u2212'}
-        </button>
-        <button type="button" aria-label={strings.trackingUp} title={strings.trackingUp} onClick={() => dispatch({ type: 'ADJUST_TRACKING', delta: 1 })}>
-          {'TRK +'}
-        </button>
-      </div>
-
-      <div className="vhs-footer">
-        <p className="vhs-help">{strings.hint}</p>
-        <p className="vhs-help vhs-help--keys">{strings.keyboardHelp}</p>
-        <div className="vhs-footer__buttons">
-          {onMutedChange && (
-            <button type="button" className="vhs-secondary" aria-pressed={muted} onClick={() => onMutedChange(!muted)}>
-              {muted ? strings.unmute : strings.mute}
-            </button>
-          )}
-          <button type="button" className="vhs-secondary" onClick={onClose}>
-            {strings.close}
-          </button>
-        </div>
       </div>
     </section>
   );

@@ -325,9 +325,42 @@
   color: #5fd39a;
 }
 
+.vhs-insert-overlay { position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; align-content: center; gap: 10px; background: rgba(2, 3, 8, .78); color: var(--vhs-accent); font: 800 13px ui-monospace, monospace; letter-spacing: .1em; text-align: center; animation: vhs-power-on 1.3s ease both; }
+.vhs-insert-cassette, .tape-pickup__cassette { position: relative; width: 116px; height: 66px; border: 3px solid #b8a27a; border-radius: 6px; background: linear-gradient(135deg, #24283a, #080a12); box-shadow: 0 0 22px rgba(255, 190, 90, .35); animation: vhs-cassette-in 1.3s ease both; }
+.vhs-insert-cassette span, .tape-pickup__cassette span { position: absolute; top: 20px; width: 20px; height: 20px; border: 3px solid #d6c291; border-radius: 50%; animation: vhs-reel-spin .5s linear infinite; }
+.vhs-insert-cassette span:first-child, .tape-pickup__cassette span:first-child { left: 16px; }
+.vhs-insert-cassette span:last-child, .tape-pickup__cassette span:last-child { right: 16px; }
+@keyframes vhs-cassette-in { from { transform: translateY(90px) scale(.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+@keyframes vhs-reel-spin { to { transform: rotate(360deg); } }
+@keyframes vhs-power-on { 0%, 20% { opacity: 0; } 35% { opacity: 1; } 45% { opacity: .35; } 58%, 100% { opacity: 1; } }
+.tape-pickup { position: fixed; z-index: 60; inset: 0; display: grid; place-items: center; align-content: center; gap: 10px; background: rgba(3, 5, 12, .88); color: #f2c376; font: 800 14px ui-monospace, monospace; letter-spacing: .12em; text-align: center; pointer-events: none; animation: vhs-power-on 1.3s ease both; }
+.tape-pickup small { color: #dfe3ee; font-size: 12px; letter-spacing: .06em; }
+.tape-pickup__cassette { animation-duration: 1.3s; }
+.vhs-player--fallback { min-height: 260px; align-content: center; background: #0b0d16; }
+.vhs-player--fallback span { color: #aeb5c9; font-size: 12px; }
+
+.vhs-deck { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 12px 14px; border: 2px solid #272b3b; border-top: 0; border-radius: 0 0 12px 12px; background: linear-gradient(#171a28, #080a11); }
+.vhs-deck__slot { height: 50px; display: grid; place-items: center; overflow: hidden; border: 3px solid #05060a; border-radius: 4px; background: #020307; box-shadow: inset 0 3px 8px #000; }
+.vhs-deck__cassette { display: flex; align-items: center; justify-content: space-around; gap: 12px; width: min(240px, 72%); height: 34px; padding: 5px 10px; border: 2px solid #9e8b68; border-radius: 4px; background: linear-gradient(135deg, #25293a, #0c0e16); color: #d8c18f; font: 700 8px ui-monospace, monospace; letter-spacing: .08em; animation: vhs-deck-idle 2.5s ease-in-out infinite alternate; }
+.vhs-deck__reel { width: 13px; height: 13px; border: 2px solid #cbb887; border-radius: 50%; animation: vhs-reel-spin .8s linear infinite; }
+.vhs-deck--ejecting .vhs-deck__cassette { animation: vhs-eject 0.5s ease-out forwards; }
+@keyframes vhs-eject { from { transform: translateY(0); opacity: 1; } to { transform: translateY(42px); opacity: 0; } }
+
+.vhs-deck__led--play { color: #74e59a; text-shadow: 0 0 10px #4bdc7d; }
+@keyframes vhs-deck-idle { from { transform: translateX(-2px); } to { transform: translateX(2px); } }
+.vhs-controls--minimal { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.vhs-controls--minimal .vhs-controls__main { min-height: 52px; font-size: 14px; }
+.vhs-controls--minimal button:disabled { opacity: .5; cursor: wait; }
+.vhs-insert-overlay { position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; align-content: center; gap: 10px; background: rgba(2, 3, 8, .92); color: var(--vhs-accent); font: 800 13px ui-monospace, monospace; letter-spacing: .1em; text-align: center; animation: vhs-power-on 1.3s ease both; }
 .vhs-player--reduced,
 .vhs-player--reduced * {
   transition: none !important;
+}
+
+.vhs-player--reduced .vhs-deck__cassette,
+.vhs-player--reduced .vhs-deck__reel,
+.vhs-player--reduced .vhs-insert-overlay {
+  animation: none;
 }
 
 .vhs-player--reduced .vhs-notice {
