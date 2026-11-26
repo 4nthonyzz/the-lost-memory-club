@@ -1614,6 +1614,49 @@
         "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
         "timestamp": 1795655772219
       }
+    ],
+    "32.1 Web Audio engine: SFX and ambient music": [
+      {
+        "executionId": "d0b5d8a2-116b-47c5-9b77-da7d89dc9e2c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795656400384
+      },
+      {
+        "executionId": "d0b5d8a2-116b-47c5-9b77-da7d89dc9e2c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795656722579
+      }
+    ],
+    "32.2 Wire audio into the world and add the mute badge": [
+      {
+        "executionId": "d0b5d8a2-116b-47c5-9b77-da7d89dc9e2c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795656722056
+      },
+      {
+        "executionId": "d0b5d8a2-116b-47c5-9b77-da7d89dc9e2c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795657000114
+      }
+    ],
+    "32.3 Docs, metrics and verification": [
+      {
+        "executionId": "d0b5d8a2-116b-47c5-9b77-da7d89dc9e2c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795657000567
+      },
+      {
+        "executionId": "d0b5d8a2-116b-47c5-9b77-da7d89dc9e2c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795657556201
+      }
+    ],
+    "32. Procedural world audio": [
+      {
+        "executionId": "d0b5d8a2-116b-47c5-9b77-da7d89dc9e2c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795657556338
+      }
     ]
   }
 }

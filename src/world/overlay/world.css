@@ -180,6 +180,25 @@
   pointer-events: none;
 }
 
+/*
+ * Audio badge: bottom-right, stacked directly above the notes counter (counter is bottom 12px, about 34px tall, so the
+ * badge sits at bottom 54px and is about 30px tall; it stays visible while inspecting, where the counter is hidden).
+ * It lies below the card region (which ends at 22% + 112px from the bottom, always above 112px), clear of the prompt
+ * (centre, bottom 22%), the message pill, the App status line (centre, always at least 220px free on the right) and the
+ * App HUD (top-left progress, top-right menu). Only the button accepts the mouse.
+ */
+.world-audio {
+  position: absolute;
+  right: 12px;
+  bottom: 54px;
+  pointer-events: none;
+}
+
+.world-audio-button {
+  letter-spacing: 0.06em;
+  padding: 5px 10px;
+}
+
 .world-notes .world-chip {
   padding: 6px 10px;
   letter-spacing: 0.06em;

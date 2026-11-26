@@ -126,3 +126,13 @@ describe('card scroll keys (task 28.1)', () => {
     expect(cardScrollFor('ArrowLeft')).toBeNull();
   });
 });
+
+describe('mute key (task 32.2)', () => {
+  it('maps KeyM to a one-shot mute role that is never held and follows the key filter', () => {
+    expect(keyRole('KeyM')).toBe('mute');
+    expect(isActionRole('mute')).toBe(true);
+    expect(isKeyEventAccepted(ok)).toBe(true);
+    expect(isKeyEventAccepted({ ...ok, tagName: 'INPUT' })).toBe(false);
+    expect(isKeyEventAccepted({ ...ok, insideWorldWrapper: false })).toBe(false);
+  });
+});

@@ -51,6 +51,8 @@ vi.mock('./controller/usePlayerRig', async () => {
 });
 
 import { WorldScene } from './WorldScene';
+import { __setWorldAudioFactoryForTests } from './audio/engineFactory';
+import type { WorldAudioEngine } from './audio/worldAudio';
 
 const originalGetContext = HTMLCanvasElement.prototype.getContext;
 const lockSpy = vi.fn();
@@ -850,5 +852,238 @@ describe('WorldScene open-book manuals (task 29.1)', () => {
     const { unmount } = open('manual-snake');
     unmount();
     expect(remove.mock.calls.filter((c) => c[0] === 'wheel')).toHaveLength(1);
+  });
+});
+
+describe('WorldScene procedural audio (task 32.2)', () => {
+  type Fake = { [K in keyof WorldAudioEngine]: ReturnType<typeof vi.fn> };
+  let fake: Fake;
+  let created: number;
+  let muted: boolean;
+  const sources = import.meta.glob(['./WorldScene.tsx', './audio/engineFactory.ts', './overlay/AudioBadge.tsx'], {
+    query: '?raw',
+    import: 'default',
+    eager: true,
+  }) as Record<string, string>;
+
+  beforeEach(() => {
+    muted = false;
+    created = 0;
+    fake = {
+      unlock: vi.fn(),
+      setHidden: vi.fn(),
+      setDucked: vi.fn(),
+      setMuted: vi.fn(),
+      toggleMuted: vi.fn(() => {
+        muted = !muted;
+        return muted;
+      }),
+      isMuted: vi.fn(() => muted),
+      isUnlocked: vi.fn(() => true),
+      tick: vi.fn(),
+      playVhsInsertSfx: vi.fn(),
+      playArcadeCoinSfx: vi.fn(),
+      playLampSwitchSfx: vi.fn(),
+      playPageRustleSfx: vi.fn(),
+      dispose: vi.fn(),
+    };
+    __setWorldAudioFactoryForTests(() => {
+      created += 1;
+      return fake as unknown as WorldAudioEngine;
+    });
+  });
+  afterEach(() => __setWorldAudioFactoryForTests(null));
+
+  const badge = () => document.querySelector('.world-audio-button') as HTMLButtonElement;
+  const pressE = (wrapper: HTMLElement) => {
+    fireEvent.keyDown(wrapper, { code: 'KeyE', key: 'e' });
+    fireEvent.keyUp(wrapper, { code: 'KeyE', key: 'e' });
+  };
+
+  it('does not unlock on mount, focus or re-render; unlocks on the first click and on an accepted keydown', () => {
+    const onInspect = vi.fn();
+    const { rerender } = render(createElement(WorldScene, { onInspect, memoryShifted: false }));
+    const wrapper = document.querySelector('.world-wrapper') as HTMLElement;
+    wrapper.focus();
+    fireEvent.focus(wrapper);
+    rerender(createElement(WorldScene, { onInspect, memoryShifted: true }));
+    expect(fake.unlock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('canvas'));
+    expect(fake.unlock).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(wrapper, { code: 'KeyW', key: 'w' });
+    expect(fake.unlock).toHaveBeenCalledTimes(2);
+    const outside = document.createElement('input');
+    document.body.append(outside);
+    fireEvent.keyDown(outside, { code: 'KeyW', key: 'w' });
+    outside.remove();
+    expect(fake.unlock).toHaveBeenCalledTimes(2);
+  });
+
+  it('creates one engine per mount and disposes it on unmount', () => {
+    const { unmount } = renderWorld();
+    fireEvent.click(screen.getByTestId('canvas'));
+    expect(created).toBe(1);
+    expect(fake.dispose).not.toHaveBeenCalled();
+    unmount();
+    expect(fake.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('E on the CRT plays the insert sound and still calls onInspect once', () => {
+    h.target = 'vhs';
+    const { wrapper, onInspect } = renderWorld();
+    pressE(wrapper);
+    expect(fake.playVhsInsertSfx).toHaveBeenCalledTimes(1);
+    expect(fake.playArcadeCoinSfx).not.toHaveBeenCalled();
+    expect(onInspect).toHaveBeenCalledTimes(1);
+    expect(onInspect).toHaveBeenCalledWith('vhs');
+  });
+
+  it('E on the arcade cabinet plays the coin sound and still calls onInspect once', () => {
+    h.target = 'arcade';
+    const { wrapper, onInspect } = renderWorld();
+    pressE(wrapper);
+    expect(fake.playArcadeCoinSfx).toHaveBeenCalledTimes(1);
+    expect(fake.playVhsInsertSfx).not.toHaveBeenCalled();
+    expect(onInspect).toHaveBeenCalledWith('arcade');
+  });
+
+  it('the WebGL fallback buttons unlock, play the same sounds and call onInspect', () => {
+    setWebgl(false);
+    const { onInspect } = renderWorld();
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect the CRT television' }));
+    expect(fake.unlock).toHaveBeenCalledTimes(1);
+    expect(fake.playVhsInsertSfx).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Use the arcade cabinet' }));
+    expect(fake.playArcadeCoinSfx).toHaveBeenCalledTimes(1);
+    expect(onInspect).toHaveBeenNthCalledWith(1, 'vhs');
+    expect(onInspect).toHaveBeenNthCalledWith(2, 'arcade');
+  });
+
+  it('a lamp toggle plays the switch sound; closing nothing else plays', () => {
+    h.target = 'desk-lamp-left';
+    const { wrapper } = renderWorld();
+    pressE(wrapper);
+    pressE(wrapper);
+    expect(fake.playLampSwitchSfx).toHaveBeenCalledTimes(2);
+    expect(fake.playPageRustleSfx).not.toHaveBeenCalled();
+  });
+
+  it('opening a card rustles once; a real page switch rustles again; the active page and closing are silent', () => {
+    h.target = 'manual-snake';
+    const { wrapper } = renderWorld();
+    pressE(wrapper);
+    expect(fake.playPageRustleSfx).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(wrapper, { code: 'Digit1', key: '1' }); // already page 1
+    expect(fake.playPageRustleSfx).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(wrapper, { code: 'Digit2', key: '2' });
+    expect(fake.playPageRustleSfx).toHaveBeenCalledTimes(2);
+    fireEvent.keyDown(wrapper, { code: 'Digit2', key: '2' });
+    expect(fake.playPageRustleSfx).toHaveBeenCalledTimes(2);
+    fireEvent.click(document.getElementById('world-card-tab-1')!);
+    expect(fake.playPageRustleSfx).toHaveBeenCalledTimes(3);
+    fireEvent.click(document.getElementById('world-card-tab-1')!);
+    expect(fake.playPageRustleSfx).toHaveBeenCalledTimes(3);
+    pressE(wrapper); // closes the card
+    expect(document.querySelector('.world-card')).toBeNull();
+    expect(fake.playPageRustleSfx).toHaveBeenCalledTimes(3);
+    expect(fake.playLampSwitchSfx).not.toHaveBeenCalled();
+  });
+
+  it('KeyM toggles mute and the badge text, aria-pressed and label follow; it is prevented and never held', () => {
+    const { wrapper } = renderWorld();
+    expect(badge().textContent).toBe('AUDIO: ON [M]');
+    expect(badge().getAttribute('aria-pressed')).toBe('false');
+    expect(badge().getAttribute('aria-label')).toBe('Toggle audio (M)');
+    expect(fireEvent.keyDown(wrapper, { code: 'KeyM', key: 'm' })).toBe(false);
+    expect(fake.toggleMuted).toHaveBeenCalledTimes(1);
+    expect(badge().textContent).toBe('AUDIO: MUTED [M]');
+    expect(badge().getAttribute('aria-pressed')).toBe('true');
+    expect([...(h.heldKeysRef?.current.roles ?? [])]).not.toContain('mute');
+    fireEvent.keyDown(wrapper, { code: 'KeyM', key: 'm', repeat: true });
+    expect(fake.toggleMuted).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(wrapper, { code: 'KeyM', key: 'm' });
+    expect(badge().textContent).toBe('AUDIO: ON [M]');
+    expect(document.querySelector('.world-audio')?.getAttribute('role')).toBe('status');
+  });
+
+  it('KeyM works while a card is open and is ignored from inputs and outside the wrapper', () => {
+    h.target = 'manual-snake';
+    const { wrapper } = renderWorld();
+    pressE(wrapper);
+    fireEvent.keyDown(wrapper, { code: 'KeyM', key: 'm' });
+    expect(fake.toggleMuted).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('.world-card')).not.toBeNull();
+    const input = document.createElement('input');
+    document.body.append(input);
+    fireEvent.keyDown(input, { code: 'KeyM', key: 'm' });
+    fireEvent.keyDown(document.body, { code: 'KeyM', key: 'm' });
+    input.remove();
+    expect(fake.toggleMuted).toHaveBeenCalledTimes(1);
+  });
+
+  it('clicking the badge toggles mute and never requests pointer lock', () => {
+    renderWorld();
+    fireEvent.click(badge());
+    expect(fake.toggleMuted).toHaveBeenCalledTimes(1);
+    expect(badge().textContent).toBe('AUDIO: MUTED [M]');
+    expect(lockSpy).not.toHaveBeenCalled();
+    expect(fireEvent.mouseDown(badge())).toBe(false); // keeps the focus on the world
+  });
+
+  it('lists the audio key in the controls hint', () => {
+    renderWorld();
+    expect(screen.getByText('M: toggle audio')).toBeTruthy();
+  });
+
+  it('ducks while a station panel is open and restores on resume', () => {
+    h.target = 'vhs';
+    const { wrapper } = renderWorld();
+    expect(fake.setDucked).toHaveBeenLastCalledWith(false);
+    pressE(wrapper);
+    expect(fake.setDucked).toHaveBeenLastCalledWith(true);
+    fireEvent.keyUp(wrapper, { code: 'KeyE', key: 'e' });
+    fireEvent.keyDown(wrapper, { code: 'Enter', key: 'Enter' });
+    expect(fake.setDucked).toHaveBeenLastCalledWith(false);
+  });
+
+  it('follows a supplied inputEnabled prop', () => {
+    const onInspect = vi.fn();
+    const { rerender } = render(createElement(WorldScene, { onInspect, memoryShifted: false, inputEnabled: false }));
+    expect(fake.setDucked).toHaveBeenLastCalledWith(true);
+    rerender(createElement(WorldScene, { onInspect, memoryShifted: false, inputEnabled: true }));
+    expect(fake.setDucked).toHaveBeenLastCalledWith(false);
+    rerender(createElement(WorldScene, { onInspect, memoryShifted: false, inputEnabled: false }));
+    expect(fake.setDucked).toHaveBeenLastCalledWith(true);
+  });
+
+  it('visibilitychange forwards document.hidden and never unlocks; unmount removes the listener', () => {
+    const { unmount } = renderWorld();
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    try {
+      document.dispatchEvent(new Event('visibilitychange'));
+      expect(fake.setHidden).toHaveBeenLastCalledWith(true);
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+      document.dispatchEvent(new Event('visibilitychange'));
+      expect(fake.setHidden).toHaveBeenLastCalledWith(false);
+      expect(fake.unlock).not.toHaveBeenCalled();
+      unmount();
+      const calls = fake.setHidden.mock.calls.length;
+      document.dispatchEvent(new Event('visibilitychange'));
+      expect(fake.setHidden.mock.calls.length).toBe(calls);
+    } finally {
+      delete (document as { hidden?: boolean }).hidden;
+    }
+  });
+
+  it('introduces no timers in the audio wiring', () => {
+    for (const [name, src] of Object.entries(sources)) {
+      if (name.endsWith('WorldScene.tsx')) {
+        // The documented 3 s context-loss timer is the only one.
+        expect(src.match(/setTimeout\(/g)).toHaveLength(1);
+        expect(src).not.toMatch(/setInterval\(/);
+      } else {
+        expect(src).not.toMatch(/setTimeout|setInterval/);
+      }
+    }
   });
 });

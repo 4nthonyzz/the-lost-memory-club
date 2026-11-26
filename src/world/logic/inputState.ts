@@ -16,7 +16,8 @@ export type KeyRole =
   | 'page1'
   | 'page2'
   | 'scrollPageUp'
-  | 'scrollPageDown';
+  | 'scrollPageDown'
+  | 'mute';
 
 const ROLE_BY_CODE: Readonly<Record<string, KeyRole>> = {
   KeyW: 'forward',
@@ -38,11 +39,19 @@ const ROLE_BY_CODE: Readonly<Record<string, KeyRole>> = {
   Numpad2: 'page2',
   PageUp: 'scrollPageUp',
   PageDown: 'scrollPageDown',
+  KeyM: 'mute',
 };
 
-/** Roles that are one-shot actions, never held (interact, the card page keys and PageUp / PageDown). */
+/** Roles that are one-shot actions, never held (interact, the card page keys, PageUp / PageDown and mute). */
 export function isActionRole(role: KeyRole): boolean {
-  return role === 'interact' || role === 'page1' || role === 'page2' || role === 'scrollPageUp' || role === 'scrollPageDown';
+  return (
+    role === 'interact' ||
+    role === 'page1' ||
+    role === 'page2' ||
+    role === 'scrollPageUp' ||
+    role === 'scrollPageDown' ||
+    role === 'mute'
+  );
 }
 
 /** A request to scroll the open Archive Document Card: one line step or one page, up (-1) or down (1). */

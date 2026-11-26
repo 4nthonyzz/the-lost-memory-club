@@ -1,17 +1,19 @@
 # World Exploration: Test Report
 
-Task 15.1, counts refreshed by task 31.3. Requirements 13.2, 13.10, 13.11, 13.14, 15.6. Related: `design.md` (Correctness Properties), `manual-test-log.md`, `tasks.md`.
+Task 15.1, counts refreshed by task 32.3. Requirements 13.2, 13.10, 13.11, 13.14, 15.6. Related: `design.md` (Correctness Properties), `manual-test-log.md`, `tasks.md`.
 
 ## Result of the audit run
 
 Command: `npm test` (Vitest, `vite.config.ts`: `environment: 'node'`, `include: ['src/**/*.test.ts']`). The earlier audit used `npx vitest run --reporter=verbose` for per-test output, which runs the same suite.
 
 ```
-Test Files  32 passed (32)
-     Tests  898 passed (898)
+Test Files  33 passed (33)
+     Tests  940 passed (940)
 ```
 
-**Task 31.3 run log (current state, 898 tests).** `npm run typecheck` exited 0 (`tsc --noEmit`, no output). `npm run build` exited 0 (`tsc --noEmit && vite build`, Vite v7.3.8, 106 modules transformed, built in 5.40 s, no missing-export error; `dist/assets/index-Dxg6jevW.css` 13.42 kB, `dist/assets/index-D3QllGzZ.js` 1,324.18 kB, 382.04 kB gzip; PowerShell wraps Vite's chunk-size warning in a `NativeCommandError` record, which is only the warning). `npm test` was run twice with the summary captured, and each run printed `Test Files  32 passed (32)` and `Tests  898 passed (898)` with exit 0 (11.65 s and 12.97 s); a third run with the JSON reporter counted 898 passed, 0 failed. No test timed out in any run, so no single-file re-run was needed and no flakiness was observed. `npx vitest run src/world/scene/modelDetail.test.ts` printed `Test Files  1 passed (1)` and `Tests  191 passed (191)` (exit 0); its computed report line was `[18.2] computed triangles: 19154 (detail 18912 + base 242), draw-call estimate (grouped by geometry+material): 343, ... textures 32, texture memory estimate 7.70 MB`, and the `[22.1]` line printed `texture memory estimate 7.703 MB`. `npx vitest run src/world/logic/targeting.bench.test.ts` printed `Tests  1 passed (1)` (informational timing only: `measured total 15.04 ms; computed 0.752 us/call`). All numbers are computed from the suite, not runtime-measured. Task 31 added 10 tests and no file (888 to 898 in 32 files): `playerStep.test.ts` 19 to 24 and `modelDetail.test.ts` 186 to 191.
+**Task 32.3 run log (current state, 940 tests in 33 files).** `npm run typecheck` exited 0 (`tsc --noEmit`, no output). `npm run build` exited 0 (`tsc --noEmit && vite build`, Vite v7.3.8, 109 modules transformed, built in 5.32 s, no missing-export error; `dist/assets/index-D4HlsHii.css` 13.55 kB (3.42 kB gzip), `dist/assets/index-DV1WXIKC.js` 1,333.42 kB (385.08 kB gzip); PowerShell wraps Vite's chunk-size warning in a `NativeCommandError` record, which is only the warning). The audio module is now in the bundle (the task 31.3 build was 1,324.18 kB JS, 106 modules). `npm test` was run four times and exited 0 every time. Runs 1 and 4 printed `Test Files  33 passed (33)` and `Tests  940 passed (940)` (11.08 s and 7.89 s; run 4 was captured to a file). Run 2 (15.09 s) printed `Test Files  33 passed (33)` but its `Tests` line was cut by my output filter, and the filter of run 3 matched no line, so for runs 2 and 3 only the exit code (0) is recorded, and run 2's file count. No test timed out in any run, so no single-file re-run was needed and no flakiness was observed. `npx vitest run src/world/scene/modelDetail.test.ts` printed `Test Files  1 passed (1)` and `Tests  191 passed (191)` (exit 0); its computed lines were `[18.3] computed triangles: 19154 (detail 18912 + base 242), draw-call estimate: 343, textures 32, texture memory estimate 7.70 MB, lights 4 (computed, not runtime-measured)`, `[28.2] triangles 19154 (delta 2), textures 32, texture memory 7.703 MiB (computed)` and `[30.1] triangles 19154 (delta 38 from 19116)`. `npx vitest run src/world/logic/targeting.bench.test.ts` printed `Tests  1 passed (1)` (informational timing only: `measured total 11.60 ms; computed 0.580 us/call`, 254 reachable cells x 16 yaws, 4 stations, 28 colliders, 1308 calls returned a station; the same benchmark printed `measured total 38.27 ms; computed 1.913 us/call` inside the first full `npm test` run, while other files ran in parallel). All numbers are computed from the suite, not runtime-measured. Task 32 added 42 tests and one file (898 to 940, 32 to 33 files): `audio/worldAudio.test.ts` (new, 26), `WorldScene.test.ts` 50 to 65 and `inputState.test.ts` 18 to 19. **Task 32 audio is tested only with a fake audio context; nothing was verified by listening.**
+
+**Task 31.3 run log (historical, 898 tests).** `npm run typecheck` exited 0 (`tsc --noEmit`, no output). `npm run build` exited 0 (`tsc --noEmit && vite build`, Vite v7.3.8, 106 modules transformed, built in 5.40 s, no missing-export error; `dist/assets/index-Dxg6jevW.css` 13.42 kB, `dist/assets/index-D3QllGzZ.js` 1,324.18 kB, 382.04 kB gzip; PowerShell wraps Vite's chunk-size warning in a `NativeCommandError` record, which is only the warning). `npm test` was run twice with the summary captured, and each run printed `Test Files  32 passed (32)` and `Tests  898 passed (898)` with exit 0 (11.65 s and 12.97 s); a third run with the JSON reporter counted 898 passed, 0 failed. No test timed out in any run, so no single-file re-run was needed and no flakiness was observed. `npx vitest run src/world/scene/modelDetail.test.ts` printed `Test Files  1 passed (1)` and `Tests  191 passed (191)` (exit 0); its computed report line was `[18.2] computed triangles: 19154 (detail 18912 + base 242), draw-call estimate (grouped by geometry+material): 343, ... textures 32, texture memory estimate 7.70 MB`, and the `[22.1]` line printed `texture memory estimate 7.703 MB`. `npx vitest run src/world/logic/targeting.bench.test.ts` printed `Tests  1 passed (1)` (informational timing only: `measured total 15.04 ms; computed 0.752 us/call`). All numbers are computed from the suite, not runtime-measured. Task 31 added 10 tests and no file (888 to 898 in 32 files): `playerStep.test.ts` 19 to 24 and `modelDetail.test.ts` 186 to 191.
 
 **Task 30.4 run log (historical, 888 tests).** `npm run typecheck` exited 0 (`tsc --noEmit`, no output). `npm run build` exited 0 (`tsc --noEmit && vite build`, Vite v7.3.8, 106 modules transformed, built in 6.10 s, no missing-export error; `dist/assets/index-Dxg6jevW.css` 13.42 kB, `dist/assets/index-BQAbOpo_.js` 1,323.12 kB, 381.53 kB gzip; PowerShell wraps Vite's chunk-size warning in a `NativeCommandError` record, which is only the warning). `npm test` was run several times and exited 0 every time; the two runs captured line by line each printed `Test Files  32 passed (32)` and `Tests  888 passed (888)` (10.96 s and 9.40 s), and a JSON-reporter run counted 888 passed, 0 failed, 32 files. No test timed out in any run, so no single-file re-run was needed. `npx vitest run src/world/scene/modelDetail.test.ts` printed `Test Files  1 passed (1)` and `Tests  186 passed (186)` (exit 0) and `npx vitest run src/world/logic/targeting.bench.test.ts` printed `Tests  1 passed (1)` (informational timing only: `measured total 24.88 ms; computed 1.244 us/call`). All numbers are computed from the suite, not runtime-measured. Task 30 added 32 tests and one file, `logic/smoothing.test.ts` (856 to 888, 31 to 32 files).
 
@@ -52,9 +54,10 @@ These numbers describe the repository at the time of the audit. They change when
 | --- | --- |
 | `src/App.test.ts` | 8 |
 | `src/core/gameReducer.test.ts` | 4 |
-| `src/world/WorldScene.test.ts` | 50 |
+| `src/world/WorldScene.test.ts` | 65 |
 | `src/world/WorldScene.inputEnabled.test.ts` | 8 |
 | `src/world/boundary.test.ts` | 10 |
+| `src/world/audio/worldAudio.test.ts` | 26 (fake audio context) |
 | `src/world/assets/assetManifest.test.ts` | 22 |
 | `src/world/assets/assets.test.ts` | 9 |
 | `src/world/controller/useReducedMotion.test.ts` | 8 |
@@ -66,7 +69,7 @@ These numbers describe the repository at the time of the audit. They change when
 | `src/world/logic/inputMode.supplied.test.ts` | 17 |
 | `src/world/logic/inputMode.fallback.test.ts` | 7 |
 | `src/world/logic/inputMode.prop.test.ts` | 22 |
-| `src/world/logic/inputState.test.ts` | 18 |
+| `src/world/logic/inputState.test.ts` | 19 |
 | `src/world/logic/look.test.ts` | 20 |
 | `src/world/logic/movement.test.ts` | 15 |
 | `src/world/logic/palette.test.ts` | 4 |
@@ -82,7 +85,7 @@ These numbers describe the repository at the time of the audit. They change when
 | `src/world/scene/memoryShift.test.ts` | 16 |
 | `src/world/scene/modelDetail.test.ts` | 191 |
 | `src/world/scene/proceduralTextures.test.ts` | 231 |
-| **Total** | **898 in 32 files** |
+| **Total** | **940 in 33 files** |
 
 New test areas since the audit (polish pass, tasks 18.1 to 18.3), all computed from declared data, none visual: island media console and 1.2 m walkway clearance (`roomLayout.test.ts`), north-wall filing cabinets and bulletin board, book and shelf counts, triangle budget below 20,000, texture memory within 8 MB, at most 4 lights, disposal of all textures and wall geometries (`modelDetail.test.ts`), new procedural textures (`proceduralTextures.test.ts`), and memory-shift tint of the new materials (`memoryShift.test.ts`). Which exact tests were added by which task is not itemized here.
 
@@ -144,7 +147,29 @@ New test areas from task 31 (direct mouse look, walk feel, desk cassettes, ceili
 - Task 31.2 (`modelDetail.test.ts`, describe "task 31.2: desk cassette and ceiling fixture texture polish", 5 tests): the three desk cassettes use `tapeBlack` (flat `#2a2d36`, textured multiplier `#474b54`, base times multiplier about `#2a2d36`); the cassette faces sample UV windows inside the `vhsShell` label, window and spine-label regions, upright; the loose cassette rests on the desk top, stays inside its footprint and overlaps no other desk part; the ceiling fixtures keep the same three parts, with tube and housing sampling the brushed-steel stripe of `metalCabinet` and the bloom strip unchanged; budgets (19,154 triangles, at most 19,200, 4 lights, 32 textures, 7.703 MiB, every texture and cached geometry disposed once).
 - Not covered: how the cassettes, fixtures, look feel and walk speed look or feel in a real browser; the computed fixture tube brightness (about `#bf` against the old `#e8f4ff`) is arithmetic, not a rendered check.
 
-## Task 31.3 verification evidence (computed from source and tests, **not verified visually**)
+New test areas from task 32 (procedural world audio), computed from source and tests with a **fake audio context**. Task 32 is **not verified by listening**: no real sound was heard, and jsdom has no `AudioContext`. 42 tests were added (898 to 940, 32 to 33 files): `audio/worldAudio.test.ts` (new file, 26 tests: silent no-op without `AudioContext` and when the factory returns null or throws, nothing created before a gesture, gesture-only start, ducking and mute gains, hidden suspend, bell scheduling with look-ahead and no backlog after a time jump, SFX recipes, dispose closing the context once), `WorldScene.test.ts` +15 (50 to 65, describe "WorldScene procedural audio (task 32.2)": engine per mount through the test-only factory, unlock only from gestures, `KeyM` and badge text, `aria-pressed` and `aria-label`, `KeyM` while a card is open and its rejection from inputs and outside the wrapper, the badge never requests pointer lock, the `M: toggle audio` hint, the SFX trigger map, and a source scan that finds no timers in the audio wiring) and `inputState.test.ts` +1 (18 to 19, the `KeyM` role).
+- Not covered: how anything sounds (loudness, balance, character); real browser autoplay and `resume()` behaviour; the per-frame `onAudioTick` call in `scene/Effects.tsx:184` (an inspected code path, since `Effects` is mocked in the world tests); audio CPU cost.
+
+## Task 32.3 verification evidence (computed from source and tests, **not verified by listening**)
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Lights | 4 (1 ambient + 3 point) | `scene/Lighting.tsx:14` (`M3_LIGHT_COUNT = 4`), declarations at `:51-54` (file unchanged by task 32); `expect(M3_LIGHT_COUNT).toBe(4)` in `modelDetail.test.ts` (for example `:2812`, `:2997`) |
+| Triangles | 19,154, at most 19,200 and below 20,000 | `[18.3]` and `[30.1]` lines in the `modelDetail.test.ts` output; `modelDetail.test.ts:2810` (`toBeLessThanOrEqual(19200)`) |
+| Texture memory | 7.703 MiB (8,076,989 bytes), at most 7.85 MB; 32 textures | `[28.2]` line; `modelDetail.test.ts:2814` (`toBeLessThanOrEqual(7.85 * 1048576)`) |
+| Timers | one, the documented 3 s context-restore timeout; none in `src/world/audio/` | non-test search of `src/world` for `setTimeout` and `setInterval`: only `WorldScene.tsx:217` (type) and `:269` (`setTimeout(onFail, CONTEXT_RESTORE_TIMEOUT_MS)`, constant at `:40`); test "introduces no timers in the audio wiring" (`WorldScene.test.ts:1078`) |
+| Storage | none in `src/world`, including `audio/` | non-test search for `localStorage`, `sessionStorage` and `indexedDB` found no code use (README prose only) |
+| `AudioContext` creation | only inside `unlock()` | `audio/worldAudio.ts:470` (`ctx = factory()`, the only call of the factory) and `:186-196` (`defaultContextFactory`, reached only through that factory); test "creates nothing before a gesture" (`audio/worldAudio.test.ts:233`) |
+| Dispose closes the context | yes, once | `audio/worldAudio.ts` `dispose()` (`graph.ctx.close()`); test "stops continuous nodes, disconnects, closes once and then no-ops" (`audio/worldAudio.test.ts:517`) |
+| `StationId` | unchanged, `'vhs' \| 'arcade'` | `src/core/contracts.ts:7` |
+| `onInspect` | only for stations | `WorldScene.tsx:209` (station handler), `:305` (fallback buttons), `controller/useWorldInput.ts:162` (`target.type === 'station'`) |
+| Pointer lock | `requestPointerLock` only inside `requestLock` (`controller/usePointerLock.ts:22-28`), called only for a gesture (`controller/useWorldInput.ts:185`); the badge and card clicks never reach it | test "clicking the badge toggles mute and never requests pointer lock" (`WorldScene.test.ts:1024`) |
+| `ASSET_MANIFEST` and files | still `Object.freeze({})`; no `.glb`, `.gltf` or audio files (`.mp3`, `.ogg`, `.wav`, `.m4a`, `.aac`, `.flac`) under `src` or `public` | `src/world/assets/assetManifest.ts:20`; file search printed 0 files |
+| Files outside `src/world` | no change in `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json`, `tools/`, `docs/` | `git diff --stat HEAD` on those paths printed nothing |
+| Working tree | modified: `.kiro/specs/world-exploration/tasks.md`, `tasks.meta.json`, `src/world/WorldScene.tsx`, `WorldScene.test.ts`, `controller/useWorldInput.ts`, `logic/inputState.ts`, `logic/inputState.test.ts`, `overlay/ControlsHint.tsx`, `overlay/WorldOverlay.tsx`, `overlay/world.css`, `scene/Effects.tsx` (plus the four documents of this task); new: `src/world/audio/`, `src/world/overlay/AudioBadge.tsx` | `git status --short` (nothing committed or pushed) |
+| Text integrity | no BOM, control character, U+FFFD or mojibake in `src/world` or the spec documents | byte-level scan (98 files before the document edits; re-run after them) |
+
+## Task 31.3 verification evidence (historical, computed from source and tests, **not verified visually**)
 
 | Check | Result | Evidence |
 | --- | --- | --- |
@@ -249,6 +274,8 @@ These tests combine several modules or render components; none uses a real brows
 - Performance on target hardware. The project owner measured median 16.70 ms and p95 18.60 ms once on a dev build with the `?worldPerf=1` sampler (hardware not provided; see `performance-log.md` section 4). That measurement was taken before Tasks 23 to 30 and has not been repeated. Tasks 24 and 25 add additive transparent layers (lamp cones, desk pools, ceiling bloom strips), Task 26 adds anisotropy 4 on every texture, Task 27 adds a texture and a themed card overlay and Task 30.3 redraws and re-uploads the three attract textures up to 24 times per second (about 18.9 MB/s and 72 canvas redraws per second by arithmetic, not measured, the largest new runtime cost since that measurement; it was about 9.4 MB/s at 12 Hz in Task 29.2), so re-measuring is strongly recommended; no test asserts speed, and `targeting.bench.test.ts` is informational.
 - Task 28 (scrollbar thumb dragging, trackpad deltas, wheel delivery under pointer lock, the look and legibility of the protruding manuals and their cover and spine art, the orientation of the +Z and -Z cover art): not tested in a browser; jsdom covers the scroll logic and the geometry data only.
 - Task 29 (the open-book breakpoints at 640 px and 760 px, the spine, page-fold, ribbon and stamp visuals, the fit of the book inside the card region, the attract animation smoothness, the look of the collection pulse, the real texture upload cost, and closing a book card by walking away, where the player rig is mocked and the behaviour is unchanged): not tested in a browser; jsdom does no layout, so it covers the page state, the DOM structure and the pure animation logic only. Task 29 is **not verified visually**.
+
+- Task 32 (procedural world audio): no real sound was verified (the tests use a fake audio context and jsdom has none); loudness and balance are unmeasured; browser autoplay and `resume()` behaviour is untested; the per-frame `onAudioTick` call in `scene/Effects.tsx:184` has no direct test (`Effects` is mocked in the world tests); audio CPU cost is unmeasured. The engine must be reviewed with Developer 3 before merge (the game-foundation spec assigns audio effects to Developer 3), so the game does not run two audio systems.
 
 ## Test gaps recorded for Requirement 13.14
 

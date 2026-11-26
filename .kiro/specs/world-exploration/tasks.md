@@ -52,6 +52,8 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 
 - Approved scope change (crisp look, faster walk, cassette and fixture polish), 2026-12-08: mouse look deltas apply 1:1 to both the target and the rendered look (no smoothing lag on mouse). Keyboard look (I/J/K/L; the arrow keys move, they do not turn) keeps exponential smoothing with `LOOK_SMOOTHING_LAMBDA` 42. `WALK_SPEED` rises about 15% (2.5 -> about 2.9 m/s; the earlier approved initial value 2.5 is superseded) and `MOVE_SMOOTHING_LAMBDA` goes from 20 to 28. Collision substeps, bounds, snap on blur / inspect / clear input and the reduced-motion bypass are unchanged. The loose desk VHS cassette uses a satin charcoal shell (`#2a2d36`) with the existing `vhsShell` texture; the ceiling fluorescent bars get diffuser and end-cap detail from existing textures. Budgets: triangles at most 19,200 (currently 19,154; 0 extra), at most 4 lights, 32 textures, texture memory at most 7.85 MB (7.703 MiB; 0 extra bytes). `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged. The earlier smoothing wording (look lambda about 32 for mouse and movement lambda about 20) in the 2026-12-07 bullet and in task 30.2 is superseded by this bullet.
 
+- Approved scope change (procedural world audio), 2026-12-09: a zero-asset procedural Web Audio engine is added in `src/world/audio/` (`createWorldAudioEngine`). It is a silent no-op when `AudioContext` / `webkitAudioContext` is missing and accepts an injectable context factory for tests. The context is created or resumed only on a user gesture (click or keydown in the world wrapper), suspended while `document.hidden`, and closed on dispose. SFX: VHS insert (on `onInspect('vhs')`), arcade coin (on `onInspect('arcade')`), lamp switch, page rustle (card open and page 1 / 2). Click-to-inspect no longer exists (removed in M1), so station SFX fire on E and on the WebGL fallback buttons. Ambient late-night VHS-store music at about 78 BPM: the pad and tape hiss are continuously running nodes (they keep playing while the canvas uses `frameloop="demand"` during an open panel), and sparse bell notes are scheduled ahead from the existing `useFrame` using `audioCtx.currentTime` (no `setInterval` / `setTimeout`). Master BGM gain is about 0.15 and is ducked x0.4 while a station panel is open (gain ramp triggered by the mode change, not the frame loop). `KeyM` toggles mute, and a compact "AUDIO: ON [M]" / "AUDIO: MUTED [M]" badge shows the state. Coordination note: the game-foundation spec assigns audio effects to Developer 3, so this world-local engine must be reviewed with Developer 3 before merge so the game does not run two audio systems. Budgets unchanged: triangles 19,154 (at most 19,200), 4 lights, 32 textures (7.703 MiB), no new timers. `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/blender/` stay unchanged.
+
 ## Tasks
 
 ### Milestone 1: Playable 3D room (primitives only)
@@ -1155,6 +1157,36 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: documentation and the spec folder only.
     - _Requirements: 14.11, 14.12, 15.3, 15.6_
 
+### Procedural world audio
+
+- [x] 32. Procedural world audio
+  - [x] 32.1 Web Audio engine: SFX and ambient music
+    - Files: `src/world/audio/worldAudio.ts`, `src/world/audio/worldAudio.test.ts` (new); `src/world/boundary.test.ts` only if its rules need to cover the new folder.
+    - `createWorldAudioEngine` with an injectable context factory, silent no-op when `AudioContext` / `webkitAudioContext` is missing. Context created or resumed only via an explicit gesture call, suspended while `document.hidden`, closed on dispose (twice-safe). SFX: VHS insert, arcade coin, lamp switch, page rustle. Ambient music at about 78 BPM: continuous pad and tape-hiss nodes, sparse bell notes scheduled ahead from a `tick(audioCtx.currentTime)` call (no `setInterval` / `setTimeout`). Master BGM gain about 0.15, `setDucked(true)` ramps to x0.4, `toggleMute()` and `isMuted()`.
+    - Acceptance: no audio files and no new dependency; no timers; no-op engine never throws; nothing plays before a gesture; mute silences SFX and BGM; ducking ramps the gain; dispose closes the context once; the module has no React or three.js import.
+    - Tests: `worldAudio.test.ts` with a fake context (no-op without `AudioContext`, gesture-only start, suspend on hidden, close on dispose, ducking and mute gain values, bell scheduling is ahead of `currentTime` and deterministic, no timers used). Run `npm run typecheck`, `npm test`.
+    - Depends on: 31.3.
+    - Boundary: `src/world/audio/` only; no storage access; no import from `src/arcade/` or `src/memories/`; `ASSET_MANIFEST` stays empty.
+    - _Requirements: 10.1, 10.4, 13.1, 14.2, 14.4, 14.7, 15.1, 16.8, 16.9_
+
+  - [x] 32.2 Wire audio into the world and add the mute badge
+    - Files: `src/world/WorldScene.tsx`, `src/world/controller/useWorldInput.ts`, `src/world/logic/inputState.ts` (`KeyM` role), `src/world/scene/Effects.tsx` or a small audio host component inside the Canvas, `src/world/overlay/WorldOverlay.tsx` or new `src/world/overlay/AudioBadge.tsx`, `src/world/overlay/world.css`; tests `src/world/WorldScene.test.ts`, `src/world/logic/inputState.test.ts`.
+    - Create the engine once per world mount and dispose it on unmount. Start or resume it on the first click or keydown inside the world wrapper. Fire the VHS insert SFX on `onInspect('vhs')` and the coin SFX on `onInspect('arcade')`, from E and from the WebGL fallback buttons. Fire the lamp switch SFX on lamp toggle and the page rustle on card open and page 1 / 2. Tick music scheduling from the existing `useFrame`. Duck on the mode change to `inspecting` (and restore on leaving it), not from the frame loop. `KeyM` toggles mute with the same key filtering as other keys. Show the badge "AUDIO: ON [M]" / "AUDIO: MUTED [M]" with `role="status"` inside the wrapper, without covering the App HUD.
+    - Acceptance: no audio before a gesture; E on a Station plays the matching SFX and still calls `onInspect` once; `KeyM` from an input outside the wrapper is ignored and does not move the player; badge text matches the state; no new timers; triangles, lights and textures unchanged (19,154 / 4 / 32); `WorldSceneProps` and `onInspect` unchanged; `src/App.tsx` unchanged.
+    - Tests: `inputState.test.ts` (`KeyM` role and filtering), `WorldScene.test.ts` with an injected fake engine (gesture start, SFX per Station and fallback button, lamp and page SFX, ducking on inspect, mute toggle and badge text, dispose on unmount). Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 32.1.
+    - Boundary: `src/world/` only; no storage access; the import-boundary test still passes.
+    - _Requirements: 7.5, 7.6, 7.7, 8.1, 11.12, 11.13, 11.14, 15.1, 15.2, 15.4, 16.6, 16.7, 16.8, 16.9, 20.2, 20.8_
+
+  - [x] 32.3 Docs, metrics and verification
+    - Files: `src/world/README.md`, `.kiro/specs/world-exploration/performance-log.md`, `.kiro/specs/world-exploration/integration-notes.md`, `.kiro/specs/world-exploration/test-report.md` (each only where counts changed).
+    - Re-run `npm run typecheck`, `npm test` and `npm run build`. Record computed triangles, lights and texture memory, each labelled "computed, not runtime-measured". Document the audio engine, `KeyM`, the badge, and the Developer 3 review requirement (avoid two audio systems). Audio is marked tested only by unit tests with a fake context, not by listening. Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final code and test counts; all text in English; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 32.2.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional. The 17 property-based test sub-tasks can be skipped for a faster MVP. Tasks 16.2 and 16.3 are marked `*` because they must not be implemented without approval.
@@ -1241,7 +1273,10 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     { "id": 69, "tasks": ["30.4"] },
     { "id": 70, "tasks": ["31.1"] },
     { "id": 71, "tasks": ["31.2"] },
-    { "id": 72, "tasks": ["31.3"] }
+    { "id": 72, "tasks": ["31.3"] },
+    { "id": 73, "tasks": ["32.1"] },
+    { "id": 74, "tasks": ["32.2"] },
+    { "id": 75, "tasks": ["32.3"] }
   ]
 }
 ```

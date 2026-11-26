@@ -1,6 +1,8 @@
 import { Component, useCallback, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from 'react';
 import { useThree } from '@react-three/fiber';
 import type { StationId } from '../core/contracts';
+import { createWorldAudio } from './audio/engineFactory';
+import type { WorldAudioEngine } from './audio/worldAudio';
 import { FrameSamplerHost } from './controller/useFrameSampler';
 import { usePlayerRig } from './controller/usePlayerRig';
 import { useWorldInput, type WorldInput } from './controller/useWorldInput';
@@ -106,28 +108,92 @@ function PlayerRigHost({
   return null;
 }
 
+type GetAudio = () => WorldAudioEngine;
+
+/**
+ * One audio engine per WorldScene mount. It is created lazily (never during render, never before an effect or event
+ * handler asks for it) and disposed on unmount. The ref is cleared on cleanup, so React StrictMode's simulated
+ * unmount / remount gets a fresh engine instead of a disposed one.
+ */
+function useWorldAudioEngine(): GetAudio {
+  const ref = useRef<WorldAudioEngine | null>(null);
+  const get = useCallback<GetAudio>(() => {
+    if (ref.current === null) ref.current = createWorldAudio();
+    return ref.current;
+  }, []);
+  useEffect(
+    () => () => {
+      ref.current?.dispose();
+      ref.current = null;
+    },
+    [],
+  );
+  return get;
+}
+
+/** Plays the SFX of a station request. The arcade coin also sounds when the App then shows its lock message (the coin is rejected). */
+function playStationSfx(audio: WorldAudioEngine, id: StationId): void {
+  if (id === 'vhs') audio.playVhsInsertSfx();
+  else if (id === 'arcade') audio.playArcadeCoinSfx();
+}
+
 function WorldInteractive({
   onInspect,
   memoryShifted,
   inputEnabled,
   onFail,
-}: WorldSceneProps & { onFail: () => void }) {
+  getAudio,
+}: WorldSceneProps & { onFail: () => void; getAudio: GetAudio }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const getTargetRef = useRef<() => InteractionTarget | null>(() => null);
   const [target, setTarget] = useState<InteractionTarget | null>(null);
   // World-local prop state: lamp on/off and the latest prop message. Session-only, never persisted.
   const [propState, setPropState] = useState<PropState>(initialPropState);
-  const onPropInteract = useCallback((id: PropInteractableId) => setPropState((s) => reducePropInteract(s, id)), []);
+  // Audio is a side effect only: it never changes what the world sends to onInspect.
+  const [audioMuted, setAudioMuted] = useState(false);
+  const onGesture = useCallback(() => getAudio().unlock(), [getAudio]);
+  const onToggleMute = useCallback(() => {
+    const audio = getAudio();
+    audio.unlock();
+    setAudioMuted(audio.toggleMuted());
+  }, [getAudio]);
+  const cardOpenRef = useRef(false);
+  const cardPageRef = useRef<CardPage>(1);
+  const onPropInteract = useCallback(
+    (id: PropInteractableId) => {
+      const audio = getAudio();
+      if (cardOpenRef.current) {
+        // E closes the open card: silent.
+      } else if (id === 'desk-lamp-left' || id === 'desk-lamp-right') {
+        audio.playLampSwitchSfx();
+      } else {
+        audio.playPageRustleSfx();
+        cardPageRef.current = 1;
+      }
+      setPropState((s) => reducePropInteract(s, id));
+    },
+    [getAudio],
+  );
   // Archive Document Card. The anchor and open flag live in refs so the per-frame distance check and the key handler
   // read them without React state churn. Closing is idempotent.
   const cardAnchorRef = useRef<Vec2 | null>(null);
-  const cardOpenRef = useRef(false);
   const closeCard = useCallback(() => {
     cardAnchorRef.current = null;
     cardOpenRef.current = false;
+    cardPageRef.current = 1;
     setPropState((s) => reduceCloseCard(s));
   }, []);
-  const onCardPage = useCallback((page: CardPage) => setPropState((s) => reduceCardPage(s, page)), []);
+  // A page rustle only when the visible page really changes (not for the page that is already shown).
+  const onCardPage = useCallback(
+    (page: CardPage) => {
+      if (cardOpenRef.current && cardPageRef.current !== page) {
+        cardPageRef.current = page;
+        getAudio().playPageRustleSfx();
+      }
+      setPropState((s) => reduceCardPage(s, page));
+    },
+    [getAudio],
+  );
   const getCardAnchor = useCallback(() => cardAnchorRef.current, []);
   const isCardOpen = useCallback(() => cardOpenRef.current, []);
   const onCardScroll = useCallback((s: CardScroll) => {
@@ -139,9 +205,10 @@ function WorldInteractive({
   const inspectStation = useCallback(
     (id: StationId) => {
       closeCard(); // opening a station closes any open card
+      playStationSfx(getAudio(), id);
       onInspect(id);
     },
-    [closeCard, onInspect],
+    [closeCard, onInspect, getAudio],
   );
   const onTargetChange = useCallback((t: InteractionTarget | null) => {
     setTarget(t);
@@ -160,12 +227,27 @@ function WorldInteractive({
     onCardPage,
     onCardScroll,
     inputEnabled,
+    onGesture,
+    onToggleMute,
   });
+  // Duck the music while a station panel is open. Driven by the mode, not by the frame loop.
+  const inspectingMode = input.mode === 'inspecting';
+  useEffect(() => {
+    getAudio().setDucked(inspectingMode);
+  }, [inspectingMode, getAudio]);
+  // Suspend audio while the tab is hidden. Never unlocks.
+  useEffect(() => {
+    const onVisibility = () => getAudio().setHidden(document.hidden);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [getAudio]);
+  const onAudioTick = useCallback((elapsed: number) => getAudio().tick(elapsed), [getAudio]);
   // Keep the refs in step with the committed state (the open card id is the single source).
   const openCard = propState.openCard;
   const { releaseCardArrows } = input;
   useEffect(() => {
     cardOpenRef.current = openCard !== null;
+    cardPageRef.current = 1;
     cardAnchorRef.current = openCard === null ? null : (INTERACTABLE_DEFS.find((d) => d.id === openCard)?.anchor ?? null);
     // ArrowUp / ArrowDown scroll the card now, so movement they were driving stops.
     if (openCard !== null) releaseCardArrows();
@@ -195,7 +277,7 @@ function WorldInteractive({
         <Room />
         <Props lampOn={propState.lampOn} />
         <Stations />
-        <Effects active={input.mode !== 'inspecting'} />
+        <Effects active={input.mode !== 'inspecting'} onAudioTick={onAudioTick} />
         <FrameSamplerHost />
         <PlayerRigHost
           input={input}
@@ -208,15 +290,25 @@ function WorldInteractive({
           onContextRestored={clearTimer}
         />
       </WorldCanvas>
-      <WorldOverlay mode={input.mode} target={target} lampOn={propState.lampOn} message={propState.message} card={propState.openCard} cardPage={propState.cardPage} onCardPage={onCardPage} notesRead={propState.read.size} canResume={inputEnabled === undefined} keyboardLookHint={input.keyboardLookHint} />
+      <WorldOverlay mode={input.mode} target={target} lampOn={propState.lampOn} message={propState.message} card={propState.openCard} cardPage={propState.cardPage} onCardPage={onCardPage} notesRead={propState.read.size} canResume={inputEnabled === undefined} keyboardLookHint={input.keyboardLookHint} audioMuted={audioMuted} onToggleAudio={onToggleMute} />
     </div>
   );
 }
 
-function FallbackView({ onInspect }: { onInspect: (station: StationId) => void }) {
+function FallbackView({ onInspect, getAudio }: { onInspect: (station: StationId) => void; getAudio: GetAudio }) {
+  // The button click is the user gesture: unlock, then play the station SFX, then report the request.
+  const inspect = useCallback(
+    (id: StationId) => {
+      const audio = getAudio();
+      audio.unlock();
+      playStationSfx(audio, id);
+      onInspect(id);
+    },
+    [getAudio, onInspect],
+  );
   return (
     <div className="world-wrapper" tabIndex={-1}>
-      <WebglFallback onInspect={onInspect} />
+      <WebglFallback onInspect={inspect} />
     </div>
   );
 }
@@ -242,11 +334,13 @@ export function WorldScene({ onInspect, memoryShifted, inputEnabled }: WorldScen
   const [failed, setFailed] = useState(false);
   const fail = useCallback(() => setFailed(true), []);
 
-  const fallback = <FallbackView onInspect={onInspect} />;
+  const getAudio = useWorldAudioEngine();
+
+  const fallback = <FallbackView onInspect={onInspect} getAudio={getAudio} />;
   if (!webgl || failed) return fallback;
   return (
     <WorldErrorBoundary fallback={fallback}>
-      <WorldInteractive onInspect={onInspect} memoryShifted={memoryShifted} inputEnabled={inputEnabled} onFail={fail} />
+      <WorldInteractive onInspect={onInspect} memoryShifted={memoryShifted} inputEnabled={inputEnabled} onFail={fail} getAudio={getAudio} />
     </WorldErrorBoundary>
   );
 }

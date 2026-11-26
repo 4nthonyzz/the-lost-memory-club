@@ -1,5 +1,6 @@
 import type { StationId } from '../../core/contracts';
 import { CaptureOverlay } from './CaptureOverlay';
+import { AudioBadge } from './AudioBadge';
 import { ControlsHint } from './ControlsHint';
 import { Crosshair } from './Crosshair';
 import { InteractionPrompt } from './InteractionPrompt';
@@ -34,10 +35,13 @@ export interface WorldOverlayProps {
   canResume?: boolean;
   /** True after pointer lock was denied or is unsupported. */
   keyboardLookHint?: boolean;
+  /** Audio badge state. The badge is shown only when onToggleAudio is supplied. */
+  audioMuted?: boolean;
+  onToggleAudio?: () => void;
 }
 
 /** Rendered inside the World_Wrapper; never covers the App status line. */
-export function WorldOverlay({ mode, target = null, lampOn, message = null, card = null, cardPage = 1, onCardPage, notesRead, canResume = true, keyboardLookHint = false }: WorldOverlayProps) {
+export function WorldOverlay({ mode, target = null, lampOn, message = null, card = null, cardPage = 1, onCardPage, notesRead, canResume = true, keyboardLookHint = false, audioMuted = false, onToggleAudio }: WorldOverlayProps) {
   const inspecting = mode === 'inspecting';
   return (
     <div className="world-overlay">
@@ -49,6 +53,7 @@ export function WorldOverlay({ mode, target = null, lampOn, message = null, card
       {inspecting ? <PanelOpenNotice canResume={canResume} /> : null}
       {keyboardLookHint && !inspecting ? <KeyboardLookHint /> : null}
       {notesRead !== undefined && !inspecting ? <NotesCounter read={notesRead} /> : null}
+      {onToggleAudio ? <AudioBadge muted={audioMuted} onToggle={onToggleAudio} /> : null}
       <ControlsHint />
     </div>
   );

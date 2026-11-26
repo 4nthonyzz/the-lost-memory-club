@@ -58,6 +58,13 @@ export interface UseWorldInputOptions {
   onCardScroll?: (scroll: CardScroll) => void;
   /** Optional external switch. Absent means unchanged default behavior. */
   inputEnabled?: boolean;
+  /**
+   * Called synchronously from a real user gesture inside the wrapper: an accepted, non-repeated keydown, or a click that
+   * is not on a button, form field or the card. Used to unlock audio. Read through a ref.
+   */
+  onGesture?: () => void;
+  /** Called when KeyM is pressed (accepted, not repeated, no Ctrl / Meta / Alt). Read through a ref. */
+  onToggleMute?: () => void;
 }
 
 export interface WorldInput {
@@ -97,6 +104,8 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
   const isCardOpenRef = useRef(options.isCardOpen);
   const onCardPageRef = useRef(options.onCardPage);
   const onCardScrollRef = useRef(options.onCardScroll);
+  const onGestureRef = useRef(options.onGesture);
+  const onToggleMuteRef = useRef(options.onToggleMute);
   // Physical codes of the held movement keys, so two keys sharing a role (W and ArrowUp) release independently.
   const physicalRef = useRef<Set<string>>(new Set());
   const releaseArrowsRef = useRef<() => void>(() => undefined);
@@ -107,6 +116,8 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
   isCardOpenRef.current = options.isCardOpen;
   onCardPageRef.current = options.onCardPage;
   onCardScrollRef.current = options.onCardScroll;
+  onGestureRef.current = options.onGesture;
+  onToggleMuteRef.current = options.onToggleMute;
 
   const getMode = useCallback((): InputMode => stateRef.current.mode, []);
 
@@ -196,6 +207,11 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
         insideWorldWrapper: target instanceof Node && wrapper.contains(target),
       });
       const modeBefore = stateRef.current.mode;
+      // An accepted keydown is a user gesture: unlock audio first, so SFX triggered below can sound.
+      if (accepted && !e.repeat) onGestureRef.current?.();
+      // KeyM toggles audio in every mode, including while pointer-locked and while a card is open.
+      const isMute = accepted && role === 'mute' && !e.ctrlKey && !e.metaKey && !e.altKey;
+      if (isMute && !e.repeat) onToggleMuteRef.current?.();
       // Escape closes an open card. It is never prevented: the browser also uses it to release pointer lock.
       if (accepted && e.code === 'Escape') onCloseCardRef.current?.();
 
@@ -215,6 +231,8 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
       // Keys 1 and 2 are claimed only while a card is open.
       if (accepted && role !== null && modeBefore !== 'inspecting' && e.code !== 'Escape' && (!cardOnlyKey || cardOpen)) {
         e.preventDefault();
+      } else if (isMute) {
+        e.preventDefault(); // KeyM is also claimed while inspecting
       }
 
       const current = role === 'interact' ? getTargetRef.current() : null;
@@ -255,6 +273,7 @@ export function useWorldInput(options: UseWorldInputOptions): WorldInput {
       // Clicks on overlay buttons or form fields are not canvas activations.
       const tag = target?.tagName?.toUpperCase();
       if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      onGestureRef.current?.();
       dispatch({ type: 'CANVAS_CLICK' }, true);
     };
 
