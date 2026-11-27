@@ -1,0 +1,1834 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Create world types and constants": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497483660
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497501839
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497578730
+      }
+    ],
+    "1.2 Implement the Milestone 1 room layout with reachability test": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497483851
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497808133
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497908217
+      }
+    ],
+    "2.1 Implement movement module with unit tests": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497484678
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497583100
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497700161
+      }
+    ],
+    "2.4 Implement collision module with unit tests": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497485440
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497583300
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497700605
+      }
+    ],
+    "3.1 Implement mouse look module with unit tests": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497486456
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497583732
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497701343
+      }
+    ],
+    "3.2 Implement interaction targeting with unit tests": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497487347
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497584853
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497702158
+      }
+    ],
+    "3.4 Implement input state and key filtering with unit tests": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497488448
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497585482
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497702891
+      }
+    ],
+    "3.7 Implement the mode state machine (prop absent) with unit tests": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497489154
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497808949
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497908971
+      }
+    ],
+    "4. Checkpoint - Pure logic complete": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497490200
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498022979
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498076881
+      }
+    ],
+    "5.1 Implement the minimal palette": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497491104
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497712970
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497804706
+      }
+    ],
+    "5.2 Implement the M1 scene components": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497491932
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498080930
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498206116
+      }
+    ],
+    "5.3 Implement the M1 overlay components": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497492741
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497713244
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497805371
+      }
+    ],
+    "5.4 Implement pointer-lock and input controller hooks": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497493749
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497916574
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498016400
+      }
+    ],
+    "5.5 Implement the player rig": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497494474
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498081144
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498206340
+      }
+    ],
+    "5.6 Wire WorldScene.tsx": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497495640
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498209145
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498318576
+      }
+    ],
+    "5.7 Write import-boundary test": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497496460
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498321560
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498518526
+      }
+    ],
+    "5.8 Write component-level tests": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497497170
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498322456
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498518730
+      }
+    ],
+    "6. Checkpoint - Milestone 1 playable": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497497807
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498521504
+      },
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498611617
+      }
+    ],
+    "2. Movement and collision pure logic (test-first)": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497700695
+      }
+    ],
+    "1. Foundation: types, constants and room layout": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497908403
+      }
+    ],
+    "3. Look, targeting, input and mode pure logic (test-first)": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795497909045
+      }
+    ],
+    "5. M1 scene, controllers, overlays and WorldScene wiring": [
+      {
+        "executionId": "5ec009f3-a404-4260-bf6e-1fc4e44fa6ca",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795498518804
+      }
+    ],
+    "7.1 Add keyboard look to the look module": [
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499366144
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499374876
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499461556
+      }
+    ],
+    "7.3 Wire keyboard look into the controllers": [
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499366358
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499468907
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499538972
+      }
+    ],
+    "7.4 Implement pointer-lock denial and unsupported fallback display": [
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499367259
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499375004
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499462118
+      }
+    ],
+    "7.5 Complete the controls hint": [
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499368142
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499375443
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499462654
+      }
+    ],
+    "7.6 Write unit tests for fallback transitions": [
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499369388
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499543785
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499597880
+      }
+    ],
+    "8. Checkpoint - Milestone 2 complete": [
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499369908
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499598070
+      },
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499700840
+      }
+    ],
+    "7. Keyboard look, pointer-lock fallback and full controls hint": [
+      {
+        "executionId": "ce4d6f6e-56e5-4b5d-933a-994dfee9013b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795499539106
+      }
+    ],
+    "9.1 Extend the layout to the full archive": [
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500287497
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500296368
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500448024
+      }
+    ],
+    "9.2 Render the full layout": [
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500287739
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500452536
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500582488
+      }
+    ],
+    "9.3 Implement feedback ownership text": [
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500287906
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500296592
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500448156
+      }
+    ],
+    "9.4 Extend the mode reducer for the supplied inputEnabled prop": [
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500288048
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500297488
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500449022
+      }
+    ],
+    "9.7 Implement the optional inputEnabled prop in the world module": [
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500288863
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500453355
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500583085
+      }
+    ],
+    "9.8 Write component tests for supplied and absent inputEnabled": [
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500289911
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500588153
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500665316
+      }
+    ],
+    "9.9 NON-IMPLEMENTATION: document the App.tsx change for team coordination": [
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500291008
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500588451
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500665783
+      }
+    ],
+    "10. Checkpoint - Milestone 3 complete": [
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500291878
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500668836
+      },
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500763627
+      }
+    ],
+    "9. Full layout, interaction feedback ownership and the inputEnabled prop": [
+      {
+        "executionId": "401cf05d-85e5-4faf-a637-a6af97943d20",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795500665850
+      }
+    ],
+    "11.1 Complete the palette module": [
+      {
+        "executionId": "52752366-95bf-4364-8943-ee219a3be9f4",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795538008469
+      },
+      {
+        "executionId": "52752366-95bf-4364-8943-ee219a3be9f4",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795538015004
+      },
+      {
+        "executionId": "52752366-95bf-4364-8943-ee219a3be9f4",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795538131027
+      }
+    ],
+    "11.3 Implement the reduced-motion hook": [
+      {
+        "executionId": "52752366-95bf-4364-8943-ee219a3be9f4",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795538009146
+      },
+      {
+        "executionId": "52752366-95bf-4364-8943-ee219a3be9f4",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795538015744
+      },
+      {
+        "executionId": "52752366-95bf-4364-8943-ee219a3be9f4",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795538130452
+      }
+    ],
+    "11.4 Wire Memory_Shift into the scene": [
+      {
+        "executionId": "52752366-95bf-4364-8943-ee219a3be9f4",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795538010136
+      },
+      {
+        "executionId": "52752366-95bf-4364-8943-ee219a3be9f4",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795538134565
+      },
+      {
+        "executionId": "52752366-95bf-4364-8943-ee219a3be9f4",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795538341122
+      }
+    ],
+    "11.5 Implement environmental effects": [
+      {
+        "executionId": "52752366-95bf-4364-8943-ee219a3be9f4",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795538010960
+      },
+      {
+        "executionId": "52752366-95bf-4364-8943-ee219a3be9f4",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795538344150
+      },
+      {
+        "executionId": "52752366-95bf-4364-8943-ee219a3be9f4",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795538691029
+      }
+    ],
+    "12. Checkpoint - Milestone 4 complete": [
+      {
+        "executionId": "52752366-95bf-4364-8943-ee219a3be9f4",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795538011701
+      },
+      {
+        "executionId": "52752366-95bf-4364-8943-ee219a3be9f4",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795538694202
+      },
+      {
+        "executionId": "52752366-95bf-4364-8943-ee219a3be9f4",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795538987940
+      }
+    ],
+    "11. Memory_Shift and effects": [
+      {
+        "executionId": "52752366-95bf-4364-8943-ee219a3be9f4",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795538691195
+      }
+    ],
+    "13.1 Implement the asset loader, manifest and AssetModel": [
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552888764
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552914687
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553556675
+      }
+    ],
+    "13.2 Integrate AssetModel into scene components": [
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552904592
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553562446
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553737626
+      }
+    ],
+    "13.3 Add original Blender scripts": [
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552904729
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552915325
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553556856
+      }
+    ],
+    "13.4 Add asset budget check and asset log": [
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552905094
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553563325
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553737833
+      }
+    ],
+    "13.5 Full-screen game shell and in-game overlays (approved App.tsx/styles.css change)": [
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552906237
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552916238
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553556975
+      }
+    ],
+    "13.6 Upgrade procedural model detail (primitives only)": [
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552907278
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552916971
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553557127
+      }
+    ],
+    "14. Checkpoint - Milestone 5 complete": [
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795552909246
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553743610
+      },
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553928543
+      }
+    ],
+    "13. Optional GLB assets with primitive fallback": [
+      {
+        "executionId": "9136d2cc-5c0d-41bf-a31b-7786ee4f2473",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795553737972
+      }
+    ],
+    "15.7 Procedural canvas textures and model craftsmanship upgrade": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795554688521
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795555385315
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795556287622
+      }
+    ],
+    "15.1 Audit test coverage against design properties": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795554689389
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795556296353
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795556445661
+      }
+    ],
+    "15.4 MANUAL MEASUREMENT: record performance results": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795554690425
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795556296559
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795556446875
+      },
+      {
+        "executionId": "709b9690-2b94-4012-93d5-e659f0fd4b82",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795618215831
+      },
+      {
+        "executionId": "709b9690-2b94-4012-93d5-e659f0fd4b82",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795618416659
+      }
+    ],
+    "15.5 Update src/world/README.md": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795554691319
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795556456604
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795556660014
+      }
+    ],
+    "17. Final checkpoint - Verify and report": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795554692305
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795556660797
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795556854926
+      }
+    ],
+    "15.2 Add a dev-only frame sampler and targeting benchmark": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795554693124
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795555375020
+      }
+    ],
+    "15.3 Create the manual test log": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795554694204
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795555375214
+      }
+    ],
+    "15.6 Relocate the arcade Station into the Arcade_Area and dress it": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795554695314
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795555375337
+      }
+    ],
+    "15.8 Apply M5 polish fixes": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795554696319
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795555376230
+      }
+    ],
+    "16.1 NON-IMPLEMENTATION: record pending proposals P2 to P8": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795554697016
+      },
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795555376974
+      }
+    ],
+    "16. Approval-gated proposals (do not implement unless approved)": [
+      {
+        "executionId": "38d9da78-b766-40bd-96e5-63c42655f793",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795555377060
+      }
+    ],
+    "18.1 Centralize the vhs Station and add the north-wall focal layout": [
+      {
+        "executionId": "259fd6d5-a488-4ce9-a1bf-8e9101b4e6e5",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795558024301
+      },
+      {
+        "executionId": "259fd6d5-a488-4ce9-a1bf-8e9101b4e6e5",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795559015415
+      }
+    ],
+    "18.2 Wood bookcases with dense varied books and VHS slipcases": [
+      {
+        "executionId": "259fd6d5-a488-4ce9-a1bf-8e9101b4e6e5",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795559016307
+      },
+      {
+        "executionId": "259fd6d5-a488-4ce9-a1bf-8e9101b4e6e5",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795559834633
+      }
+    ],
+    "18.3 Wall, rug, bulletin board, ceiling and corner dressing": [
+      {
+        "executionId": "259fd6d5-a488-4ce9-a1bf-8e9101b4e6e5",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795559835227
+      },
+      {
+        "executionId": "259fd6d5-a488-4ce9-a1bf-8e9101b4e6e5",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795560795592
+      }
+    ],
+    "18.4 Update computed metrics and run verification": [
+      {
+        "executionId": "259fd6d5-a488-4ce9-a1bf-8e9101b4e6e5",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795560796211
+      },
+      {
+        "executionId": "259fd6d5-a488-4ce9-a1bf-8e9101b4e6e5",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795561009223
+      }
+    ],
+    "18. Visual and spatial polish pass": [
+      {
+        "executionId": "259fd6d5-a488-4ce9-a1bf-8e9101b4e6e5",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795561009352
+      }
+    ],
+    "19.1 Re-center the island, move the desk and rebalance lighting": [
+      {
+        "executionId": "53fe06ea-e2fb-4eff-a19d-10897ec5a1ef",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795567923813
+      },
+      {
+        "executionId": "0a4569c6-1110-4e5d-8653-0c6fcd2ae168",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795570452876
+      },
+      {
+        "executionId": "0a4569c6-1110-4e5d-8653-0c6fcd2ae168",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795570742355
+      }
+    ],
+    "19.2 Texture headroom and visual craftsmanship upgrade": [
+      {
+        "executionId": "0a4569c6-1110-4e5d-8653-0c6fcd2ae168",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795570742712
+      },
+      {
+        "executionId": "0a4569c6-1110-4e5d-8653-0c6fcd2ae168",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795571244339
+      }
+    ],
+    "19.3 Update computed metrics and run verification": [
+      {
+        "executionId": "0a4569c6-1110-4e5d-8653-0c6fcd2ae168",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795571245027
+      },
+      {
+        "executionId": "0a4569c6-1110-4e5d-8653-0c6fcd2ae168",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795571427328
+      }
+    ],
+    "19. Spatial and visual refinement pass": [
+      {
+        "executionId": "0a4569c6-1110-4e5d-8653-0c6fcd2ae168",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795571427481
+      }
+    ],
+    "20.1 Three-cabinet layout, geometry and lighting": [
+      {
+        "executionId": "a915c7be-a3bc-4605-8819-8e23f58ddea8",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795609401919
+      },
+      {
+        "executionId": "a915c7be-a3bc-4605-8819-8e23f58ddea8",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795610099344
+      }
+    ],
+    "20.2 Attract screen and marquee textures": [
+      {
+        "executionId": "a915c7be-a3bc-4605-8819-8e23f58ddea8",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795610099786
+      },
+      {
+        "executionId": "a915c7be-a3bc-4605-8819-8e23f58ddea8",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795610508675
+      }
+    ],
+    "20.3 Docs, metrics and verification": [
+      {
+        "executionId": "a915c7be-a3bc-4605-8819-8e23f58ddea8",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795610509126
+      },
+      {
+        "executionId": "a915c7be-a3bc-4605-8819-8e23f58ddea8",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795610784022
+      }
+    ],
+    "20. Three dedicated arcade cabinets": [
+      {
+        "executionId": "a915c7be-a3bc-4605-8819-8e23f58ddea8",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795610784129
+      }
+    ],
+    "21.1 Couch geometry fix and upholstery texture": [
+      {
+        "executionId": "6efcd75e-f6b7-4440-9523-cb4e26973884",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795612099659
+      },
+      {
+        "executionId": "6efcd75e-f6b7-4440-9523-cb4e26973884",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795612589455
+      }
+    ],
+    "21.2 CRT casing texture and glass screen": [
+      {
+        "executionId": "6efcd75e-f6b7-4440-9523-cb4e26973884",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795612589679
+      },
+      {
+        "executionId": "6efcd75e-f6b7-4440-9523-cb4e26973884",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795612904810
+      }
+    ],
+    "21.3 Docs, metrics and verification": [
+      {
+        "executionId": "6efcd75e-f6b7-4440-9523-cb4e26973884",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795612905214
+      },
+      {
+        "executionId": "6efcd75e-f6b7-4440-9523-cb4e26973884",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795613096675
+      }
+    ],
+    "21. Couch fix and CRT craftsmanship": [
+      {
+        "executionId": "6efcd75e-f6b7-4440-9523-cb4e26973884",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795613096787
+      }
+    ],
+    "22.1 Texture headroom, media island, armchair and VHS shells": [
+      {
+        "executionId": "91c939c4-ba55-4237-9ca9-23fe0c1a5b1f",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795613379007
+      },
+      {
+        "executionId": "91c939c4-ba55-4237-9ca9-23fe0c1a5b1f",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795614041007
+      }
+    ],
+    "22.2 Filing cabinets, boxes, crates, desk clutter and doors": [
+      {
+        "executionId": "91c939c4-ba55-4237-9ca9-23fe0c1a5b1f",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795614041174
+      },
+      {
+        "executionId": "929ed3c7-0757-4b1e-8ab3-a28976ee26de",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795616802019
+      }
+    ],
+    "22.3 Docs, metrics and verification": [
+      {
+        "executionId": "929ed3c7-0757-4b1e-8ab3-a28976ee26de",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795616802617
+      },
+      {
+        "executionId": "929ed3c7-0757-4b1e-8ab3-a28976ee26de",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795617047949
+      }
+    ],
+    "22. Cohesive prop texture upgrade": [
+      {
+        "executionId": "929ed3c7-0757-4b1e-8ab3-a28976ee26de",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795617048202
+      }
+    ],
+    "15. Verification, measurement and documentation": [
+      {
+        "executionId": "709b9690-2b94-4012-93d5-e659f0fd4b82",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795618418004
+      }
+    ],
+    "23.1 Lamp glow upgrade and second desk lamp": [
+      {
+        "executionId": "78a2290e-2889-4e48-80b3-9fb31adb17ed",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795618742205
+      },
+      {
+        "executionId": "78a2290e-2889-4e48-80b3-9fb31adb17ed",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795619723071
+      }
+    ],
+    "23.2 Interactable props: lamps and manuals": [
+      {
+        "executionId": "78a2290e-2889-4e48-80b3-9fb31adb17ed",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795619725547
+      },
+      {
+        "executionId": "78a2290e-2889-4e48-80b3-9fb31adb17ed",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795620566184
+      }
+    ],
+    "23.3 Docs, metrics and verification": [
+      {
+        "executionId": "78a2290e-2889-4e48-80b3-9fb31adb17ed",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795620566827
+      },
+      {
+        "executionId": "78a2290e-2889-4e48-80b3-9fb31adb17ed",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795620926466
+      }
+    ],
+    "23. Interactive desk lamps and arcade manuals": [
+      {
+        "executionId": "78a2290e-2889-4e48-80b3-9fb31adb17ed",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795620926637
+      }
+    ],
+    "24.1 Lamp cones, pools, emissive shades, room light coupling and ceiling bloom": [
+      {
+        "executionId": "09289ed3-3ab9-49d1-af09-98f672eaefee",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795621452693
+      },
+      {
+        "executionId": "09289ed3-3ab9-49d1-af09-98f672eaefee",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795621894088
+      }
+    ],
+    "24.2 Clue inspector card, new readable props and notes counter": [
+      {
+        "executionId": "09289ed3-3ab9-49d1-af09-98f672eaefee",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795621894682
+      },
+      {
+        "executionId": "09289ed3-3ab9-49d1-af09-98f672eaefee",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795624677703
+      }
+    ],
+    "24.3 Docs, metrics and verification": [
+      {
+        "executionId": "09289ed3-3ab9-49d1-af09-98f672eaefee",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795624678787
+      },
+      {
+        "executionId": "09289ed3-3ab9-49d1-af09-98f672eaefee",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795626170912
+      }
+    ],
+    "24. Dramatic lighting and clue inspector": [
+      {
+        "executionId": "09289ed3-3ab9-49d1-af09-98f672eaefee",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795626171121
+      }
+    ],
+    "25.1 Notebook targeting fix, banker's lamp craft, soft cones and richer pools": [
+      {
+        "executionId": "f575a57e-68d2-4992-bde5-0ed06f5d592e",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795627493877
+      },
+      {
+        "executionId": "f575a57e-68d2-4992-bde5-0ed06f5d592e",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795628066383
+      }
+    ],
+    "25.2 Arcade floor glow and Club Archive Notice": [
+      {
+        "executionId": "f575a57e-68d2-4992-bde5-0ed06f5d592e",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795628067255
+      },
+      {
+        "executionId": "f575a57e-68d2-4992-bde5-0ed06f5d592e",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795628397722
+      }
+    ],
+    "25.3 Docs, metrics, verification and PR summary": [
+      {
+        "executionId": "f575a57e-68d2-4992-bde5-0ed06f5d592e",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795628398556
+      },
+      {
+        "executionId": "f575a57e-68d2-4992-bde5-0ed06f5d592e",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795628838996
+      }
+    ],
+    "25. Lamp craft, arcade glow and final polish": [
+      {
+        "executionId": "f575a57e-68d2-4992-bde5-0ed06f5d592e",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795628839220
+      }
+    ],
+    "26.1 Anisotropic filtering and procedural texture detail": [
+      {
+        "executionId": "e2bf819b-af8d-4e94-8f82-aa1cba4b5d0d",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795631741698
+      },
+      {
+        "executionId": "ed6a0a94-4218-402a-876f-f0cee9726c89",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795633005260
+      },
+      {
+        "executionId": "ed6a0a94-4218-402a-876f-f0cee9726c89",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795633421538
+      }
+    ],
+    "26.2 Mid-tone lighting balance": [
+      {
+        "executionId": "ed6a0a94-4218-402a-876f-f0cee9726c89",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795633422099
+      },
+      {
+        "executionId": "ed6a0a94-4218-402a-876f-f0cee9726c89",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795633910547
+      }
+    ],
+    "26.3 Docs, metrics and verification": [
+      {
+        "executionId": "ed6a0a94-4218-402a-876f-f0cee9726c89",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795633910794
+      },
+      {
+        "executionId": "ed6a0a94-4218-402a-876f-f0cee9726c89",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795634251818
+      }
+    ],
+    "26. Texture craft and mid-tone lighting": [
+      {
+        "executionId": "ed6a0a94-4218-402a-876f-f0cee9726c89",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795634251967
+      }
+    ],
+    "27.1 cabinetAndManualDetail texture and in-place sharpening": [
+      {
+        "executionId": "a1d72f68-2b4a-4457-bc5e-b7a51ff000ac",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795634727930
+      },
+      {
+        "executionId": "a1d72f68-2b4a-4457-bc5e-b7a51ff000ac",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795635646247
+      }
+    ],
+    "27.2 Themed two-page Archive Document Card": [
+      {
+        "executionId": "a1d72f68-2b4a-4457-bc5e-b7a51ff000ac",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795635646976
+      },
+      {
+        "executionId": "a1d72f68-2b4a-4457-bc5e-b7a51ff000ac",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795636127966
+      }
+    ],
+    "27.3 Docs, metrics and verification": [
+      {
+        "executionId": "a1d72f68-2b4a-4457-bc5e-b7a51ff000ac",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795636127156
+      },
+      {
+        "executionId": "a1d72f68-2b4a-4457-bc5e-b7a51ff000ac",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795637378224
+      }
+    ],
+    "27. Cabinet detail and themed document card": [
+      {
+        "executionId": "a1d72f68-2b4a-4457-bc5e-b7a51ff000ac",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795637378444
+      }
+    ],
+    "28.1 Wheel, key and scrollbar scrolling for the document card": [
+      {
+        "executionId": "d73710a2-a3ad-4acd-adfb-5faad5cc710c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795638093702
+      },
+      {
+        "executionId": "d73710a2-a3ad-4acd-adfb-5faad5cc710c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795638407036
+      }
+    ],
+    "28.2 Protruding manual volumes with spine and cover art": [
+      {
+        "executionId": "d73710a2-a3ad-4acd-adfb-5faad5cc710c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795638406306
+      },
+      {
+        "executionId": "d73710a2-a3ad-4acd-adfb-5faad5cc710c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795639163229
+      }
+    ],
+    "28.3 Docs, metrics and verification": [
+      {
+        "executionId": "d73710a2-a3ad-4acd-adfb-5faad5cc710c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795639162905
+      },
+      {
+        "executionId": "d73710a2-a3ad-4acd-adfb-5faad5cc710c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795639805960
+      }
+    ],
+    "28. Scrollable card and protruding themed manuals": [
+      {
+        "executionId": "d73710a2-a3ad-4acd-adfb-5faad5cc710c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795639806079
+      }
+    ],
+    "29.1 Open two-page book layout for the manual cards": [
+      {
+        "executionId": "aa42faf1-ca3b-4c67-bc16-43c0c366bfd9",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795640378231
+      },
+      {
+        "executionId": "aa42faf1-ca3b-4c67-bc16-43c0c366bfd9",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795640662758
+      }
+    ],
+    "29.2 Animated attract screens": [
+      {
+        "executionId": "aa42faf1-ca3b-4c67-bc16-43c0c366bfd9",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795640663359
+      },
+      {
+        "executionId": "aa42faf1-ca3b-4c67-bc16-43c0c366bfd9",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795641202759
+      }
+    ],
+    "29.3 Docs, metrics and verification": [
+      {
+        "executionId": "aa42faf1-ca3b-4c67-bc16-43c0c366bfd9",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795641203602
+      },
+      {
+        "executionId": "aa42faf1-ca3b-4c67-bc16-43c0c366bfd9",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795641887935
+      }
+    ],
+    "29. Open-book manuals and animated attract screens": [
+      {
+        "executionId": "aa42faf1-ca3b-4c67-bc16-43c0c366bfd9",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795641888085
+      }
+    ],
+    "30.1 Remove the right desk lamp square artefact": [
+      {
+        "executionId": "5abe65d5-3482-44a6-968e-ad85b92aab3b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795642368549
+      },
+      {
+        "executionId": "5abe65d5-3482-44a6-968e-ad85b92aab3b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795642811369
+      }
+    ],
+    "30.2 Smooth camera look and movement": [
+      {
+        "executionId": "5abe65d5-3482-44a6-968e-ad85b92aab3b",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795642811915
+      },
+      {
+        "executionId": "ba125fd3-c33a-4c15-a649-0481e91a035f",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795644429235
+      },
+      {
+        "executionId": "ba125fd3-c33a-4c15-a649-0481e91a035f",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795644624595
+      }
+    ],
+    "30.3 24 Hz fluid attract animations": [
+      {
+        "executionId": "ba125fd3-c33a-4c15-a649-0481e91a035f",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795644625204
+      },
+      {
+        "executionId": "ba125fd3-c33a-4c15-a649-0481e91a035f",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795644892431
+      }
+    ],
+    "30.4 Docs, metrics and verification": [
+      {
+        "executionId": "ba125fd3-c33a-4c15-a649-0481e91a035f",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795644891688
+      },
+      {
+        "executionId": "ba125fd3-c33a-4c15-a649-0481e91a035f",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795645608948
+      }
+    ],
+    "30. Lamp fix, smooth motion and 24 Hz attract screens": [
+      {
+        "executionId": "ba125fd3-c33a-4c15-a649-0481e91a035f",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795645609127
+      }
+    ],
+    "31.1 Direct mouse look and faster, snappier movement": [
+      {
+        "executionId": "65c80338-1ca0-41f9-8ea7-4cdcec2f5994",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795646122459
+      },
+      {
+        "executionId": "65c80338-1ca0-41f9-8ea7-4cdcec2f5994",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795653783823
+      }
+    ],
+    "31.2 Desk cassette and ceiling fixture texture polish": [
+      {
+        "executionId": "65c80338-1ca0-41f9-8ea7-4cdcec2f5994",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795653784194
+      },
+      {
+        "executionId": "65c80338-1ca0-41f9-8ea7-4cdcec2f5994",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795654223769
+      }
+    ],
+    "31.3 Docs, metrics and verification": [
+      {
+        "executionId": "65c80338-1ca0-41f9-8ea7-4cdcec2f5994",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795654224096
+      },
+      {
+        "executionId": "65c80338-1ca0-41f9-8ea7-4cdcec2f5994",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795655772013
+      }
+    ],
+    "31. Crisp look, faster walk and fixture polish": [
+      {
+        "executionId": "65c80338-1ca0-41f9-8ea7-4cdcec2f5994",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795655772219
+      }
+    ],
+    "32.1 Web Audio engine: SFX and ambient music": [
+      {
+        "executionId": "d0b5d8a2-116b-47c5-9b77-da7d89dc9e2c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795656400384
+      },
+      {
+        "executionId": "d0b5d8a2-116b-47c5-9b77-da7d89dc9e2c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795656722579
+      }
+    ],
+    "32.2 Wire audio into the world and add the mute badge": [
+      {
+        "executionId": "d0b5d8a2-116b-47c5-9b77-da7d89dc9e2c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795656722056
+      },
+      {
+        "executionId": "d0b5d8a2-116b-47c5-9b77-da7d89dc9e2c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795657000114
+      }
+    ],
+    "32.3 Docs, metrics and verification": [
+      {
+        "executionId": "d0b5d8a2-116b-47c5-9b77-da7d89dc9e2c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795657000567
+      },
+      {
+        "executionId": "d0b5d8a2-116b-47c5-9b77-da7d89dc9e2c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795657556201
+      }
+    ],
+    "32. Procedural world audio": [
+      {
+        "executionId": "d0b5d8a2-116b-47c5-9b77-da7d89dc9e2c",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795657556338
+      }
+    ],
+    "33.1 Turntable placement, model and triangle reclaim": [
+      {
+        "executionId": "06f7ad88-b1bc-40c9-933c-bcec0da0a6a0",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795658475604
+      },
+      {
+        "executionId": "06f7ad88-b1bc-40c9-933c-bcec0da0a6a0",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795659607841
+      }
+    ],
+    "33.2 Music catalog, crossfade and needle-drop SFX": [
+      {
+        "executionId": "06f7ad88-b1bc-40c9-933c-bcec0da0a6a0",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795659608123
+      },
+      {
+        "executionId": "06f7ad88-b1bc-40c9-933c-bcec0da0a6a0",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795659983679
+      }
+    ],
+    "33.3 Turntable catalog card, track keys and spin wiring": [
+      {
+        "executionId": "06f7ad88-b1bc-40c9-933c-bcec0da0a6a0",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795659984179
+      },
+      {
+        "executionId": "06f7ad88-b1bc-40c9-933c-bcec0da0a6a0",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795660580446
+      }
+    ],
+    "33.4 Docs, metrics and verification": [
+      {
+        "executionId": "06f7ad88-b1bc-40c9-933c-bcec0da0a6a0",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795660581108
+      },
+      {
+        "executionId": "06f7ad88-b1bc-40c9-933c-bcec0da0a6a0",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795661110818
+      }
+    ],
+    "33. Turntable and music catalog": [
+      {
+        "executionId": "06f7ad88-b1bc-40c9-933c-bcec0da0a6a0",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795661111104
+      }
+    ],
+    "34.1 Relocate the record player and build the Hi-Fi table": [
+      {
+        "executionId": "29f15491-0fc0-4459-85f3-5b42b3e2de94",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795661587239
+      },
+      {
+        "executionId": "29f15491-0fc0-4459-85f3-5b42b3e2de94",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795663725582
+      }
+    ],
+    "34.2 Now-playing jacket wiring": [
+      {
+        "executionId": "29f15491-0fc0-4459-85f3-5b42b3e2de94",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795663728900
+      },
+      {
+        "executionId": "29f15491-0fc0-4459-85f3-5b42b3e2de94",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795664059744
+      }
+    ],
+    "34.3 Docs, metrics and verification": [
+      {
+        "executionId": "29f15491-0fc0-4459-85f3-5b42b3e2de94",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795664062177
+      },
+      {
+        "executionId": "29f15491-0fc0-4459-85f3-5b42b3e2de94",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795665208717
+      }
+    ],
+    "34. Hi-Fi table relocation and record display": [
+      {
+        "executionId": "29f15491-0fc0-4459-85f3-5b42b3e2de94",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795665210610
+      }
+    ],
+    "35.1 Two-tier console model, floor speaker and raised budget tests": [
+      {
+        "executionId": "10866c62-37ab-4486-85fb-9a6103b557a6",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795695188574
+      },
+      {
+        "executionId": "10866c62-37ab-4486-85fb-9a6103b557a6",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795696536865
+      }
+    ],
+    "35.2 Playback state wiring for the new console": [
+      {
+        "executionId": "10866c62-37ab-4486-85fb-9a6103b557a6",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795696537174
+      },
+      {
+        "executionId": "10866c62-37ab-4486-85fb-9a6103b557a6",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795696665964
+      }
+    ],
+    "35.3 Docs, metrics and verification": [
+      {
+        "executionId": "10866c62-37ab-4486-85fb-9a6103b557a6",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795696666747
+      },
+      {
+        "executionId": "10866c62-37ab-4486-85fb-9a6103b557a6",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795697158745
+      }
+    ],
+    "35. Two-tier Hi-Fi console": [
+      {
+        "executionId": "10866c62-37ab-4486-85fb-9a6103b557a6",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795697159072
+      }
+    ],
+    "36.1 Turntable micro-copy, badge tooltip, Kiro README section and audit": [
+      {
+        "executionId": "9ed658e0-2785-4b29-bde2-98f4a069c298",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795788312300
+      },
+      {
+        "executionId": "9ed658e0-2785-4b29-bde2-98f4a069c298",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795788906757
+      }
+    ],
+    "36.2 Docs and final verification": [
+      {
+        "executionId": "9ed658e0-2785-4b29-bde2-98f4a069c298",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795788904711
+      },
+      {
+        "executionId": "9ed658e0-2785-4b29-bde2-98f4a069c298",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795789465703
+      }
+    ],
+    "36. Micro-copy polish, Kiro documentation and pre-PR audit": [
+      {
+        "executionId": "9ed658e0-2785-4b29-bde2-98f4a069c298",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795789466175
+      }
+    ]
+  }
+}

@@ -1,0 +1,200 @@
+// Input mode state machine (prop absent and supplied inputEnabled).
+// Pure reducer: effects are returned as data and performed by the controller.
+// No timers, no React/three/DOM imports.
+import type { PropInteractableId } from '../worldTypes';
+import type { KeyRole } from './inputState';
+
+export type InputMode = 'capturePending' | 'active' | 'inspecting';
+
+export interface ModeState {
+  mode: InputMode;
+  pointerLocked: boolean;
+  /** True after a lock denial or an unsupported pointer lock API. */
+  keyboardLookHint: boolean;
+  /** undefined = prop absent; otherwise the supplied value. */
+  inputEnabled: boolean | undefined;
+  /** True while E is physically held after a press that was consumed. */
+  eRepeatGuard: boolean;
+}
+
+export type ModeEvent =
+  | { type: 'CANVAS_CLICK' }
+  | { type: 'LOCK_ACQUIRED' }
+  | { type: 'LOCK_LOST' }
+  | { type: 'LOCK_DENIED' }
+  | { type: 'LOCK_UNSUPPORTED' }
+  | {
+      type: 'KEY_DOWN';
+      role: KeyRole | null;
+      code: string;
+      repeat: boolean;
+      accepted: boolean;
+      hasTarget: boolean;
+      /** Kind of the current target. Omitted behaves as 'station' when hasTarget is true. */
+      targetKind?: 'station' | 'prop' | null;
+      /** Id of the targeted prop when 	argetKind is 'prop'. */
+      targetPropId?: PropInteractableId | null;
+      /** True while an Archive Document Card is open. E with no target then closes it; 1 and 2 switch its page (or select tracks 1 and 2 on the turntable card); 3, 4 and 5 select tracks. Omitted means false. */
+      cardOpen?: boolean;
+    }
+  | { type: 'KEY_UP'; role: KeyRole | null }
+  | { type: 'EXTERNAL_ENABLED'; value: boolean }
+  | { type: 'WINDOW_BLUR_OR_HIDDEN' };
+
+export type ModeEffect =
+  | { type: 'CALL_ON_INSPECT' }
+  | { type: 'PROP_INTERACT'; id: PropInteractableId }
+  | { type: 'CLOSE_CARD' }
+  | { type: 'CARD_PAGE'; page: 1 | 2 }
+  | { type: 'CARD_TRACK'; index: 2 | 3 | 4 }
+  | { type: 'RELEASE_POINTER_LOCK' }
+  | { type: 'REQUEST_POINTER_LOCK' }
+  | { type: 'CLEAR_INPUT' }
+  | { type: 'FOCUS_CANVAS' };
+
+export interface ModeResult {
+  state: ModeState;
+  effects: ModeEffect[];
+}
+
+/** Mount state: capturePending (inspecting when the supplied prop is false), no effects. */
+export function initialModeState(inputEnabled?: boolean): ModeState {
+  return {
+    mode: inputEnabled === false ? 'inspecting' : 'capturePending',
+    pointerLocked: false,
+    keyboardLookHint: false,
+    inputEnabled,
+    eRepeatGuard: false,
+  };
+}
+
+const none = (state: ModeState): ModeResult => ({ state, effects: [] });
+
+export function reduceMode(s: ModeState, e: ModeEvent): ModeResult {
+  switch (e.type) {
+    case 'CANVAS_CLICK':
+      if (s.mode === 'inspecting' && s.inputEnabled === false) return none(s);
+      if (s.mode === 'inspecting') return resume(s, false);
+      if (s.mode === 'capturePending') {
+        return {
+          state: s,
+          effects: [{ type: 'FOCUS_CANVAS' }, { type: 'REQUEST_POINTER_LOCK' }],
+        };
+      }
+      return none(s);
+
+    case 'LOCK_ACQUIRED':
+      if (s.mode !== 'capturePending') return none(s);
+      return none({ ...s, mode: 'active', pointerLocked: true, keyboardLookHint: false });
+
+    case 'LOCK_LOST':
+      if (s.mode === 'inspecting') return none(s);
+      return none({ ...s, mode: 'capturePending', pointerLocked: false });
+
+    case 'LOCK_DENIED':
+    case 'LOCK_UNSUPPORTED':
+      if (s.mode === 'inspecting') return none(s);
+      return none({ ...s, keyboardLookHint: true });
+
+    case 'KEY_UP':
+      if (e.role === 'interact' && s.eRepeatGuard) {
+        return none({ ...s, eRepeatGuard: false });
+      }
+      return none(s);
+
+    case 'EXTERNAL_ENABLED':
+      return externalEnabled(s, e.value);
+
+    case 'WINDOW_BLUR_OR_HIDDEN':
+      return { state: s, effects: [{ type: 'CLEAR_INPUT' }] };
+
+    case 'KEY_DOWN':
+      return keyDown(s, e);
+  }
+}
+
+function externalEnabled(s: ModeState, value: boolean): ModeResult {
+  if (s.inputEnabled === value) return none(s);
+  const first = s.inputEnabled === undefined;
+  if (!value) {
+    return {
+      state: { ...s, inputEnabled: false, mode: 'inspecting', pointerLocked: false },
+      effects: [{ type: 'RELEASE_POINTER_LOCK' }, { type: 'CLEAR_INPUT' }],
+    };
+  }
+  // value true: first supplied value changes nothing else; false -> true needs a later gesture.
+  if (first) return none({ ...s, inputEnabled: true });
+  return none({ ...s, inputEnabled: true, mode: 'capturePending', pointerLocked: false });
+}
+
+function resume(s: ModeState, byE: boolean): ModeResult {
+  return {
+    state: { ...s, mode: 'capturePending', pointerLocked: false, eRepeatGuard: byE },
+    effects: [{ type: 'CLEAR_INPUT' }, { type: 'FOCUS_CANVAS' }],
+  };
+}
+
+function keyDown(s: ModeState, e: Extract<ModeEvent, { type: 'KEY_DOWN' }>): ModeResult {
+  if (!e.accepted || e.repeat) return none(s);
+
+  // Keys 1 and 2 switch the page of an open card. No mode change, no pointer-lock release, no input clear.
+  if (e.role === 'page1' || e.role === 'page2') {
+    if (s.mode === 'inspecting' || !e.cardOpen) return none(s);
+    return { state: s, effects: [{ type: 'CARD_PAGE', page: e.role === 'page1' ? 1 : 2 }] };
+  }
+
+  // Keys 3, 4 and 5 select turntable tracks 2..4 while a card is open. The world ignores them unless the open card is the turntable.
+  if (e.role === 'track3' || e.role === 'track4' || e.role === 'track5') {
+    if (s.mode === 'inspecting' || !e.cardOpen) return none(s);
+    const index = e.role === 'track3' ? 2 : e.role === 'track4' ? 3 : 4;
+    return { state: s, effects: [{ type: 'CARD_TRACK', index }] };
+  }
+
+  const isEnter = e.code === 'Enter';
+  const isE = e.code === 'KeyE' || e.role === 'interact';
+
+  if (s.mode === 'inspecting') {
+    if (s.inputEnabled === false) return none(s);
+    if (isEnter || isE) return resume(s, isE);
+    return none(s);
+  }
+
+  if (isE) {
+    if (s.eRepeatGuard) return none(s);
+    if (e.hasTarget && e.targetKind === 'prop') {
+      // A world-local prop: handled inside the world. No inspect, no pointer-lock release, no input clear,
+      // no mode change. The repeat guard keeps it to one action per key press.
+      if (!e.targetPropId) return none(s);
+      return {
+        state: { ...s, eRepeatGuard: true },
+        effects: [{ type: 'PROP_INTERACT', id: e.targetPropId }],
+      };
+    }
+    if (!e.hasTarget && e.cardOpen) {
+      // E on nothing while a card is open closes it. One action per press (repeat guard).
+      return { state: { ...s, eRepeatGuard: true }, effects: [{ type: 'CLOSE_CARD' }] };
+    }
+    if (e.hasTarget) {
+      // Supplied prop: never suspend; the prop alone decides suspension.
+      const mode = s.inputEnabled === undefined ? 'inspecting' : 'capturePending';
+      return {
+        state: { ...s, mode, pointerLocked: false, eRepeatGuard: true },
+        effects: [
+          { type: 'CALL_ON_INSPECT' },
+          { type: 'RELEASE_POINTER_LOCK' },
+          { type: 'CLEAR_INPUT' },
+        ],
+      };
+    }
+  }
+
+  // Key activation of the capture overlay (valid user gesture).
+  if ((isEnter || isE) && s.mode === 'capturePending') {
+    return {
+      state: s,
+      effects: [{ type: 'FOCUS_CANVAS' }, { type: 'REQUEST_POINTER_LOCK' }],
+    };
+  }
+
+  return none(s);
+}
