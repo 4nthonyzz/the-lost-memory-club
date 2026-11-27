@@ -94,7 +94,7 @@ export const FRAGMENT_CAPTIONS: Readonly<Record<string, Record<Language, string>
 
 export const ENDINGS_ES: Readonly<Record<EndingId, Omit<LocalizedEnding, 'id'>>> = {
   'bittersweet-dawn': {
-    title: 'Amanecer agridulce',
+    title: 'El primer viernes',
     choiceLabel: 'Liberar recuerdos',
     text: 'Dejas que las cintas se acaben. Maya, Sam y Julian se despiden desde la puerta mientras el CRT se apaga y la luz de la ma\u00f1ana atraviesa Midnight Rentals. Duele. Tambi\u00e9n ha terminado.',
   },
@@ -104,7 +104,7 @@ export const ENDINGS_ES: Readonly<Record<EndingId, Omit<LocalizedEnding, 'id'>>>
     text: 'Pulsas grabar. La cuenta atr\u00e1s empieza otra vez y la fiesta no termina nunca. En alg\u00fan lugar fuera del encuadre, el mundo olvida que alguna vez estuviste all\u00ed.',
   },
   'archivists-truth': {
-    title: 'La verdad del Archivista',
+    title: 'El recuerdo que vive',
     choiceLabel: 'Ver el \u00faltimo fotograma',
     text: 'El fotograma final se queda quieto y la imagen por fin muestra qui\u00e9n ha tenido el mando todo este tiempo. Julian muri\u00f3 en 1998. Leo se convirti\u00f3 en El Archivista para borrar su culpa, un minuto rebobinado a la vez. Esta vez la cinta se reproduce hasta el final.',
   },

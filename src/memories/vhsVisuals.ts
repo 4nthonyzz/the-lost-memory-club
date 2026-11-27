@@ -13,6 +13,7 @@ export interface VisualParams {
   bandShift: number;
   flicker: number;
   reveal: number;
+  reducedDistortion: boolean;
 }
 
 const FRAME_REACH = TRANSPORT_FPS * 2;
@@ -24,6 +25,20 @@ function clamp01(value: number): number {
 
 export function atmosphereFor(signalQuality: number): Atmosphere {
   return signalQuality >= AMBER_THRESHOLD ? 'amber' : 'cold';
+}
+
+export const SIGNAL_THRESHOLD = 0.8;
+
+export function isInAnomalyWindow(tape: TapeDefinition | null, position: number): boolean {
+  if (!tape) return false;
+  const frame = frameAt(position);
+  return tape.clueWindows.some((window) => frame >= window.startFrame && frame <= window.endFrame);
+}
+
+export function formatClock(seconds: number): string {
+  const total = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0));
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${pad(Math.floor(total / 60))}:${pad(total % 60)}`;
 }
 
 export function clueReveal(tape: TapeDefinition | null, position: number, tracking: number): number {
@@ -54,6 +69,7 @@ export function computeVisualParams(state: TransportState, reducedDistortion: bo
     bandShift: moving ? (reducedDistortion ? 4 : 22) : 0,
     flicker: reducedDistortion ? 0 : (1 - quality) * 0.15,
     reveal,
+    reducedDistortion,
   };
 }
 

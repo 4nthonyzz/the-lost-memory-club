@@ -20,6 +20,7 @@ export interface ShellStrings {
     demoArcadeWon: string;
     tapeCollected: string;
     clueConfirmed: string;
+    needTape: string;
     archiveLoaded: string;
     endingLocked: string;
     reset: string;
@@ -78,6 +79,7 @@ export interface UiStrings {
     restart: string;
     archiveReady: string;
     frozenStamp: string;
+    dawnStamp: string;
   };
   save: Record<SaveStatus, string>;
   settings: {
@@ -112,8 +114,8 @@ const EN: UiStrings = {
     newBadge: 'NEW',
     secretUnlocked: 'A hidden tape has surfaced.',
     restart: 'Return to the archive',
-    archiveReady: 'ARCHIVE-10 READY',
-    frozenStamp: 'OCT 31 1998 23:58',
+    archiveReady: 'ARCHIVE-10: MAYA',
+    frozenStamp: '23:58', dawnStamp: '01 NOV 1998',
   },
   save: {
     idle: 'Not saved yet',
@@ -147,6 +149,7 @@ const EN: UiStrings = {
       demoArcadeWon: 'Demo: arcade victory recorded.',
       tapeCollected: 'Tape collected. Load it in the deck and play it.',
       clueConfirmed: 'CLUE CONFIRMED \u00b7 The arcade is now unlocked.',
+      needTape: 'The VCR is empty. Find a tape first.',
       archiveLoaded: 'Archive 09 restored. Its tape is now in the deck.',
       endingLocked: 'Restore Archive 09 before opening the ending.',
       reset: 'Development save reset.',
@@ -202,8 +205,8 @@ const ES: UiStrings = {
     newBadge: 'NUEVO',
     secretUnlocked: 'Ha surgido una cinta oculta.',
     restart: 'Volver al archivo',
-    archiveReady: 'ARCHIVO-10 LISTO',
-    frozenStamp: 'OCT 31 1998 23:58',
+    archiveReady: 'ARCHIVO-10: MAYA',
+    frozenStamp: '23:58', dawnStamp: '01 NOV 1998',
   },
   save: {
     idle: 'A\u00fan sin guardar',
@@ -237,6 +240,7 @@ const ES: UiStrings = {
       demoArcadeWon: 'Demo: victoria en la recreativa registrada.',
       tapeCollected: 'Cinta recogida. C\u00e1rgala en la platina y rep\u00f3drala.',
       clueConfirmed: 'PISTA CONFIRMADA \u00b7 La recreativa est\u00e1 desbloqueada.',
+      needTape: 'La videograbadora est\u00e1 vac\u00eda. Primero encuentra una cinta.',
       archiveLoaded: 'Archivo 09 restaurado. Su cinta ya est\u00e1 en la platina.',
       endingLocked: 'Restaura el Archivo 09 antes de abrir el final.',
       reset: 'Guardado de desarrollo reiniciado.',

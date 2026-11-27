@@ -63,10 +63,10 @@ export const ACTS: readonly ActDefinition[] = [
     tape: {
       id: SECOND_TAPE_ID,
       title: 'Oct 30 \u2014 The Mirror Match',
-      duration: 96,
+      duration: 60,
       idealTracking: 38,
       initialTracking: 50,
-      clueWindows: [{ clueId: SECOND_CLUE_ID, startFrame: at(61), endFrame: at(63.5), trackingMin: 30, trackingMax: 46 }],
+      clueWindows: [{ clueId: SECOND_CLUE_ID, startFrame: at(41), endFrame: at(44), trackingMin: 30, trackingMax: 46 }],
     },
     clueId: SECOND_CLUE_ID,
     gameId: SHADOW_FIGHT_GAME_ID,
@@ -82,10 +82,10 @@ export const ACTS: readonly ActDefinition[] = [
     tape: {
       id: THIRD_TAPE_ID,
       title: 'Oct 31, 23:58 \u2014 Last Broadcast',
-      duration: 120,
+      duration: 60,
       idealTracking: 81,
       initialTracking: 50,
-      clueWindows: [{ clueId: THIRD_CLUE_ID, startFrame: at(117), endFrame: at(119), trackingMin: 74, trackingMax: 88 }],
+      clueWindows: [{ clueId: THIRD_CLUE_ID, startFrame: at(50), endFrame: at(54), trackingMin: 74, trackingMax: 88 }],
     },
     clueId: THIRD_CLUE_ID,
     gameId: DEAD_FREQUENCY_GAME_ID,
@@ -116,7 +116,7 @@ export const ARCHIVE_TRUTH_TEXT =
 export const ENDINGS: readonly EndingDefinition[] = [
   {
     id: 'bittersweet-dawn',
-    title: 'Bittersweet Dawn',
+    title: 'The First Friday',
     choiceLabel: 'Release Memories',
     text: 'You let the tapes run out. Maya, Sam and Julian wave from the doorway as the CRT fades, and morning light cuts through Midnight Rentals. It hurts. It is also over.',
   },
@@ -128,7 +128,7 @@ export const ENDINGS: readonly EndingDefinition[] = [
   },
   {
     id: 'archivists-truth',
-    title: 'The Archivist\u2019s Truth',
+    title: 'The Memory That Lives',
     choiceLabel: 'Watch the Last Frame',
     text: 'The final frame holds still and the picture finally shows who has been holding the remote. Julian died in 1998. Leo became The Archivist to erase his guilt, one rewound minute at a time. This time the tape plays through to the end.',
   },

@@ -10,6 +10,8 @@ export interface EndingScreenProps {
   language: Language;
   reducedDistortion: boolean;
   endings: readonly EndingView[];
+  /** Descriptions of what is still needed to unlock the secret ending. Empty = all done. */
+  secretMissing?: readonly string[];
   onChosen?: (id: EndingSceneId) => void;
   onRestart: () => void;
 }
@@ -23,7 +25,7 @@ const CORRUPTION_BY_ENDING: Record<EndingSceneId, number> = {
 function captionFor(id: EndingSceneId, strings: UiStrings['endings']): string {
   switch (id) {
     case 'bittersweet-dawn':
-      return '';
+      return strings.dawnStamp;
     case 'forever-1998':
       return strings.frozenStamp;
     case 'archivists-truth':
@@ -60,7 +62,7 @@ function EndingCanvas({ id, caption, reducedDistortion }: EndingCanvasProps) {
   return <canvas ref={canvasRef} className="ending__canvas" width={ENDING_WIDTH} height={ENDING_HEIGHT} aria-hidden="true" />;
 }
 
-export function EndingScreen({ language, reducedDistortion, endings, onChosen, onRestart }: EndingScreenProps) {
+export function EndingScreen({ language, reducedDistortion, endings, secretMissing = [], onChosen, onRestart }: EndingScreenProps) {
   const strings = getUiStrings(language).endings;
   const headingId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -120,6 +122,18 @@ export function EndingScreen({ language, reducedDistortion, endings, onChosen, o
                 </button>
               </li>
             ))}
+            {secretMissing.length > 0 && (
+              <li>
+                <div className="ending__choice ending__choice--locked" aria-disabled="true">
+                  <span className="ending__choice-label ending__choice-label--locked">
+                    {language === 'es' ? '\uD83D\uDD12 El recuerdo que vive' : '\uD83D\uDD12 The Memory That Lives'}
+                  </span>
+                  <span className="ending__choice-title">
+                    {language === 'es' ? 'Falta: ' : 'Missing: '}{secretMissing.join(', ')}
+                  </span>
+                </div>
+              </li>
+            )}
           </ul>
         </>
       )}

@@ -23,8 +23,15 @@ export interface PlayerStrings {
   close: string;
   clueRecorded: string;
   perfectTracking: string;
+  inserting: string;
   hint: string;
   keyboardHelp: string;
+  capturePrompt: string;
+  captured: string;
+  timeline: string;
+  timelineAnomaly: string;
+  stepPause: string;
+  stepTune: string;
 }
 
 const EN: PlayerStrings = {
@@ -48,14 +55,21 @@ const EN: PlayerStrings = {
   close: 'Eject and close',
   clueRecorded: 'CLUE RECORDED',
   perfectTracking: '100% TRACKING \u00b7 PERFECT SIGNAL',
+  inserting: 'INSERTING TAPE \u00b7 PLEASE WAIT',
   hint: 'Pause on the strange frame and adjust the tracking.',
   keyboardHelp: 'Space play/pause \u00b7 \u2190/\u2192 rewind/forward \u00b7 , . step frame \u00b7 [ ] or \u2193/\u2191 tracking (Shift for \u00b15) \u00b7 Esc close',
+  capturePrompt: 'Press Space or click to capture memory',
+  captured: 'MEMORY CAPTURED',
+  timeline: 'Tape position',
+  timelineAnomaly: 'Anomaly zone',
+  stepPause: '1. Pause on the anomaly',
+  stepTune: '2. Tune the tracking',
 };
 
 const ES: PlayerStrings = {
   region: 'Reproductor VHS',
   screenLabel: 'Pantalla de reproducci\u00f3n de la cinta',
-  modes: { stopped: 'STOP', playing: 'PLAY', paused: 'PAUSA', rewind: 'REBOB', ffwd: 'AVANCE' },
+  modes: { stopped: 'DETENIDO', playing: 'REPRODUCIENDO', paused: 'PAUSA', rewind: 'REBOBINANDO', ffwd: 'AVANZANDO' },
   rewind: 'Rebobinar',
   play: 'Reproducir',
   pause: 'Pausar',
@@ -66,15 +80,22 @@ const ES: PlayerStrings = {
   trackingDown: 'Bajar tracking',
   trackingUp: 'Subir tracking',
   trackingSlider: 'Ajuste de tracking',
-  trackingLabel: 'Tracking',
+  trackingLabel: 'Tracking (Sinton\u00eda)',
   signalLabel: 'Se\u00f1al',
   mute: 'Silenciar',
   unmute: 'Activar sonido',
   close: 'Expulsar y cerrar',
   clueRecorded: 'PISTA REGISTRADA',
   perfectTracking: '100% TRACKING \u00b7 SE\u00d1AL PERFECTA',
+  inserting: 'INSERTANDO CINTA \u00b7 ESPERA',
   hint: 'Pausa en el fotograma extra\u00f1o y ajusta el tracking.',
-  keyboardHelp: 'Espacio reproducir/pausa \u00b7 \u2190/\u2192 rebobinar/avanzar \u00b7 , . fotograma \u00b7 [ ] o \u2193/\u2191 tracking (May\u00fas para \u00b15) \u00b7 Esc cerrar',
+  keyboardHelp: 'Espacio reproducir/pausa \u00b7 \u2190/\u2192 rebobinar/avanzar \u00b7 , . fotograma \u00b7 [ ] o \u2193/\u2191 tracking (May\u00fas para \u00b15) \u00b7 Esc para cerrar',
+  capturePrompt: 'Pulsa Espacio o haz clic para capturar el recuerdo',
+  captured: 'RECUERDO CAPTURADO',
+  timeline: 'Posici\u00f3n en la cinta',
+  timelineAnomaly: 'Zona de anomal\u00eda',
+  stepPause: '1. Pausa en la anomal\u00eda',
+  stepTune: '2. Ajusta el tracking',
 };
 
 export function getPlayerStrings(language: Language): PlayerStrings {
