@@ -1,5 +1,3 @@
-# THE LOST MEMORY CLUB
-
 <div align="center">
   <img src="docs/assets/cover.png" alt="The Lost Memory Club - Retro Horror Concept Artwork" width="100%" />
 
@@ -8,56 +6,97 @@
   <p><strong>Kiroween 2026 · Resurrection Category</strong></p>
 </div>
 
-> **Development Status: Early Development — Not yet a finished or playable game.**
+> **Development Status: Active Integration on `main`**
 >
-> This repository contains an initial development scaffold, a visual prototype, three isolated feature areas, a typed core event contract, initial Kiro specifications, and automated reducer tests. Gameplay, first-person exploration, actual VHS playback, and the ending remain to be implemented through Kiro IDE.
+> The **3D Archive Exploration World (`src/world/**`)** is **complete and merged into `main`** (`1,054` passing automated tests across 34 test suites, `19,988 / 20,000` triangles, 32 procedural textures, and a zero-asset procedural Web Audio engine). The **Haunted Arcade (`src/arcade/`)** and **VHS Narrative & Persistence (`src/memories/`, `src/ui/`)** modules are actively integrating onto this shared `main` foundation.
 
-## About the Project
+---
 
-**The Lost Memory Club** is an original browser-based retro horror mystery developed for **Kiroween 2026**, proposed for the **Resurrection** category.
+## About the Project (30-Second Overview)
 
-Explore a forgotten media archive, uncover a clue hidden in a VHS tape, play a haunted arcade game, and discover how recovered memories change the archive itself.
+**The Lost Memory Club** is a browser-based 1990s psychological retro-horror mystery built for **Kiroween 2026** (*Resurrection* category), designed for fans of analog horror, retro arcade culture, and narrative exploration games.
 
-Inspired by 1990s media culture, the project combines retro aesthetics, psychological horror, environmental exploration, and interactive storytelling.
+**Resurrecting Obsolete 1990s Tech in the Browser:** Players step into a late-night, abandoned VHS and arcade media archive in first person—flipping through physical two-page arcade manuals, spinning eerie vinyl tracks on a working 1990s Hi-Fi turntable, uncovering clues hidden on a cursed VHS tape, and beating a haunted arcade game to witness how recovered memories permanently alter the room around them.
+
+### Why It Stands Out
+- **"Scare Me, Then Make It Easy" UX:** Combines unsettling 1990s late-night atmosphere (CRT hum, eerie archive liner notes, flickering attract screens, and dynamic room lighting) with immediate, frictionless controls (`WASD` + 1:1 mouse aim, `E` to inspect, `1–5` turntable track hotkeys, `M` mute toggle, and a live `NOTES READ: X / 7` progress counter).
+- **Zero-Asset Procedural Craft:** Every texture (32 procedural canvases), 3D prop, 24 Hz arcade attract screen, and Web Audio synthesizer track/SFX is generated procedurally in code—eliminating external `.glb` or `.mp3` dependencies and ensuring 100% copyright-safe audio.
+- **Reusable Open-Source Architecture:** Built with strict module isolation (`src/world/`, `src/arcade/`, `src/memories/`, `src/core/`) under the MIT License so other web developers can reuse the zero-asset Web Audio synth, procedural texture pipeline, and budget-tested React Three Fiber exploration harness.
+
+---
+
+## Built with Kiro
+
+This project was engineered using **Kiro IDE** as the core architectural and verification workflow, with all specifications and steering rules preserved at the root of this repository (`/.kiro`):
+
+- **Spec-Driven Development (`.kiro/specs/`):**
+  - `.kiro/specs/game-foundation/` defines the global product requirements, typed station contracts (`StationId = 'vhs' | 'arcade'`), and core state architecture.
+  - `.kiro/specs/world-exploration/` documents 36 incremental implementation and verification tasks (`requirements.md`, `design.md`, `tasks.md`, `tasks.meta.json`) alongside automated audit logs (`test-report.md`, `performance-log.md`, `integration-notes.md`). Structuring specs before implementation prevented context drift across 30+ commits while keeping 3D geometry strictly inside performance budgets.
+- **Steering & Module Isolation (`.kiro/steering/`):**
+  - `architecture.md` and `product.md` enforce strict module boundaries across team areas.
+  - `src/world/boundary.test.ts` automatically verifies in CI that `src/world/**` never leaks imports or storage calls into protected modules (`src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`).
+- **Budget-Verified Procedural Pipeline:**
+  - Automated geometry and memory assertions (`modelDetail.test.ts`, `roomLayout.test.ts`, `targeting.test.ts`) enforce hard budgets on every commit: `19,988 / 20,000` triangles, `403 / 425` grouped draw calls, `4` scene lights, and `32` procedural textures (`7.703 MiB <= 7.85 MB`).
+
+```text
+.kiro/
+├── specs/
+│   ├── game-foundation/          # Core architecture, contracts, and global tasks
+│   └── world-exploration/        # 36-task 3D world spec, audit logs, and benchmarks
+└── steering/
+    ├── architecture.md           # Module isolation & budget rules
+    └── product.md                # 1990s analog horror UX & atmosphere direction
+```
+
+---
 
 ## Visual Preview
 
 ### Concept Artwork
 
-The visual identity of the project draws inspiration from abandoned video rental stores, CRT televisions, VHS recordings, and classic arcade machines.
+The visual identity of **The Lost Memory Club** draws inspiration from late-night 1990s video rental archives, CRT televisions, VHS recordings, Hi-Fi vinyl consoles, and classic arcade cabinets.
 
-*The artwork above represents the intended atmosphere and visual direction of the game. It is not a screenshot of the current playable build.*
+*The cover artwork above illustrates the target atmosphere and visual direction of the archive.*
 
-### In-Game Screenshots
+### Implemented Features in the Current `main` Build
 
-Actual gameplay screenshots will be added as the main features are implemented and tested. We want to showcase real gameplay rather than represent planned features as completed functionality.
+- **1990s Archive Room & Lighting (`src/world/scene/`, `src/world/layout/`):** First-person navigation with substep collision detection, frame-rate-independent movement + 1:1 mouse look, interactive desk lamps coupled to scene lighting, and a `?worldPerf=1` runtime overlay.
+- **Interactive Clues & Two-Page Arcade Manuals (`src/world/overlay/`):** 7 readable archive documents (`NOTES READ: X / 7`), including illustrated two-page spread manuals (`SNAKE.EXE`, `LAST EXIT`, `DEAD FREQUENCY`) with `1` / `2` page switching.
+- **Animated Arcade Cabinets (24 Hz):** Live procedural canvas attract loops running across all 3 arcade machines (automatically pauses while inspecting stations and respects `prefers-reduced-motion`).
+- **Two-Tier 1990s Hi-Fi Turntable & Procedural Web Audio (`src/world/audio/`):** Walnut/steel audio console and 3-way floor loudspeaker featuring a 33 1/3 RPM spinning platter, pivoting tonearm, dynamic *NOW PLAYING* LP jacket, 4 selectable procedural 1990s synth tracks + stop (`1`–`5`), needle-drop/VHS/coin/lamp SFX, automatic station panel audio ducking, and `M` mute toggle (`AudioBadge`).
+
+---
 
 ## Technology Stack
 
 | Technology | Purpose |
 |---|---|
-| React | Application interface and component architecture |
-| TypeScript | Type safety and application logic |
-| Vite | Development environment and build tooling |
-| Three.js / React Three Fiber | 3D rendering and basic scene prototype |
-| HTML Canvas | Planned Snake arcade minigame |
-| Web Audio API | Planned original audio and sound effects |
-| LocalStorage | Planned versioned game progress |
-| Vitest | Unit testing and reducer validation |
-| Kiro IDE | Specification-driven development and AI-assisted implementation |
+| **Kiro IDE** | Spec-driven architecture (`.kiro/specs/`), steering enforcement (`.kiro/steering/`), and task-by-task implementation |
+| **React 18 & TypeScript** | Strict type-safe UI overlays, station routing, and interactive document viewers |
+| **Three.js / React Three Fiber** | Real-time 3D archive rendering, procedural materials, and custom prop geometry |
+| **HTML5 Canvas (2D)** | 32 procedural textures and 24 Hz animated arcade attract screens |
+| **Web Audio API** | Zero-asset procedural 1990s synth soundtrack, vinyl needle-drop, VHS, and arcade SFX |
+| **Vitest & GitHub Actions CI** | 1,054+ unit, property, budget, and boundary tests run automatically on push/PR to `main` |
+| **Vite** | Fast local development server and optimized production bundling |
+
+---
 
 ## Requirements
 
 Before running the project, make sure you have installed:
 
-- Node.js 20.19+ (or 22.12+).
-- npm.
+- **Node.js** `20.19+` (or `22.12+`)
+- **npm**
+
+---
 
 ## Getting Started
 
-Clone the repository and install its dependencies:
+Clone the repository and install dependencies:
 
 ```bash
+git clone [https://github.com/4nthonyzz/the-lost-memory-club.git](https://github.com/4nthonyzz/the-lost-memory-club.git)
+cd the-lost-memory-club
 npm install
 ```
 
@@ -67,129 +106,69 @@ Start the development server:
 npm run dev
 ```
 
-Open the local URL printed by Vite in your browser.
+Open the local URL printed by Vite in your browser (append `?worldPerf=1` to inspect live FPS and scene metrics).
+
+### Controls Quick Reference
+
+- **`W A S D` / Arrow Keys:** Walk through the archive
+- **Mouse (Click canvas) / `I J K L`:** Look around
+- **`E`:** Inspect CRT TV/VHS, Arcade Cabinets, Clues, Manuals, Lamps, or Turntable
+- **`1`–`4` / `5`:** Spin tracks 1–4 or stop the 1990s Hi-Fi turntable
+- **`M`:** Toggle procedural Web Audio on/off
+- **`Esc`:** Close active inspection overlay
+
+---
 
 ## Testing and Validation
 
-Run the following commands to validate the project:
-
-**TypeScript validation**
+Run the full validation suite locally (mirrored by `.github/workflows/ci.yml`):
 
 ```bash
+# TypeScript type validation
 npm run typecheck
-```
 
-**Automated tests**
-
-```bash
+# Automated test suite (1,054+ tests across 34 files)
 npm test
-```
 
-**Production build**
-
-```bash
+# Production bundle build
 npm run build
 ```
 
+---
+
 ## Project Structure and Team Responsibilities
 
-Development is organized into three main feature areas, with shared contracts maintained collaboratively.
+Development is organized into isolated feature directories coordinated through typed contracts in `src/core/`:
 
-| Feature Area | Directory | Responsibility |
+| Feature Area | Directory | Status & Responsibility |
 |---|---|---|
-| World and Exploration | `src/world/` | Developer 1: navigation, camera, collisions, interactables, and 3D optimization |
-| Haunted Arcade | `src/arcade/` | Developer 2: Snake mechanics, results, deterministic rules, and tests |
-| VHS, Narrative and UI | `src/memories/`, `src/ui/` | Developer 3: playback, clues, progression UI, and persistence |
-| Shared Contracts and Reducer | `src/core/` | Changes must be reviewed and approved collaboratively |
+| **World & Exploration** | `src/world/` | **Completed & Merged (`main`)** — Developer 1: 3D archive room, first-person controls, collisions, interactive props, procedural textures, and Web Audio engine |
+| **Haunted Arcade** | `src/arcade/` | **In Progress** — Developer 2: playable retro horror Snake minigame, scoring, win/loss states, and deterministic rules |
+| **VHS, Narrative & UI** | `src/memories/`, `src/ui/` | **In Progress** — Developer 3: VHS tape playback, memory clues, narrative progression, and `LocalStorage` persistence |
+| **Shared Core Contracts** | `src/core/` | Shared typed event contracts (`StationId`, reducer state) maintained collaboratively |
 
-All team members should use **Kiro IDE** for meaningful portions of planning, implementation, and testing.
+For team workflow and branching conventions, see [`docs/TEAM_SETUP.md`](docs/TEAM_SETUP.md).
 
-Development should take place in separate feature branches, with changes integrated through reviewed pull requests.
+---
 
-For collaboration guidelines, see [`docs/TEAM_SETUP.md`](docs/TEAM_SETUP.md).
+## Security, Originality and Licensing
 
-## Kiro and Spec-Driven Development
+- **Starter Scaffold Disclosure:** Built upon the initial *The Lost Memory Club* project scaffold (`src/core/` typed contracts and foundation specs); all 3D exploration geometry, procedural textures, Web Audio synthesizer/SFX engine, arcade minigame logic, and VHS narrative systems were created during the Kiroween 2026 submission period.
+- **Zero Exposed Secrets:** No API keys, tokens, or credentials are stored in source control, and `.env*` files are excluded via `.gitignore`.
+- **`.kiro/` Tracked at Root:** Both `.kiro/specs/` and `.kiro/steering/` remain committed and visible at the repository root.
+- **100% Original & Copyright-Safe:** All 3D geometry, textures, UI, and Web Audio synthesis are original code. Third-party dependencies are documented in [`docs/THIRD_PARTY_ASSETS.md`](docs/THIRD_PARTY_ASSETS.md).
+- **License:** Released under the **MIT License** (see [`LICENSE`](LICENSE)).
 
-This starter is a **manually prepared development scaffold**. It is not evidence of prior Kiro execution.
+---
 
-The team will use Kiro IDE to implement the project through a structured, specification-driven workflow.
+## Kiroween 2026 Submission Checklist
 
-The development process includes:
-
-1. Reviewing and refining the initial specifications.
-2. Defining technical designs and implementation tasks.
-3. Implementing features incrementally in their assigned modules.
-4. Testing functionality and validating integration.
-5. Reviewing changes before merging them into the main development branch.
-
-The `.kiro/` directory must remain tracked in Git.
-
-**Important project guidelines:**
-
-- Do not add `.kiro/` to `.gitignore`.
-- Preserve actual Kiro hook outputs and relevant development evidence.
-- Keep test results and reviewed pull requests as verifiable records.
-- Avoid modifying shared contracts without team approval.
-
-The initial specifications are located in:
-
-```text
-.kiro/
-├── specs/
-│   └── game-foundation/
-│       ├── requirements.md
-│       ├── design.md
-│       └── tasks.md
-└── steering/
-    ├── architecture.md
-    └── product.md
-```
-
-## Minimum Viable Product (MVP)
-
-The target MVP is intentionally limited to a scope achievable by a three-person development team.
-
-The planned experience should support:
-
-- Exploring one compact 3D archive.
-- Recovering one clue through a VHS recording.
-- Playing one complete original Snake minigame.
-- Triggering a visible and persistent change in the environment.
-- Completing a short narrative experience.
-
-The focus is on delivering a cohesive, functional experience rather than introducing too many unfinished features.
-
-## Licensing, Originality and Credits
-
-The source code in this repository is licensed under the **MIT License**.
-
-The project's original artwork, audio, and narrative will be documented separately.
-
-Third-party libraries, tools, and assets must be recorded in [`docs/THIRD_PARTY_ASSETS.md`](docs/THIRD_PARTY_ASSETS.md), including:
-
-- Asset or library name.
-- Original source.
-- Author or creator.
-- Applicable license and usage permissions.
-
-All submitted materials must be original or properly authorized for use. We will not copy copyrighted game characters, music, or film footage without permission.
-
-Contributors and third-party creators must receive appropriate credit.
-
-## Submission Status
-
-Before the final Kiroween 2026 submission, the project must include:
-
-- A public GitHub repository.
-- A detected repository license.
-- The committed `.kiro/` directory.
-- Complete installation and execution instructions.
-- A deployed version of the game.
-- A YouTube demonstration video under three minutes, public or unlisted without a password.
-
-The demonstration must present the essential gameplay and project functionality within the first three minutes, as only that portion will be reviewed.
-
-**This repository is currently under development and is not yet a submission-ready application.**
+- [x] Public GitHub repository (`4nthonyzz/the-lost-memory-club`) with MIT License
+- [x] `.kiro/` directory (`specs/` and `steering/`) tracked at repository root
+- [x] Complete installation, controls, and automated CI validation (`typecheck`, `test`, `build`)
+- [x] 3D exploration world, interactive props, and procedural Web Audio merged into `main`
+- [ ] Full integration of Arcade (`src/arcade/`) and VHS Memory playback (`src/memories/`) on `main`
+- [ ] Public YouTube demonstration video (< 3 minutes) and deployed build link for Devpost
 
 ---
 
