@@ -1009,6 +1009,7 @@ describe('WorldScene procedural audio (task 32.2)', () => {
     expect(badge().textContent).toBe('AUDIO: ON [M]');
     expect(badge().getAttribute('aria-pressed')).toBe('false');
     expect(badge().getAttribute('aria-label')).toBe('Toggle audio (M)');
+    expect(badge().getAttribute('title')).toBe('Late-night synth & room SFX \u2014 press M to mute');
     expect(fireEvent.keyDown(wrapper, { code: 'KeyM', key: 'm' })).toBe(false);
     expect(fake.toggleMuted).toHaveBeenCalledTimes(1);
     expect(badge().textContent).toBe('AUDIO: MUTED [M]');
@@ -1234,7 +1235,10 @@ describe('WorldScene turntable catalog card (task 33.3)', () => {
     expect(rows().every((r) => r.tagName === 'BUTTON' && r.getAttribute('tabindex') === '-1')).toBe(true);
     expect(activeRow()).toBe(0);
     expect(rows()[0].getAttribute('aria-current')).toBe('true');
-    expect(card()?.querySelector('.world-card-footer')?.textContent).toBe('Press 1-5 to select · E or move away to close');
+    expect(card()?.querySelector('.world-card-footer')?.textContent).toBe('[1\u20134] Spin \u00b7 [5] Stop \u00b7 [E / Esc] Close \u00b7 [M] Mute');
+    expect(card()?.querySelector('.world-card-liner')?.textContent).toBe(
+      'Archive liner note: the club closed at midnight, but this record kept turning. Sleeve 5 is blank, and nobody remembers who lifts the needle.',
+    );
     expect(onInspect).not.toHaveBeenCalled();
     expect(document.getElementById('world-card-tab-1')).toBeNull();
   });

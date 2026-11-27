@@ -165,6 +165,21 @@ New test areas from task 34 (Hi-Fi listening table, wall-flush face culling, now
 
 New test areas from task 35 (two-tier Hi-Fi console, floor loudspeaker, raised caps, playback wiring), computed from declared data and mocked components, **not verified visually or by listening**. 19 tests were added (1,035 to 1,054 in 34 files): `modelDetail.test.ts` +10 (228 to 238), `roomLayout.test.ts` +4 (39 to 43), `targeting.test.ts` +4 (50 to 54) and `WorldScene.test.ts` +1 (80 to 81); `proceduralTextures.test.ts` stays at 231. Covered: the unchanged console box, the loudspeaker box x -2.49..-2.15, z 3.68..4 (solid, not interactable), the new caps (`TRIANGLE_CAP` 20,000, `DRAW_CALL_CAP` 425), the exact totals 19,988 triangles and 403 draw calls, console 1,250 / 34 and loudspeaker 180 / 5, 4 lights, 32 textures and 7.703 MiB, the dust cover and tonearm clearance, the per-part playback wiring (track keys, STOP, glow 0.25 and 0.07) and that `onInspect` is not called. Not covered: how the console, dust cover, label bands, per-instance colour tint and loudspeaker look; sound.
 
+## Task 36.2 verification run (computed from source and tests, **not verified visually or by listening**)
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Flaky timeout | fixed | The `floor loudspeaker beside the two-tier console` tests in `targeting.test.ts` (task 35.1) timed out under full-suite load and passed alone. The "changes no target anywhere" test now collects mismatches into an array, asserts once at the end and has an explicit 30,000 ms timeout; the line-of-sight loop also collects violations and asserts once. The assertions mean the same as before (identical target with and without the speaker collider). |
+| `npm run typecheck` | exit 0 | `tsc --noEmit`, no output |
+| `npm test`, run 1 | exit 0 | `Test Files  34 passed (34)`, `Tests  1054 passed (1054)` (75.7 s) |
+| `npm test`, run 2 | exit 0 | `Test Files  34 passed (34)`, `Tests  1054 passed (1054)` (18.7 s) |
+| `npm run build` | exit 0 | 111 modules; JS 1,358.42 kB (393.92 kB gzip), CSS 14.82 kB. The chunk-size warning (over 500 kB) is only a warning; PowerShell wraps it in a `NativeCommandError`. |
+| `modelDetail.test.ts` | 238 of 238 passed | Metrics unchanged (computed, not runtime-measured): 19,988 of 20,000 triangles, 403 draw calls (under 425), 4 lights, 32 textures, 7.703 MiB (at most 7.85 MB). |
+| Test count change | none | Task 36 added no test; 1,054 tests in 34 files, as at task 35.3. |
+| Encoding | 0 findings | Scan of the files changed in Task 36 for the usual UTF-8-read-as-Latin-1 sequences and U+FFFD (the only matches were this row's own description, now reworded). |
+
+The runtime frame time is still unmeasured since before Tasks 23 to 36 (use `?worldPerf=1`).
+
 ## Task 35.3 verification evidence (computed from source and tests, **not verified visually**)
 
 | Check | Result | Evidence |

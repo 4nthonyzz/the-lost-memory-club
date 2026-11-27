@@ -15,6 +15,7 @@ export function AudioBadge({ muted, onToggle }: AudioBadgeProps) {
         className="world-button world-audio-button"
         aria-pressed={muted}
         aria-label="Toggle audio (M)"
+        title={'Late-night synth & room SFX \u2014 press M to mute'}
         onMouseDown={(e) => e.preventDefault()}
         onClick={onToggle}
       >

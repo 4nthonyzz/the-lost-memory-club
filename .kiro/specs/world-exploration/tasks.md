@@ -60,6 +60,8 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
 
 - Approved scope change (two-tier Hi-Fi console, budgets raised), 2026-12-12: the user approved raising the scene triangle cap from 19,200 to the Requirement 14 limit of 20,000 (the hard limit is unchanged) and the draw-call estimate test limit from < 400 to < 425. This supersedes the 19,200 caps in the 26, 27, 28, 29, 30, 31, 33 and 34 bullets for current-state checks (historical task text keeps its wording). The `record-player` becomes a two-tier 1.25 m walnut-and-metal console at about x -2.1..-0.85, z 3.55..4 (it may shift slightly if the floor speaker needs room). Every existing reachability, 1.2 m walkway, doorway-lane, island, spawn-disc, bookcase-walkway and line-of-sight test must stay green without loosening thresholds. Top tier: the turntable under an open clear acrylic dust cover (24-segment platter, label, spindle, tonearm poses), a centre NOW PLAYING stand with the track-coloured jacket (#16a34a, #e11d48, #38bdf8, #f59e0b; #3a3d46 on STOP), scattered cassettes, and a small brass desk lamp on the right with an emissive amber glow (no light). Lower tier: a wire basket rack of tightly packed LP sleeves (left), a silver 1990s stereo receiver with buttons, an LED meter and an amber/green backlit display (centre) above horizontal record or cassette stacks, and a weathered wooden crate of vertical records with spine labels (right). A wood-grained 3-way floor loudspeaker stands beside the console on the couch side (solid collider, because it is floor-standing). Self-illumination only (glow 0.25 playing / 0.07 stopped, LED and display materials). Budgets: 4 lights, 32 textures at 7.703 MiB (0 new bytes), no timers. The referenced image_457.png is not in the workspace, so the text description is the specification. `StationId` is unchanged; `ASSET_MANIFEST` stays `Object.freeze({})`. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json` and `tools/` stay unchanged. The audio still needs the Developer 3 review.
 
+- Approved scope change (micro-copy, Kiro docs, pre-PR audit), 2026-12-13: no geometry, texture, light or audio-engine changes (triangles stay 19,988 / 20,000, draw calls 403, 4 lights, 32 textures at 7.703 MiB). The pass covers turntable card micro-copy and key legend, an `AudioBadge` `title` tooltip (the visible label is unchanged), a "Built with Kiro (Kiroween 2026)" section in `src/world/README.md`, and a pre-PR audit (`.kiro` tracked and not ignored, secrets / credentials / `.env` scan, protected paths unchanged). The root `README.md` is team-owned (game-foundation assigns README to Developer 3) and is NOT edited: a ready-to-paste snippet is proposed in `integration-notes.md` instead. `src/App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json`, `tools/` and the root `README.md` stay unchanged.
+
 ## Tasks
 
 ### Milestone 1: Playable 3D room (primitives only)
@@ -1292,6 +1294,27 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     - Boundary: documentation and the spec folder only.
     - _Requirements: 14.11, 14.12, 15.3, 15.6_
 
+### Micro-copy, Kiro documentation and pre-PR audit
+
+- [x] 36. Micro-copy polish, Kiro documentation and pre-PR audit
+  - [x] 36.1 Turntable micro-copy, badge tooltip, Kiro README section and audit
+    - Files: `src/world/overlay/turntableCatalog.ts`, `src/world/overlay/AudioBadge.tsx`, `src/world/overlay/ControlsHint.tsx` (only if needed), `src/world/README.md`; tests `src/world/WorldScene.test.ts` and any test asserting the changed strings.
+    - Refine the turntable card micro-copy and key legend (keys 1-5, E / Esc to close). Add a `title` tooltip to the `AudioBadge` explaining the M key; the visible label ("AUDIO: ON [M]" / "AUDIO: MUTED [M]") is unchanged. Add a "Built with Kiro (Kiroween 2026)" section to `src/world/README.md` that claims only what is implemented and tested. Run the pre-PR audit: `.kiro/` is tracked and not ignored, scan for secrets, credentials and `.env` files, and confirm protected paths are unchanged with `git diff`.
+    - Acceptance: visible badge text unchanged; tooltip present; no geometry, texture, light or audio-engine change (19,988 / 20,000 triangles, 403 draw calls, 4 lights, 32 textures at 7.703 MiB); audit finds no secrets and `.kiro/` is not ignored; `App.tsx`, `src/core/`, `src/arcade/`, `src/memories/`, `src/ui/`, `src/styles.css`, `vite.config.ts`, `package.json`, `package-lock.json`, `tools/` and the root `README.md` are unchanged.
+    - Tests: update `WorldScene.test.ts` and any test asserting the changed strings. Run `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 35.3.
+    - Boundary: `src/world/` only; all text in English; no new dependency.
+    - _Requirements: 8.1, 15.1, 15.2, 15.3, 15.4, 15.6, 20.2, 20.8_
+
+  - [x] 36.2 Docs and final verification
+    - Files: `.kiro/specs/world-exploration/integration-notes.md` (Task 36 results and the proposed root README snippet), `.kiro/specs/world-exploration/test-report.md`, `.kiro/specs/world-exploration/performance-log.md` (only if counts change).
+    - Record the audit results and add a ready-to-paste root README snippet for the team owner (Developer 3). Re-run `npm run typecheck`, `npm test` and `npm run build` and record the results. Runtime fields stay "not measured". Task 15.4 stays open.
+    - Acceptance: documents match the final code and test counts; all text in English; the root `README.md` is not edited; no unmeasured claim.
+    - Tests: `npm run typecheck`, `npm test`, `npm run build`.
+    - Depends on: 36.1.
+    - Boundary: documentation and the spec folder only.
+    - _Requirements: 14.11, 14.12, 15.3, 15.6_
+
 ## Notes
 
 - Tasks marked with `*` are optional. The 17 property-based test sub-tasks can be skipped for a faster MVP. Tasks 16.2 and 16.3 are marked `*` because they must not be implemented without approval.
@@ -1391,7 +1414,9 @@ Every task lists: affected files, acceptance criteria, tests, dependencies (task
     { "id": 82, "tasks": ["34.3"] },
     { "id": 83, "tasks": ["35.1"] },
     { "id": 84, "tasks": ["35.2"] },
-    { "id": 85, "tasks": ["35.3"] }
+    { "id": 85, "tasks": ["35.3"] },
+    { "id": 86, "tasks": ["36.1"] },
+    { "id": 87, "tasks": ["36.2"] }
   ]
 }
 ```

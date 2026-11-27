@@ -1798,6 +1798,37 @@
         "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
         "timestamp": 1795697159072
       }
+    ],
+    "36.1 Turntable micro-copy, badge tooltip, Kiro README section and audit": [
+      {
+        "executionId": "9ed658e0-2785-4b29-bde2-98f4a069c298",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795788312300
+      },
+      {
+        "executionId": "9ed658e0-2785-4b29-bde2-98f4a069c298",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795788906757
+      }
+    ],
+    "36.2 Docs and final verification": [
+      {
+        "executionId": "9ed658e0-2785-4b29-bde2-98f4a069c298",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795788904711
+      },
+      {
+        "executionId": "9ed658e0-2785-4b29-bde2-98f4a069c298",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795789465703
+      }
+    ],
+    "36. Micro-copy polish, Kiro documentation and pre-PR audit": [
+      {
+        "executionId": "9ed658e0-2785-4b29-bde2-98f4a069c298",
+        "chatSessionId": "sess_faad51e6-377e-4af3-9390-54cdf621d285",
+        "timestamp": 1795789466175
+      }
     ]
   }
 }

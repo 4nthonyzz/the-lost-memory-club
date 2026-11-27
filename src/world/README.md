@@ -2,6 +2,14 @@
 
 First-person 3D archive room for The Lost Memory Club, built with React Three Fiber. The module renders the world, lets the player walk and look around, and reports which station the player wants to use. It does not decide what happens next.
 
+## Built with Kiro (Kiroween 2026)
+
+This module was built spec-first with Kiro. The statements below can be checked in the repository.
+
+1. **Spec-driven architecture.** `.kiro/specs/world-exploration/` holds `requirements.md`, `design.md`, and the task list in `tasks.md` (progress metadata in `tasks.meta.json`). `tasks.md` has 36 top-level tasks (task 36, this documentation pass, included). Its optional sub-tasks are marked with `*` (20 entries, 19 of them still unchecked). They are mostly the property-based tests, which were deferred: the module is covered by deterministic unit and integration tests instead. Every change after the first milestones was recorded as an "Approved scope change" bullet in `tasks.md` before it was implemented.
+2. **Steering and boundary enforcement.** `.kiro/steering/product.md` and `.kiro/steering/architecture.md` set the product and architecture rules. `src/world/boundary.test.ts` turns the module rules into a test. It reads every `src/world/**/*.ts(x)` file as text, strips comments, and fails if: a file imports from `src/arcade` or `src/memories`; a file imports anything from `src/core` other than `core/contracts`; a source file uses `localStorage`, `sessionStorage`, `indexedDB` or `document.cookie`; or a file in `world/logic/` imports `react`, `react-dom`, `three` or `@react-three/*`. The test also checks its own scanner against sample violations. It does not check imports of other `src/` folders such as `src/ui`, and it cannot catch dynamic specifiers built at run time.
+3. **Zero-asset procedural pipeline.** The world ships with no external binary assets: `ASSET_MANIFEST` is empty (`Object.freeze({})`), and there are no `.glb` or audio files. Visuals are 32 procedural canvas textures, multi-part props built from primitive geometry, and three animated attract screens redrawn at up to 24 Hz (`ATTRACT_MAX_HZ`). Sound is synthesised at run time with Web Audio (`src/world/audio/`). Texture count, triangle and draw-call budgets are asserted by automated tests. The look of the scene and the sound of the audio engine have **not** been verified visually or by listening in this pass; they are covered by code-level tests only (see "Verification labels").
+
 ## Verification labels
 
 Every feature below carries one of these labels.
@@ -370,7 +378,7 @@ Zero audio files, no new dependency, no timers, no storage. Everything is synthe
 
 **33.3, turntable card, keys and prompt (`WorldScene.tsx`, `overlay/WorldInspectorCard.tsx`, `overlay/turntableCatalog.ts`, `logic/inputMode.ts`, `logic/inputState.ts`, `logic/propState.ts`).**
 
-- E on the record player calls `openCard('record-player')`. It is **not counted in NOTES READ**, which stays at 7. The card has `data-theme="turntable"` and `TURNTABLE_PALETTE` (every text pair has a contrast of at least 4.5:1, `logic/cardThemes.test.ts`), five track rows and the footer `Press 1-5 to select · E or move away to close`.
+- E on the record player calls `openCard('record-player')`. It is **not counted in NOTES READ**, which stays at 7. The card has `data-theme="turntable"` and `TURNTABLE_PALETTE` (every text pair has a contrast of at least 4.5:1, `logic/cardThemes.test.ts`), five track rows, a short archive liner note (task 36.1) and the key legend footer `[1–4] Spin · [5] Stop · [E / Esc] Close · [M] Mute` (it replaced the earlier `Press 1-5 to select · E or move away to close`).
 - Key routing: with the turntable card open, `Digit` or `Numpad` 1 to 5 select tracks 0 to 4. With a document card open, 1 and 2 switch pages and 3 to 5 do nothing. With no card open the number keys do nothing.
 - Clicking a row selects the track, unlocks audio (it is a user gesture) and **never recaptures pointer lock**. Selecting STOP plays no needle drop; selecting another track does.
 - Playing state is `engine.isPlaying()` (track 0 to 3 and unlocked). The prompt reads `Press E to use 1990s Turntable`, and `Press E to use 1990s Turntable · Now playing: <title>` while a track plays.

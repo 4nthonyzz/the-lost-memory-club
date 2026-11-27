@@ -500,12 +500,14 @@ describe('floor loudspeaker beside the two-tier console does not disturb targeti
     expect(label(pick({ x: -1.5, z: 2.6 }, yawToward({ x: -1.5, z: 2.6 }, def.anchor)))).toBe('record-player');
     expect(label(pick({ x: -2.1, z: 1.6 }, yawToward({ x: -2.1, z: 1.6 }, def.anchor)))).toBe('record-player');
     let checked = 0;
+    const violations: string[] = [];
     for (const c of cells) {
       if (c.z >= def.anchor.z || Math.hypot(def.anchor.x - c.x, def.anchor.z - c.z) > 2.2) continue;
       const yaw = yawToward(c, def.anchor);
-      expect(label(pick(c, yaw)), `${c.x},${c.z}`).toBe(label(pick(c, yaw, withoutSpeaker)));
+      if (label(pick(c, yaw)) !== label(pick(c, yaw, withoutSpeaker))) violations.push(`${c.x},${c.z}`);
       checked++;
     }
+    expect(violations).toEqual([]);
     expect(checked).toBeGreaterThan(20);
     // The line of sight from the closest cells to the anchor never crosses the speaker footprint, which lies west of the table and behind its front plane (z 3.55).
     expect(speaker.box.minZ).toBeGreaterThan(body.box.minZ);
@@ -513,12 +515,16 @@ describe('floor loudspeaker beside the two-tier console does not disturb targeti
   });
 
   it('changes no target anywhere: over every reachable cell and four headings the result is identical with and without the speaker collider', () => {
+    const violations: string[] = [];
     for (const c of cells.filter((_, i) => i % 2 === 0)) {
       for (const yaw of [0, Math.PI / 2, Math.PI, -Math.PI / 2, 0.7, -2.1]) {
-        expect(label(pick(c, yaw)), `${c.x},${c.z} yaw ${yaw}`).toBe(label(pick(c, yaw, withoutSpeaker)));
+        const withSpeaker = label(pick(c, yaw));
+        const without = label(pick(c, yaw, withoutSpeaker));
+        if (withSpeaker !== without) violations.push(`${c.x},${c.z} yaw ${yaw}: ${withSpeaker} vs ${without}`);
       }
     }
-  });
+    expect(violations).toEqual([]);
+  }, 30000);
 
   it('leaves the Stations and the other props at their existing test cells unchanged', () => {
     const spots = [

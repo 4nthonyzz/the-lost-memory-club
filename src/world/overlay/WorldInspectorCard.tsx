@@ -19,6 +19,7 @@ import {
   TURNTABLE_CARD_TAG,
   TURNTABLE_CARD_TITLE,
   TURNTABLE_FOOTER_HINT,
+  TURNTABLE_LINER_NOTE,
   trackBpmLabel,
   turntableStatusText,
 } from './turntableCatalog';
@@ -446,6 +447,7 @@ function TurntableCard({ track, playingTrack, onTrack }: { track: number; playin
         <ul className="world-card-pills" aria-label="Turntable status">
           <li className="world-pill world-pill-status">{turntableStatusText(playingTrack)}</li>
         </ul>
+        <p className="world-card-liner">{TURNTABLE_LINER_NOTE}</p>
         <div className="world-track-list" role="listbox" aria-label="Track list">
           {MUSIC_CATALOG.map((entry, i) => (
             <button
