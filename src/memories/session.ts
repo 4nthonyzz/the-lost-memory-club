@@ -1,4 +1,5 @@
-import { FIRST_CLUE_ID, FIRST_TAPE_ID, MEMORY_ID, SNAKE_GAME_ID, type GameEvent, type GameState } from '../core/contracts';
+import { FIRST_CLUE_ID, FIRST_TAPE_ID, MEMORY_ID, type GameEvent, type GameState } from '../core/contracts';
+import { canRestoreArchive } from '../core/progression';
 import { ACTS, ARCHIVE_TAPE, PERFECT_TRACKING_CLUE_ID } from './fragments/memoryCatalog';
 import type { ExtraProgress } from './fragments/narrativeEvaluator';
 import type { ClueDetection, TapeDefinition } from './restoration/types';
@@ -43,7 +44,7 @@ export function canLoadSummerTape(state: GameState): boolean {
 }
 
 export function canOpenArchive(state: GameState): boolean {
-  return state.completedArcades.includes(SNAKE_GAME_ID);
+  return canRestoreArchive(state);
 }
 
 export function isArchiveRestored(state: GameState): boolean {

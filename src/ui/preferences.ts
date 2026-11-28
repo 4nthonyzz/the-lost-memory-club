@@ -10,7 +10,7 @@ export interface Preferences {
 }
 
 export function createDefaultPreferences(reducedDistortion = false): Preferences {
-  return { version: 1, language: 'en', reducedDistortion, muted: false };
+  return { version: 1, language: 'es', reducedDistortion, muted: false };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

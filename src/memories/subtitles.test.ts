@@ -41,8 +41,8 @@ describe('subtitles', () => {
 
   it('switches language instantly and returns null between cues', () => {
     const first = ACTS[0]!.tape.id;
-    expect(subtitleAt(first, 3, 'en')).toContain('Camera is rolling');
-    expect(subtitleAt(first, 3, 'es')).toContain('La c\u00e1mara graba');
+    expect(subtitleAt(first, 3, 'en')).toContain('Rolling!');
+    expect(subtitleAt(first, 3, 'es')).toContain('Grabando');
     expect(subtitleAt(first, 0, 'en')).toBeNull();
     expect(subtitleAt('unknown-tape', 3, 'en')).toBeNull();
   });

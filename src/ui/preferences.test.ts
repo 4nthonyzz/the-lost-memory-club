@@ -3,8 +3,8 @@ import { createDefaultPreferences, loadPreferences, parsePreferences, PREFERENCE
 import { getUiStrings } from './strings';
 
 describe('preferences', () => {
-  it('defaults to English with effects and audio enabled', () => {
-    expect(createDefaultPreferences()).toEqual({ version: 1, language: 'en', reducedDistortion: false, muted: false });
+  it('defaults to Spanish with effects and audio enabled', () => {
+    expect(createDefaultPreferences()).toEqual({ version: 1, language: 'es', reducedDistortion: false, muted: false });
   });
 
   it('uses its own versioned key', () => {
@@ -27,7 +27,7 @@ describe('preferences', () => {
 
   it('repairs invalid fields individually', () => {
     const result = parsePreferences(JSON.stringify({ version: 1, language: 'fr', reducedDistortion: 'yes', muted: true }));
-    expect(result).toEqual({ version: 1, language: 'en', reducedDistortion: false, muted: true });
+    expect(result).toEqual({ version: 1, language: 'es', reducedDistortion: false, muted: true });
   });
 
   it('keeps a provided fallback for invalid fields', () => {

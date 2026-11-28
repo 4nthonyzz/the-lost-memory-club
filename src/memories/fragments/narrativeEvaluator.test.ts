@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { FIRST_CLUE_ID, FIRST_TAPE_ID, MEMORY_ID, SNAKE_GAME_ID, type GameEvent, type GameState } from '../../core/contracts';
+import {
+  DEAD_FREQUENCY_GAME_ID,
+  FIRST_CLUE_ID,
+  FIRST_TAPE_ID,
+  MEMORY_ID,
+  SECOND_CLUE_ID,
+  SECOND_TAPE_ID,
+  SECRET_BOX_ID,
+  SHADOW_FIGHT_GAME_ID,
+  SNAKE_GAME_ID,
+  THIRD_CLUE_ID,
+  THIRD_TAPE_ID,
+  type GameEvent,
+  type GameState,
+} from '../../core/contracts';
 import { createInitialState, gameReducer } from '../../core/gameReducer';
 import { ACTS, ENDINGS } from './memoryCatalog';
 import { evaluateNarrativeState, narrativeFor, type ExtraProgress } from './narrativeEvaluator';
@@ -12,6 +26,24 @@ const collect: GameEvent = { type: 'TAPE_COLLECTED', tapeId: FIRST_TAPE_ID };
 const clue: GameEvent = { type: 'VHS_CLUE_FOUND', tapeId: FIRST_TAPE_ID, clueId: FIRST_CLUE_ID };
 const win: GameEvent = { type: 'ARCADE_WON', gameId: SNAKE_GAME_ID, score: 10 };
 const restore: GameEvent = { type: 'MEMORY_RESTORED', memoryId: MEMORY_ID };
+
+/** Acts two and three, so that Archive 09 can be restored. */
+const laterActs: GameEvent[] = [
+  { type: 'TAPE_COLLECTED', tapeId: SECOND_TAPE_ID },
+  { type: 'VHS_CLUE_FOUND', tapeId: SECOND_TAPE_ID, clueId: SECOND_CLUE_ID },
+  { type: 'ARCADE_WON', gameId: SHADOW_FIGHT_GAME_ID, score: 10 },
+  { type: 'TAPE_COLLECTED', tapeId: THIRD_TAPE_ID },
+  { type: 'VHS_CLUE_FOUND', tapeId: THIRD_TAPE_ID, clueId: THIRD_CLUE_ID },
+  { type: 'ARCADE_WON', gameId: DEAD_FREQUENCY_GAME_ID, score: 10 },
+];
+const polaroids: GameEvent[] = [FIRST_TAPE_ID, SECOND_TAPE_ID, THIRD_TAPE_ID].map((tapeId) => ({
+  type: 'PHOTO_CAPTURED' as const,
+  tapeId,
+  photoId: `${tapeId}-memory`,
+}));
+const box: GameEvent = { type: 'SECRET_BOX_COLLECTED', boxId: SECRET_BOX_ID };
+const archiveOpen: GameEvent[] = [collect, clue, win, ...laterActs, restore];
+const completeStory: GameEvent[] = [collect, clue, win, ...laterActs, restore, box, ...polaroids];
 
 const allSecrets = ACTS.map((act) => act.secret.id);
 const fullProgress: ExtraProgress = {
@@ -42,7 +74,15 @@ describe('evaluateNarrativeState with GameState v1', () => {
     const ids = (events: GameEvent[]) => evaluateNarrativeState(play(events)).fragments.map((entry) => entry.id);
     expect(ids([collect])).toEqual(['tape-001:memory']);
     expect(ids([collect, clue])).toEqual(['tape-001:memory', 'tape-001:clue']);
-    expect(ids([collect, clue, win, restore])).toEqual(['tape-001:memory', 'tape-001:clue', 'archive-09:memory']);
+    expect(ids(archiveOpen)).toEqual([
+    'tape-001:memory',
+    'tape-001:clue',
+    'tape-002:memory',
+    'tape-002:clue',
+    'tape-003:memory',
+    'tape-003:clue',
+    'archive-09:memory',
+  ]);
   });
 
   it('opens act 2 only after act 1 is completed', () => {
@@ -57,13 +97,13 @@ describe('evaluateNarrativeState with GameState v1', () => {
   });
 
   it('unlocks the two standard endings when archive-09 is restored', () => {
-    const result = evaluateNarrativeState(play([collect, clue, win, restore]));
+    const result = evaluateNarrativeState(play(archiveOpen));
     expect(result.archiveRestored).toBe(true);
     expect(result.unlockedEndings).toEqual(['bittersweet-dawn', 'forever-1998']);
   });
 
   it('does not unlock the secret ending from v1 progress alone', () => {
-    const result = evaluateNarrativeState(play([collect, clue, win, restore]));
+    const result = evaluateNarrativeState(play(archiveOpen));
     expect(result.unlockedEndings).not.toContain('archivists-truth');
     expect(result.secrets).toEqual({ found: 0, total: 3, perfectTracking: false, eligible: false });
   });
@@ -96,15 +136,19 @@ describe('evaluateNarrativeState with extra progress', () => {
     expect(result.acts.map((entry) => entry.status)).toEqual(['available', 'locked', 'locked']);
   });
 
-  it('unlocks the secret ending only with all three secrets and perfect tracking', () => {
-    const restored = play([collect, clue, win, restore]);
-    expect(evaluateNarrativeState(restored, fullProgress).unlockedEndings).toEqual(['bittersweet-dawn', 'forever-1998', 'archivists-truth']);
+  it('unlocks the secret ending only with the full story, the box and three Polaroids', () => {
+    expect(evaluateNarrativeState(play(completeStory), fullProgress).unlockedEndings).toEqual(['bittersweet-dawn', 'forever-1998', 'archivists-truth']);
 
-    const missingSecret = { ...fullProgress, minigameSecrets: allSecrets.slice(1) };
-    expect(evaluateNarrativeState(restored, missingSecret).unlockedEndings).not.toContain('archivists-truth');
+    const withoutBox = play(completeStory.filter((event) => event.type !== 'SECRET_BOX_COLLECTED'));
+    expect(evaluateNarrativeState(withoutBox, fullProgress).unlockedEndings).not.toContain('archivists-truth');
 
-    const imperfect = { ...fullProgress, perfectTrackingArchive: false };
-    expect(evaluateNarrativeState(restored, imperfect).unlockedEndings).not.toContain('archivists-truth');
+    const twoPolaroids = play(completeStory.filter((event) => event.type !== 'PHOTO_CAPTURED' || event.tapeId !== THIRD_TAPE_ID));
+    expect(evaluateNarrativeState(twoPolaroids, fullProgress).unlockedEndings).not.toContain('archivists-truth');
+  });
+
+  it('ignores session flags for the secret ending, which follows the story gates only', () => {
+    const withoutFlags = evaluateNarrativeState(play(completeStory), {});
+    expect(withoutFlags.unlockedEndings).toContain('archivists-truth');
   });
 
   it('does not unlock the secret ending before archive-09 is restored', () => {
@@ -114,11 +158,10 @@ describe('evaluateNarrativeState with extra progress', () => {
   });
 
   it('reveals the Archivist fragment only for the secret ending', () => {
-    const restored = play([collect, clue, win, restore]);
-    const secret = evaluateNarrativeState(restored, fullProgress);
+    const secret = evaluateNarrativeState(play(completeStory), fullProgress);
     expect(secret.fragments.map((entry) => entry.id)).toContain('archive-09:truth');
     expect(secret.fragments.find((entry) => entry.id === 'archive-09:truth')?.text).toContain('Leo is The Archivist');
-    expect(evaluateNarrativeState(restored).fragments.map((entry) => entry.id)).not.toContain('archive-09:truth');
+    expect(evaluateNarrativeState(play([...completeStory.slice(0, 3), ...laterActs, restore])).fragments.map((entry) => entry.id)).not.toContain('archive-09:truth');
   });
 
   it('ignores unknown secret identifiers', () => {
@@ -127,7 +170,7 @@ describe('evaluateNarrativeState with extra progress', () => {
   });
 
   it('counts every journal fragment when all progress is present', () => {
-    const result = evaluateNarrativeState(play([collect, clue, win, restore]), fullProgress);
+    const result = evaluateNarrativeState(play(completeStory), fullProgress);
     expect(result.fragments).toHaveLength(result.totalFragments);
   });
 });
@@ -153,11 +196,11 @@ describe('narrativeFor', () => {
     expect(stage([collect])).toBe('stirring');
     expect(stage([collect, clue])).toBe('watching');
     expect(stage([collect, clue, win])).toBe('shifted');
-    expect(stage([collect, clue, win, restore])).toBe('archive-open');
+    expect(stage(archiveOpen)).toBe('archive-open');
   });
 
   it('never decreases distortion as progress grows and stays within 0..1', () => {
-    const chain: GameEvent[][] = [[], [collect], [collect, clue], [collect, clue, win], [collect, clue, win, restore]];
+    const chain: GameEvent[][] = [[], [collect], [collect, clue], [collect, clue, win], archiveOpen];
     const values = chain.map((events) => narrativeFor(play(events)).distortion);
     expect(values[0]).toBe(0);
     for (let index = 1; index < values.length; index += 1) {

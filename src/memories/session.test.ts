@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { FIRST_CLUE_ID, FIRST_TAPE_ID, MEMORY_ID, SNAKE_GAME_ID, type GameEvent, type GameState } from '../core/contracts';
+import {
+  DEAD_FREQUENCY_GAME_ID,
+  FIRST_CLUE_ID,
+  FIRST_TAPE_ID,
+  MEMORY_ID,
+  SECOND_CLUE_ID,
+  SECOND_TAPE_ID,
+  SECRET_BOX_ID,
+  SHADOW_FIGHT_GAME_ID,
+  SNAKE_GAME_ID,
+  THIRD_CLUE_ID,
+  THIRD_TAPE_ID,
+  type GameEvent,
+  type GameState,
+} from '../core/contracts';
 import { createInitialState, gameReducer } from '../core/gameReducer';
 import { buildJournalModel } from './fragments/journalView';
 import { ACTS, ARCHIVE_TAPE, PERFECT_TRACKING_CLUE_ID } from './fragments/memoryCatalog';
@@ -27,6 +41,23 @@ function apply(state: GameState, events: GameEvent[]): GameState {
 function detectionsFrom(actions: TransportAction[]): ClueDetection[] {
   return actions.reduce(transportReducer, createTransportState()).detections.slice();
 }
+
+/** Every event of the three acts, in playable order. */
+const ACT_ONE: GameEvent[] = [
+  { type: 'TAPE_COLLECTED', tapeId: FIRST_TAPE_ID },
+  { type: 'VHS_CLUE_FOUND', tapeId: FIRST_TAPE_ID, clueId: FIRST_CLUE_ID },
+  { type: 'ARCADE_WON', gameId: SNAKE_GAME_ID, score: DEMO_ARCADE_SCORE },
+];
+const ACT_TWO: GameEvent[] = [
+  { type: 'TAPE_COLLECTED', tapeId: SECOND_TAPE_ID },
+  { type: 'VHS_CLUE_FOUND', tapeId: SECOND_TAPE_ID, clueId: SECOND_CLUE_ID },
+  { type: 'ARCADE_WON', gameId: SHADOW_FIGHT_GAME_ID, score: DEMO_ARCADE_SCORE },
+];
+const ACT_THREE: GameEvent[] = [
+  { type: 'TAPE_COLLECTED', tapeId: THIRD_TAPE_ID },
+  { type: 'VHS_CLUE_FOUND', tapeId: THIRD_TAPE_ID, clueId: THIRD_CLUE_ID },
+  { type: 'ARCADE_WON', gameId: DEAD_FREQUENCY_GAME_ID, score: DEMO_ARCADE_SCORE },
+];
 
 describe('detection routing', () => {
   it('marks only the archive perfect-tracking detection as a session flag', () => {
@@ -72,26 +103,22 @@ describe('gates used by the App shell', () => {
     expect(canLoadSummerTape(apply(initial, [{ type: 'TAPE_COLLECTED', tapeId: FIRST_TAPE_ID }]))).toBe(true);
   });
 
-  it('opens Archive 09 only after the arcade is won', () => {
-    const withClue = apply(createInitialState(), [
-      { type: 'TAPE_COLLECTED', tapeId: FIRST_TAPE_ID },
-      { type: 'VHS_CLUE_FOUND', tapeId: FIRST_TAPE_ID, clueId: FIRST_CLUE_ID },
-    ]);
-    expect(canOpenArchive(withClue)).toBe(false);
-    expect(canOpenArchive(apply(withClue, [{ type: 'ARCADE_WON', gameId: SNAKE_GAME_ID, score: DEMO_ARCADE_SCORE }]))).toBe(true);
+  it('opens Archive 09 only after all three acts are won, not after the first cabinet', () => {
+    expect(canOpenArchive(apply(createInitialState(), ACT_ONE))).toBe(false);
+    expect(canOpenArchive(apply(createInitialState(), [...ACT_ONE, ...ACT_TWO]))).toBe(false);
+    expect(canOpenArchive(apply(createInitialState(), [...ACT_ONE, ...ACT_TWO, ...ACT_THREE]))).toBe(true);
   });
 
-  it('reports the clue and archive flags from GameState v1', () => {
+  it('reports the clue and archive flags from the state', () => {
     expect(isClueFound(createInitialState())).toBe(false);
     expect(isArchiveRestored(createInitialState())).toBe(false);
   });
 });
 
-describe('end-to-end demo path through the reducer and the player', () => {
-  it('goes from tape to clue, arcade win, archive restore and the secret ending', () => {
+describe('end-to-end path through the reducer, the transport and the journal', () => {
+  it('goes from tape to clue, through all acts, to archive and the secret ending', () => {
     const clue = SUMMER_TAPE.clueWindows[0]!;
 
-    let state = apply(createInitialState(), [{ type: 'TAPE_COLLECTED', tapeId: SUMMER_TAPE.id }]);
     const clueDetections = detectionsFrom([
       { type: 'LOAD_TAPE', tape: SUMMER_TAPE },
       { type: 'SET_TRACKING', value: SUMMER_TAPE.idealTracking },
@@ -100,10 +127,13 @@ describe('end-to-end demo path through the reducer and the player', () => {
       { type: 'PAUSE' },
     ]);
     expect(clueDetections).toHaveLength(1);
+
+    let state = apply(createInitialState(), [{ type: 'TAPE_COLLECTED', tapeId: SUMMER_TAPE.id }]);
     state = apply(state, clueDetections.map(clueEventFor));
     expect(isClueFound(state)).toBe(true);
 
-    state = apply(state, [{ type: 'ARCADE_WON', gameId: SNAKE_GAME_ID, score: DEMO_ARCADE_SCORE }]);
+    state = apply(state, ACT_ONE.slice(2));
+    state = apply(state, [...ACT_TWO, ...ACT_THREE]);
     expect(canOpenArchive(state)).toBe(true);
 
     state = apply(state, [{ type: 'MEMORY_RESTORED', memoryId: MEMORY_ID }]);
@@ -119,20 +149,21 @@ describe('end-to-end demo path through the reducer and the player', () => {
     ]);
     expect(perfectDetections.some(isPerfectTrackingDetection)).toBe(true);
 
+    const withSecrets = apply(state, [
+      { type: 'PHOTO_CAPTURED', tapeId: FIRST_TAPE_ID, photoId: `${FIRST_TAPE_ID}-memory` },
+      { type: 'PHOTO_CAPTURED', tapeId: SECOND_TAPE_ID, photoId: `${SECOND_TAPE_ID}-memory` },
+      { type: 'PHOTO_CAPTURED', tapeId: THIRD_TAPE_ID, photoId: `${THIRD_TAPE_ID}-memory` },
+      { type: 'SECRET_BOX_COLLECTED', boxId: SECRET_BOX_ID },
+    ]);
     let session = recordPerfectTracking(EMPTY_SESSION);
     for (const act of ACTS) session = toggleMinigameSecret(session, act.secret.id);
 
-    const journal = buildJournalModel(state, progressFor(session), 'en');
+    const journal = buildJournalModel(withSecrets, progressFor(session), 'en');
     expect(journal.endings.map((ending) => ending.id)).toEqual(['bittersweet-dawn', 'forever-1998', 'archivists-truth']);
   });
 
-  it('keeps the ending locked when the secret flags are missing', () => {
-    const state = apply(createInitialState(), [
-      { type: 'TAPE_COLLECTED', tapeId: FIRST_TAPE_ID },
-      { type: 'VHS_CLUE_FOUND', tapeId: FIRST_TAPE_ID, clueId: FIRST_CLUE_ID },
-      { type: 'ARCADE_WON', gameId: SNAKE_GAME_ID, score: DEMO_ARCADE_SCORE },
-      { type: 'MEMORY_RESTORED', memoryId: MEMORY_ID },
-    ]);
+  it('keeps the secret ending locked without the box and the three Polaroids', () => {
+    const state = apply(createInitialState(), [...ACT_ONE, ...ACT_TWO, ...ACT_THREE, { type: 'MEMORY_RESTORED', memoryId: MEMORY_ID }]);
     const journal = buildJournalModel(state, progressFor(EMPTY_SESSION), 'es');
     expect(journal.endings.map((ending) => ending.id)).toEqual(['bittersweet-dawn', 'forever-1998']);
   });

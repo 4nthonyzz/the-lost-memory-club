@@ -1,7 +1,8 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import './ui.css';
 import { CrtCorruptionOverlay } from './CrtCorruptionOverlay';
 import { drawEnding, ENDING_HEIGHT, ENDING_WIDTH } from './endingScenes';
+import { getFlowStrings } from './flowStrings';
 import type { Language } from './preferences';
 import { getUiStrings, type UiStrings } from './strings';
 import type { EndingSceneId, EndingView } from './viewModels';
@@ -10,10 +11,13 @@ export interface EndingScreenProps {
   language: Language;
   reducedDistortion: boolean;
   endings: readonly EndingView[];
-  /** Descriptions of what is still needed to unlock the secret ending. Empty = all done. */
+  /** The ending the player already chose. When set, its scene replaces the choice list. */
+  chosenId: EndingSceneId | null;
+  /** Readable descriptions of what the secret ending still needs. Empty when all is done. */
   secretMissing?: readonly string[];
-  onChosen?: (id: EndingSceneId) => void;
-  onRestart: () => void;
+  onChosen: (id: EndingSceneId) => void;
+  /** Called from the scene's button. The member card opens only after this. */
+  onFinish: () => void;
 }
 
 const CORRUPTION_BY_ENDING: Record<EndingSceneId, number> = {
@@ -44,10 +48,10 @@ function EndingCanvas({ id, caption, reducedDistortion }: EndingCanvasProps) {
 
   useEffect(() => {
     const context = canvasRef.current?.getContext('2d');
-    if (!context) return;
+    if (!context) return undefined;
     if (reducedDistortion) {
       drawEnding(context, id, 0, true, caption);
-      return;
+      return undefined;
     }
     const start = performance.now();
     let frameId = 0;
@@ -62,22 +66,17 @@ function EndingCanvas({ id, caption, reducedDistortion }: EndingCanvasProps) {
   return <canvas ref={canvasRef} className="ending__canvas" width={ENDING_WIDTH} height={ENDING_HEIGHT} aria-hidden="true" />;
 }
 
-export function EndingScreen({ language, reducedDistortion, endings, secretMissing = [], onChosen, onRestart }: EndingScreenProps) {
+export function EndingScreen({ language, reducedDistortion, endings, chosenId, secretMissing = [], onChosen, onFinish }: EndingScreenProps) {
   const strings = getUiStrings(language).endings;
+  const flow = getFlowStrings(language).endings;
   const headingId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const [chosenId, setChosenId] = useState<EndingSceneId | null>(null);
-  const chosen = endings.find((ending) => ending.id === chosenId) ?? null;
+  const chosen = chosenId === null ? null : endings.find((ending) => ending.id === chosenId) ?? null;
   const secretUnlocked = endings.some((ending) => ending.id === 'archivists-truth');
 
   useEffect(() => {
     headingRef.current?.focus();
-  }, [chosenId]);
-
-  function choose(id: EndingSceneId): void {
-    setChosenId(id);
-    onChosen?.(id);
-  }
+  }, [chosen?.id]);
 
   if (chosen) {
     return (
@@ -90,8 +89,8 @@ export function EndingScreen({ language, reducedDistortion, endings, secretMissi
           {chosen.title}
         </h2>
         <p className="ending__text">{chosen.text}</p>
-        <button type="button" className="ending__button" onClick={onRestart}>
-          {strings.restart}
+        <button type="button" className="ending__button" onClick={onFinish}>
+          {flow.continue}
         </button>
       </section>
     );
@@ -115,7 +114,7 @@ export function EndingScreen({ language, reducedDistortion, endings, secretMissi
           <ul className="ending__choices">
             {endings.map((ending) => (
               <li key={ending.id}>
-                <button type="button" className={`ending__choice ending__choice--${ending.id}`} onClick={() => choose(ending.id)}>
+                <button type="button" className={`ending__choice ending__choice--${ending.id}`} onClick={() => onChosen(ending.id)}>
                   <span className="ending__choice-label">{ending.choiceLabel}</span>
                   <span className="ending__choice-title">{ending.title}</span>
                   {ending.id === 'archivists-truth' && <span className="ending__badge">{strings.newBadge}</span>}
@@ -125,11 +124,10 @@ export function EndingScreen({ language, reducedDistortion, endings, secretMissi
             {secretMissing.length > 0 && (
               <li>
                 <div className="ending__choice ending__choice--locked" aria-disabled="true">
-                  <span className="ending__choice-label ending__choice-label--locked">
-                    {language === 'es' ? '\uD83D\uDD12 El recuerdo que vive' : '\uD83D\uDD12 The Memory That Lives'}
-                  </span>
+                  <span className="ending__choice-label ending__choice-label--locked">{flow.lockedName}</span>
                   <span className="ending__choice-title">
-                    {language === 'es' ? 'Falta: ' : 'Missing: '}{secretMissing.join(', ')}
+                    {flow.missingPrefix}
+                    {secretMissing.join(', ')}
                   </span>
                 </div>
               </li>

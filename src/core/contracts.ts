@@ -10,8 +10,14 @@ export const SHADOW_FIGHT_GAME_ID = 'shadow-fight-001' as const;
 export const DEAD_FREQUENCY_GAME_ID = 'dead-frequency-001' as const;
 export const MEMORY_ID = 'archive-09' as const;
 export const SAVE_KEY = 'lost-memory-club.save.v1';
+
 export type StationId = 'vhs' | 'arcade';
 export type EndingId = 'bittersweet-dawn' | 'forever-1998' | 'archivists-truth';
+
+/**
+ * Events are the only way to change persistent state. Payloads of the original events are unchanged.
+ * RUN_STARTED and RUN_FINISHED carry a timestamp supplied by the UI, so the reducer stays pure.
+ */
 export type GameEvent =
   | { type: 'TAPE_COLLECTED'; tapeId: string }
   | { type: 'VHS_CLUE_FOUND'; tapeId: string; clueId: string }
@@ -23,7 +29,10 @@ export type GameEvent =
   | { type: 'INTRO_COMPLETED' }
   | { type: 'CALENDAR_SHIFTED'; date: string }
   | { type: 'ENDING_CHOSEN'; endingId: EndingId }
+  | { type: 'RUN_STARTED'; at: number }
+  | { type: 'RUN_FINISHED'; at: number }
   | { type: 'RESET_DEMO' };
+
 export interface GameState {
   version: 2;
   collectedTapes: string[];
@@ -36,4 +45,8 @@ export interface GameState {
   introCompleted: boolean;
   endingUnlocked: boolean;
   chosenEnding: EndingId | null;
+  /** Epoch milliseconds when the run left the PLAY screen. Null before the run starts. */
+  startedAt: number | null;
+  /** Epoch milliseconds when the player chose an ending. Null until then. */
+  finishedAt: number | null;
 }

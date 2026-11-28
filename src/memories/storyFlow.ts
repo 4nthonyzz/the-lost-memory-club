@@ -1,51 +1,24 @@
-import {
-  FIRST_CLUE_ID,
-  FIRST_TAPE_ID,
-  MEMORY_ID,
-  SECOND_CLUE_ID,
-  SECOND_TAPE_ID,
-  SECRET_BOX_ID,
-  THIRD_CLUE_ID,
-  THIRD_TAPE_ID,
-  type EndingId,
-  type GameEvent,
-  type GameState,
-} from '../core/contracts';
-import { gameReducer } from '../core/gameReducer';
+import { MEMORY_ID, SECRET_BOX_ID, type GameEvent, type GameState } from '../core/contracts';
+import { ACT_LINKS, canCollectSecretBox, canCollectTape, canRestoreArchive } from '../core/progression';
 import { ACTS, ARCHIVE_TAPE } from './fragments/memoryCatalog';
+import { tapeTitle } from './fragments/narrativeText';
 import type { Language } from './i18n';
 import type { TapeDefinition } from './restoration/types';
 
-export const COLLECTIBLE_IDS = [FIRST_TAPE_ID, SECOND_TAPE_ID, THIRD_TAPE_ID, SECRET_BOX_ID] as const;
+export { isSecretEndingEligible, unlockedEndingIds } from '../core/progression';
 
-const TAPE_CLUES: ReadonlyArray<readonly [string, string]> = [
-  [FIRST_TAPE_ID, FIRST_CLUE_ID],
-  [SECOND_TAPE_ID, SECOND_CLUE_ID],
-  [THIRD_TAPE_ID, THIRD_CLUE_ID],
-];
+/** One thing the TV shelf can offer the player. */
+export type DeckOption =
+  | { kind: 'pickup'; tapeId: string }
+  | { kind: 'box' }
+  | { kind: 'archive' }
+  | { kind: 'replay'; tapeId: string };
 
+/** Maps a world or shelf object id to the event that collects it. Null for unknown ids. */
 export function collectEvent(id: string): GameEvent | null {
   if (id === SECRET_BOX_ID) return { type: 'SECRET_BOX_COLLECTED', boxId: SECRET_BOX_ID };
-  if (id === FIRST_TAPE_ID || id === SECOND_TAPE_ID || id === THIRD_TAPE_ID) return { type: 'TAPE_COLLECTED', tapeId: id };
+  if (ACT_LINKS.some((link) => link.tapeId === id)) return { type: 'TAPE_COLLECTED', tapeId: id };
   return null;
-}
-
-export function isCollected(state: GameState, id: string): boolean {
-  return id === SECRET_BOX_ID ? state.collectedSecrets.includes(id) : state.collectedTapes.includes(id);
-}
-
-/** Objects still in the room: not yet collected, and the story already lets the player take them (the reducer accepts it). */
-export function availableCollectibles(state: GameState): string[] {
-  return COLLECTIBLE_IDS.filter((id) => {
-    if (isCollected(state, id)) return false;
-    const event = collectEvent(id);
-    return event !== null && gameReducer(state, event) !== state;
-  });
-}
-
-function isWatched(state: GameState, tapeId: string): boolean {
-  const clue = TAPE_CLUES.find(([tape]) => tape === tapeId)?.[1];
-  return clue !== undefined && state.discoveredClues.includes(clue);
 }
 
 export function tapeById(id: string): TapeDefinition | null {
@@ -53,46 +26,93 @@ export function tapeById(id: string): TapeDefinition | null {
   return ACTS.find((act) => act.tape.id === id)?.tape ?? null;
 }
 
-/** The tape the VCR plays next: an unwatched tape the player holds, then Archive 09 once the arcade is beaten, else a replay. */
-export function nextTape(state: GameState): TapeDefinition | null {
-  for (const [tapeId] of TAPE_CLUES) {
-    if (state.collectedTapes.includes(tapeId) && !isWatched(state, tapeId)) return tapeById(tapeId);
+export function photoIdForTape(tapeId: string): string {
+  return `${tapeId}:${tapeId}-memory`;
+}
+
+export function isTapePhotoCaptured(state: GameState, tapeId: string): boolean {
+  return state.capturedPhotos.includes(photoIdForTape(tapeId));
+}
+
+function isWatched(state: GameState, tapeId: string): boolean {
+  const link = ACT_LINKS.find((entry) => entry.tapeId === tapeId);
+  return link !== undefined && state.discoveredClues.includes(link.clueId);
+}
+
+/**
+ * A tape the player already holds but has not watched yet. The TV plays it at once, so a player who
+ * closed the deck early can finish that tape before anything else.
+ */
+export function unwatchedHeldTape(state: GameState): TapeDefinition | null {
+  for (const link of ACT_LINKS) {
+    if (state.collectedTapes.includes(link.tapeId) && !isWatched(state, link.tapeId)) return tapeById(link.tapeId);
   }
-  if (state.completedArcades.length > 0) return ARCHIVE_TAPE;
-  const held = [...TAPE_CLUES].reverse().find(([tapeId]) => state.collectedTapes.includes(tapeId));
-  return held ? tapeById(held[0]) : null;
+  return null;
 }
 
-/** The KV-1996 hums with static while there is something new to play. */
-export function tvCalling(state: GameState): boolean {
-  if (TAPE_CLUES.some(([tapeId]) => state.collectedTapes.includes(tapeId) && !isWatched(state, tapeId))) return true;
-  return state.completedArcades.length > 0 && !state.restoredMemories.includes(MEMORY_ID);
+/** Everything the shelf inside the VHS deck can offer right now, in story order. */
+export function deckOptions(state: GameState): DeckOption[] {
+  const options: DeckOption[] = [];
+  for (const link of ACT_LINKS) {
+    if (canCollectTape(state, link.tapeId)) options.push({ kind: 'pickup', tapeId: link.tapeId });
+  }
+  if (canCollectSecretBox(state)) options.push({ kind: 'box' });
+  if (canRestoreArchive(state)) options.push({ kind: 'archive' });
+  for (const link of ACT_LINKS) {
+    if (state.collectedTapes.includes(link.tapeId) && isWatched(state, link.tapeId)) {
+      options.push({ kind: 'replay', tapeId: link.tapeId });
+    }
+  }
+  return options;
 }
 
-/** Final 3: all three tapes, arcade progress, the hidden box and Archive 09 restored. */
-export function secretEndingEligible(state: GameState): boolean {
-  return (
-    TAPE_CLUES.every(([tapeId]) => state.collectedTapes.includes(tapeId)) &&
-    state.collectedSecrets.includes(SECRET_BOX_ID) &&
-    state.completedArcades.length > 0 &&
-    state.restoredMemories.includes(MEMORY_ID)
-  );
+/** Label for a tape on the shelf, such as "Tape 02 · Oct 30 — The Mirror Match". */
+export function shelfTapeLabel(tapeId: string, language: Language): string {
+  const act = ACT_LINKS.find((link) => link.tapeId === tapeId);
+  const title = tapeTitle(tapeId, language);
+  if (!act) return title;
+  const number = String(act.act).padStart(2, '0');
+  return language === 'es' ? `Cinta ${number} \u00b7 ${title}` : `Tape ${number} \u00b7 ${title}`;
 }
 
-export function unlockedEndingIds(state: GameState): EndingId[] {
-  if (!state.restoredMemories.includes(MEMORY_ID)) return [];
-  const ids: EndingId[] = ['bittersweet-dawn', 'forever-1998'];
-  if (secretEndingEligible(state)) ids.push('archivists-truth');
-  return ids;
-}
-
-/** One short line at the top of the screen. */
+/**
+ * One short line at the top of the screen: the first step the player has not finished.
+ * The order matches the acts: take the tape, find its clue, beat its cabinet, then the archive.
+ */
 export function objectiveLine(state: GameState, language: Language): string {
   const es = language === 'es';
-  if (!state.collectedTapes.includes(FIRST_TAPE_ID)) return es ? '1. Recoge la cinta VHS del mostrador [E]' : '1. Pick up the VHS tape on the desk [E]';
-  if (!state.discoveredClues.includes(FIRST_CLUE_ID)) return es ? '2. Inserta la cinta en la videograbadora del televisor [E]' : '2. Insert the tape into the VCR under the TV [E]';
-  if (state.completedArcades.length === 0) return es ? '3. Explora la sala Arcade iluminada o busca la siguiente cinta' : '3. Explore the lit Arcade room or find the next tape';
-  if (!state.restoredMemories.includes(MEMORY_ID)) return es ? '4. Reproduce Archive 09 en el televisor KV-1996 [E]' : '4. Play Archive 09 on the KV-1996 [E]';
-  if (state.chosenEnding === null) return es ? '5. Decide c\u00f3mo termina el club' : '5. Decide how the club ends';
+  for (const link of ACT_LINKS) {
+    const number = link.act;
+    const game = ACTS.find((act) => act.gameId === link.gameId)?.gameName ?? link.gameId;
+    if (!state.collectedTapes.includes(link.tapeId)) {
+      if (link.act === 1) {
+        return es
+          ? '1. Abre la platina del televisor y recoge la primera cinta [E]'
+          : '1. Open the VCR at the TV and take the first tape [E]';
+      }
+      return es
+        ? `${number}. Abre la platina y recoge la cinta ${number} [E]`
+        : `${number}. Open the VCR and take tape ${number} [E]`;
+    }
+    if (!state.discoveredClues.includes(link.clueId)) {
+      return es
+        ? `${number}. Reproduce la cinta ${number} y encuentra la pista`
+        : `${number}. Play tape ${number} and find the clue`;
+    }
+    if (!state.completedArcades.includes(link.gameId)) {
+      return es ? `${number}. Juega ${game} en la recreativa [E]` : `${number}. Play ${game} in the arcade [E]`;
+    }
+  }
+  if (!state.restoredMemories.includes(MEMORY_ID)) {
+    return es ? '4. Reproduce Archivo 09 en la platina [E]' : '4. Play Archive 09 in the VCR [E]';
+  }
+  if (!state.collectedSecrets.includes(SECRET_BOX_ID)) {
+    return es
+      ? '5. Busca la caja de Julian y Maya en la platina [E]'
+      : '5. Look for Julian and Maya\u2019s box in the VCR [E]';
+  }
+  if (state.chosenEnding === null) {
+    return es ? '6. Decide c\u00f3mo termina el club' : '6. Decide how the club ends';
+  }
   return es ? 'Midnight Rentals duerme. Gracias por recordar.' : 'Midnight Rentals sleeps. Thank you for remembering.';
 }

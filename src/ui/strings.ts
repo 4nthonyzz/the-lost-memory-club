@@ -23,7 +23,11 @@ export interface ShellStrings {
     needTape: string;
     archiveLoaded: string;
     endingLocked: string;
+    boxCollected: string;
     reset: string;
+    calendarShifted: string;
+    arcadeAwakened: string;
+    polaroidDeveloped: string;
   };
   progress: {
     eyebrow: string;
@@ -152,7 +156,11 @@ const EN: UiStrings = {
       needTape: 'The VCR is empty. Find a tape first.',
       archiveLoaded: 'Archive 09 restored. Its tape is now in the deck.',
       endingLocked: 'Restore Archive 09 before opening the ending.',
+      boxCollected: 'Julian and Maya\u2019s box is in your hands. Keep it safe.',
       reset: 'Development save reset.',
+      calendarShifted: 'The wall clock has stopped at 31-09-98.',
+      arcadeAwakened: 'SNAKE.EXE has just switched on by itself.',
+      polaroidDeveloped: 'The Polaroid develops. Something is watching from the frame.',
     },
     progress: {
       eyebrow: 'FIELD NOTES',
@@ -243,7 +251,11 @@ const ES: UiStrings = {
       needTape: 'La videograbadora est\u00e1 vac\u00eda. Primero encuentra una cinta.',
       archiveLoaded: 'Archivo 09 restaurado. Su cinta ya est\u00e1 en la platina.',
       endingLocked: 'Restaura el Archivo 09 antes de abrir el final.',
+      boxCollected: 'La caja de Julian y Maya ya est\u00e1 en tus manos. G\u00e1rdala.',
       reset: 'Guardado de desarrollo reiniciado.',
+      calendarShifted: 'El reloj de la pared acaba de detenerse en 31-09-98.',
+      arcadeAwakened: 'La cabina SNAKE.EXE acaba de encenderse sola.',
+      polaroidDeveloped: 'La Polaroid se revela. Algo observa desde el encuadre.',
     },
     progress: {
       eyebrow: 'NOTAS DE CAMPO',

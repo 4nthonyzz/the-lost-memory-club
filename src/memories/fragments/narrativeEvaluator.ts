@@ -1,4 +1,5 @@
 import { MEMORY_ID, type GameState } from '../../core/contracts';
+import { isSecretEndingEligible } from '../../core/progression';
 import {
   ACTS,
   ARCHIVE_MEMORY_TEXT,
@@ -147,7 +148,8 @@ export function evaluateNarrativeState(gameState: GameState, extraProgress: Extr
   const archiveRestored = gameState.restoredMemories.includes(MEMORY_ID);
   const secretsFound = ACTS.filter((definition) => secretIds.has(definition.secret.id)).length;
   const perfectTracking = extraProgress.perfectTrackingArchive === true;
-  const eligible = archiveRestored && secretsFound === ACTS.length && perfectTracking;
+  // The secret ending follows the story gates in core: all tapes, cabinets, the box and three Polaroids.
+  const eligible = isSecretEndingEligible(gameState);
 
   if (archiveRestored) fragments.push({ id: `${MEMORY_ID}:memory`, title: 'Archive 09', text: ARCHIVE_MEMORY_TEXT });
   if (eligible) fragments.push({ id: `${MEMORY_ID}:truth`, title: 'The Archivist', text: ARCHIVE_TRUTH_TEXT });

@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { FIRST_CLUE_ID, FIRST_TAPE_ID, MEMORY_ID, SNAKE_GAME_ID, type GameEvent } from '../../core/contracts';
+import {
+  DEAD_FREQUENCY_GAME_ID,
+  FIRST_CLUE_ID,
+  FIRST_TAPE_ID,
+  MEMORY_ID,
+  SECOND_CLUE_ID,
+  SECOND_TAPE_ID,
+  SECRET_BOX_ID,
+  SHADOW_FIGHT_GAME_ID,
+  SNAKE_GAME_ID,
+  THIRD_CLUE_ID,
+  THIRD_TAPE_ID,
+  type GameEvent,
+} from '../../core/contracts';
 import { createInitialState, gameReducer } from '../../core/gameReducer';
 import { buildJournalModel } from './journalView';
 import { ACTS, ENDINGS } from './memoryCatalog';
@@ -21,11 +34,22 @@ const events: GameEvent[] = [
   { type: 'TAPE_COLLECTED', tapeId: FIRST_TAPE_ID },
   { type: 'VHS_CLUE_FOUND', tapeId: FIRST_TAPE_ID, clueId: FIRST_CLUE_ID },
   { type: 'ARCADE_WON', gameId: SNAKE_GAME_ID, score: 10 },
+  { type: 'TAPE_COLLECTED', tapeId: SECOND_TAPE_ID },
+  { type: 'VHS_CLUE_FOUND', tapeId: SECOND_TAPE_ID, clueId: SECOND_CLUE_ID },
+  { type: 'ARCADE_WON', gameId: SHADOW_FIGHT_GAME_ID, score: 10 },
+  { type: 'TAPE_COLLECTED', tapeId: THIRD_TAPE_ID },
+  { type: 'VHS_CLUE_FOUND', tapeId: THIRD_TAPE_ID, clueId: THIRD_CLUE_ID },
+  { type: 'ARCADE_WON', gameId: DEAD_FREQUENCY_GAME_ID, score: 10 },
   { type: 'MEMORY_RESTORED', memoryId: MEMORY_ID },
 ];
 const finished = events.reduce(gameReducer, createInitialState());
+/** Box and the three Polaroids, the last gates of the secret ending. */
+const secretGates: GameEvent[] = [
+  { type: 'SECRET_BOX_COLLECTED', boxId: SECRET_BOX_ID },
+  ...[FIRST_TAPE_ID, SECOND_TAPE_ID, THIRD_TAPE_ID].map((tapeId): GameEvent => ({ type: 'PHOTO_CAPTURED', tapeId, photoId: `${tapeId}-memory` })),
+];
 
-const everything = evaluateNarrativeState(finished, {
+const everything = evaluateNarrativeState(secretGates.reduce(gameReducer, finished), {
   collectedTapes: ACTS.map((act) => act.tape.id),
   discoveredClues: ACTS.map((act) => act.clueId),
   completedGames: ACTS.map((act) => act.gameId),
@@ -108,7 +132,7 @@ describe('buildJournalModel', () => {
   it('builds English and Spanish journals from GameState v1', () => {
     const english = buildJournalModel(finished, {}, 'en');
     const spanish = buildJournalModel(finished, {}, 'es');
-    expect(english.entries.map((entry) => entry.kind)).toEqual(['memory', 'clue', 'archive']);
+    expect(english.entries.map((entry) => entry.kind)).toEqual(['memory', 'clue', 'memory', 'clue', 'memory', 'clue', 'archive']);
     expect(spanish.entries.map((entry) => entry.id)).toEqual(english.entries.map((entry) => entry.id));
     expect(spanish.entries[0]!.text).not.toBe(english.entries[0]!.text);
     expect(english.totalEntries).toBe(8);
@@ -116,13 +140,10 @@ describe('buildJournalModel', () => {
 
   it('exposes localized endings, adding the secret ending only when earned', () => {
     expect(buildJournalModel(finished, {}, 'es').endings.map((ending) => ending.id)).toEqual(['bittersweet-dawn', 'forever-1998']);
-    const extra = {
-      minigameSecrets: ACTS.map((act) => act.secret.id),
-      perfectTrackingArchive: true,
-    };
-    const secret = buildJournalModel(finished, extra, 'es').endings;
+    const earned = secretGates.reduce(gameReducer, finished);
+    const secret = buildJournalModel(earned, {}, 'es').endings;
     expect(secret.map((ending) => ending.id)).toContain('archivists-truth');
-    expect(secret.find((ending) => ending.id === 'archivists-truth')?.title).toBe('La verdad del Archivista');
+    expect(secret.find((ending) => ending.id === 'archivists-truth')?.title).toBe('El recuerdo que vive');
   });
 
   it('returns an empty journal for a new game', () => {
